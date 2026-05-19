@@ -1,0 +1,127 @@
+.fx-pulse {
+    animation: fxPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes fxPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+}
+
+.fx-pop {
+    animation: fxPop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes fxPop {
+    0% { transform: scale(0.6); opacity: 0; }
+    60% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); }
+}
+
+.fx-flip {
+    perspective: 800px;
+    transform-style: preserve-3d;
+    animation: fxFlip 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes fxFlip {
+    from { transform: rotateY(180deg); opacity: 0.4; }
+    to { transform: rotateY(0); opacity: 1; }
+}
+
+.fx-shake {
+    animation: fxShake 0.4s ease;
+}
+
+@keyframes fxShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+
+.fx-glow {
+    box-shadow: 0 0 0 0 currentColor;
+    animation: fxGlow 1.4s ease-in-out infinite;
+}
+
+@keyframes fxGlow {
+    0%, 100% { box-shadow: 0 0 12px color-mix(in srgb, currentColor, transparent 70%); }
+    50% { box-shadow: 0 0 28px color-mix(in srgb, currentColor, transparent 50%); }
+}
+
+.fx-ripple {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.fx-ripple::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.35) 0%, transparent 50%);
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    pointer-events: none;
+}
+
+.fx-ripple:active::after {
+    opacity: 1;
+    transform: scale(1.4);
+    transition: opacity 0s;
+}
+
+.fx-particles {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.fx-particles span {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: fxConfetti 1.2s ease-out forwards;
+    opacity: 0.9;
+}
+
+@keyframes fxConfetti {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx, 0), var(--dy, -120px)) scale(0.4); opacity: 0; }
+}
+
+.fx-number-roll {
+    display: inline-block;
+    transition: transform 0.18s ease;
+}
+
+.fx-number-roll.bumping {
+    animation: fxNumberBump 0.35s ease;
+}
+
+@keyframes fxNumberBump {
+    0% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+    100% { transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fx-pulse, .fx-pop, .fx-flip, .fx-shake, .fx-glow, .fx-particles span, .fx-number-roll {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+.gampo-reduce-motion .fx-pulse,
+.gampo-reduce-motion .fx-pop,
+.gampo-reduce-motion .fx-flip,
+.gampo-reduce-motion .fx-shake,
+.gampo-reduce-motion .fx-glow,
+.gampo-reduce-motion .fx-particles span,
+.gampo-reduce-motion .fx-number-roll {
+    animation: none !important;
+    transition: none !important;
+}

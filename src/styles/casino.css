@@ -1,0 +1,913 @@
+.casino-page {
+    height: 100%;
+    overflow: auto;
+    padding: 24px;
+    background:
+        linear-gradient(180deg, rgba(6, 20, 28, 0.42), rgba(26, 44, 56, 0.98)),
+        var(--bg-primary);
+}
+
+.casino-hero,
+.section-hero {
+    max-width: 1380px;
+    margin: 0 auto 18px;
+    min-height: 310px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 24px;
+    align-items: stretch;
+}
+
+.casino-hero-copy,
+.section-hero {
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        linear-gradient(90deg, rgba(15, 33, 46, 0.94), rgba(15, 33, 46, 0.74), rgba(15, 33, 46, 0.36)),
+        url('/example-assets/xaxino/frontend/6305cef1a72c51661325041.jpg') center / cover;
+    padding: 34px;
+    overflow: hidden;
+}
+
+.section-hero {
+    min-height: 220px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+}
+
+.casino-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent-green);
+    font-size: 12px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+}
+
+.casino-hero h1,
+.section-hero h1 {
+    margin: 0 0 14px;
+    color: var(--text-primary);
+    font-size: clamp(48px, 7vw, 88px);
+    line-height: 0.92;
+    letter-spacing: 0;
+}
+
+.section-hero h1 {
+    font-size: clamp(40px, 5vw, 68px);
+}
+
+.casino-hero p,
+.section-hero p {
+    margin: 0;
+    max-width: 720px;
+    color: var(--text-secondary);
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+.casino-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+}
+
+.casino-action {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 900;
+    padding: 0 15px;
+    cursor: pointer;
+}
+
+.casino-action.primary {
+    background: var(--accent-green);
+    color: #071109;
+    border-color: transparent;
+}
+
+.casino-bank-panel {
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, #0f212e, #142836);
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.casino-bank-panel > div:first-child span,
+.casino-stat-grid span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.casino-bank-panel > div:first-child strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 36px;
+    margin-top: 6px;
+}
+
+.casino-progress {
+    height: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.casino-progress span,
+.casino-progress i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-green), #41d6ff);
+}
+
+.casino-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 9px;
+}
+
+.casino-stat-grid div {
+    border-radius: 8px;
+    background: rgba(47, 69, 83, 0.66);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 12px;
+}
+
+.casino-stat-grid strong {
+    display: block;
+    color: var(--text-primary);
+    margin-top: 4px;
+    font-size: 17px;
+}
+
+.casino-strip {
+    max-width: 1380px;
+    margin: 0 auto 18px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.collection-tile {
+    min-height: 116px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--accent), transparent 78%), rgba(15, 33, 46, 0.96));
+    color: inherit;
+    text-decoration: none;
+    padding: 16px;
+}
+
+.collection-tile span,
+.rail-block h3,
+.studio-table span,
+.mission-card span,
+.lesson-grid span,
+.vip-panel > div:first-child span,
+.activity-table span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.collection-tile span {
+    color: var(--text-primary);
+    font-size: 16px;
+}
+
+.collection-tile p {
+    color: var(--text-secondary);
+    margin: 8px 0 0;
+    line-height: 1.45;
+    font-size: 13px;
+}
+
+.casino-workspace {
+    max-width: 1380px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 18px;
+    align-items: start;
+}
+
+.casino-toolbar {
+    display: grid;
+    grid-template-columns: minmax(260px, 360px) 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.casino-search {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    padding: 0 12px;
+}
+
+.casino-search input {
+    width: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.casino-filters {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+}
+
+.casino-filters button {
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    padding: 0 14px;
+    font-weight: 900;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.casino-filters button.active {
+    background: rgba(0, 231, 1, 0.12);
+    border-color: var(--accent-green);
+    color: var(--text-primary);
+}
+
+.casino-game-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
+}
+
+.category-row {
+    max-width: 1380px;
+    margin: 0 auto 22px;
+}
+
+.category-row > header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.category-row h2 {
+    color: var(--text-primary);
+    font-size: 18px;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.category-row > header a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 800;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.category-row > header a:hover {
+    color: var(--accent-green);
+}
+
+.category-scroll {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+}
+
+.category-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.category-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+}
+
+.category-card {
+    flex: 0 0 168px;
+    scroll-snap-align: start;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(47, 69, 83, 0.84), rgba(15, 33, 46, 0.98));
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    padding-bottom: 8px;
+}
+
+.category-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--accent), transparent 70%);
+}
+
+.category-art {
+    position: relative;
+    height: 200px;
+    display: grid;
+    place-items: center;
+    background:
+        radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--accent), transparent 50%), rgba(15, 33, 46, 0.95) 70%),
+        linear-gradient(135deg, color-mix(in srgb, var(--accent), transparent 65%), rgba(15, 33, 46, 0.92));
+    overflow: hidden;
+}
+
+.category-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.category-art span {
+    color: var(--text-primary);
+    font-size: 32px;
+    font-weight: 950;
+    letter-spacing: 0.04em;
+}
+
+.category-glow {
+    position: absolute;
+    bottom: -30%;
+    left: -10%;
+    width: 140%;
+    height: 70%;
+    background: radial-gradient(ellipse at center, color-mix(in srgb, var(--accent), transparent 60%), transparent 70%);
+    pointer-events: none;
+}
+
+.category-card h3 {
+    color: var(--text-primary);
+    font-size: 14px;
+    margin: 8px 10px 2px;
+}
+
+.category-card small {
+    color: var(--text-secondary);
+    margin: 0 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.verify-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+.verify-toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 14px;
+    background: rgba(15, 33, 46, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    margin-bottom: 14px;
+}
+
+.verify-toolbar > div,
+.verify-toolbar > label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.verify-toolbar span {
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
+.verify-toolbar code {
+    color: var(--accent-green);
+    font-size: 12px;
+    word-break: break-all;
+}
+
+.verify-client input {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.verify-client button {
+    margin-top: 6px;
+    border: none;
+    background: var(--accent-green);
+    color: #071109;
+    font-weight: 900;
+    font-size: 12px;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+.verify-actions {
+    flex-direction: row !important;
+    gap: 8px;
+    align-self: end;
+}
+
+.verify-section-title {
+    color: var(--text-primary);
+    font-size: 14px;
+    margin: 14px 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.verify-composite {
+    word-break: break-all;
+    color: var(--text-secondary);
+    font-size: 10px;
+}
+
+.verify-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 33, 46, 0.6);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.verify-card span {
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
+.verify-card code {
+    color: var(--accent-green);
+    font-size: 11px;
+    word-break: break-all;
+}
+
+.verify-card small {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.verify-card strong {
+    margin-top: auto;
+    font-weight: 900;
+}
+
+.verify-card strong.positive {
+    color: var(--accent-green);
+}
+
+.verify-card strong.negative {
+    color: var(--accent-red);
+}
+
+.race-board {
+    display: grid;
+    gap: 8px;
+}
+
+.race-row {
+    display: grid;
+    grid-template-columns: 36px 1fr 140px 140px;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 33, 46, 0.66);
+    border-radius: 8px;
+}
+
+.race-row.you {
+    border-color: var(--accent-green);
+    background: rgba(0, 231, 1, 0.08);
+}
+
+.promotions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+}
+
+.promotion-card {
+    position: relative;
+    background: linear-gradient(180deg, rgba(47, 69, 83, 0.84), rgba(15, 33, 46, 0.98));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 18px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.promotion-card::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 160px;
+    height: 160px;
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent), transparent 50%), transparent 70%);
+    pointer-events: none;
+}
+
+.promotion-badge {
+    align-self: flex-start;
+    background: color-mix(in srgb, var(--accent), transparent 75%);
+    color: var(--accent);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 950;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.promotion-kicker {
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+}
+
+.promotion-card h2 {
+    color: var(--text-primary);
+    font-size: 18px;
+    margin: 0;
+}
+
+.promotion-card p {
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0;
+    flex: 1;
+}
+
+.promotion-card .casino-action {
+    align-self: flex-start;
+    margin-top: 4px;
+}
+
+.race-rank {
+    color: var(--accent-green);
+    font-weight: 950;
+    font-size: 18px;
+}
+
+.race-volume {
+    color: var(--text-primary);
+    font-weight: 900;
+    text-align: right;
+}
+
+.race-prize {
+    color: var(--text-secondary);
+    font-weight: 800;
+    text-align: right;
+}
+
+@media (max-width: 760px) {
+    .race-row {
+        grid-template-columns: 28px 1fr;
+    }
+    .race-volume,
+    .race-prize {
+        text-align: left;
+        grid-column: 2;
+    }
+}
+
+.casino-game-card {
+    min-height: 306px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(47, 69, 83, 0.84), rgba(15, 33, 46, 0.98));
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.16s ease, border-color 0.16s ease;
+}
+
+.casino-game-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+}
+
+.casino-game-art {
+    height: 150px;
+    display: grid;
+    place-items: center;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--accent), transparent 72%), rgba(15, 33, 46, 0.92));
+    overflow: hidden;
+}
+
+.casino-game-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.casino-game-art span {
+    color: var(--text-primary);
+    font-size: 26px;
+    font-weight: 950;
+}
+
+.casino-game-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+}
+
+.casino-game-body span {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.casino-game-body h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 18px;
+}
+
+.casino-game-body div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+}
+
+.casino-game-body b {
+    border-radius: 999px;
+    background: rgba(15, 33, 46, 0.82);
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 5px 7px;
+}
+
+.casino-rail {
+    position: sticky;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.rail-block,
+.studio-table,
+.mission-card,
+.lesson-grid article,
+.vip-panel article,
+.activity-table,
+.vip-panel > div:first-child {
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--bg-secondary);
+}
+
+.rail-block {
+    padding: 14px;
+}
+
+.rail-block h3 {
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+}
+
+.rail-link,
+.activity-mini {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 0;
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rail-link span,
+.activity-mini span {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.rail-link strong,
+.activity-mini strong {
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.mini-progress {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.mini-progress span,
+.muted {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.mini-progress div {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.mini-progress i {
+    display: block;
+    height: 100%;
+    background: var(--accent-green);
+}
+
+.studio-grid,
+.mission-grid,
+.lesson-grid,
+.vip-panel {
+    max-width: 1380px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+}
+
+.studio-table,
+.mission-card,
+.lesson-grid article,
+.vip-panel article,
+.vip-panel > div:first-child {
+    padding: 18px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.studio-table h2,
+.mission-card h2,
+.lesson-grid h2,
+.vip-panel h2 {
+    margin: 6px 0 8px;
+    color: var(--text-primary);
+    font-size: 20px;
+}
+
+.studio-table p,
+.mission-card p,
+.lesson-grid p,
+.vip-panel p {
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin: 0 0 16px;
+}
+
+.studio-table div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.studio-table b {
+    border-radius: 999px;
+    background: rgba(0, 231, 1, 0.1);
+    color: var(--accent-green);
+    padding: 6px 8px;
+    font-size: 12px;
+}
+
+.vip-panel > div:first-child strong {
+    display: block;
+    color: var(--accent-green);
+    font-size: 32px;
+    margin-top: 6px;
+}
+
+.vip-panel article.unlocked {
+    border-color: rgba(0, 231, 1, 0.35);
+}
+
+.vip-panel small {
+    display: block;
+    color: var(--text-secondary);
+    margin-top: 8px;
+}
+
+.activity-table {
+    max-width: 1380px;
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+.activity-table > div {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr) 130px;
+    gap: 12px;
+    padding: 13px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.activity-table strong {
+    color: var(--text-primary);
+}
+
+.positive {
+    color: var(--accent-green) !important;
+}
+
+.negative {
+    color: var(--accent-red) !important;
+}
+
+@media (max-width: 1180px) {
+    .casino-hero,
+    .casino-workspace,
+    .section-hero {
+        grid-template-columns: 1fr;
+    }
+
+    .casino-rail {
+        position: static;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 780px) {
+    .casino-page {
+        padding: 14px;
+    }
+
+    .casino-hero-copy,
+    .section-hero {
+        padding: 24px;
+    }
+
+    .casino-strip,
+    .casino-toolbar,
+    .casino-rail,
+    .casino-stat-grid,
+    .activity-table > div {
+        grid-template-columns: 1fr;
+    }
+}

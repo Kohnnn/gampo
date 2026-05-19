@@ -1,0 +1,133 @@
+.education-panel {
+    background: linear-gradient(180deg, rgba(15, 33, 46, 0.96), rgba(26, 44, 56, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 16px;
+    color: var(--text-primary);
+    min-width: 280px;
+}
+
+.education-panel-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.education-panel-header span {
+    color: var(--accent-green);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.education-panel-header strong {
+    text-align: right;
+    font-size: 15px;
+}
+
+.education-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.education-grid div,
+.education-note {
+    background: rgba(47, 69, 83, 0.58);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.education-grid span,
+.education-note span {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+
+.education-grid strong,
+.education-note strong {
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.education-grid .positive,
+.education-note .positive {
+    color: var(--accent-green);
+}
+
+.education-grid .negative,
+.education-note .negative {
+    color: var(--accent-red);
+}
+
+.education-note {
+    margin-top: 10px;
+}
+
+.education-note p {
+    color: var(--text-secondary);
+    margin: 6px 0 0;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.education-note.compact {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.education-note.compact span {
+    margin: 0;
+}
+
+.core-education-dock {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 120;
+}
+
+.core-education-toggle {
+    border: none;
+    border-radius: 8px;
+    background: var(--accent-green);
+    color: #06120b;
+    font-weight: 900;
+    padding: 11px 14px;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+}
+
+.core-education-sheet {
+    position: absolute;
+    right: 0;
+    bottom: 52px;
+    width: min(360px, calc(100vw - 32px));
+    display: none;
+}
+
+.core-education-dock.open .core-education-sheet {
+    display: block;
+}
+
+@media (max-width: 760px) {
+    .education-panel {
+        min-width: 0;
+    }
+
+    .core-education-dock {
+        right: 12px;
+        bottom: 12px;
+    }
+}

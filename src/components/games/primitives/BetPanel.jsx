@@ -1,0 +1,207 @@
+// Stake/Rainbet-style bet panel with Manual / Auto / Strategy tabs.
+// Drives any game's bet flow. Provides:
+//   - Bet amount with ½ / 2× / Max controls
+//   - Auto tab: bet count, stop on profit/loss, single-win-greater-than,
+//     bet adjustments on win/loss
+//   - Strategy tab: simple Martingale / Reverse / Flat presets
+//   - Auto-play loop integration via onPlay callback
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Play, Pause, ChevronsRight, Settings, Sliders } from 'lucide-react'
+import { formatCredits } from '../../../utils/simulationMath'
+
+const TABS = ['manual', 'auto', 'strategy']
+
+export default function BetPanel({
+    balance,
+    minBet = 0.01,
+    maxBet = 10000,
+    initialBet = 5,
+    onPlay,
+    onStop,
+    runningRound,
+    actionLabel = 'Play',
+    disableAuto = false,
+    children, // game-specific controls injected into manual tab body
+    autoChildren, // optional extra auto controls
+}) {
+    const [tab, setTab] = useState('manual')
+    const [betAmount, setBetAmount] = useState(initialBet)
+    // Auto state
+    const [autoCount, setAutoCount] = useState(10)
+    const [autoInfinite, setAutoInfinite] = useState(false)
+    const [stopProfit, setStopProfit] = useState('')
+    const [stopLoss, setStopLoss] = useState('')
+    const [stopBigWin, setStopBigWin] = useState('')
+    const [onWinPct, setOnWinPct] = useState(0)
+    const [onWinReset, setOnWinReset] = useState(true)
+    const [onLossPct, setOnLossPct] = useState(0)
+    const [onLossReset, setOnLossReset] = useState(true)
+    // Strategy presets
+    const [strategy, setStrategy] = useState('flat')
+
+    const autoRunning = useRef(false)
+    const autoLeft = useRef(0)
+    const autoBaseBet = useRef(initialBet)
+    const sessionProfit = useRef(0)
+
+    const half = useCallback(() => setBetAmount(v => Math.max(minBet, Number((v / 2).toFixed(2)))), [minBet])
+    const double = useCallback(() => setBetAmount(v => Math.min(maxBet, Number((v * 2).toFixed(2)))), [maxBet])
+    const max = useCallback(() => setBetAmount(Math.max(minBet, Number(Math.min(maxBet, balance || 0).toFixed(2)))), [balance, maxBet, minBet])
+
+    const stopAuto = useCallback(() => {
+        autoRunning.current = false
+        autoLeft.current = 0
+        sessionProfit.current = 0
+        if (onStop) onStop()
+    }, [onStop])
+
+    const handlePlay = useCallback(async () => {
+        if (tab === 'manual') {
+            if (!onPlay) return
+            await onPlay({ betAmount, mode: 'manual' })
+            return
+        }
+        if (tab === 'strategy') {
+            // Strategy is just a single play with the strategy hint passed through
+            if (!onPlay) return
+            await onPlay({ betAmount, mode: 'strategy', strategy })
+            return
+        }
+        if (autoRunning.current) {
+            stopAuto()
+            return
+        }
+        autoRunning.current = true
+        autoLeft.current = autoInfinite ? Infinity : Math.max(1, Number(autoCount) || 1)
+        autoBaseBet.current = betAmount
+        sessionProfit.current = 0
+        let currentBet = betAmount
+        const limitProfit = Number(stopProfit)
+        const limitLoss = Number(stopLoss)
+        const limitBigWin = Number(stopBigWin)
+        while (autoRunning.current && autoLeft.current > 0) {
+            // safety: stop if balance can't cover bet
+            if ((balance || 0) < currentBet) {
+                stopAuto()
+                break
+            }
+            const result = await Promise.resolve(onPlay({ betAmount: currentBet, mode: 'auto' }))
+            const profit = Number(result?.profit) || 0
+            sessionProfit.current += profit
+            // stop conditions
+            if (Number.isFinite(limitProfit) && limitProfit > 0 && sessionProfit.current >= limitProfit) { stopAuto(); break }
+            if (Number.isFinite(limitLoss) && limitLoss > 0 && sessionProfit.current <= -limitLoss) { stopAuto(); break }
+            if (Number.isFinite(limitBigWin) && limitBigWin > 0 && profit >= limitBigWin) { stopAuto(); break }
+            // bet adjust
+            if (profit > 0) {
+                if (onWinReset) currentBet = autoBaseBet.current
+                else if (onWinPct) currentBet = Math.max(minBet, Number((currentBet * (1 + onWinPct / 100)).toFixed(2)))
+            } else if (profit < 0) {
+                if (onLossReset) currentBet = autoBaseBet.current
+                else if (onLossPct) currentBet = Math.max(minBet, Number((currentBet * (1 + onLossPct / 100)).toFixed(2)))
+            }
+            currentBet = Math.min(maxBet, currentBet)
+            if (autoLeft.current !== Infinity) autoLeft.current -= 1
+            // small breathing room so UI can render
+            await new Promise(res => setTimeout(res, 120))
+        }
+        autoRunning.current = false
+    }, [tab, onPlay, betAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto])
+
+    useEffect(() => () => { autoRunning.current = false }, [])
+
+    const isAutoLive = tab === 'auto' && autoRunning.current
+
+    return (
+        <div className="bp-panel">
+            <div className="bp-tabs">
+                {TABS.filter(t => t !== 'auto' || !disableAuto).map(t => (
+                    <button key={t} className={`bp-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
+                        {t === 'manual' ? <ChevronsRight size={14} /> : t === 'auto' ? <Settings size={14} /> : <Sliders size={14} />}
+                        <span>{t}</span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="bp-section">
+                <label className="bp-label">Bet Amount</label>
+                <div className="bp-bet-row">
+                    <input type="number" className="bp-bet-input" min={minBet} max={maxBet} step={0.5}
+                        value={betAmount}
+                        onChange={e => setBetAmount(Math.max(minBet, Number(e.target.value) || 0))}
+                    />
+                    <button className="bp-bet-btn" onClick={half}>½</button>
+                    <button className="bp-bet-btn" onClick={double}>2×</button>
+                    <button className="bp-bet-btn" onClick={max}>Max</button>
+                </div>
+                <div className="bp-bal-line">
+                    <span>Balance</span>
+                    <strong>{formatCredits(balance || 0)}</strong>
+                </div>
+            </div>
+
+            {tab === 'manual' && children && <div className="bp-section">{children}</div>}
+
+            {tab === 'auto' && (
+                <>
+                    <div className="bp-section">
+                        <label className="bp-label">Number of Bets</label>
+                        <div className="bp-row">
+                            <input type="number" min="1" className="bp-bet-input" value={autoInfinite ? 0 : autoCount} disabled={autoInfinite} onChange={e => setAutoCount(Math.max(1, Number(e.target.value) || 1))} />
+                            <button className={`bp-bet-btn ${autoInfinite ? 'active' : ''}`} onClick={() => setAutoInfinite(v => !v)}>∞</button>
+                        </div>
+                    </div>
+                    <div className="bp-section">
+                        <label className="bp-label">On Win</label>
+                        <div className="bp-row">
+                            <button className={`bp-bet-btn ${onWinReset ? 'active' : ''}`} onClick={() => setOnWinReset(true)}>Reset</button>
+                            <button className={`bp-bet-btn ${!onWinReset ? 'active' : ''}`} onClick={() => setOnWinReset(false)}>Increase</button>
+                            {!onWinReset && <input className="bp-bet-input" type="number" placeholder="%" value={onWinPct} onChange={e => setOnWinPct(Number(e.target.value) || 0)} />}
+                        </div>
+                    </div>
+                    <div className="bp-section">
+                        <label className="bp-label">On Loss</label>
+                        <div className="bp-row">
+                            <button className={`bp-bet-btn ${onLossReset ? 'active' : ''}`} onClick={() => setOnLossReset(true)}>Reset</button>
+                            <button className={`bp-bet-btn ${!onLossReset ? 'active' : ''}`} onClick={() => setOnLossReset(false)}>Increase</button>
+                            {!onLossReset && <input className="bp-bet-input" type="number" placeholder="%" value={onLossPct} onChange={e => setOnLossPct(Number(e.target.value) || 0)} />}
+                        </div>
+                    </div>
+                    <div className="bp-section">
+                        <label className="bp-label">Stop on Profit</label>
+                        <input className="bp-bet-input" type="number" placeholder="0 = off" value={stopProfit} onChange={e => setStopProfit(e.target.value)} />
+                    </div>
+                    <div className="bp-section">
+                        <label className="bp-label">Stop on Loss</label>
+                        <input className="bp-bet-input" type="number" placeholder="0 = off" value={stopLoss} onChange={e => setStopLoss(e.target.value)} />
+                    </div>
+                    <div className="bp-section">
+                        <label className="bp-label">Stop on Single Win ≥</label>
+                        <input className="bp-bet-input" type="number" placeholder="0 = off" value={stopBigWin} onChange={e => setStopBigWin(e.target.value)} />
+                    </div>
+                    {autoChildren}
+                </>
+            )}
+
+            {tab === 'strategy' && (
+                <div className="bp-section">
+                    <label className="bp-label">Strategy</label>
+                    <div className="bp-row">
+                        {['flat', 'martingale', 'reverse'].map(s => (
+                            <button key={s} className={`bp-bet-btn ${strategy === s ? 'active' : ''}`} onClick={() => setStrategy(s)}>{s}</button>
+                        ))}
+                    </div>
+                    <p className="bp-hint">Strategy is educational only. Negative EV applies the same as manual play.</p>
+                </div>
+            )}
+
+            <button className={`bp-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''}`}
+                disabled={runningRound && !isAutoLive}
+                onClick={handlePlay}
+            >
+                {isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {tab === 'auto' ? 'Start Autobet' : actionLabel}</>}
+            </button>
+        </div>
+    )
+}
