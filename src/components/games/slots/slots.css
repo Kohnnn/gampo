@@ -1,0 +1,102 @@
+.slots-stage {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: center;
+    transition: box-shadow 0.4s ease;
+}
+
+.slots-frame {
+    width: 100%;
+    max-width: 760px;
+    background:
+        linear-gradient(180deg, #2a3845, #0f212e),
+        radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.08), transparent 50%);
+    border: 4px solid;
+    border-image: linear-gradient(135deg, #ffe680, #b07a16 50%, #ffe680) 1;
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow:
+        inset 0 0 40px rgba(0, 0, 0, 0.6),
+        inset 0 4px 8px rgba(255, 255, 255, 0.08),
+        0 16px 36px rgba(0, 0, 0, 0.5);
+    position: relative;
+}
+
+.slots-frame::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, transparent 30%, rgba(255, 207, 90, 0.3) 50%, transparent 70%);
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.slots-grid {
+    display: grid;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 14px;
+    border-radius: 10px;
+    box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.6);
+    position: relative;
+}
+
+.slot-cell {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    color: var(--text-primary);
+    font-weight: 950;
+    font-size: 22px;
+    background: linear-gradient(160deg, #2a3845, #1a2c38);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+        inset 0 -12px 28px rgba(0, 0, 0, 0.32),
+        inset 0 4px 8px rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    position: relative;
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.2s, box-shadow 0.2s;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.slot-cell img {
+    max-width: 80%;
+    max-height: 80%;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+.slot-cell.reel-spin {
+    animation: slotSpin 0.18s linear infinite;
+    filter: blur(0.8px);
+}
+
+.slot-cell.reel-stop {
+    animation: slotLand 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.slot-cell.cluster-glow {
+    animation: clusterGlowSlots 1s ease-in-out infinite;
+    filter: brightness(1.3) saturate(1.2);
+    box-shadow:
+        0 0 28px rgba(255, 207, 90, 0.7),
+        inset 0 0 16px rgba(255, 207, 90, 0.5);
+    border-color: #ffe680;
+    z-index: 2;
+}
+
+@keyframes slotSpin {
+    from { transform: translateY(-12px); opacity: 0.7; }
+    to { transform: translateY(12px); opacity: 0.95; }
+}
+
+@keyframes slotLand {
+    from { transform: translateY(-30px) scale(0.92); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyfr

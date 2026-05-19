@@ -1,0 +1,10 @@
+[
+  {
+    "type": "console.error",
+    "text": "Warning: [antd: InputNumber] `addonBefore` is deprecated. Please use `Space.Compact` instead."
+  },
+  {
+    "type": "console.error",
+    "text": "Warning: [antd: Button.Group] `Button.Group` is deprecated. Please use `Space.Compact` instead."
+  }
+]

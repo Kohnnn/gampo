@@ -1,0 +1,68 @@
+.color-stage {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    align-items: center;
+    padding: 32px 12px;
+    position: relative;
+    transition: box-shadow 0.4s ease;
+    border-radius: 16px;
+}
+
+.color-spectrum {
+    width: min(360px, 75vw);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    position: relative;
+    background: conic-gradient(from 0deg, #e23d4f, #3d7dff, #00c781, #ffcf5a, #e23d4f);
+    border: 14px solid;
+    border-image: linear-gradient(135deg, #ffe680, #b07a16) 1;
+    box-shadow:
+        inset 0 0 0 8px rgba(15, 33, 46, 0.7),
+        inset 0 0 60px rgba(0, 0, 0, 0.3),
+        0 32px 80px rgba(0, 0, 0, 0.5);
+    transition: transform 1.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.color-spectrum::before {
+    content: '';
+    position: absolute;
+    inset: 30%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffe680, #b07a16 60%, #6f4a09 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    z-index: 1;
+}
+
+.color-pointer {
+    position: absolute;
+    top: 32px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-left: 18px solid transparent;
+    border-right: 18px solid transparent;
+    border-top: 32px solid #fff;
+    transform: translateX(-50%);
+    z-index: 3;
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.6));
+}
+
+.color-result-label {
+    color: var(--result-color, var(--text-primary));
+    font-size: 26px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 24px currentColor;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 10px 22px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+}
+
+.color-choices {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    

@@ -1,0 +1,114 @@
+.dice-stage {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    align-items: center;
+    padding: 24px 12px;
+    border-radius: 16px;
+    transition: box-shadow 0.4s ease;
+    position: relative;
+}
+
+.dice-track {
+    width: min(700px, 100%);
+    height: 80px;
+    border-radius: 999px;
+    position: relative;
+    background: linear-gradient(90deg, #ed4245 0%, #ed4245 30%, #ffcf5a 50%, #00e701 70%, #00e701 100%);
+    overflow: visible;
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    box-shadow:
+        inset 0 6px 16px rgba(0, 0, 0, 0.4),
+        0 12px 32px rgba(0, 0, 0, 0.4),
+        0 0 80px color-mix(in srgb, var(--accent), transparent 80%);
+}
+
+.dice-rule {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.dice-rule span {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+}
+
+.dice-rule span:nth-child(odd)::after {
+    content: attr(data-n);
+    position: absolute;
+    top: -22px;
+    left: -8px;
+    font-size: 10px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.7);
+    width: 20px;
+    text-align: center;
+}
+
+.dice-safe-zone {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    background: rgba(0, 231, 1, 0.4);
+    box-shadow: 0 0 16px rgba(0, 231, 1, 0.3) inset;
+    border-radius: 999px;
+    transition: width 0.3s, left 0.3s;
+}
+
+.dice-marker {
+    position: absolute;
+    z-index: 3;
+    top: -12px;
+    transform: translateX(-50%);
+    transition: left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dice-marker span {
+    display: block;
+    width: 10px;
+    height: 104px;
+    background: linear-gradient(180deg, #ffffff, #d8d8d8);
+    border-radius: 999px;
+    box-shadow:
+        0 0 22px rgba(255, 255, 255, 0.95),
+        0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.dice-marker.won span {
+    background: linear-gradient(180deg, #aaff8d, var(--accent-green));
+    box-shadow: 0 0 32px var(--accent-green), 0 6px 16px rgba(0, 231, 1, 0.6);
+    animation: diceWin 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dice-marker.lost span {
+    background: linear-gradient(180deg, #ff8a8a, var(--accent-red));
+    box-shadow: 0 0 32px var(--accent-red), 0 6px 16px rgba(237, 66, 69, 0.6);
+    animation: diceLoss 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes diceWin {
+    0% { transform: scaleY(0.6); }
+    50% { transform: scaleY(1.2); }
+    100% { transform: scaleY(1); }
+}
+
+@keyframes diceLoss {
+    0% { transform: scaleY(1); }
+    50% { transform: scaleY(0.7); }
+    100% { transform: scaleY(1); opacity: 0.7; }
+}
+
+.dice-outcome-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justif

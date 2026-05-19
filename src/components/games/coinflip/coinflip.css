@@ -1,0 +1,84 @@
+.coinflip-stage {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    align-items: center;
+    padding: 32px 12px;
+    transition: box-shadow 0.4s ease;
+    border-radius: 16px;
+}
+
+.coin3d-stage {
+    perspective: 1200px;
+    width: min(280px, 60vw);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    position: relative;
+}
+
+.coin3d {
+    width: 80%;
+    height: 80%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.85s cubic-bezier(0.2, 0.8, 0.2, 1);
+    filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.5));
+}
+
+.coin3d-stage.flipping .coin3d { animation: coinFlipBig 1s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@keyframes coinFlipBig {
+    0% { transform: rotateY(0) rotateX(0) translateY(0); }
+    50% { transform: rotateY(540deg) rotateX(20deg) translateY(-30px); }
+    100% { transform: rotateY(900deg) rotateX(15deg) translateY(0); }
+}
+
+.coin3d-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    backface-visibility: hidden;
+    background: radial-gradient(circle at 35% 30%, #fff8c0, #ffe680 40%, #c98e1e 75%, #6f4a09 100%);
+    display: grid;
+    place-items: center;
+    border: 6px solid #ffd766;
+    box-shadow: inset 0 -12px 32px rgba(0, 0, 0, 0.32);
+}
+
+.coin3d-face.back {
+    transform: rotateY(180deg);
+    background: radial-gradient(circle at 35% 30%, #fff2a8, #ffcf5a 40%, #b07a16 75%, #5b3c08 100%);
+}
+
+.coin3d-face img {
+    width: 75%;
+    height: 75%;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+.coin3d-edge {
+    position: absolute;
+    inset: 47% 0;
+    background: linear-gradient(180deg, #6f4a09, #b07a16, #6f4a09);
+    transform: rotateX(90deg);
+    border-radius: 50%;
+}
+
+.coin-choices {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.coin-choice {
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    padding: 14px;
+    color: var(--text-secondary);
+    font-weight: 900;
+    cursor: pointer;
+    
