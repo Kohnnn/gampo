@@ -99,4 +99,31 @@
     to { transform: translateY(0) scale(1); opacity: 1; }
 }
 
-@keyfr
+@keyframes clusterGlowSlots {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+
+.slots-paytable {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.slots-paytable span {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-secondary);
+}
+
+.slots-paytable strong {
+    color: #ffcf5a;
+    margin-left: 4px;
+    font-weight: 900;
+}
+

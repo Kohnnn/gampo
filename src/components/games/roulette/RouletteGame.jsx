@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
 import { BOARD_NUMBERS, WHEEL_ORDER, colorOf, makeBet } from './layout'
 import EducationPanel from '../../EducationPanel'
 import './roulette.css'
@@ -30,6 +30,7 @@ export default function RouletteGame() {
     const [ballRotation, setBallRotation] = useState(0)
     const [history, setHistory] = useState([])
     const [lastWon, setLastWon] = useState(null)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
 
     const totalStake = bets.reduce((sum, b) => sum + b.amount, 0)
 
@@ -71,11 +72,17 @@ export default function RouletteGame() {
             }
             const profit = totalReturn - totalStake
             if (totalReturn > 0) addWinnings(totalReturn, 'Roulette return')
+            const effectiveMult = totalStake > 0 ? totalReturn / totalStake : 0
             setResult(number)
             setLastWon(profit > 0)
             setSpinning(false)
             setHistory(prev => [number, ...prev].slice(0, 18))
-            playSound(profit > 0 ? 'win' : 'loss')
+            if (effectiveMult >= 5) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier: effectiveMult })
+            } else {
+                playSound(profit > 0 ? 'win' : 'loss')
+            }
             session.record({
                 id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                 label: `${number} ${colorOf(number)}`,
@@ -224,6 +231,7 @@ export default function RouletteGame() {
                     ))}
                 </div>
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={18 / 37} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

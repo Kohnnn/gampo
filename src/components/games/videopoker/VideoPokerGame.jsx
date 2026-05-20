@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './videopoker.css'
@@ -70,6 +70,7 @@ export default function VideoPokerGame() {
     const [outcomeKey, setOutcomeKey] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
     const [dealKey, setDealKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Video Poker')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
@@ -100,7 +101,12 @@ export default function VideoPokerGame() {
         setOutcomeKey(outcome.label)
         setBurstKey(k => k + 1)
         setDealKey(k => k + 1)
-        playSound(returnAmount > 0 ? 'win' : 'loss')
+        if (outcome.multiplier >= 9) {
+            playSound('bigwin')
+            setBigWin({ trigger: Date.now(), profit, multiplier: outcome.multiplier })
+        } else {
+            playSound(returnAmount > 0 ? 'win' : 'loss')
+        }
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
             label: outcome.label,
@@ -155,6 +161,7 @@ export default function VideoPokerGame() {
                 </div>
                 {outcomeKey && burstKey > 0 && <Particles key={burstKey} count={14} color="#8ae66e" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={9} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.45} payoutMultiplier={1.85} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

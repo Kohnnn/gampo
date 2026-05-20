@@ -54,4 +54,36 @@
         inset 0 4px 8px rgba(255, 255, 255, 0.6);
     border: 4px solid transparent;
     transition: transform 0.3s ease, border-color 0.3s ease;
-    position: rel
+    position: relative;
+}
+
+.war-card::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    pointer-events: none;
+}
+
+.war-card.win {
+    border-color: var(--accent-green);
+    transform: scale(1.08);
+    box-shadow: 0 0 40px rgba(0, 231, 1, 0.5), 0 24px 48px rgba(0, 0, 0, 0.4);
+}
+
+.war-card.loss {
+    border-color: var(--accent-red);
+    opacity: 0.7;
+    filter: grayscale(0.4);
+}
+
+.war-card.red { color: #c93237; }
+
+.war-versus {
+    color: var(--accent-green);
+    font-size: 36px;
+    font-weight: 950;
+    text-shadow: 0 0 20px rgba(0, 231, 1, 0.5);
+}
+

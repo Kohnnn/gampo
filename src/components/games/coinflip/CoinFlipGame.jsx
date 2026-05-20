@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession, Asset } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession, Asset } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './coinflip.css'
@@ -53,7 +53,7 @@ export default function CoinFlipGame() {
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={flipping} actionLabel="Flip Coin" onPlay={performPlay}>
+                <BetPanel balance={balance} initialBet={5} runningRound={flipping} actionLabel="Flip Coin" onPlay={performPlay} lastBet={null}>
                     <div className="bp-section">
                         <label className="bp-label">Pick</label>
                         <div className="coin-choices">

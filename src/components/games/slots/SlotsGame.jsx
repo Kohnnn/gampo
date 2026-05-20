@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, pickWeighted } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession, Asset } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession, Asset } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './slots.css'
@@ -61,6 +61,8 @@ export default function SlotsGame() {
     const [winningCells, setWinningCells] = useState([])
     const [burstKey, setBurstKey] = useState(0)
     const [lastWon, setLastWon] = useState(false)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
 
     const variantConfig = variant === 'lines'
         ? { rows: 3, cols: 5, paylines: [[0, 1, 2, 3, 4], [5, 6, 7, 8, 9], [10, 11, 12, 13, 14], [0, 6, 12, 8, 4], [10, 6, 2, 8, 14]] }
@@ -75,6 +77,7 @@ export default function SlotsGame() {
             resolve({ profit: 0 })
             return
         }
+        setLastBet(betAmount)
         playSound('tick')
         setRunning(true)
         setStoppedCols(0)
@@ -119,7 +122,12 @@ export default function SlotsGame() {
             setBurstKey(k => k + 1)
             setLastWon(returnAmount > 0)
             setRunning(false)
-            playSound(returnAmount > 0 ? 'win' : 'loss')
+            if (multiplier >= 5) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier })
+            } else {
+                playSound(returnAmount > 0 ? 'win' : 'loss')
+            }
             session.record({
                 id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                 label: `${multiplier}×`,
@@ -146,6 +154,7 @@ export default function SlotsGame() {
                     runningRound={running}
                     actionLabel="Spin Reels"
                     onPlay={performPlay}
+                    lastBet={lastBet}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Theme</label>
@@ -197,6 +206,7 @@ export default function SlotsGame() {
                 </div>
                 {burstKey > 0 && winningCells.length > 0 && <Particles key={burstKey} count={20} color="#ffcf5a" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.28} payoutMultiplier={2.4} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

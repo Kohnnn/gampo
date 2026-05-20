@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { clamp, formatCredits, limboWinChance } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './limbo.css'
@@ -20,6 +20,8 @@ export default function LimboGame() {
     const [lastWon, setLastWon] = useState(null)
     const [running, setRunning] = useState(false)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
     const chance = limboWinChance(target)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
@@ -28,6 +30,7 @@ export default function LimboGame() {
             resolve({ profit: 0 })
             return
         }
+        setLastBet(betAmount)
         playSound('tick')
         setRunning(true)
         const { roll: r } = nextRoll('limbo')
@@ -39,7 +42,12 @@ export default function LimboGame() {
         setLast(multiplier)
         setLastWon(won)
         setBurstKey(k => k + 1)
-        playSound(won ? 'win' : 'loss')
+        if (won && target >= 5) {
+            playSound('bigwin')
+            setBigWin({ trigger: Date.now(), profit, multiplier: target })
+        } else {
+            playSound(won ? 'win' : 'loss')
+        }
         session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${multiplier.toFixed(2)}×`, profit, betAmount, multiplier: won ? target : 0, meta: { target } })
         showToast(won ? 'win' : 'loss', won ? 'Target cleared' : 'Below target', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         setRunning(false)
@@ -62,13 +70,19 @@ export default function LimboGame() {
                     runningRound={running}
                     actionLabel="Run Limbo"
                     onPlay={performPlay}
+                    lastBet={lastBet}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Target Multiplier</label>
-                        <input type="number" min="1.01" max="100" step="0.1" value={target} onChange={e => setTarget(clamp(Number(e.target.value) || 1.01, 1.01, 100))} className="bp-bet-input" />
+                        <input type="number" min="1.01" max="100" step="0.1" value={target} onChange={event => setTarget(clamp(Number(event.target.value) || 1.01, 1.01, 100))} className="bp-bet-input" />
+                    </div>
+                    <div className="bp-quick-actions">
+                        {[1.5, 2, 5, 10, 50, 100].map(t => (
+                            <button key={t} onClick={() => setTarget(t)}>{t}×</button>
+                        ))}
                     </div>
                     <div className="bp-bal-line">
-                        <span>Hit Chance</span>
+                        <span>Estimated hit chance</span>
                         <strong>{(chance * 100).toFixed(2)}%</strong>
                     </div>
                 </BetPanel>
@@ -94,6 +108,7 @@ export default function LimboGame() {
                 </div>
                 <div className="limbo-target-label">Target {target.toFixed(2)}×</div>
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={chance} payoutMultiplier={target} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

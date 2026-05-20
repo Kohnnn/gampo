@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './tower.css'
@@ -29,6 +29,7 @@ export default function TowerGame() {
     const [phase, setPhase] = useState('idle') // idle | climbing
     const [fellAt, setFellAt] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
 
     const config = PRESETS[risk]
     const multiplier = Number(Math.pow(config.growth, level).toFixed(2))
@@ -77,7 +78,12 @@ export default function TowerGame() {
         const returnAmount = activeBet * multiplier
         const profit = returnAmount - activeBet
         addWinnings(returnAmount, 'Tower return')
-        playSound('win')
+        if (multiplier >= 5) {
+            playSound('bigwin')
+            setBigWin({ trigger: Date.now(), profit, multiplier })
+        } else {
+            playSound('win')
+        }
         setBurstKey(k => k + 1)
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
@@ -146,6 +152,7 @@ export default function TowerGame() {
                 </div>
                 {burstKey > 0 && phase === 'idle' && session.history[0]?.profit > 0 && <Particles key={burstKey} count={18} color="#41d6ff" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={Math.pow(config.safe, Math.max(1, level + 1))} payoutMultiplier={Math.max(1.28, multiplier)} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

@@ -84,4 +84,32 @@
     gap: 8px;
 }
 
-.rps-choice
+.rps-choice {
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    padding: 14px;
+    color: var(--text-secondary);
+    font-weight: 900;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+
+.rps-choice img { width: 56px; height: 56px; object-fit: contain; }
+
+.rps-choice:hover {
+    color: var(--text-primary);
+    border-color: #ef476f;
+    transform: translateY(-2px);
+}
+
+.rps-choice.active {
+    color: #ef476f;
+    border-color: #ef476f;
+    background: rgba(239, 71, 111, 0.12);
+    box-shadow: 0 0 16px rgba(239, 71, 111, 0.4);
+}
+

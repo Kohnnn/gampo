@@ -1,13 +1,14 @@
 // Stake/Rainbet-style bet panel with Manual / Auto / Strategy tabs.
 // Drives any game's bet flow. Provides:
 //   - Bet amount with ½ / 2× / Max controls
+//   - Quick actions: ½, 2×, Max, Min, Rebet last
 //   - Auto tab: bet count, stop on profit/loss, single-win-greater-than,
 //     bet adjustments on win/loss
 //   - Strategy tab: simple Martingale / Reverse / Flat presets
 //   - Auto-play loop integration via onPlay callback
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Play, Pause, ChevronsRight, Settings, Sliders } from 'lucide-react'
+import { Play, Pause, ChevronsRight, Settings, Sliders, RotateCcw } from 'lucide-react'
 import { formatCredits } from '../../../utils/simulationMath'
 
 const TABS = ['manual', 'auto', 'strategy']
@@ -24,6 +25,7 @@ export default function BetPanel({
     disableAuto = false,
     children, // game-specific controls injected into manual tab body
     autoChildren, // optional extra auto controls
+    lastBet = null,
 }) {
     const [tab, setTab] = useState('manual')
     const [betAmount, setBetAmount] = useState(initialBet)
@@ -48,6 +50,12 @@ export default function BetPanel({
     const half = useCallback(() => setBetAmount(v => Math.max(minBet, Number((v / 2).toFixed(2)))), [minBet])
     const double = useCallback(() => setBetAmount(v => Math.min(maxBet, Number((v * 2).toFixed(2)))), [maxBet])
     const max = useCallback(() => setBetAmount(Math.max(minBet, Number(Math.min(maxBet, balance || 0).toFixed(2)))), [balance, maxBet, minBet])
+    const min = useCallback(() => setBetAmount(minBet), [minBet])
+    const rebet = useCallback(() => {
+        if (lastBet && Number.isFinite(lastBet) && lastBet > 0) {
+            setBetAmount(Math.max(minBet, Math.min(maxBet, lastBet)))
+        }
+    }, [lastBet, maxBet, minBet])
 
     const stopAuto = useCallback(() => {
         autoRunning.current = false
@@ -134,6 +142,11 @@ export default function BetPanel({
                     <button className="bp-bet-btn" onClick={half}>½</button>
                     <button className="bp-bet-btn" onClick={double}>2×</button>
                     <button className="bp-bet-btn" onClick={max}>Max</button>
+                </div>
+                <div className="bp-quick-actions">
+                    <button onClick={min}>Min</button>
+                    <button onClick={() => setBetAmount(initialBet)}>Reset</button>
+                    <button onClick={rebet} disabled={!lastBet}><RotateCcw size={11} style={{ marginRight: 3 }} />Rebet</button>
                 </div>
                 <div className="bp-bal-line">
                     <span>Balance</span>

@@ -78,4 +78,56 @@
 .cc-lane.current .cc-mult { color: #ffcf5a; }
 .cc-lane.crossed .cc-mult { color: var(--accent-green); }
 
-.
+.cc-car {
+    position: absolute;
+    top: 50%;
+    left: -80px;
+    width: 64px;
+    height: 28px;
+    background: linear-gradient(135deg, #c93237, #6a151a);
+    border-radius: 6px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.2);
+    transform: translateY(-50%);
+    animation: ccCar 0.8s linear forwards;
+    pointer-events: none;
+    z-index: 4;
+}
+
+@keyframes ccCar {
+    from { left: -80px; }
+    to { left: calc(100% + 80px); }
+}
+
+.cc-action-btns {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    max-width: 460px;
+}
+
+.cc-action-btns button {
+    flex: 1;
+    height: 52px;
+    border-radius: 10px;
+    border: 2px solid var(--border-color);
+    background: linear-gradient(160deg, var(--bg-tertiary), rgba(15, 33, 46, 0.9));
+    color: var(--text-primary);
+    font-weight: 950;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.cc-action-btns button:hover:not(:disabled) { transform: translateY(-2px); }
+
+.cc-action-btns button.cc-cashout {
+    background: linear-gradient(160deg, rgba(0, 231, 1, 0.3), rgba(0, 100, 0, 0.2));
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+    text-shadow: 0 0 12px rgba(0, 231, 1, 0.4);
+}
+
+.cc-action-btns button:disabled { opacity: 0.4; cursor: not-allowed; }
+

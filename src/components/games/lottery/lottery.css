@@ -70,4 +70,45 @@
 
 .lot-grid button {
     aspect-ratio: 1;
-    border: 2px solid var(--border
+    border: 2px solid var(--border-color);
+    border-radius: 999px;
+    background: linear-gradient(160deg, var(--bg-tertiary), rgba(15, 33, 46, 0.9));
+    color: var(--text-secondary);
+    font-weight: 950;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.lot-grid button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    color: var(--text-primary);
+}
+
+.lot-grid button.selected {
+    color: var(--accent-green);
+    border-color: var(--accent-green);
+    box-shadow: 0 0 16px rgba(0, 231, 1, 0.4);
+}
+
+.lot-grid button.drawn {
+    background: radial-gradient(circle at 30% 25%, #ffe680, #c98e1e 75%);
+    color: #1a2c38;
+    border-color: rgba(255, 207, 90, 0.6);
+}
+
+.lot-grid button.hit {
+    background: radial-gradient(circle at 30% 25%, #aaff8d, var(--accent-green) 75%);
+    color: #052905;
+    border-color: var(--accent-green);
+    animation: lotHit 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: 0 0 24px rgba(0, 231, 1, 0.6);
+}
+
+@keyframes lotHit {
+    0% { transform: scale(0.6); }
+    60% { transform: scale(1.25); }
+    100% { transform: scale(1); }
+}
+
