@@ -63,24 +63,55 @@ This keeps `framer-motion` out of the home/lobby chunk. It only ships when the u
 | Crash           | CSS pulse + history dot enter                                                                         |
 | Plinko          | Drop-shadow + hit-flash on bins                                                                       |
 | Mines           | Hover lift + flip + bomb burst                                                                        |
-| **Dice**        | Batch 2: glowing marker, win-zone fill, NumberRoll, particle burst, audio                             |
-| **Limbo**       | Batch 2: rocket gauge, drifting starfield, NumberRoll, ring color shift, particle burst, audio        |
-| **Coin Flip**   | Batch 2: 3D rotateY coin (front/back+edge), 0.9s flip, particle ring, audio                           |
-| **Wheel**       | Batch 2: smooth 2.1s ease-out spin, biased landing, particle burst, audio                             |
-| **Color Pick**  | Batch 2: spinning spectrum disc with pointer, decelerating land, color paint result, audio            |
-| **Guess Number**| Batch 2: spinning orb, win/loss state shadow, sparkle particles, audio                                |
-| **RPS**         | Batch 2: side slam-in, winner scale, loser desaturate, push shake, particle burst, audio              |
-| **Hi-Lo**       | Batch 2: card flip, win/loss border, streak counter with fire flair at 3+, audio                      |
-| **Blackjack**   | Batch 3: real card render with rank+suit glyphs, staggered deal, hidden hole-card, chip-fly, 500-hand study runner |
-| **Baccarat**    | Batch 3: squeeze reveal (700ms delay), bead road (6 rows × N cols), win/loss flash, particles, audio  |
-| **Casino War**  | Batch 3: card slam from sides, Go-To-War tie option, win/loss flash, particles, audio                 |
-| **Video Poker** | Batch 3: paytable with current-win highlight, real card render, hold-pin animation, deal stagger, audio |
-| **Tower**       | Batch 4: parallax climb, current tile pulse, fall rotate-drop, cashout pulse, particles, audio        |
-| **Chicken Cross**| Batch 4: chicken sprite (hop/splat states), car flyby chrome, cashout pulse, particles, audio        |
-| **Lottery**     | Batch 4: tumbler shake + drop-by-drop ball reveal, hit cells gold scale-pop, sparkle particles, audio |
-| **Keno**        | Batch 4: drop-by-drop drawn balls (220ms apart), hit cells scale-pop with green glow, audio           |
-| **Sic Bo**      | Batch 4: cup shake → dice tumble out one by one, triple-win glow, win/loss flash, audio               |
-| **Slots**       | Batch 4: true reel-by-reel stop (220ms per col), cluster-glow on winning cells, particles, audio       |
-| **Roulette**    | Batch 4: real spinning wheel (37 segments, correct order), counter-rotating ball, decelerate to land, audio |
+| **Dice**        | Glowing marker, win-zone fill, NumberRoll, particle burst, audio, **BigWinOverlay (≥5×)**             |
+| **Limbo**       | Rocket gauge, drifting starfield, NumberRoll, particle burst, audio, **BigWinOverlay (≥5×)**          |
+| **Coin Flip**   | 3D rotateY coin (front/back+edge), 0.9s flip, particle ring, audio                                    |
+| **Wheel**       | Smooth 2.1s ease-out spin, biased landing, particle burst, audio, **BigWinOverlay (≥5×)**             |
+| **Color Pick**  | Spinning spectrum disc with pointer, decelerating land, color paint result, audio                     |
+| **Guess Number**| Spinning orb, win/loss state shadow, sparkle particles, audio, **BigWinOverlay (any 9.4× hit)**       |
+| **RPS**         | Side slam-in, winner scale, loser desaturate, push shake, particle burst, audio                       |
+| **Hi-Lo**       | Card flip, win/loss border, streak counter with fire flair at 3+, audio                               |
+| **Blackjack**   | Real card render, hidden hole-card, chip-fly, 500-hand study runner                                   |
+| **Baccarat**    | Squeeze reveal (700ms delay), bead road, win/loss flash, particles, audio                             |
+| **Casino War**  | Card slam from sides, Go-To-War tie option, win/loss flash, particles, audio                          |
+| **Video Poker** | Paytable highlight, real card render, hold-pin animation, deal stagger, audio, **BigWinOverlay (≥9×)**|
+| **Tower**       | Parallax climb, current tile pulse, fall rotate-drop, cashout pulse, particles, audio, **BigWinOverlay (≥5×)** |
+| **Chicken Cross**| Chicken sprite (hop/splat states), occasional car flyby chrome, cashout pulse, particles, audio      |
+| **Lottery**     | Tumbler shake + drop-by-drop ball reveal, hit cells gold scale-pop, sparkle particles, audio, **BigWinOverlay (≥8×)** |
+| **Keno**        | Drop-by-drop drawn balls, hit cells scale-pop with green glow, audio                                  |
+| **Sic Bo**      | Cup shake → dice tumble out one by one, triple-win glow, win/loss flash, audio                        |
+| **Slots**       | True reel-by-reel stop, cluster-glow on winning cells, particles, audio, **BigWinOverlay (≥5×)**      |
+| **Roulette**    | Real spinning wheel (37 segments, correct order), counter-rotating ball, decelerate landing, audio, **BigWinOverlay (effective ≥5×)** |
 
-All 19 simulator games are now visually upgraded. Crash / Plinko / Mines retain their original engine polish from earlier passes; deeper Phaser/Matter overhauls remain as future work in the roadmap.
+## BigWinOverlay tiers
+
+`<BigWinOverlay>` is a shared primitive at `src/components/games/primitives/BigWinOverlay.jsx`. When triggered above the configured `threshold`, it auto-classifies the multiplier into a tier:
+
+| Multiplier | Tier      | Visual                                |
+|-----------:|-----------|---------------------------------------|
+| 5×–14×     | BIG WIN   | gold border-image, 96px multiplier    |
+| 15×–49×    | HUGE WIN  | pink accent, 120px multiplier         |
+| 50×+       | MEGA WIN  | pink/violet border-image, 144px text  |
+
+Lifecycle: 0.6s pop-in, ~2.4s sustain, fade out. Non-blocking (`pointer-events: none`). Includes 24-particle radial burst with per-segment delay, plus a 3-second conic-gradient ray sweep (mix-blend `screen`).
+
+Trigger pattern in a game:
+
+```jsx
+const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+// after a win:
+if (multiplier >= 5) {
+    playSound('bigwin')
+    setBigWin({ trigger: Date.now(), profit, multiplier })
+}
+// in JSX:
+<BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+```
+
+The `trigger` prop is any monotonically increasing value (Date.now() works). `BigWinOverlay` auto-shows for 2.4s then hides; reuses the same component instance across plays.
+
+## Quick-action shortcuts
+
+`<BetPanel>` exposes a `bp-quick-actions` row of 3 buttons: **Min**, **Reset**, **Rebet**. The Rebet button is disabled when no `lastBet` prop is provided. Wire by tracking `lastBet` state in the game and passing it to `<BetPanel lastBet={lastBet} />`.
+
+The remaining games will be upgraded in batch 4; see `roadmap.md`.

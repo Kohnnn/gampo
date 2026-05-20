@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './wheel.css'
@@ -27,6 +27,8 @@ export default function WheelGame() {
     const [lastWon, setLastWon] = useState(null)
     const [spinning, setSpinning] = useState(false)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
     const segments = wheelPresets[risk]
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
@@ -35,6 +37,7 @@ export default function WheelGame() {
             resolve({ profit: 0 })
             return
         }
+        setLastBet(betAmount)
         playSound('tick')
         setSpinning(true)
         const { roll: r } = nextRoll('wheel')
@@ -52,7 +55,12 @@ export default function WheelGame() {
             setLastWon(won)
             setBurstKey(k => k + 1)
             setSpinning(false)
-            playSound(won ? 'win' : 'loss')
+            if (won && multiplier >= 5) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier })
+            } else {
+                playSound(won ? 'win' : 'loss')
+            }
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${multiplier}×`, profit, betAmount, multiplier, meta: { risk } })
             showToast(profit >= 0 ? 'win' : 'loss', `Wheel ${multiplier}×`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -76,6 +84,7 @@ export default function WheelGame() {
                     runningRound={spinning}
                     actionLabel="Spin Wheel"
                     onPlay={performPlay}
+                    lastBet={lastBet}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Risk</label>
@@ -110,6 +119,7 @@ export default function WheelGame() {
                 <div className="wheel-last">Last: {last === null ? '--' : `${last}×`}</div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={20} color="#ffcf5a" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={hitChance} payoutMultiplier={avgMultiplier} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

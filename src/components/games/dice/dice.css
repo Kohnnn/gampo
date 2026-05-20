@@ -111,4 +111,78 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justif
+    justify-content: center;
+}
+
+.dice-big {
+    color: var(--text-primary);
+    font-size: clamp(80px, 14vw, 160px);
+    font-weight: 950;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    text-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+    font-variant-numeric: tabular-nums;
+}
+
+.dice-big.win {
+    color: var(--accent-green);
+    text-shadow: 0 0 40px rgba(0, 231, 1, 0.7), 0 8px 24px rgba(0, 0, 0, 0.5);
+    animation: diceBigWin 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dice-big.loss {
+    color: var(--accent-red);
+    text-shadow: 0 0 30px rgba(237, 66, 69, 0.6);
+}
+
+@keyframes diceBigWin {
+    0% { transform: scale(0.6); opacity: 0; }
+    50% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.dice-meta-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    width: 100%;
+    max-width: 700px;
+    justify-content: space-between;
+}
+
+.dice-meta-card {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dice-meta-card span {
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.dice-meta-card strong {
+    color: var(--text-primary);
+    font-size: 22px;
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+}
+
+.dice-meta-card.target strong { color: var(--accent-green); }
+.dice-meta-card.payout strong { color: #ffcf5a; }
+.dice-meta-card.chance strong { color: #58a6ff; }
+
+.dice-slider {
+    width: 100%;
+    accent-color: var(--accent-green);
+    height: 8px;
+}
+

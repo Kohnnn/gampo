@@ -119,4 +119,48 @@
     grid-template-columns: 2fr 1fr;
     gap: 10px;
     width: 100%;
-    max-width: 82
+    max-width: 820px;
+}
+
+.bac-road-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 8px;
+    overflow-x: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.bac-road-card h4 {
+    margin: 0 0 6px;
+    color: #1a1a1a;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 900;
+}
+
+.bac-road-grid {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(6, 16px);
+    gap: 1px;
+}
+
+.bac-road-cell {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    box-sizing: border-box;
+}
+
+.bac-road-cell.banker { border-color: #9f252a; }
+.bac-road-cell.player { border-color: #1475e1; }
+.bac-road-cell.tie { background: #ffcf5a; border-color: #b07a16; }
+
+.bac-road-cell.dot-banker { background: #9f252a; }
+.bac-road-cell.dot-player { background: #1475e1; }
+.bac-road-cell.dot-red { background: #ed4245; }
+.bac-road-cell.dot-blue { background: #1475e1; }
+

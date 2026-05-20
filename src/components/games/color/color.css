@@ -65,4 +65,30 @@
 .color-choices {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    
+    gap: 8px;
+}
+
+.color-choice {
+    background: color-mix(in srgb, var(--swatch) 30%, var(--bg-tertiary));
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    padding: 14px;
+    color: var(--text-primary);
+    font-weight: 950;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.color-choice:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.2);
+}
+
+.color-choice.active {
+    border-color: var(--swatch);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--swatch) 40%, transparent), 0 0 24px color-mix(in srgb, var(--swatch) 40%, transparent);
+    background: color-mix(in srgb, var(--swatch) 50%, var(--bg-tertiary));
+}
+

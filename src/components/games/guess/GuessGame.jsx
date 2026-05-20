@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './guess.css'
@@ -20,10 +20,13 @@ export default function GuessGame() {
     const [spinning, setSpinning] = useState(false)
     const [lastWon, setLastWon] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
     const payout = 9.4
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Guess Number')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('tick')
         setSpinning(true)
         const next = Math.floor(nextRoll('guess').roll * 10)
@@ -36,7 +39,12 @@ export default function GuessGame() {
             setLastWon(won)
             setBurstKey(k => k + 1)
             setSpinning(false)
-            playSound(won ? 'win' : 'loss')
+            if (won) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier: payout })
+            } else {
+                playSound('loss')
+            }
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: String(next), profit, betAmount, multiplier: won ? payout : 0, meta: { picked: choice } })
             showToast(won ? 'win' : 'loss', won ? 'Number hit' : 'Number missed', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -52,7 +60,7 @@ export default function GuessGame() {
             accent="#4cc9f0"
             backdrop="/assets/games/backdrops/backdrop-stars.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={spinning} actionLabel="Reveal Number" onPlay={performPlay}>
+                <BetPanel balance={balance} initialBet={5} runningRound={spinning} actionLabel="Reveal Number" onPlay={performPlay} lastBet={lastBet}>
                     <div className="bp-section">
                         <label className="bp-label">Pick a number 0-9</label>
                         <div className="guess-pick">
@@ -73,6 +81,7 @@ export default function GuessGame() {
                 <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>You picked <strong>{choice}</strong> — hit chance 10%</p>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={18} color="#41d6ff" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.1} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { dicePayout, formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './dice.css'
@@ -21,6 +21,8 @@ export default function DiceGame() {
     const [lastWon, setLastWon] = useState(null)
     const [running, setRunning] = useState(false)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
     const payout = dicePayout(winChance / 100)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
@@ -29,6 +31,7 @@ export default function DiceGame() {
             resolve({ profit: 0 })
             return
         }
+        setLastBet(betAmount)
         playSound('tick')
         setRunning(true)
         const { roll: r } = nextRoll('dice')
@@ -40,7 +43,17 @@ export default function DiceGame() {
         setLastRoll(roll)
         setLastWon(won)
         setBurstKey(k => k + 1)
-        playSound(won ? 'win' : 'loss')
+        if (won) {
+            const tier = payout >= 50 ? 'mega' : payout >= 15 ? 'huge' : payout >= 5 ? 'big' : null
+            if (tier) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier: payout })
+            } else {
+                playSound('win')
+            }
+        } else {
+            playSound('loss')
+        }
         session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: roll.toFixed(2), profit, betAmount, multiplier: won ? payout : 0, meta: { winChance, rollMode } })
         showToast(won ? 'win' : 'loss', won ? 'Dice hit' : 'Dice miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         setRunning(false)
@@ -62,6 +75,7 @@ export default function DiceGame() {
                     runningRound={running}
                     actionLabel="Roll Dice"
                     onPlay={performPlay}
+                    lastBet={lastBet}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Win Chance: {winChance}%</label>
@@ -101,4 +115,20 @@ export default function DiceGame() {
                 <div className="dice-meta-row">
                     <div className="dice-meta-card target">
                         <span>{rollMode === 'under' ? 'Roll Under' : 'Roll Over'}</span>
-         
+                        <strong>{rollMode === 'under' ? winChance.toFixed(2) : (100 - winChance).toFixed(2)}</strong>
+                    </div>
+                    <div className="dice-meta-card chance">
+                        <span>Win Chance</span>
+                        <strong>{winChance.toFixed(2)}%</strong>
+                    </div>
+                    <div className="dice-meta-card payout">
+                        <span>Multiplier</span>
+                        <strong>{payout.toFixed(2)}×</strong>
+                    </div>
+                </div>
+            </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <EducationPanel definition={definition} betAmount={5} winProbability={winChance / 100} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
+        </GameShell>
+    )
+}

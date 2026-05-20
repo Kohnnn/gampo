@@ -1,8 +1,112 @@
 # Changelog
 
+## 2026-05 - Phase 8: BigWinOverlay, polish, quick actions
+
+Build mode: yes. Compliance: still fake-credit only.
+
+### New shared primitive: BigWinOverlay
+
+- Full-screen win-celebration overlay with three tiers based on multiplier:
+  - **BIG WIN** (≥5×) — gold rays, gold border-image, 96px multiplier text
+  - **HUGE WIN** (≥15×) — pink accent, 120px text
+  - **MEGA WIN** (≥50×) — purple/pink border-image, 144px text, brighter halo
+- 24-particle radial burst with per-segment delay
+- Bevel-bordered card with brass border-image
+- Conic-gradient ray sweep (3s rotation)
+- 2.4s lifecycle with fade in/out
+- Auto-dismiss + non-blocking (`pointer-events: none`)
+
+### Quick-action shortcuts in BetPanel
+
+New `bp-quick-actions` row below bet input:
+- **Min** — drop to minBet
+- **Reset** — back to initialBet
+- **Rebet** — repeat last bet (icon-prefixed; disabled when no last bet)
+- Existing ½ / 2× / Max remain on the main row
+
+### Games wired with BigWinOverlay + lastBet (rebet)
+
+| Game | Threshold | Notes |
+|------|-----------|-------|
+| **Dice** | 5× | Tier auto-derived from `dicePayout` |
+| **Limbo** | 5× | Triggers when target ≥ 5 and won |
+| **Wheel** | 5× | Triggers on segments ≥ 5× |
+| **Roulette** | 5× | Effective multiplier = totalReturn / totalStake |
+| **Slots** | 5× | Sum of paylines/cluster |
+| **Tower** | 5× | On cashout multiplier |
+| **Lottery** | 8× | Threshold tied to 3-of-5 hit (8×) |
+| **Video Poker** | 9× | Full-house tier and above |
+| **Guess Number** | 5× | 9.4× payout always triggers |
+
+Slots, Wheel, Roulette also play the new `bigwin` 16-bit synth cue (8-step ascending arpeggio + sustain) instead of the standard `win` tone when threshold is hit.
+
+### Audio
+
+`bigwin` cue from earlier pass kept; now triggered consistently across the games above. Default mute behavior unchanged.
+
+### Bundle
+
+| Chunk | Size | Gzip |
+|-------|-----:|-----:|
+| `index.js` (initial) | 76.81 KB | 23.94 KB |
+| `react-vendor` | 163.90 KB | 53.50 KB |
+| `chart` | 207.43 KB | 71.20 KB |
+| `antd-vendor` (lazy) | 659.71 KB | 212.70 KB |
+| `phaser` (lazy) | 1,478.41 KB | 339.65 KB |
+| All other chunks | < 80 KB | < 18 KB |
+
+No regressions; chunks under 1500 KB warning. BigWinOverlay adds ~1 KB minified to the shared primitives bundle.
+
+### Tests
+
+- 26/26 passing across 5 test files (`simulationMath`, `originalsMath`, `blackjackStrategy`, `fairRng`, `sportsApi`).
+
+### Documentation
+
+- `docs/changelog.md` — this entry.
+- `docs/animations.md` — BigWinOverlay tiers and trigger thresholds added.
+
+### Known limitations / next pass
+
+- Roulette chip-stack visualization (drag-stacking discs on cells) deferred — still uses single chip badge.
+- BigWinOverlay not yet wired into Crash, Plinko, Mines, Baccarat, Sic Bo, Hi-Lo, Casino War, Color, RPS, Coin Flip — these remain as quick win to backport in the next pass.
+- Plinko/Crash/Mines visual asset wiring (rocket, gem, bomb sprites) deferred.
+
 ## 2026-05 - Phase 7: assets generated, per-game refactor, live poker
 
-Build mode: yes. Compliance: still fake-credit only. All bitmap art generated locally via 9Router `cx/gpt-5.5-image`; no third-party brand assets, no operator logos.
+(see prior entries below)
+
+### Asset pipeline (Phase 1)
+
+- `.env.local` extended with `NINEROUTER_URL` / `NINEROUTER_KEY` aliases.
+- `scripts/genAssets.js` patched to auto-load `.env.local` and prefer `cx/gpt-5.5-image`.
+- 94 PNGs generated.
+
+### Shared primitives + per-game refactor
+
+- `<GameShell>`, `<BetPanel>`, `<HistoryDrawer>`, `<StatsOverlay>`, `<Asset>`, `useGameSession`.
+- 18 simulator games refactored into per-game folders.
+
+### Roulette / Baccarat / Sic Bo
+
+- Roulette racetrack (Voisins, Tier, Orphelins, Zero Neighbours).
+- Baccarat Big Road / Big Eye Boy / Small Road / Cockroach Pig.
+- Sic Bo full betting layout.
+
+### Live Poker
+
+- 6-max NLH at `/poker` with 5 simulated bots, simulated chat sidebar.
+- `pokersolver`-backed showdown evaluation.
+- 16-bit synth SFX bank.
+
+## 2026-05 - Earlier
+
+- Batches 0-6, see prior entries below for details.
+
+## Original
+
+- Initial educational simulator with Crash, Plinko, Mines, Dino, plus 14 simulators and a synthetic sportsbook.
+
 
 ### Asset pipeline (Phase 1)
 

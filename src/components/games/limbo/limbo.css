@@ -103,3 +103,29 @@
         inset 0 0 0 22px var(--bg-secondary),
         inset 0 0 32px rgba(255, 255, 255, 0.06),
         0 0 80px rgba(237, 66, 69, 0.5);
+}
+
+.limbo-ring span {
+    color: var(--text-primary);
+    font-size: clamp(48px, 9vw, 80px);
+    font-weight: 950;
+    text-shadow: 0 0 32px rgba(255, 255, 255, 0.4), 0 4px 12px rgba(0, 0, 0, 0.6);
+    letter-spacing: -0.02em;
+    animation: limboCounterSteady 12s linear infinite;
+}
+
+@keyframes limboCounterSteady {
+    to { transform: rotate(-360deg); }
+}
+
+.limbo-target-label {
+    color: var(--text-primary);
+    font-weight: 900;
+    font-size: 18px;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 8px 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    z-index: 2;
+}
+

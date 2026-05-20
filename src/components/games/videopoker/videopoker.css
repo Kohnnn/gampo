@@ -83,4 +83,42 @@
 .vp-card.red { color: #c93237; }
 .vp-card.held {
     border-color: var(--accent-green);
-    tra
+    transform: translateY(-16px);
+    box-shadow:
+        0 20px 32px rgba(0, 231, 1, 0.4),
+        inset 0 2px 4px rgba(255, 255, 255, 0.6);
+}
+
+@keyframes vpDeal {
+    from { transform: translateY(-40px) rotate(-8deg) scale(0.6); opacity: 0; }
+    to { transform: translateY(0) rotate(0) scale(1); opacity: 1; }
+}
+
+.vp-rank {
+    font-size: 26px;
+    font-weight: 950;
+    align-self: flex-start;
+    line-height: 1;
+}
+
+.vp-suit {
+    font-size: 36px;
+    line-height: 1;
+    align-self: flex-end;
+}
+
+.vp-hold {
+    position: absolute;
+    bottom: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-green);
+    color: #071109;
+    font-size: 11px;
+    font-weight: 950;
+    padding: 4px 10px;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0, 231, 1, 0.5);
+    letter-spacing: 0.04em;
+}
+

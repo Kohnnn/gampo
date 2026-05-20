@@ -192,4 +192,7 @@ export default function SicBoGame() {
 
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={16} color="#ff8f3d" />}
             </div>
-            <EducationPanel definition={definition} betAmount={chip} winProbability={0
+            <EducationPanel definition={definition} betAmount={chip} winProbability={0.486} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
+        </GameShell>
+    )
+}

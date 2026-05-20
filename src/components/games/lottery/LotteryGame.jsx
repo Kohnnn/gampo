@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, sampleUniqueNumbers } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './lottery.css'
@@ -22,6 +22,7 @@ export default function LotteryGame() {
     const [drawing, setDrawing] = useState(false)
     const [burstKey, setBurstKey] = useState(0)
     const [lastWon, setLastWon] = useState(null)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
 
     const toggle = (n) => {
         if (drawing) return
@@ -44,7 +45,12 @@ export default function LotteryGame() {
             setLastWon(returnAmount > 0)
             setBurstKey(k => k + 1)
             setDrawing(false)
-            playSound(returnAmount > 0 ? 'win' : 'loss')
+            if (multiplier >= 8) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier })
+            } else {
+                playSound(returnAmount > 0 ? 'win' : 'loss')
+            }
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${hits}/5`, profit, betAmount, multiplier, meta: { picked: selected, drawn: next } })
             showToast(profit >= 0 ? 'win' : 'loss', `Lottery ${hits} hits`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -86,6 +92,7 @@ export default function LotteryGame() {
                 </div>
                 {burstKey > 0 && lastWon && <Particles key={burstKey} count={20} color="#ffcf5a" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
             <EducationPanel definition={definition} betAmount={5} winProbability={1 / 376992} payoutMultiplier={5000} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
