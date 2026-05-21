@@ -11,8 +11,6 @@
         "gen:assets": "node scripts/genAssets.js"
     },
     "dependencies": {
-        "@ant-design/icons": "^6.1.0",
-        "antd": "^6.2.0",
         "chart.js": "^4.5.1",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",

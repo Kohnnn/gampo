@@ -57,54 +57,49 @@
     justify-content: center;
     gap: 14px;
     padding-bottom: 30px;
-}
-
-.vp-card {
-    width: 96px;
-    aspect-ratio: 0.71;
-    border-radius: 10px;
-    background: linear-gradient(160deg, #ffffff, #e3eaf1);
-    color: #0f212e;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px;
-    border: 3px solid transparent;
-    cursor: pointer;
-    box-shadow:
-        0 12px 24px rgba(0, 0, 0, 0.4),
-        inset 0 2px 4px rgba(255, 255, 255, 0.6);
     position: relative;
-    animation: vpDeal 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-    transition: all 0.2s;
 }
 
-.vp-card.red { color: #c93237; }
-.vp-card.held {
+.vp-empty-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.vp-card-slot {
+    appearance: none;
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    padding: 6px;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.vp-card-slot:disabled { cursor: default; }
+
+.vp-card-slot.held {
     border-color: var(--accent-green);
     transform: translateY(-16px);
-    box-shadow:
-        0 20px 32px rgba(0, 231, 1, 0.4),
-        inset 0 2px 4px rgba(255, 255, 255, 0.6);
+    box-shadow: 0 20px 32px rgba(0, 231, 1, 0.4);
 }
 
-@keyframes vpDeal {
-    from { transform: translateY(-40px) rotate(-8deg) scale(0.6); opacity: 0; }
-    to { transform: translateY(0) rotate(0) scale(1); opacity: 1; }
-}
-
-.vp-rank {
-    font-size: 26px;
-    font-weight: 950;
-    align-self: flex-start;
-    line-height: 1;
-}
-
-.vp-suit {
-    font-size: 36px;
-    line-height: 1;
-    align-self: flex-end;
+.vp-card.placeholder {
+    background: rgba(255, 255, 255, 0.04);
+    border: 2px dashed rgba(255, 255, 255, 0.18);
+    box-shadow: none;
+    cursor: not-allowed;
+    color: transparent;
+    animation: none;
 }
 
 .vp-hold {

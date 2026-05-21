@@ -1,0 +1,79 @@
+/* Shared playing-card face styles. Used by CardFace.jsx in:
+   - Blackjack, Video Poker, Baccarat, War. */
+
+.gampo-card {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #fdfdfd 0%, #f1f3f7 100%);
+    box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.35),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.gampo-card.size-sm { width: 36px;  min-height: 50px; }
+.gampo-card.size-md { width: 52px;  min-height: 72px; }
+.gampo-card.size-lg { width: 72px;  min-height: 100px; }
+
+.gampo-card.red   { color: #d62828; }
+.gampo-card.black { color: #15161a; }
+
+.gampo-card-corner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1;
+    font-weight: 950;
+}
+.gampo-card.size-sm .gampo-card-corner { font-size: 9px;  gap: 1px; }
+.gampo-card.size-md .gampo-card-corner { font-size: 12px; gap: 1px; }
+.gampo-card.size-lg .gampo-card-corner { font-size: 15px; gap: 2px; }
+
+.gampo-card-corner-br {
+    align-self: flex-end;
+    transform: rotate(180deg);
+}
+
+.gampo-card-pip {
+    font-size: 28px;
+    line-height: 1;
+}
+.gampo-card.size-sm .gampo-card-pip { font-size: 20px; }
+.gampo-card.size-lg .gampo-card-pip { font-size: 38px; }
+
+.gampo-card-back {
+    background:
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.06) 0 4px, transparent 4px 8px),
+        linear-gradient(135deg, #1c5fa6 0%, #143b78 100%);
+    box-shadow:
+        0 4px 10px rgba(0, 0, 0, 0.4),
+        inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+}
+
+.gampo-card-back-pattern {
+    position: absolute;
+    inset: 6px;
+    border-radius: 4px;
+    border: 1px dashed rgba(255, 255, 255, 0.4);
+    background:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.15) 0 18%, transparent 19%);
+}
+
+@keyframes gampoCardDeal {
+    0%   { transform: translateY(-12px) rotate(-6deg); opacity: 0; }
+    60%  { transform: translateY(2px) rotate(2deg); opacity: 1; }
+    100% { transform: translateY(0) rotate(0); opacity: 1; }
+}
+
+.gampo-card.dealing { animation: gampoCardDeal 0.32s cubic-bezier(0.18, 0.89, 0.32, 1.15); }
+
+@media (prefers-reduced-motion: reduce) {
+    .gampo-card.dealing { animation: none; }
+}
+.gampo-reduce-motion .gampo-card.dealing { animation: none; }

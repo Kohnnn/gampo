@@ -156,7 +156,15 @@ export function ActivityPage() {
         >
             <div className="activity-table">
                 {transactions.length === 0 ? (
-                    <p className="muted">No activity yet.</p>
+                    <div className="activity-empty">
+                        <img src="/assets/games/lobby/hero-arcade.png" alt="" aria-hidden="true" />
+                        <h3>No activity yet</h3>
+                        <p>Every practice bet, return, top-up and reset will land here. Try a quick game to seed the log.</p>
+                        <div className="activity-empty-actions">
+                            <Link to="/dice" className="casino-action primary">Try Dice</Link>
+                            <Link to="/originals" className="casino-action">Browse Originals</Link>
+                        </div>
+                    </div>
                 ) : transactions.map(item => (
                     <div key={item.id}>
                         <span>{item.timestamp.toLocaleString()}</span>
@@ -174,6 +182,19 @@ export function ActivityPage() {
 export function PromotionsPage() {
     const promotions = [
         {
+            id: 'solo-casino-school',
+            title: 'Solo Casino School',
+            kicker: 'Campaign',
+            badge: 'New path',
+            description: 'A single-player casino campaign: clear quests, learn why outcomes happen, and unlock study badges with practice credits only.',
+            cta: 'Start Missions',
+            link: '/missions',
+            accent: '#00e701',
+            emoji: '\uD83C\uDFAE',
+            gradient: 'linear-gradient(135deg, rgba(0, 231, 1, 0.34), rgba(7, 24, 18, 0.95))',
+            art: '/assets/games/promo/promo-edge.png',
+        },
+        {
             id: 'edge-101',
             title: 'EV 101 Workshop',
             kicker: 'Education',
@@ -182,6 +203,9 @@ export function PromotionsPage() {
             cta: 'Open Risk Academy',
             link: '/learn',
             accent: '#00e701',
+            emoji: '\uD83D\uDCCA',
+            gradient: 'linear-gradient(135deg, rgba(0, 231, 1, 0.32), rgba(0, 95, 0, 0.92))',
+            art: '/assets/games/promo/promo-edge.png',
         },
         {
             id: 'race-week',
@@ -192,6 +216,9 @@ export function PromotionsPage() {
             cta: 'View Race',
             link: '/race',
             accent: '#ffcf5a',
+            emoji: '\uD83C\uDFC1',
+            gradient: 'linear-gradient(135deg, rgba(255, 207, 90, 0.32), rgba(120, 70, 0, 0.95))',
+            art: '/assets/games/promo/promo-race.png',
         },
         {
             id: 'verify-day',
@@ -202,6 +229,22 @@ export function PromotionsPage() {
             cta: 'Open Verify',
             link: '/verify',
             accent: '#58a6ff',
+            emoji: '\uD83D\uDD12',
+            gradient: 'linear-gradient(135deg, rgba(88, 166, 255, 0.32), rgba(20, 50, 130, 0.95))',
+            art: '/assets/games/promo/promo-verify.png',
+        },
+        {
+            id: 'poker-lab',
+            title: 'Poker Persona Lab',
+            kicker: 'Live Poker',
+            badge: 'Interactive',
+            description: 'Play against randomized bot personalities, read table talk, then compare your line against the GTO chart.',
+            cta: 'Open Poker',
+            link: '/poker',
+            accent: '#ff7ab6',
+            emoji: '\u2660',
+            gradient: 'linear-gradient(135deg, rgba(255, 122, 182, 0.32), rgba(70, 18, 54, 0.95))',
+            art: '/assets/games/promo/promo-race.png',
         },
         {
             id: 'sports-lab',
@@ -212,6 +255,9 @@ export function PromotionsPage() {
             cta: 'Open Sportsbook',
             link: '/sports',
             accent: '#7c5cff',
+            emoji: '\u26BD',
+            gradient: 'linear-gradient(135deg, rgba(124, 92, 255, 0.32), rgba(50, 25, 120, 0.95))',
+            art: '/assets/games/promo/promo-sports.png',
         },
     ]
 
@@ -224,7 +270,17 @@ export function PromotionsPage() {
         >
             <div className="promotions-grid">
                 {promotions.map(p => (
-                    <article key={p.id} className="promotion-card" style={{ '--accent': p.accent }}>
+                    <article
+                        key={p.id}
+                        className="promotion-card"
+                        style={{
+                            '--accent': p.accent,
+                            backgroundImage: p.art
+                                ? `${p.gradient}, url(${p.art})`
+                                : p.gradient,
+                        }}
+                    >
+                        <span className="promotion-emoji" aria-hidden="true">{p.emoji}</span>
                         <span className="promotion-badge">{p.badge}</span>
                         <small className="promotion-kicker">{p.kicker}</small>
                         <h2>{p.title}</h2>
@@ -321,6 +377,9 @@ export function VerifyPage() {
             </div>
 
             <h3 className="verify-section-title">Recent rolls</h3>
+            <p className="muted verify-hint">
+                Each game logs its own <code>gameId</code> as you play. The list reflects everything in this browser since the last <em>Clear log</em>; play a few rounds across different games to mix the log.
+            </p>
             <div className="verify-grid">
                 {recent.length === 0 ? (
                     <p className="muted">Play a wired game (Dice, Limbo, Coin Flip, Wheel, RPS, Guess, Color, Hi-Lo) to populate the verification log.</p>
@@ -364,14 +423,24 @@ export function RacePage() {
             icon={<Trophy size={18} />}
         >
             <div className="race-board">
-                {race.map((player, index) => (
-                    <article key={player.id} className={`race-row ${player.isYou ? 'you' : ''}`}>
-                        <span className="race-rank">{index + 1}</span>
-                        <strong>{player.name}{player.isYou && ' (you)'}</strong>
-                        <span className="race-volume">{formatCredits(player.wagered)}</span>
-                        <span className="race-prize">{player.prize}</span>
-                    </article>
-                ))}
+                {race.map((player, index) => {
+                    const avatar = player.isYou
+                        ? null
+                        : `/assets/games/poker/poker-avatar-${(index % 5) + 1}.png`
+                    return (
+                        <article key={player.id} className={`race-row ${player.isYou ? 'you' : ''}`}>
+                            <span className="race-rank">{index + 1}</span>
+                            {avatar ? (
+                                <img className="race-avatar" src={avatar} alt="" aria-hidden="true" />
+                            ) : (
+                                <span className="race-avatar race-avatar-you" aria-hidden="true">YOU</span>
+                            )}
+                            <strong>{player.name}{player.isYou && ' (you)'}</strong>
+                            <span className="race-volume">{formatCredits(player.wagered)}</span>
+                            <span className="race-prize">{player.prize}</span>
+                        </article>
+                    )
+                })}
             </div>
             <p className="muted" style={{ marginTop: 12 }}>
                 Prizes are simulated badges. No cash value, no transfers, no payout claims.
@@ -379,5 +448,4 @@ export function RacePage() {
         </CasinoSection>
     )
 }
-
 

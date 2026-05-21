@@ -142,6 +142,24 @@ export const assetManifest = [
     { name: 'poker-avatar-3', dir: 'poker', size: sq, prompt: `Generic stylized neutral poker avatar portrait variant 3, geometric minimalist, neon color palette. ${STYLE}` },
     { name: 'poker-avatar-4', dir: 'poker', size: sq, prompt: `Generic stylized neutral poker avatar portrait variant 4, geometric minimalist, neon color palette. ${STYLE}` },
     { name: 'poker-avatar-5', dir: 'poker', size: sq, prompt: `Generic stylized neutral poker avatar portrait variant 5, geometric minimalist, neon color palette. ${STYLE}` },
+
+    // === Game-card thumbnails (HomePage category rows + GameGrid) ===
+    // Portrait-ish 768x1024 keeps the aspect close to the existing 8 thumbnail images.
+    { name: 'card-dice', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Dice": glossy white casino dice rolling with neon teal trail and over/under range slider glow, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-limbo', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Limbo": rocket-style multiplier rising into deep purple starfield, glowing target reticle, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-keno', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Keno": grid of glowing numbered keno balls falling, gold and amber accents, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-wheel', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Wheel": colorful spinning fortune wheel from above with pointer, neon segments, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-roulette', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Roulette": European single-zero roulette wheel angled view, ivory ball, glossy 3D, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-blackjack', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Blackjack": fanned playing cards Ace + King of spades on green felt, no text on cards, dark navy backdrop. ${STYLE}` },
+    { name: 'card-slots', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Slots": three glowing slot reels showing abstract sevens and bell symbols, neon gold accents, no text labels, dark navy backdrop. ${STYLE}` },
+    { name: 'card-sicbo', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Sic Bo": three white casino dice in glass tumbler with neon orange glow, top down view, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-baccarat', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Baccarat": elegant pair of glossy playing cards on green felt with gold trim, abstract suit pips, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-videopoker', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Video Poker": fanned five-card royal flush silhouette with neon green glow on dark felt, no rank text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-color', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Color Pick": rainbow color wheel split into four quadrants with center pointer, glossy 3D, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-tower', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Tower Climb": glowing stack of climbing tiles ascending into neon mist, multiplier ladder shape, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-lottery', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Lottery Draw": glass lottery tumbler with multicolor numbered balls mid-tumble, gold rim, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-war', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Casino War": two crossed playing-card backs in pink/magenta neon, dueling motif, no text, dark navy backdrop. ${STYLE}` },
+    { name: 'card-chickencross', dir: 'cards/games', size: '768x1024', prompt: `Vertical casino game card thumbnail for "Chicken Cross": cute cartoon chicken hopping across glowing road lanes with multiplier columns, no text, dark navy backdrop. ${STYLE}` },
 ]
 
 export const STYLE_GUARD = STYLE

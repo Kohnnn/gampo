@@ -1,96 +1,11 @@
 
 > gampo-educational-simulator@1.0.0 dev
-> vite --host 127.0.0.1 --port 5173
+> vite --host 0.0.0.0
 
 
-  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m256[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m272[22m[2m[0m ms[22m
 
-  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.6:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.29.144.1:[1m5173[22m/[39m
 [2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
-[2m12:59:34 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx[22m
-[2m1:02:36 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/CrashGame/BettingPanel.jsx[22m
-[2m1:02:36 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PlinkoGame/Sidebar.jsx[22m
-[2m1:02:36 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MinesGame/MinesGame.jsx[22m
-[2m1:02:36 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/DinoGame/DinoGame.jsx[22m
-[2m1:02:36 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/CrashGame/GameHistory.jsx[22m
-[2m1:02:54 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/CrashGame/CrashGame.css[22m
-[2m1:04:46 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx[22m
-[2m1:06:10 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SimulatorGames/SimulatorGame.css[22m
-[2m1:08:21 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m1:37:49 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/CoreGameEducationDock.jsx, /src/pages/SportsPage.jsx, /src/pages/HomePage.jsx, /src/components/SimulatorGames/SimulatorGame.jsx[22m
-[2m1:38:58 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SimulatorGames/SimulatorGame.jsx[22m
-[2m1:39:33 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/SimulatorGames/SimulatorGame.css[22m
-[2m1:39:56 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx[22m
-[2m1:41:04 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx[22m
-[2m1:41:17 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx[22m
-[2m1:42:31 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx[22m
-[2m1:42:48 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Header.jsx[22m
-[2m1:42:48 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.jsx[22m
-[2m1:43:01 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CasinoPages.jsx, /src/pages/HomePage.jsx[22m
-[2m1:43:51 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CasinoPages.jsx, /src/pages/HomePage.jsx[22m
-[2m1:43:51 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CasinoPages.jsx[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/baccarat.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/baccaratsingle.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bingo.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/blackjack.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/blackjack_new.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bubble-shooter.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bullet.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/chicken_road.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/classicdice.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/claw_booster.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/classicdice_new.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/coinflip.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/coinflip_new.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/color.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/crash.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/dice.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/double.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/fast_crash.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/hashdice.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/hotpot.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/hilo.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/jade.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/keno.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/keno_single.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/limbo.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/lottery.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/new_jade.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/mines.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/oriental-beauties.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/parity.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/patti.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/plinko.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/ringOfFortune.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/ringOfFortune_new.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/roulette.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/roulettesingle.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/roulettesingle_new.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/sicbo-multiplayer.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/slots.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/stellar_rush.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/sword.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/tower.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/twist.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/ultimatedice.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/ultimatedice_new.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/videopoker.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/wheel.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bcgame-roll/verfity.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bcgame-crash/iter.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bcgame-roulette/index.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bcgame-blackjack/docs/index.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bcgame-roll/docs/index.html[22m
-[2m10:52:12 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/verify/bcgame-crash/docs/index.html[22m
-[2m11:01:46 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Roulette/index.html[22m
-[2m11:01:54 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Baccaratio/frontend/src/app/app.component.html[22m
-[2m11:01:54 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Baccaratio/frontend/src/index.html[22m
-[2m11:01:55 pm[22m [36m[1m[vite][22m[39m changed tsconfig file detected: D:\gampo\example\Baccaratio\frontend\tsconfig.json - Clearing cache and forcing full-reload to ensure TypeScript is compiled with updated config values.
-[2m11:01:55 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Baccaratio/frontend/src/app/game/bet-panel/bet-panel.component.html[22m
-[2m11:01:55 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Baccaratio/frontend/src/app/game/game-table/game-table.component.html[22m
-[2m11:01:55 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Baccaratio/frontend/src/app/game/bet-history/bet-history.component.html[22m
-[2m11:01:55 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Baccaratio/frontend/src/app/game/player-status/player-status.component.html[22m
-[2m11:01:55 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Baccaratio/frontend/src/app/auth/login/login.component.html[22m
-[2m11:01:55 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/Baccaratio/frontend/src/app/auth/register/register.component.html[22m
-[2m11:11:38 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mexample/lucky-digger/index.html[22m
-[2m11:11:38 pm[22m [36m[1m[vite][22m[39m changed tsconfig file detected: D:\gampo\example\lucky-digger\tsconfig.json - Clearing cache and forcing full-reload to ensure TypeScript is compiled with updated config values.

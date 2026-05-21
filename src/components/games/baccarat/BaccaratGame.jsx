@@ -3,9 +3,11 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { nextRoll } from '../../../utils/fairRng'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import { buildBigEyeBoy, buildBigRoad, buildCockroachPig, buildSmallRoad } from './roads'
+import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './baccarat.css'
 
@@ -15,8 +17,10 @@ const SUITS = ['S', 'H', 'D', 'C']
 function newDeck() {
     const out = []
     for (const s of SUITS) for (const r of RANKS) out.push({ rank: r, suit: s })
+    // Fisher-Yates with provably-fair RNG. Each swap consumes one nonce.
     for (let i = out.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
+        const { roll } = nextRoll('baccarat')
+        const j = Math.floor(roll * (i + 1))
         ;[out[i], out[j]] = [out[j], out[i]]
     }
     return out
@@ -74,18 +78,49 @@ export default function BaccaratGame() {
     const [bets, setBets] = useState({}) // { banker: amount, player: amount, tie: amount, pair_p: amount, pair_b: amount, big: amount, small: amount }
     const [chip, setChip] = useState(5)
     const [hand, setHand] = useState(null)
-    const [outcomes, setOutcomes] = useState([]) // 'B' / 'P' / 'T' oldest-first
+    // Hydrate the road-map outcomes list from persisted session history so the
+    // Big/Big Eye/Small/Cockroach panels are populated immediately on reload
+    // (eval v3 §3b).
+    const [outcomes, setOutcomes] = useState(() => {
+        const seed = []
+        // useGameSession serves history newest-first; reverse to oldest-first.
+        const hydrated = (session.history || [])
+            .map(h => h?.meta?.outcome)
+            .filter(Boolean)
+            .reverse()
+        seed.push(...hydrated)
+        return seed
+    })
     const [running, setRunning] = useState(false)
     const [lastWon, setLastWon] = useState(null)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [burstKey, setBurstKey] = useState(0)
+    const [lastChips, setLastChips] = useState({})
+    const [lastTotal, setLastTotal] = useState(null)
 
     const totalStake = Object.values(bets).reduce((s, v) => s + (v || 0), 0)
     const addBet = (key) => setBets(prev => ({ ...prev, [key]: (prev[key] || 0) + chip }))
     const clear = () => setBets({})
+    const restoreLast = () => {
+        if (!Object.keys(lastChips).length) {
+            showToast('error', 'No previous bets', 'Place chips to seed Repeat')
+            return
+        }
+        setBets({ ...lastChips })
+    }
 
-    const performPlay = () => new Promise(resolve => {
-        if (totalStake <= 0) { showToast('error', 'No bets', 'Place chips first'); resolve({ profit: 0 }); return }
-        if (!placeBet(totalStake, 'Baccarat')) { showToast('error', 'Not enough credits', `Need ${formatCredits(totalStake)}`); resolve({ profit: 0 }); return }
+    const performPlay = ({ mode } = {}) => new Promise(resolve => {
+        let activeBets = bets
+        let stake = totalStake
+        if (stake <= 0 && Object.keys(lastChips).length && (mode === 'auto' || mode === 'manual')) {
+            activeBets = { ...lastChips }
+            stake = Object.values(activeBets).reduce((s, v) => s + (v || 0), 0)
+            setBets(activeBets)
+        }
+        if (stake <= 0) { showToast('error', 'No bets', 'Place chips first'); resolve({ profit: 0 }); return }
+        if (!placeBet(stake, 'Baccarat')) { showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`); resolve({ profit: 0 }); return }
+        setLastChips({ ...activeBets })
+        setLastTotal(stake)
         playSound('deal')
         setRunning(true)
         const next = drawBaccaratHand()
@@ -107,22 +142,28 @@ export default function BaccaratGame() {
         }
 
         let totalReturn = 0
-        for (const [k, amount] of Object.entries(bets)) {
+        for (const [k, amount] of Object.entries(activeBets)) {
             if (!amount) continue
             const mult = payouts[k] || 0
             totalReturn += amount * mult
         }
-        const profit = totalReturn - totalStake
+        const profit = totalReturn - stake
         if (totalReturn > 0) addWinnings(totalReturn, 'Baccarat return')
+        const effectiveMult = stake > 0 ? totalReturn / stake : 0
         setHand(next)
         setOutcomes(prev => [...prev, outcome])
         setLastWon(profit > 0)
         setBurstKey(k => k + 1)
-        playSound(profit > 0 ? 'win' : 'loss')
+        if (effectiveMult >= 5) {
+            playSound('bigwin')
+            setBigWin({ trigger: Date.now(), profit, multiplier: effectiveMult })
+        } else {
+            playSound(profit > 0 ? 'win' : 'loss')
+        }
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
             label: `${outcome} ${playerScore}-${bankerScore}`,
-            profit, betAmount: totalStake,
+            profit, betAmount: stake,
             meta: { outcome, playerScore, bankerScore, playerPair, bankerPair },
         })
         showToast(profit >= 0 ? 'win' : 'loss', `Baccarat ${outcome === 'B' ? 'Banker' : outcome === 'P' ? 'Player' : 'Tie'}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
@@ -150,6 +191,7 @@ export default function BaccaratGame() {
                     runningRound={running}
                     actionLabel={`Deal Baccarat (${formatCredits(totalStake)})`}
                     onPlay={performPlay}
+                    lastBet={lastTotal}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Chip</label>
@@ -159,7 +201,10 @@ export default function BaccaratGame() {
                             ))}
                         </div>
                     </div>
-                    <button className="bp-bet-btn" onClick={clear} disabled={!totalStake}>Clear bets</button>
+                    <div className="bp-row">
+                        <button className="bp-bet-btn" onClick={clear} disabled={!totalStake}>Clear</button>
+                        <button className="bp-bet-btn" onClick={restoreLast} disabled={!Object.keys(lastChips).length}>Repeat</button>
+                    </div>
                 </BetPanel>
             }
             aside={
@@ -170,14 +215,18 @@ export default function BaccaratGame() {
             }
         >
             <div className={`bac-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+                <RecentResultsStrip results={session.stats.lastResults} />
+                {!hand && totalStake <= 0 && (
+                    <p className="bac-hint">Place chips on Banker / Player / Tie, then deal.</p>
+                )}
                 <div className="bac-table">
                     <div className="bac-side">
                         <h3>Player</h3>
                         <div className="bac-score">{hand ? handTotal(hand.player) : '--'}</div>
                         <div className="bac-cards">
                             {(hand?.player || [{}, {}]).map((c, i) => c.rank ? (
-                                <div key={i} className={`bac-card ${suitColor(c.suit)}`}><span>{c.rank}</span><span>{suitGlyph(c.suit)}</span></div>
-                            ) : <div key={i} className="bac-card empty">?</div>)}
+                                <CardFace key={i} rank={c.rank} suit={c.suit} dealing size="md" />
+                            ) : <CardBack key={i} size="md" />)}
                         </div>
                     </div>
                     <div className="bac-side">
@@ -185,8 +234,8 @@ export default function BaccaratGame() {
                         <div className="bac-score">{hand ? handTotal(hand.banker) : '--'}</div>
                         <div className="bac-cards">
                             {(hand?.banker || [{}, {}]).map((c, i) => c.rank ? (
-                                <div key={i} className={`bac-card ${suitColor(c.suit)}`}><span>{c.rank}</span><span>{suitGlyph(c.suit)}</span></div>
-                            ) : <div key={i} className="bac-card empty">?</div>)}
+                                <CardFace key={i} rank={c.rank} suit={c.suit} dealing size="md" />
+                            ) : <CardBack key={i} size="md" />)}
                         </div>
                     </div>
                 </div>
@@ -239,6 +288,7 @@ export default function BaccaratGame() {
 
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={14} color="#f6c85f" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={0.4586} payoutMultiplier={1.95} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

@@ -325,9 +325,9 @@
 .category-card {
     flex: 0 0 168px;
     scroll-snap-align: start;
-    border-radius: 10px;
+    border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(180deg, rgba(47, 69, 83, 0.84), rgba(15, 33, 46, 0.98));
+    background: linear-gradient(180deg, rgba(19, 36, 49, 0.96), rgba(7, 17, 24, 0.98));
     overflow: hidden;
     text-decoration: none;
     color: inherit;
@@ -352,10 +352,20 @@
     overflow: hidden;
 }
 
+.category-art::after,
+.casino-game-art::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 52%, rgba(0, 0, 0, 0.48));
+    pointer-events: none;
+}
+
 .category-art img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transform: scale(1.02);
 }
 
 .category-art span {
@@ -462,6 +472,20 @@
     letter-spacing: 0.06em;
 }
 
+.verify-hint {
+    margin: 0 0 10px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.verify-hint code {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--text-primary);
+}
+
 .verify-composite {
     word-break: break-all;
     color: var(--text-secondary);
@@ -517,13 +541,33 @@
 
 .race-row {
     display: grid;
-    grid-template-columns: 36px 1fr 140px 140px;
+    grid-template-columns: 36px 40px 1fr 140px 140px;
     align-items: center;
     gap: 12px;
     padding: 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(15, 33, 46, 0.66);
     border-radius: 8px;
+}
+
+.race-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.4);
+    display: grid;
+    place-items: center;
+    font-size: 9px;
+    font-weight: 950;
+    color: var(--text-primary);
+}
+
+.race-avatar-you {
+    background: var(--accent-green);
+    color: #001b00;
+    border-color: var(--accent-green);
 }
 
 .race-row.you {
@@ -540,6 +584,9 @@
 .promotion-card {
     position: relative;
     background: linear-gradient(180deg, rgba(47, 69, 83, 0.84), rgba(15, 33, 46, 0.98));
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     padding: 18px;
@@ -547,6 +594,18 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-height: 180px;
+}
+
+.promotion-emoji {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    font-size: 38px;
+    opacity: 0.85;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+    pointer-events: none;
+    z-index: 1;
 }
 
 .promotion-card::before {
@@ -632,21 +691,23 @@
     min-height: 306px;
     display: flex;
     flex-direction: column;
-    border-radius: 8px;
+    border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    background: linear-gradient(180deg, rgba(47, 69, 83, 0.84), rgba(15, 33, 46, 0.98));
+    background: linear-gradient(180deg, rgba(19, 36, 49, 0.96), rgba(7, 17, 24, 0.98));
     overflow: hidden;
     color: inherit;
     text-decoration: none;
-    transition: transform 0.16s ease, border-color 0.16s ease;
+    transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
 .casino-game-card:hover {
     transform: translateY(-3px);
     border-color: var(--accent);
+    box-shadow: 0 18px 36px color-mix(in srgb, var(--accent), transparent 78%);
 }
 
 .casino-game-art {
+    position: relative;
     height: 150px;
     display: grid;
     place-items: center;
@@ -659,6 +720,7 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transform: scale(1.02);
 }
 
 .casino-game-art span {
@@ -877,6 +939,51 @@
 
 .negative {
     color: var(--accent-red) !important;
+}
+
+.activity-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+    padding: 28px 16px;
+    background: linear-gradient(180deg, rgba(47, 69, 83, 0.45), rgba(15, 33, 46, 0.92));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    color: var(--text-secondary);
+}
+
+.activity-empty img {
+    width: min(420px, 100%);
+    height: 140px;
+    object-fit: cover;
+    border-radius: 10px;
+    opacity: 0.85;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.activity-empty h3 {
+    margin: 4px 0 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 950;
+    letter-spacing: -0.01em;
+}
+
+.activity-empty p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    max-width: 460px;
+    line-height: 1.5;
+}
+
+.activity-empty-actions {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 @media (max-width: 1180px) {

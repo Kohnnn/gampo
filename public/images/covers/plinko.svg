@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Plinko game cover">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f212e"/><stop offset="1" stop-color="#102c1a"/></linearGradient><radialGradient id="g" cx="52%" cy="44%" r="65%"><stop stop-color="#00e701" stop-opacity=".5"/><stop offset="1" stop-color="#00e701" stop-opacity="0"/></radialGradient></defs>
+  <rect width="640" height="360" rx="28" fill="url(#bg)"/><rect width="640" height="360" rx="28" fill="url(#g)"/>
+  <g fill="#dff7ea" opacity=".9">
+    <circle cx="320" cy="78" r="11"/><circle cx="276" cy="126" r="8"/><circle cx="364" cy="126" r="8"/><circle cx="232" cy="174" r="8"/><circle cx="320" cy="174" r="8"/><circle cx="408" cy="174" r="8"/><circle cx="188" cy="222" r="8"/><circle cx="276" cy="222" r="8"/><circle cx="364" cy="222" r="8"/><circle cx="452" cy="222" r="8"/>
+  </g>
+  <circle cx="318" cy="45" r="28" fill="#ffcf5a" stroke="#fff2a6" stroke-width="5"/><text x="306" y="56" fill="#231b05" font-family="Arial Black, Arial" font-size="30">G</text>
+  <g font-family="Arial Black, Arial" font-size="20" font-weight="900"><rect x="146" y="275" width="348" height="44" rx="12" fill="#071109" opacity=".75"/><text x="168" y="305" fill="#ffcf5a">0.2x</text><text x="274" y="305" fill="#00e701">9x</text><text x="382" y="305" fill="#ff6b4a">130x</text></g>
+  <text x="44" y="78" fill="#e9f3ff" font-family="Arial Black, Arial" font-size="48" font-weight="900">PLINKO</text>
+</svg>

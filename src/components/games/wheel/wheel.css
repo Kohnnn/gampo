@@ -13,12 +13,12 @@
 .wheel-pointer {
     width: 0;
     height: 0;
-    border-left: 22px solid transparent;
-    border-right: 22px solid transparent;
-    border-top: 38px solid var(--accent-green);
-    filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.6));
+    border-left: 30px solid transparent;
+    border-right: 30px solid transparent;
+    border-top: 50px solid var(--accent-green);
+    filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.65));
     z-index: 3;
-    margin-bottom: -10px;
+    margin-bottom: -16px;
 }
 
 .wheel-disc {
@@ -36,6 +36,18 @@
         inset 0 0 60px rgba(0, 0, 0, 0.3),
         0 32px 80px rgba(0, 0, 0, 0.5);
     transition: transform 2.1s cubic-bezier(0.16, 1, 0.3, 1);
+    /* Idle: very slow rotation so the wheel never looks frozen pre-spin. */
+    animation: wheelIdleSpin 32s linear infinite;
+}
+
+.wheel-disc.spinning { animation: none; }
+
+@keyframes wheelIdleSpin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wheel-disc { animation: none; }
 }
 
 .wheel-disc::before {
@@ -55,11 +67,12 @@
     inset: 24px;
     transform-origin: center;
     color: #06120b;
-    font-size: 14px;
+    font-size: 26px;
     font-weight: 950;
     text-align: center;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 1px 2px rgba(0, 0, 0, 0.7);
     z-index: 2;
+    letter-spacing: -0.01em;
 }
 
 .wheel-disc span.blank { color: rgba(255, 255, 255, 0.3); }

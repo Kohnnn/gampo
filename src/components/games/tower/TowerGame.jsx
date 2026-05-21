@@ -4,7 +4,8 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './tower.css'
@@ -30,6 +31,8 @@ export default function TowerGame() {
     const [fellAt, setFellAt] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
+    const { schedule, cancelAll } = useCancellableTimeouts()
 
     const config = PRESETS[risk]
     const multiplier = Number(Math.pow(config.growth, level).toFixed(2))
@@ -37,6 +40,7 @@ export default function TowerGame() {
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (phase === 'climbing') { resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Tower Climb')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('click')
         setActiveBet(betAmount)
         setLevel(0)
@@ -65,7 +69,7 @@ export default function TowerGame() {
             meta: { risk, level },
         })
         showToast('loss', 'Tower fell', `-${formatCredits(activeBet)}`)
-        window.setTimeout(() => {
+        schedule(() => {
             setPhase('idle')
             setActiveBet(0)
             setLevel(0)
@@ -94,7 +98,7 @@ export default function TowerGame() {
         showToast('win', 'Tower cashed out', `+${formatCredits(profit)}`)
         setPhase('idle')
         setActiveBet(0)
-        window.setTimeout(() => setLevel(0), 800)
+        schedule(() => setLevel(0), 800)
     }
 
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
@@ -109,10 +113,14 @@ export default function TowerGame() {
                 <BetPanel
                     balance={balance}
                     initialBet={5}
-                    runningRound={phase === 'climbing'}
+                    runningRound={false}
                     actionLabel="Start Tower"
                     onPlay={performPlay}
                     disableAuto
+                    lastBet={lastBet}
+                    playPhase={phase === 'climbing' && level > 0 ? 'in-round' : null}
+                    playLabel={phase === 'climbing' && level > 0 ? `Cashout ${multiplier.toFixed(2)}×` : 'Start Tower'}
+                    onPlayPhaseAction={cashout}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Difficulty</label>
@@ -132,6 +140,7 @@ export default function TowerGame() {
             }
         >
             <div className={`tower-stage ${fellAt !== null ? 'loss-flash' : ''}`}>
+                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className="tower-stack" style={{ transform: `translateY(${level * 4}px)` }}>
                     {Array.from({ length: HEIGHT }, (_, index) => {
                         const tileLevel = HEIGHT - index
@@ -147,8 +156,7 @@ export default function TowerGame() {
                 </div>
                 <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>Level <strong>{level}</strong> · Multiplier <strong>{multiplier.toFixed(2)}×</strong></p>
                 <div className="tower-action-btns">
-                    <button disabled={phase !== 'climbing'} onClick={climb}>Climb</button>
-                    <button className={`cashout ${phase === 'climbing' && level > 0 ? 'fx-pulse' : ''}`} disabled={phase !== 'climbing' || level === 0} onClick={cashout}>Cashout {multiplier.toFixed(2)}×</button>
+                    <button disabled={phase !== 'climbing'} onClick={climb}>Climb up</button>
                 </div>
                 {burstKey > 0 && phase === 'idle' && session.history[0]?.profit > 0 && <Particles key={burstKey} count={18} color="#41d6ff" />}
             </div>

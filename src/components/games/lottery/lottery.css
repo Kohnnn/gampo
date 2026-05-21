@@ -29,6 +29,59 @@
 }
 
 .lot-tumbler.shaking { animation: lotShake 0.4s ease-in-out infinite; }
+
+.lot-drum {
+    position: relative;
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 30% 25%, rgba(255,255,255,0.12), transparent 60%),
+        linear-gradient(135deg, rgba(255, 207, 90, 0.18), rgba(255, 207, 90, 0.04));
+    border: 2px dashed rgba(255, 207, 90, 0.45);
+    display: grid;
+    place-items: center;
+    animation: lotDrumSpin 6s linear infinite;
+}
+
+.lot-tumbler-hint {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1.1;
+    transform: rotate(0deg);
+    animation: lotDrumCounter 6s linear infinite;
+}
+
+.lot-drum-ball {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 25%, #ffffff 0%, #ffe680 35%, #c98e1e 75%);
+    color: #1a2c38;
+    font-size: 9px;
+    font-weight: 950;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+.lot-drum-ball.b1 { top: 4px;  left: 50%; transform: translateX(-50%); }
+.lot-drum-ball.b2 { right: 6px; top: 50%; transform: translateY(-50%); }
+.lot-drum-ball.b3 { bottom: 4px; left: 50%; transform: translateX(-50%); }
+.lot-drum-ball.b4 { left: 6px;  top: 50%; transform: translateY(-50%); }
+
+@keyframes lotDrumSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+@keyframes lotDrumCounter {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(-360deg); }
+}
 @keyframes lotShake {
     0%, 100% { transform: translateX(0) rotate(0); }
     25% { transform: translateX(-3px) rotate(-1deg); }

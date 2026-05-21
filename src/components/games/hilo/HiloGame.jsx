@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './hilo.css'
@@ -24,6 +24,8 @@ export default function HiloGame() {
     const [flipping, setFlipping] = useState(false)
     const [lastWon, setLastWon] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
 
     const winChance = direction === 'higher' ? (13 - currentCard) / 13 : (currentCard - 1) / 13
     const payout = winChance > 0 ? Math.max(1.01, 0.96 / winChance) : 0
@@ -31,6 +33,7 @@ export default function HiloGame() {
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (winChance <= 0) { showToast('error', 'No winning cards', 'Choose other direction'); resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Hi-Lo')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('flip')
         setFlipping(true)
         const next = Math.floor(nextRoll('hilo').roll * 13) + 1
@@ -46,7 +49,12 @@ export default function HiloGame() {
             setBurstKey(k => k + 1)
             setStreak(prev => won ? prev + 1 : 0)
             setFlipping(false)
-            playSound(won ? 'win' : push ? 'click' : 'loss')
+            if (won && payout >= 5) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier: payout })
+            } else {
+                playSound(won ? 'win' : push ? 'click' : 'loss')
+            }
             session.record({
                 id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                 label: push ? 'Push' : won ? `Win → ${renderRank(next)}` : `Miss → ${renderRank(next)}`,
@@ -73,6 +81,7 @@ export default function HiloGame() {
                     runningRound={flipping}
                     actionLabel="Draw Card"
                     onPlay={performPlay}
+                    lastBet={lastBet}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Direction</label>
@@ -103,6 +112,7 @@ export default function HiloGame() {
             }
         >
             <div className={`hilo-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+                <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="hilo-cards">
                     <span className="hilo-card">{renderRank(currentCard)}</span>
                     <span className="hilo-arrow">{direction === 'higher' ? '↑' : '↓'}</span>
@@ -110,6 +120,7 @@ export default function HiloGame() {
                 </div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={12} color="#ffcf5a" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={winChance || 0.01} payoutMultiplier={payout || 1} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

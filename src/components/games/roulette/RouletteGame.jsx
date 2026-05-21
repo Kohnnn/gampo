@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { BOARD_NUMBERS, WHEEL_ORDER, colorOf, makeBet } from './layout'
 import EducationPanel from '../../EducationPanel'
 import './roulette.css'
@@ -31,6 +31,9 @@ export default function RouletteGame() {
     const [history, setHistory] = useState([])
     const [lastWon, setLastWon] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    // Snapshot of last placed chips, kept across spins for Rebet + Auto re-bet.
+    const [lastChips, setLastChips] = useState([])
+    const [lastTotal, setLastTotal] = useState(null)
 
     const totalStake = bets.reduce((sum, b) => sum + b.amount, 0)
 
@@ -43,17 +46,35 @@ export default function RouletteGame() {
     const undo = () => setBets(prev => prev.slice(0, -1))
     const clear = () => setBets([])
 
-    const performPlay = () => new Promise(resolve => {
-        if (!bets.length) {
+    const restoreLastChips = () => {
+        if (!lastChips.length) {
+            showToast('error', 'No previous bets', 'Place chips to seed Rebet')
+            return
+        }
+        setBets(lastChips.map(b => ({ ...b, id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}` })))
+    }
+
+    const performPlay = ({ mode } = {}) => new Promise(resolve => {
+        // If auto-loop or rebet fired without chips on the felt, restore the last snapshot.
+        let activeBets = bets
+        if (!activeBets.length && lastChips.length && (mode === 'auto' || mode === 'manual')) {
+            activeBets = lastChips.map(b => ({ ...b, id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}` }))
+            setBets(activeBets)
+        }
+        if (!activeBets.length) {
             showToast('error', 'No bets', 'Place at least one chip on the board')
             resolve({ profit: 0 })
             return
         }
-        if (!placeBet(totalStake, 'Roulette')) {
-            showToast('error', 'Not enough credits', `Need ${formatCredits(totalStake)}`)
+        const stake = activeBets.reduce((sum, b) => sum + b.amount, 0)
+        if (!placeBet(stake, 'Roulette')) {
+            showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`)
             resolve({ profit: 0 })
             return
         }
+        // Snapshot for Rebet/Auto.
+        setLastChips(activeBets.map(b => ({ type: b.type, params: b.params, amount: b.amount })))
+        setLastTotal(stake)
         playSound('tick')
         setSpinning(true)
         const { roll: r } = nextRoll('roulette')
@@ -66,13 +87,13 @@ export default function RouletteGame() {
         window.setTimeout(() => {
             // settle
             let totalReturn = 0
-            for (const bet of bets) {
+            for (const bet of activeBets) {
                 const m = makeBet(bet.type, bet.params)
                 if (m.numbers.includes(number)) totalReturn += bet.amount * m.payout
             }
-            const profit = totalReturn - totalStake
+            const profit = totalReturn - stake
             if (totalReturn > 0) addWinnings(totalReturn, 'Roulette return')
-            const effectiveMult = totalStake > 0 ? totalReturn / totalStake : 0
+            const effectiveMult = stake > 0 ? totalReturn / stake : 0
             setResult(number)
             setLastWon(profit > 0)
             setSpinning(false)
@@ -86,11 +107,11 @@ export default function RouletteGame() {
             session.record({
                 id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                 label: `${number} ${colorOf(number)}`,
-                profit, betAmount: totalStake,
-                meta: { number, color: colorOf(number), legs: bets.length },
+                profit, betAmount: stake,
+                meta: { number, color: colorOf(number), legs: activeBets.length },
             })
             showToast(profit >= 0 ? 'win' : 'loss', `Roulette ${number}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
-            setBets([]) // clear placed bets after spin
+            setBets([]) // clear placed bets after spin; lastChips snapshot keeps Auto/Rebet alive
             resolve({ profit })
         }, 2400)
     })
@@ -118,6 +139,7 @@ export default function RouletteGame() {
                     actionLabel={`Spin (${formatCredits(totalStake)} on ${bets.length} bets)`}
                     onPlay={performPlay}
                     disableAuto={false}
+                    lastBet={lastTotal}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Chip Value</label>
@@ -130,6 +152,7 @@ export default function RouletteGame() {
                     <div className="bp-row">
                         <button className="rou-undo" onClick={undo} disabled={!bets.length}>Undo</button>
                         <button className="rou-clear" onClick={clear} disabled={!bets.length}>Clear</button>
+                        <button className="rou-undo" onClick={restoreLastChips} disabled={!lastChips.length}>Repeat</button>
                     </div>
                     <div className="rou-summary">
                         <span>Total: <strong>{formatCredits(totalStake)}</strong></span>
@@ -145,6 +168,7 @@ export default function RouletteGame() {
             }
         >
             <div className={`roulette-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+                <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="rou-wheel-area">
                     <div className="rou-wheel" style={{ transform: `rotate(${wheelRotation}deg)`, transition: spinning ? 'transform 2.3s cubic-bezier(0.16, 1, 0.3, 1)' : 'none' }}>
                         {WHEEL_ORDER.map((n, i) => {
@@ -157,11 +181,13 @@ export default function RouletteGame() {
                     <div className="rou-ball-track" style={{ transform: `rotate(${ballRotation}deg)`, transition: spinning ? 'transform 2.3s cubic-bezier(0.16, 1, 0.3, 1)' : 'none' }}>
                         <span className="rou-ball" />
                     </div>
-                    <div className={`rou-num-pop ${meta?.color || ''}`}>{result === null ? '--' : result}</div>
+                    <div className={`rou-num-pop ${meta?.color || ''} ${result === null ? 'idle' : ''}`}>
+                        {result === null ? <span aria-hidden="true">⟳</span> : result}
+                    </div>
                 </div>
 
                 <div className="rou-history">
-                    {history.length === 0 ? <span className="sim-muted">No history</span> : history.map((n, i) => (
+                    {history.length === 0 ? <span className="sim-muted">No spins yet</span> : history.map((n, i) => (
                         <span key={i} className={`rou-history-pill ${colorOf(n)}`}>{n}</span>
                     ))}
                 </div>

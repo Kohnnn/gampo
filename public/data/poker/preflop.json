@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "format": "6max-cash-100bb",
+  "notes": "Preflop ranges authored from common 6-max GTO solver outputs (RFI = open or fold; vs-* = facing the indicated open). Each cell has fractional frequencies for raise/call/fold. Cells not listed default to 100% fold. Sizes: open 2.5bb, 3bet 9bb-12bb depending on position.",
+  "positions": {
+    "UTG": {
+      "rfi": {
+        "size": "2.5bb",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 1.0 }, "JJ": { "raise": 1.0 }, "TT": { "raise": 1.0 }, "99": { "raise": 1.0 }, "88": { "raise": 1.0 }, "77": { "raise": 1.0 }, "66": { "raise": 1.0 }, "55": { "raise": 0.6, "fold": 0.4 }, "44": { "raise": 0.4, "fold": 0.6 }, "33": { "raise": 0.3, "fold": 0.7 }, "22": { "raise": 0.3, "fold": 0.7 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 1.0 }, "AJs": { "raise": 1.0 }, "ATs": { "raise": 1.0 }, "A9s": { "raise": 1.0 }, "A8s": { "raise": 1.0 }, "A7s": { "raise": 0.8, "fold": 0.2 }, "A6s": { "raise": 0.6, "fold": 0.4 }, "A5s": { "raise": 1.0 }, "A4s": { "raise": 1.0 }, "A3s": { "raise": 0.7, "fold": 0.3 }, "A2s": { "raise": 0.4, "fold": 0.6 },
+          "KQs": { "raise": 1.0 }, "KJs": { "raise": 1.0 }, "KTs": { "raise": 1.0 }, "K9s": { "raise": 0.8, "fold": 0.2 }, "K8s": { "raise": 0.4, "fold": 0.6 }, "K7s": { "raise": 0.2, "fold": 0.8 },
+          "QJs": { "raise": 1.0 }, "QTs": { "raise": 1.0 }, "Q9s": { "raise": 0.6, "fold": 0.4 },
+          "JTs": { "raise": 1.0 }, "J9s": { "raise": 0.6, "fold": 0.4 },
+          "T9s": { "raise": 0.7, "fold": 0.3 }, "98s": { "raise": 0.5, "fold": 0.5 }, "87s": { "raise": 0.4, "fold": 0.6 }, "76s": { "raise": 0.3, "fold": 0.7 },
+          "AKo": { "raise": 1.0 }, "AQo": { "raise": 1.0 }, "AJo": { "raise": 1.0 }, "ATo": { "raise": 0.7, "fold": 0.3 }, "A9o": { "raise": 0.2, "fold": 0.8 },
+          "KQo": { "raise": 1.0 }, "KJo": { "raise": 0.7, "fold": 0.3 }, "KTo": { "raise": 0.4, "fold": 0.6 },
+          "QJo": { "raise": 0.5, "fold": 0.5 }, "QTo": { "raise": 0.2, "fold": 0.8 },
+          "JTo": { "raise": 0.3, "fold": 0.7 }
+        }
+      }
+    },
+    "MP": {
+      "rfi": {
+        "size": "2.5bb",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 1.0 }, "JJ": { "raise": 1.0 }, "TT": { "raise": 1.0 }, "99": { "raise": 1.0 }, "88": { "raise": 1.0 }, "77": { "raise": 1.0 }, "66": { "raise": 1.0 }, "55": { "raise": 1.0 }, "44": { "raise": 0.7, "fold": 0.3 }, "33": { "raise": 0.5, "fold": 0.5 }, "22": { "raise": 0.5, "fold": 0.5 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 1.0 }, "AJs": { "raise": 1.0 }, "ATs": { "raise": 1.0 }, "A9s": { "raise": 1.0 }, "A8s": { "raise": 1.0 }, "A7s": { "raise": 1.0 }, "A6s": { "raise": 0.9, "fold": 0.1 }, "A5s": { "raise": 1.0 }, "A4s": { "raise": 1.0 }, "A3s": { "raise": 1.0 }, "A2s": { "raise": 0.7, "fold": 0.3 },
+          "KQs": { "raise": 1.0 }, "KJs": { "raise": 1.0 }, "KTs": { "raise": 1.0 }, "K9s": { "raise": 1.0 }, "K8s": { "raise": 0.8, "fold": 0.2 }, "K7s": { "raise": 0.5, "fold": 0.5 }, "K6s": { "raise": 0.3, "fold": 0.7 },
+          "QJs": { "raise": 1.0 }, "QTs": { "raise": 1.0 }, "Q9s": { "raise": 1.0 }, "Q8s": { "raise": 0.5, "fold": 0.5 },
+          "JTs": { "raise": 1.0 }, "J9s": { "raise": 1.0 }, "J8s": { "raise": 0.5, "fold": 0.5 },
+          "T9s": { "raise": 1.0 }, "T8s": { "raise": 0.7, "fold": 0.3 },
+          "98s": { "raise": 1.0 }, "87s": { "raise": 0.8, "fold": 0.2 }, "76s": { "raise": 0.7, "fold": 0.3 }, "65s": { "raise": 0.5, "fold": 0.5 }, "54s": { "raise": 0.3, "fold": 0.7 },
+          "AKo": { "raise": 1.0 }, "AQo": { "raise": 1.0 }, "AJo": { "raise": 1.0 }, "ATo": { "raise": 1.0 }, "A9o": { "raise": 0.6, "fold": 0.4 }, "A8o": { "raise": 0.2, "fold": 0.8 },
+          "KQo": { "raise": 1.0 }, "KJo": { "raise": 1.0 }, "KTo": { "raise": 0.8, "fold": 0.2 },
+          "QJo": { "raise": 0.9, "fold": 0.1 }, "QTo": { "raise": 0.5, "fold": 0.5 },
+          "JTo": { "raise": 0.7, "fold": 0.3 }
+        }
+      }
+    },
+    "CO": {
+      "rfi": {
+        "size": "2.5bb",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 1.0 }, "JJ": { "raise": 1.0 }, "TT": { "raise": 1.0 }, "99": { "raise": 1.0 }, "88": { "raise": 1.0 }, "77": { "raise": 1.0 }, "66": { "raise": 1.0 }, "55": { "raise": 1.0 }, "44": { "raise": 1.0 }, "33": { "raise": 1.0 }, "22": { "raise": 1.0 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 1.0 }, "AJs": { "raise": 1.0 }, "ATs": { "raise": 1.0 }, "A9s": { "raise": 1.0 }, "A8s": { "raise": 1.0 }, "A7s": { "raise": 1.0 }, "A6s": { "raise": 1.0 }, "A5s": { "raise": 1.0 }, "A4s": { "raise": 1.0 }, "A3s": { "raise": 1.0 }, "A2s": { "raise": 1.0 },
+          "KQs": { "raise": 1.0 }, "KJs": { "raise": 1.0 }, "KTs": { "raise": 1.0 }, "K9s": { "raise": 1.0 }, "K8s": { "raise": 1.0 }, "K7s": { "raise": 1.0 }, "K6s": { "raise": 0.7, "fold": 0.3 }, "K5s": { "raise": 0.5, "fold": 0.5 }, "K4s": { "raise": 0.3, "fold": 0.7 },
+          "QJs": { "raise": 1.0 }, "QTs": { "raise": 1.0 }, "Q9s": { "raise": 1.0 }, "Q8s": { "raise": 1.0 }, "Q7s": { "raise": 0.5, "fold": 0.5 }, "Q6s": { "raise": 0.3, "fold": 0.7 },
+          "JTs": { "raise": 1.0 }, "J9s": { "raise": 1.0 }, "J8s": { "raise": 1.0 }, "J7s": { "raise": 0.6, "fold": 0.4 },
+          "T9s": { "raise": 1.0 }, "T8s": { "raise": 1.0 }, "T7s": { "raise": 0.6, "fold": 0.4 },
+          "98s": { "raise": 1.0 }, "97s": { "raise": 0.8, "fold": 0.2 }, "87s": { "raise": 1.0 }, "86s": { "raise": 0.7, "fold": 0.3 }, "76s": { "raise": 1.0 }, "75s": { "raise": 0.6, "fold": 0.4 }, "65s": { "raise": 1.0 }, "54s": { "raise": 0.8, "fold": 0.2 },
+          "AKo": { "raise": 1.0 }, "AQo": { "raise": 1.0 }, "AJo": { "raise": 1.0 }, "ATo": { "raise": 1.0 }, "A9o": { "raise": 1.0 }, "A8o": { "raise": 0.8, "fold": 0.2 }, "A7o": { "raise": 0.4, "fold": 0.6 }, "A5o": { "raise": 0.5, "fold": 0.5 },
+          "KQo": { "raise": 1.0 }, "KJo": { "raise": 1.0 }, "KTo": { "raise": 1.0 }, "K9o": { "raise": 0.6, "fold": 0.4 },
+          "QJo": { "raise": 1.0 }, "QTo": { "raise": 1.0 }, "Q9o": { "raise": 0.6, "fold": 0.4 },
+          "JTo": { "raise": 1.0 }, "J9o": { "raise": 0.5, "fold": 0.5 }
+        }
+      }
+    },
+    "BTN": {
+      "rfi": {
+        "size": "2.5bb",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 1.0 }, "JJ": { "raise": 1.0 }, "TT": { "raise": 1.0 }, "99": { "raise": 1.0 }, "88": { "raise": 1.0 }, "77": { "raise": 1.0 }, "66": { "raise": 1.0 }, "55": { "raise": 1.0 }, "44": { "raise": 1.0 }, "33": { "raise": 1.0 }, "22": { "raise": 1.0 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 1.0 }, "AJs": { "raise": 1.0 }, "ATs": { "raise": 1.0 }, "A9s": { "raise": 1.0 }, "A8s": { "raise": 1.0 }, "A7s": { "raise": 1.0 }, "A6s": { "raise": 1.0 }, "A5s": { "raise": 1.0 }, "A4s": { "raise": 1.0 }, "A3s": { "raise": 1.0 }, "A2s": { "raise": 1.0 },
+          "KQs": { "raise": 1.0 }, "KJs": { "raise": 1.0 }, "KTs": { "raise": 1.0 }, "K9s": { "raise": 1.0 }, "K8s": { "raise": 1.0 }, "K7s": { "raise": 1.0 }, "K6s": { "raise": 1.0 }, "K5s": { "raise": 1.0 }, "K4s": { "raise": 1.0 }, "K3s": { "raise": 0.8, "fold": 0.2 }, "K2s": { "raise": 0.6, "fold": 0.4 },
+          "QJs": { "raise": 1.0 }, "QTs": { "raise": 1.0 }, "Q9s": { "raise": 1.0 }, "Q8s": { "raise": 1.0 }, "Q7s": { "raise": 1.0 }, "Q6s": { "raise": 0.9, "fold": 0.1 }, "Q5s": { "raise": 0.7, "fold": 0.3 }, "Q4s": { "raise": 0.4, "fold": 0.6 },
+          "JTs": { "raise": 1.0 }, "J9s": { "raise": 1.0 }, "J8s": { "raise": 1.0 }, "J7s": { "raise": 1.0 }, "J6s": { "raise": 0.5, "fold": 0.5 },
+          "T9s": { "raise": 1.0 }, "T8s": { "raise": 1.0 }, "T7s": { "raise": 1.0 }, "T6s": { "raise": 0.5, "fold": 0.5 },
+          "98s": { "raise": 1.0 }, "97s": { "raise": 1.0 }, "96s": { "raise": 0.6, "fold": 0.4 },
+          "87s": { "raise": 1.0 }, "86s": { "raise": 1.0 }, "85s": { "raise": 0.5, "fold": 0.5 },
+          "76s": { "raise": 1.0 }, "75s": { "raise": 1.0 }, "65s": { "raise": 1.0 }, "64s": { "raise": 0.7, "fold": 0.3 }, "54s": { "raise": 1.0 }, "53s": { "raise": 0.5, "fold": 0.5 },
+          "AKo": { "raise": 1.0 }, "AQo": { "raise": 1.0 }, "AJo": { "raise": 1.0 }, "ATo": { "raise": 1.0 }, "A9o": { "raise": 1.0 }, "A8o": { "raise": 1.0 }, "A7o": { "raise": 1.0 }, "A6o": { "raise": 0.8, "fold": 0.2 }, "A5o": { "raise": 1.0 }, "A4o": { "raise": 0.7, "fold": 0.3 }, "A3o": { "raise": 0.4, "fold": 0.6 },
+          "KQo": { "raise": 1.0 }, "KJo": { "raise": 1.0 }, "KTo": { "raise": 1.0 }, "K9o": { "raise": 1.0 }, "K8o": { "raise": 0.6, "fold": 0.4 },
+          "QJo": { "raise": 1.0 }, "QTo": { "raise": 1.0 }, "Q9o": { "raise": 1.0 }, "Q8o": { "raise": 0.5, "fold": 0.5 },
+          "JTo": { "raise": 1.0 }, "J9o": { "raise": 1.0 }, "J8o": { "raise": 0.5, "fold": 0.5 },
+          "T9o": { "raise": 1.0 }, "T8o": { "raise": 0.6, "fold": 0.4 },
+          "98o": { "raise": 0.6, "fold": 0.4 }
+        }
+      },
+      "vs-bb-3bet": {
+        "size": "facing 11bb",
+        "notes": "BTN responding to BB 3bet. 4bet (raise) at ~10% with strongest hands + selected suited blockers; call wide; fold the rest.",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 0.7, "call": 0.3 }, "JJ": { "raise": 0.4, "call": 0.6 }, "TT": { "call": 1.0 }, "99": { "call": 1.0 }, "88": { "call": 1.0 }, "77": { "call": 0.8, "fold": 0.2 }, "66": { "call": 0.6, "fold": 0.4 }, "55": { "call": 0.4, "fold": 0.6 }, "44": { "fold": 1.0 }, "33": { "fold": 1.0 }, "22": { "fold": 1.0 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 0.5, "call": 0.5 }, "AJs": { "call": 1.0 }, "ATs": { "call": 1.0 }, "A9s": { "call": 0.5, "fold": 0.5 }, "A8s": { "call": 0.4, "fold": 0.6 }, "A5s": { "raise": 0.6, "call": 0.4 }, "A4s": { "raise": 0.4, "fold": 0.6 }, "A3s": { "fold": 1.0 }, "A2s": { "fold": 1.0 },
+          "KQs": { "call": 1.0 }, "KJs": { "call": 1.0 }, "KTs": { "call": 1.0 }, "K9s": { "fold": 1.0 },
+          "QJs": { "call": 1.0 }, "QTs": { "call": 0.6, "fold": 0.4 },
+          "JTs": { "call": 0.6, "fold": 0.4 },
+          "T9s": { "call": 0.4, "fold": 0.6 }, "98s": { "call": 0.3, "fold": 0.7 },
+          "AKo": { "raise": 0.7, "call": 0.3 }, "AQo": { "call": 0.5, "fold": 0.5 }, "AJo": { "fold": 1.0 }
+        }
+      }
+    },
+    "SB": {
+      "rfi": {
+        "size": "3bb",
+        "notes": "From SB unopened. Limps optional but solver-friendly mix is raise/fold.",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 1.0 }, "JJ": { "raise": 1.0 }, "TT": { "raise": 1.0 }, "99": { "raise": 1.0 }, "88": { "raise": 1.0 }, "77": { "raise": 1.0 }, "66": { "raise": 1.0 }, "55": { "raise": 1.0 }, "44": { "raise": 1.0 }, "33": { "raise": 1.0 }, "22": { "raise": 1.0 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 1.0 }, "AJs": { "raise": 1.0 }, "ATs": { "raise": 1.0 }, "A9s": { "raise": 1.0 }, "A8s": { "raise": 1.0 }, "A7s": { "raise": 1.0 }, "A6s": { "raise": 1.0 }, "A5s": { "raise": 1.0 }, "A4s": { "raise": 1.0 }, "A3s": { "raise": 1.0 }, "A2s": { "raise": 1.0 },
+          "KQs": { "raise": 1.0 }, "KJs": { "raise": 1.0 }, "KTs": { "raise": 1.0 }, "K9s": { "raise": 1.0 }, "K8s": { "raise": 1.0 }, "K7s": { "raise": 0.8, "fold": 0.2 }, "K6s": { "raise": 0.6, "fold": 0.4 },
+          "QJs": { "raise": 1.0 }, "QTs": { "raise": 1.0 }, "Q9s": { "raise": 1.0 }, "Q8s": { "raise": 0.7, "fold": 0.3 },
+          "JTs": { "raise": 1.0 }, "J9s": { "raise": 1.0 },
+          "T9s": { "raise": 1.0 }, "98s": { "raise": 0.9, "fold": 0.1 }, "87s": { "raise": 0.7, "fold": 0.3 }, "76s": { "raise": 0.6, "fold": 0.4 }, "65s": { "raise": 0.5, "fold": 0.5 },
+          "AKo": { "raise": 1.0 }, "AQo": { "raise": 1.0 }, "AJo": { "raise": 1.0 }, "ATo": { "raise": 1.0 }, "A9o": { "raise": 0.9, "fold": 0.1 }, "A8o": { "raise": 0.6, "fold": 0.4 },
+          "KQo": { "raise": 1.0 }, "KJo": { "raise": 1.0 }, "KTo": { "raise": 0.9, "fold": 0.1 },
+          "QJo": { "raise": 0.9, "fold": 0.1 }, "QTo": { "raise": 0.7, "fold": 0.3 },
+          "JTo": { "raise": 0.6, "fold": 0.4 }
+        }
+      }
+    },
+    "BB": {
+      "rfi": {
+        "size": "checks",
+        "notes": "BB never opens unopened (only call SB-completes or check option). For the chart we surface BB-defend ranges via the vsContext keys instead."
+      },
+      "vs-btn-open": {
+        "size": "facing 2.5bb",
+        "notes": "BB defending vs BTN open. Mix of 3bet (large) and call.",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 1.0, "call": 0 }, "JJ": { "raise": 0.7, "call": 0.3 }, "TT": { "raise": 0.4, "call": 0.6 }, "99": { "raise": 0.2, "call": 0.8 }, "88": { "call": 1.0 }, "77": { "call": 1.0 }, "66": { "call": 1.0 }, "55": { "call": 1.0 }, "44": { "call": 1.0 }, "33": { "call": 1.0 }, "22": { "call": 1.0 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 0.8, "call": 0.2 }, "AJs": { "raise": 0.5, "call": 0.5 }, "ATs": { "raise": 0.3, "call": 0.7 }, "A9s": { "call": 1.0 }, "A8s": { "call": 1.0 }, "A7s": { "call": 1.0 }, "A6s": { "call": 1.0 }, "A5s": { "raise": 0.6, "call": 0.4 }, "A4s": { "raise": 0.5, "call": 0.5 }, "A3s": { "raise": 0.3, "call": 0.7 }, "A2s": { "call": 1.0 },
+          "KQs": { "raise": 0.6, "call": 0.4 }, "KJs": { "raise": 0.4, "call": 0.6 }, "KTs": { "call": 1.0 }, "K9s": { "call": 1.0 }, "K8s": { "call": 1.0 }, "K7s": { "call": 1.0 }, "K6s": { "raise": 0.4, "call": 0.6 }, "K5s": { "raise": 0.4, "call": 0.6 }, "K4s": { "call": 1.0 }, "K3s": { "call": 1.0 }, "K2s": { "call": 1.0 },
+          "QJs": { "call": 1.0 }, "QTs": { "call": 1.0 }, "Q9s": { "call": 1.0 }, "Q8s": { "call": 1.0 }, "Q7s": { "call": 1.0 }, "Q6s": { "call": 1.0 },
+          "JTs": { "call": 1.0 }, "J9s": { "call": 1.0 }, "J8s": { "call": 1.0 }, "J7s": { "call": 0.7, "fold": 0.3 },
+          "T9s": { "call": 1.0 }, "T8s": { "call": 1.0 }, "T7s": { "call": 0.7, "fold": 0.3 },
+          "98s": { "call": 1.0 }, "97s": { "call": 0.8, "fold": 0.2 },
+          "87s": { "call": 1.0 }, "86s": { "call": 0.6, "fold": 0.4 },
+          "76s": { "call": 1.0 }, "75s": { "call": 0.6, "fold": 0.4 }, "65s": { "call": 1.0 }, "54s": { "call": 0.8, "fold": 0.2 },
+          "AKo": { "raise": 1.0 }, "AQo": { "raise": 0.6, "call": 0.4 }, "AJo": { "raise": 0.4, "call": 0.6 }, "ATo": { "call": 1.0 }, "A9o": { "call": 1.0 }, "A8o": { "call": 0.8, "fold": 0.2 }, "A7o": { "call": 0.5, "fold": 0.5 }, "A5o": { "raise": 0.4, "call": 0.6 },
+          "KQo": { "raise": 0.5, "call": 0.5 }, "KJo": { "call": 1.0 }, "KTo": { "call": 1.0 }, "K9o": { "call": 0.6, "fold": 0.4 },
+          "QJo": { "call": 1.0 }, "QTo": { "call": 0.7, "fold": 0.3 }, "Q9o": { "call": 0.5, "fold": 0.5 },
+          "JTo": { "call": 1.0 }, "J9o": { "call": 0.5, "fold": 0.5 },
+          "T9o": { "call": 0.6, "fold": 0.4 }
+        }
+      },
+      "vs-co-open": {
+        "size": "facing 2.5bb",
+        "notes": "BB defending vs CO open. Tighter than vs BTN; fewer 3bets.",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 0.9, "call": 0.1 }, "JJ": { "raise": 0.5, "call": 0.5 }, "TT": { "raise": 0.3, "call": 0.7 }, "99": { "call": 1.0 }, "88": { "call": 1.0 }, "77": { "call": 1.0 }, "66": { "call": 1.0 }, "55": { "call": 1.0 }, "44": { "call": 1.0 }, "33": { "call": 0.7, "fold": 0.3 }, "22": { "call": 0.7, "fold": 0.3 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 0.6, "call": 0.4 }, "AJs": { "raise": 0.3, "call": 0.7 }, "ATs": { "call": 1.0 }, "A9s": { "call": 1.0 }, "A8s": { "call": 1.0 }, "A7s": { "call": 0.8, "fold": 0.2 }, "A6s": { "call": 0.7, "fold": 0.3 }, "A5s": { "raise": 0.5, "call": 0.5 }, "A4s": { "raise": 0.3, "call": 0.7 }, "A3s": { "call": 0.6, "fold": 0.4 }, "A2s": { "call": 0.5, "fold": 0.5 },
+          "KQs": { "raise": 0.4, "call": 0.6 }, "KJs": { "call": 1.0 }, "KTs": { "call": 1.0 }, "K9s": { "call": 0.7, "fold": 0.3 },
+          "QJs": { "call": 1.0 }, "QTs": { "call": 1.0 }, "Q9s": { "call": 0.6, "fold": 0.4 },
+          "JTs": { "call": 1.0 }, "J9s": { "call": 0.7, "fold": 0.3 },
+          "T9s": { "call": 1.0 }, "98s": { "call": 0.8, "fold": 0.2 }, "87s": { "call": 0.6, "fold": 0.4 }, "76s": { "call": 0.5, "fold": 0.5 },
+          "AKo": { "raise": 1.0 }, "AQo": { "raise": 0.4, "call": 0.6 }, "AJo": { "call": 1.0 }, "ATo": { "call": 0.7, "fold": 0.3 },
+          "KQo": { "call": 1.0 }, "KJo": { "call": 0.7, "fold": 0.3 }
+        }
+      },
+      "vs-mp-open": {
+        "size": "facing 2.5bb",
+        "notes": "BB defending vs MP open. Tighter still.",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 0.7, "call": 0.3 }, "JJ": { "raise": 0.3, "call": 0.7 }, "TT": { "call": 1.0 }, "99": { "call": 1.0 }, "88": { "call": 1.0 }, "77": { "call": 1.0 }, "66": { "call": 0.8, "fold": 0.2 }, "55": { "call": 0.6, "fold": 0.4 },
+          "AKs": { "raise": 1.0 }, "AQs": { "raise": 0.4, "call": 0.6 }, "AJs": { "call": 1.0 }, "ATs": { "call": 1.0 }, "A9s": { "call": 0.7, "fold": 0.3 }, "A5s": { "raise": 0.4, "call": 0.6 },
+          "KQs": { "call": 1.0 }, "KJs": { "call": 0.7, "fold": 0.3 }, "KTs": { "call": 0.6, "fold": 0.4 },
+          "QJs": { "call": 1.0 }, "QTs": { "call": 0.6, "fold": 0.4 },
+          "JTs": { "call": 0.8, "fold": 0.2 }, "T9s": { "call": 0.6, "fold": 0.4 }, "98s": { "call": 0.4, "fold": 0.6 },
+          "AKo": { "raise": 0.8, "call": 0.2 }, "AQo": { "call": 1.0 }, "AJo": { "call": 0.6, "fold": 0.4 }, "KQo": { "call": 0.7, "fold": 0.3 }
+        }
+      },
+      "vs-utg-open": {
+        "size": "facing 2.5bb",
+        "notes": "BB defending vs UTG open. Tightest of all.",
+        "ranges": {
+          "AA": { "raise": 1.0 }, "KK": { "raise": 1.0 }, "QQ": { "raise": 0.5, "call": 0.5 }, "JJ": { "call": 1.0 }, "TT": { "call": 1.0 }, "99": { "call": 1.0 }, "88": { "call": 0.8, "fold": 0.2 }, "77": { "call": 0.6, "fold": 0.4 },
+          "AKs": { "raise": 1.0 }, "AQs": { "call": 1.0 }, "AJs": { "call": 1.0 }, "ATs": { "call": 0.8, "fold": 0.2 }, "A5s": { "raise": 0.3, "call": 0.7 },
+          "KQs": { "call": 1.0 }, "KJs": { "call": 0.6, "fold": 0.4 }, "QJs": { "call": 0.7, "fold": 0.3 },
+          "AKo": { "raise": 0.5, "call": 0.5 }, "AQo": { "call": 0.6, "fold": 0.4 }
+        }
+      }
+    }
+  }
+}

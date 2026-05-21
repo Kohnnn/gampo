@@ -261,7 +261,9 @@ function SportsPage() {
                 <div className="sports-balance">
                     <span>Practice Credits</span>
                     <strong>{formatCredits(balance)}</strong>
-                    <small className="quota-chip">Odds API quota remaining: {totalQuotaRemaining || '–'}</small>
+                    {totalQuotaRemaining ? (
+                        <small className="quota-chip">Odds API quota remaining: {totalQuotaRemaining}</small>
+                    ) : null}
                 </div>
             </section>
 

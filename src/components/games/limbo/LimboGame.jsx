@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { clamp, formatCredits, limboWinChance } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './limbo.css'
@@ -35,7 +35,11 @@ export default function LimboGame() {
         setRunning(true)
         const { roll: r } = nextRoll('limbo')
         const won = r < chance
-        const multiplier = won ? target + r * target : 1 + r * Math.max(0.1, target - 1)
+        // Reveal multiplier: on win the actual payout target; on loss a value below target
+        // proportional to how close the random roll was to the win threshold.
+        const multiplier = won
+            ? target
+            : 1 + (1 - Math.min(0.999, r)) * Math.max(0.1, target - 1)
         const returnAmount = won ? betAmount * target : 0
         const profit = returnAmount - betAmount
         if (won) addWinnings(returnAmount, 'Limbo return')
@@ -95,6 +99,7 @@ export default function LimboGame() {
             }
         >
             <div className={`limbo-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className="limbo-stars-bg" />
                 <div className="limbo-rocket-row">
                     <div className="limbo-gauge">

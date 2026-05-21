@@ -5,6 +5,16 @@
     gap: 22px;
     align-items: center;
     transition: box-shadow 0.4s ease;
+    /* Scope the diamond/grid background to the game canvas only — fixes the
+       bleed reported in the QA evaluation report (Section 3 / Roulette). */
+    contain: layout paint;
+    overflow: hidden;
+    border-radius: 14px;
+    padding: 16px;
+    background:
+        radial-gradient(circle at 70% 100%, rgba(20, 160, 80, 0.06), transparent 65%),
+        linear-gradient(180deg, rgba(15, 33, 46, 0.55), rgba(10, 25, 35, 0.55));
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .rou-wheel-area {
@@ -110,6 +120,26 @@
 .rou-num-pop.red { background: linear-gradient(135deg, #c93237, #8a1f23); }
 .rou-num-pop.green { background: linear-gradient(135deg, #14a050, #0a6633); }
 .rou-num-pop.black { background: linear-gradient(135deg, #2a2f36, #0a0d12); }
+.rou-num-pop.idle {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 30px;
+    background: rgba(15, 33, 46, 0.95);
+    animation: none;
+}
+.rou-num-pop.idle span {
+    display: inline-block;
+    animation: rouIdleSpin 4s linear infinite;
+}
+
+@keyframes rouIdleSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rou-num-pop.idle span { animation: none; }
+}
+.gampo-reduce-motion .rou-num-pop.idle span { animation: none; }
 
 .rou-history {
     display: flex;

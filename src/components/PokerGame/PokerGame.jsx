@@ -5,9 +5,24 @@ import { useAudio } from '../../audio/AudioProvider'
 import { formatCredits } from '../../utils/simulationMath'
 import { applyAction, createInitialState, dealNext, legalActions, startHand } from '../../poker/engine/Game'
 import HeuristicBot from '../../poker/bots/HeuristicBot'
+import { preloadGto } from '../../poker/gto/loader'
+import GtoPanel from './GtoPanel'
+import HandHistoryTab, { recordHand } from './HandHistoryTab'
 import './PokerGame.css'
 
-const BOT_NAMES = ['lucky_lemur', 'binary_bee', 'oddsmonkey', 'crash_capt', 'plinko_pat']
+const BUY_INS = [200, 500, 1000, 10000]
+const BOT_PERSONAS = [
+    { name: 'lucky_lemur', avatar: 1, aggression: 0.52, chat: ['glgl', 'small pot poker', 'river saved me'] },
+    { name: 'binary_bee', avatar: 2, aggression: 0.38, chat: ['range says call', 'too many bluffs?', 'checking back'] },
+    { name: 'oddsmonkey', avatar: 3, aggression: 0.68, chat: ['pot odds say yes', 'thin value?', 'priced in'] },
+    { name: 'crash_capt', avatar: 4, aggression: 0.82, chat: ['pressure spot', 'big sizing', 'no fear'] },
+    { name: 'plinko_pat', avatar: 5, aggression: 0.47, chat: ['bouncy flop', 'one time', 'variance lol'] },
+    { name: 'turn_barrel', avatar: 1, aggression: 0.74, chat: ['barrel card', 'polar now', 'turn is mine'] },
+    { name: 'nit_nova', avatar: 2, aggression: 0.29, chat: ['not defending that', 'discipline', 'folding range'] },
+    { name: 'river_raccoon', avatar: 3, aggression: 0.58, chat: ['river spot', 'show me', 'thin call'] },
+    { name: 'solver_sam', avatar: 4, aggression: 0.61, chat: ['mixed node', 'spr matters', 'balanced enough'] },
+    { name: 'bubble_ace', avatar: 5, aggression: 0.43, chat: ['survive first', 'ladder brain', 'no punt'] },
+]
 const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => `/assets/games/poker/poker-avatar-${i}.png`)
 const SB = 1
 const BB = 2
@@ -15,6 +30,22 @@ const BB = 2
 function suitGlyph(s) { return s === 'h' ? '\u2665' : s === 'd' ? '\u2666' : s === 's' ? '\u2660' : '\u2663' }
 function suitClass(s) { return (s === 'h' || s === 'd') ? 'red' : 'black' }
 function rankPretty(r) { return r === 'T' ? '10' : r }
+
+function samplePersonas() {
+    return BOT_PERSONAS
+        .map(p => ({ p, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .slice(0, 5)
+        .map(({ p }, i) => ({ ...p, id: `bot${i}`, avatar: BOT_AVATARS[p.avatar - 1] }))
+}
+
+function botLine(persona, decision, state) {
+    const pot = state?.pot || 0
+    if (decision.type === 'raise') return decision.amount > pot ? 'overbet pressure' : persona.chat[Math.floor(Math.random() * persona.chat.length)]
+    if (decision.type === 'fold') return ['not defending that', 'too expensive', 'live to fight'][Math.floor(Math.random() * 3)]
+    if (decision.type === 'call') return ['priced in', 'call and see', 'sticky one'][Math.floor(Math.random() * 3)]
+    return ['check it', 'pot control', 'free card?'][Math.floor(Math.random() * 3)]
+}
 
 function PokerCard({ card, hidden }) {
     if (!card) return <div className="pk-card empty">--</div>
@@ -40,17 +71,48 @@ export default function PokerGame() {
     ])
     const [chatInput, setChatInput] = useState('')
     const [raiseAmount, setRaiseAmount] = useState(null)
+    const [tab, setTab] = useState('gto')
+    const [buyIn, setBuyIn] = useState(200)
+    const [bubbles, setBubbles] = useState({})
     const stepTimer = useRef(null)
+    const lastRecordedShowdown = useRef(null)
+    // Hero stack at the start of the current hand. Used to derive accurate
+    // per-hand profit at showdown (final stack − snapshot).
+    const heroStartStackRef = useRef(0)
+    const lastHandStartHistoryLen = useRef(-1)
+
+    useEffect(() => {
+        // Lazy preload GTO data once mounted so the panel doesn't block on first open.
+        preloadGto()
+    }, [])
+
+    // Snapshot hero stack on each new hand. We detect "new hand" by watching
+    // for the engine resetting community + history at the start of preflop.
+    useEffect(() => {
+        if (!state || !state.players?.length) return
+        const hero = state.players.find(p => p.isHuman)
+        if (!hero) return
+        const street = state.street
+        const handStartedNow = street === 'preflop' && state.community.length === 0 && lastHandStartHistoryLen.current !== state.history.length
+        if (handStartedNow && hero.lastAction === null) {
+            // Hero stack here already had blinds posted; add hero.putIn to recover the
+            // pre-blind starting stack.
+            heroStartStackRef.current = hero.stack + (hero.putIn || 0)
+            lastHandStartHistoryLen.current = state.history.length
+            lastRecordedShowdown.current = null
+        }
+    }, [state])
 
     const startSession = () => {
-        if (balance < 200) {
-            showToast('error', 'Need 200 GC', 'Add credits to sit down')
+        if (balance < buyIn) {
+            showToast('error', `Need ${formatCredits(buyIn)}`, 'Add credits to sit down')
             return
         }
-        if (!placeBet(200, 'Poker buy-in')) return
+        if (!placeBet(buyIn, 'Poker buy-in')) return
+        const personas = samplePersonas()
         const seats = [
-            { id: 'you', name: 'you', stack: 200, isHuman: true },
-            ...BOT_NAMES.map((n, i) => ({ id: `bot${i}`, name: n, stack: 200, avatar: BOT_AVATARS[i] })),
+            { id: 'you', name: 'you', stack: buyIn, isHuman: true },
+            ...personas.map(p => ({ id: p.id, name: p.name, stack: buyIn, avatar: p.avatar, persona: p })),
         ]
         const init = createInitialState({ players: seats, sb: SB, bb: BB, buttonIndex: 4 })
         setState(startHand(init))
@@ -60,27 +122,81 @@ export default function PokerGame() {
 
     useEffect(() => {
         if (!state) return
-        if (state.toAct < 0) return
+        if (state.street === 'showdown') return
+        // QA v4 watchdog: if there's no live actor mid-hand, force-advance.
+        if (state.toAct < 0) {
+            const stepTimerId = window.setTimeout(() => {
+                setState(prev => {
+                    if (!prev || prev.street === 'showdown' || prev.toAct >= 0) return prev
+                    return applyAction(prev, { type: 'check' }) // benign no-op kicks the engine
+                })
+            }, 250)
+            return () => window.clearTimeout(stepTimerId)
+        }
         const p = state.players[state.toAct]
         if (!p || p.isHuman) return
-        // Bot acts after a short think time
-        if (stepTimer.current) window.clearTimeout(stepTimer.current)
-        stepTimer.current = window.setTimeout(() => {
-            const decision = HeuristicBot({ state, seatIndex: state.toAct, aggression: 0.5 + (state.toAct * 0.05) % 0.4 })
+        // Bot acts after a short think time. Tracked per-turn so a stale
+        // cleanup can't clobber the pending bot.
+        const seatId = `${state.toAct}-${state.history.length}`
+        const decideTimer = window.setTimeout(() => {
+            const persona = p.persona || { aggression: 0.5, chat: ['nice'] }
+            const decision = HeuristicBot({ state, seatIndex: state.toAct, aggression: persona.aggression })
             setState(prev => applyAction(prev, decision))
             playSound(decision.type === 'fold' ? 'click' : decision.type === 'raise' ? 'flip' : 'tick')
-            // Bot chatter
-            if (Math.random() < 0.18) {
-                const lines = ['nice', 'check', 'call', 'min raise', 'all in lol', 'gl', 'sigh', 'one time']
-                setChat(prev => [...prev.slice(-30), { id: Date.now(), user: p.name, text: lines[Math.floor(Math.random() * lines.length)] }])
+            if (Math.random() < 0.46) {
+                const text = botLine(persona, decision, state)
+                setChat(prev => [...prev.slice(-30), { id: Date.now(), user: p.name, text }])
+                setBubbles(prev => ({ ...prev, [p.id]: text }))
+                window.setTimeout(() => setBubbles(prev => {
+                    const next = { ...prev }
+                    delete next[p.id]
+                    return next
+                }), 2800)
             }
         }, 700)
-        return () => { if (stepTimer.current) window.clearTimeout(stepTimer.current) }
+        // QA v4 escape hatch: if a bot's turn doesn't resolve in 5s for any
+        // reason, auto-fold them so the table can never deadlock.
+        const escapeTimer = window.setTimeout(() => {
+            setState(prev => {
+                if (!prev || prev.street === 'showdown') return prev
+                const cur = prev.players[prev.toAct]
+                if (!cur || cur.isHuman || cur.id !== p.id) return prev
+                // eslint-disable-next-line no-console
+                console.warn('[PokerGame] bot escape-hatch fold:', p.name, 'seat', state.toAct)
+                return applyAction(prev, { type: 'fold' })
+            })
+        }, 5000)
+        stepTimer.current = { decideTimer, escapeTimer, seatId }
+        return () => {
+            window.clearTimeout(decideTimer)
+            window.clearTimeout(escapeTimer)
+        }
     }, [state, playSound])
 
     const acts = state ? legalActions(state) : []
     const human = state ? state.players.find(p => p.isHuman) : null
     const isHumanTurn = state && state.toAct >= 0 && state.players[state.toAct]?.isHuman
+
+    // Record settled hand to history (once per showdown).
+    useEffect(() => {
+        if (!state || state.street !== 'showdown' || !human) return
+        const sigKey = state.history.length + ':' + state.winners.map(w => `${w.id}:${w.share}`).join(',')
+        if (lastRecordedShowdown.current === sigKey) return
+        lastRecordedShowdown.current = sigKey
+        const heroWin = state.winners.find(w => w.id === human.id)
+        // Hand profit = final hero stack (post-payout) minus the snapshot stack.
+        const startStack = heroStartStackRef.current || 0
+        const finalStack = human.stack || 0
+        const handProfit = startStack > 0 ? (finalStack - startStack) : ((heroWin?.share || 0) - (human.putIn || 0))
+        const wagered = startStack > 0 ? Math.max(0, startStack - finalStack + Math.max(0, handProfit)) : (human.putIn || 0)
+        recordHand({
+            id: `hand-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            label: heroWin ? (heroWin.hand || 'Won') : 'Folded/Lost',
+            profit: handProfit,
+            betAmount: wagered,
+            meta: { winners: state.winners.map(w => w.id), street: state.street, startStack, finalStack },
+        })
+    }, [state, human])
 
     const handleAction = (act) => {
         if (!isHumanTurn) return
@@ -135,9 +251,14 @@ export default function PokerGame() {
             </div>
             {!seated && (
                 <div className="poker-lobby">
-                    <h2>Buy-in 200 GC</h2>
-                    <p>Sit at a 6-handed table with 5 simulated bots. Practice credits only. No cash value.</p>
-                    <button className="poker-buyin" disabled={balance < 200} onClick={startSession}>Sit Down</button>
+                    <h2>Choose buy-in</h2>
+                    <p>Sit at a 6-handed table with five randomized bot personas. Practice credits only. No cash value.</p>
+                    <div className="poker-buyin-options">
+                        {BUY_INS.map(amount => (
+                            <button key={amount} className={buyIn === amount ? 'active' : ''} disabled={balance < amount} onClick={() => setBuyIn(amount)}>{formatCredits(amount)}</button>
+                        ))}
+                    </div>
+                    <button className="poker-buyin" disabled={balance < buyIn} onClick={startSession}>Sit Down {formatCredits(buyIn)}</button>
                 </div>
             )}
             {seated && state && (
@@ -170,6 +291,7 @@ export default function PokerGame() {
                                                 )
                                             )}
                                         </div>
+                                        {bubbles[p.id] && <div className="pk-speech">{bubbles[p.id]}</div>}
                                         {i === state.buttonIndex && <span className="pk-button-chip">D</span>}
                                     </div>
                                 ))}
@@ -213,16 +335,35 @@ export default function PokerGame() {
                             )}
                         </div>
                     </div>
-                    <aside className="poker-chat">
-                        <h3>Table chat</h3>
-                        <div className="pk-chat-banner">Simulated chat. Bots and you only.</div>
-                        <div className="pk-chat-list">
-                            {chat.map(m => <div key={m.id} className={`pk-msg ${m.user === 'you' ? 'self' : ''}`}><span>{m.user}</span><b>{m.text}</b></div>)}
+                    <aside className="poker-sidebar">
+                        <div className="poker-tabs">
+                            <button className={`poker-tab ${tab === 'gto' ? 'active' : ''}`} onClick={() => setTab('gto')}>GTO</button>
+                            <button className={`poker-tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
+                            <button className={`poker-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>Chat</button>
                         </div>
-                        <div className="pk-chat-input">
-                            <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Say nh..." />
-                            <button onClick={sendChat}>Send</button>
-                        </div>
+                        {tab === 'gto' && (
+                            <div className="poker-sidebar-body">
+                                <GtoPanel state={state} />
+                            </div>
+                        )}
+                        {tab === 'history' && (
+                            <div className="poker-sidebar-body">
+                                <HandHistoryTab liveState={state} />
+                            </div>
+                        )}
+                        {tab === 'chat' && (
+                            <div className="poker-sidebar-body poker-chat">
+                                <h3>Table chat</h3>
+                                <div className="pk-chat-banner">Simulated chat. Bots and you only.</div>
+                                <div className="pk-chat-list">
+                                    {chat.map(m => <div key={m.id} className={`pk-msg ${m.user === 'you' ? 'self' : ''}`}><span>{m.user}</span><b>{m.text}</b></div>)}
+                                </div>
+                                <div className="pk-chat-input">
+                                    <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Say nh..." />
+                                    <button onClick={sendChat}>Send</button>
+                                </div>
+                            </div>
+                        )}
                     </aside>
                 </div>
             )}

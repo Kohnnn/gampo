@@ -180,6 +180,51 @@
 .dice-meta-card.payout strong { color: #ffcf5a; }
 .dice-meta-card.chance strong { color: #58a6ff; }
 
+.dice-pips {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    width: 100%;
+    max-width: 520px;
+}
+
+.dice-pip {
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 8px 6px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.dice-pip-label {
+    font-weight: 950;
+    font-size: 16px;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.dice-pip-tag {
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.dice-pip.empty .dice-pip-label { color: var(--text-muted); }
+.dice-pip.won  { border-color: rgba(0, 231, 1, 0.45); background: rgba(0, 231, 1, 0.10); }
+.dice-pip.won  .dice-pip-tag { color: #2af04a; }
+.dice-pip.lost { border-color: rgba(237, 66, 69, 0.45); background: rgba(237, 66, 69, 0.10); }
+.dice-pip.lost .dice-pip-tag { color: #ff5a5d; }
+
 .dice-slider {
     width: 100%;
     accent-color: var(--accent-green);

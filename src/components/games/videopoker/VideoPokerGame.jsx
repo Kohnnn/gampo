@@ -4,16 +4,15 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
+import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './videopoker.css'
 
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 const SUITS = ['S', 'H', 'D', 'C']
 function rankValue(r) { return r === 'A' ? 14 : r === 'K' ? 13 : r === 'Q' ? 12 : r === 'J' ? 11 : Number(r) }
-function suitClass(s) { return (s === 'H' || s === 'D') ? 'red' : 'black' }
-function suitGlyph(s) { return s === 'H' ? '\u2665' : s === 'D' ? '\u2666' : s === 'S' ? '\u2660' : '\u2663' }
 
 function buildShuffledDeck() {
     const deck = []
@@ -71,9 +70,12 @@ export default function VideoPokerGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [dealKey, setDealKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
+        if (phase === 'draw') { resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Video Poker')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('deal')
         setCards(buildShuffledDeck().slice(0, 5))
         setHeld([])
@@ -81,8 +83,6 @@ export default function VideoPokerGame() {
         setPhase('draw')
         setOutcomeKey(null)
         setDealKey(k => k + 1)
-        // Resolve after draw click; for autoplay, auto-draw immediately keeping nothing (fast loop).
-        // We resolve here so autoplay can continue, but the draw button still finalizes the hand.
         resolve({ profit: 0 })
     })
 
@@ -125,14 +125,25 @@ export default function VideoPokerGame() {
             accent="#8ae66e"
             backdrop="/assets/games/backdrops/backdrop-felt-green.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={phase === 'draw'} actionLabel="Deal" onPlay={performPlay} disableAuto>
-                    <button className="bp-bet-btn" disabled={phase !== 'draw'} onClick={draw}>Draw selected hand</button>
+                <BetPanel
+                    balance={balance}
+                    initialBet={5}
+                    runningRound={false}
+                    actionLabel="Deal"
+                    onPlay={performPlay}
+                    disableAuto
+                    lastBet={lastBet}
+                    playPhase={phase === 'draw' ? 'in-round' : null}
+                    playLabel={phase === 'draw' ? 'Draw' : 'Deal'}
+                    onPlayPhaseAction={draw}
+                >
                     <p className="bp-hint">Click cards to hold; Draw replaces unheld cards.</p>
                 </BetPanel>
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
             <div className="vp-stage">
+                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className="vp-paytable">
                     {PAYTABLE.map(row => (
                         <div key={row.key} className={`vp-paytable-row ${outcomeKey === row.key ? 'won' : ''}`}>
@@ -141,20 +152,20 @@ export default function VideoPokerGame() {
                     ))}
                 </div>
                 <div className="vp-row">
+                    {phase === 'idle' && cards.length === 0 && (
+                        <div className="vp-empty-overlay">Click Deal to start</div>
+                    )}
                     {(cards.length ? cards : Array.from({ length: 5 }, () => null)).map((card, i) => (
                         <button
                             key={`${dealKey}-${i}`}
-                            className={`vp-card ${suitClass(card?.suit || 'S')} ${held.includes(i) ? 'held' : ''}`}
+                            className={`vp-card-slot ${held.includes(i) ? 'held' : ''}`}
                             disabled={!card || phase !== 'draw'}
                             style={{ animationDelay: `${i * 90}ms` }}
                             onClick={() => setHeld(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])}
                         >
-                            {card ? (
-                                <>
-                                    <span className="vp-rank">{card.rank}</span>
-                                    <span className="vp-suit">{suitGlyph(card.suit)}</span>
-                                </>
-                            ) : '--'}
+                            {card
+                                ? <CardFace rank={card.rank} suit={card.suit} dealing size="lg" />
+                                : <CardBack size="lg" />}
                             {held.includes(i) && <span className="vp-hold">HOLD</span>}
                         </button>
                     ))}
