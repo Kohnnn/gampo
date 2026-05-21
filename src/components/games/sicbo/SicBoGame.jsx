@@ -4,10 +4,13 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import { evaluate, rollDice } from './bets'
+import SicBoDie from './SicBoDie'
 import EducationPanel from '../../EducationPanel'
+import './SicBoDie.css'
 import './sicbo.css'
 
 export default function SicBoGame() {
@@ -19,15 +22,28 @@ export default function SicBoGame() {
     const [chip, setChip] = useState(5)
     const [bets, setBets] = useState({}) // key: 'big', 'total:8', 'single:3', 'pair:5', 'triple:any', 'triple:6', 'combo:1-2'
     const [dice, setDice] = useState([1, 2, 3])
-    const [revealed, setRevealed] = useState([false, false, false])
+    // QA v4: dice start revealed so the user always sees a real pip face
+    // pre-roll instead of "?" placeholders.
+    const [revealed, setRevealed] = useState([true, true, true])
     const [shaking, setShaking] = useState(false)
     const [running, setRunning] = useState(false)
     const [lastWon, setLastWon] = useState(null)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [burstKey, setBurstKey] = useState(0)
+    const [lastChips, setLastChips] = useState({})
+    const [lastTotal, setLastTotal] = useState(null)
+    const { schedule, cancelAll } = useCancellableTimeouts()
 
     const totalStake = Object.values(bets).reduce((s, v) => s + v, 0)
     const addBet = (key) => setBets(prev => ({ ...prev, [key]: (prev[key] || 0) + chip }))
     const clear = () => setBets({})
+    const restoreLast = () => {
+        if (!Object.keys(lastChips).length) {
+            showToast('error', 'No previous bets', 'Place chips to seed Repeat')
+            return
+        }
+        setBets({ ...lastChips })
+    }
 
     const settleBet = (key, d) => {
         if (key === 'big' || key === 'small' || key === 'odd' || key === 'even') return evaluate(d, key)
@@ -43,37 +59,53 @@ export default function SicBoGame() {
         return 0
     }
 
-    const performPlay = () => new Promise(resolve => {
-        if (totalStake <= 0) { showToast('error', 'No bets', 'Place chips first'); resolve({ profit: 0 }); return }
-        if (!placeBet(totalStake, 'Sic Bo')) { showToast('error', 'Not enough credits', `Need ${formatCredits(totalStake)}`); resolve({ profit: 0 }); return }
+    const performPlay = ({ mode } = {}) => new Promise(resolve => {
+        let activeBets = bets
+        let stake = totalStake
+        if (stake <= 0 && Object.keys(lastChips).length && (mode === 'auto' || mode === 'manual')) {
+            activeBets = { ...lastChips }
+            stake = Object.values(activeBets).reduce((s, v) => s + v, 0)
+            setBets(activeBets)
+        }
+        if (stake <= 0) { showToast('error', 'No bets', 'Place chips first'); resolve({ profit: 0 }); return }
+        if (!placeBet(stake, 'Sic Bo')) { showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`); resolve({ profit: 0 }); return }
+        cancelAll()
+        setLastChips({ ...activeBets })
+        setLastTotal(stake)
         playSound('tick')
         setRunning(true)
         setShaking(true)
         setRevealed([false, false, false])
         const next = rollDice(() => nextRoll('sicbo').roll)
-        window.setTimeout(() => {
+        schedule(() => {
             setShaking(false)
             setDice(next)
             playSound('flip')
             setRevealed([true, false, false])
-            window.setTimeout(() => { playSound('flip'); setRevealed([true, true, false]) }, 250)
-            window.setTimeout(() => {
+            schedule(() => { playSound('flip'); setRevealed([true, true, false]) }, 250)
+            schedule(() => {
                 playSound('flip')
                 setRevealed([true, true, true])
                 let totalReturn = 0
-                for (const [k, amount] of Object.entries(bets)) {
+                for (const [k, amount] of Object.entries(activeBets)) {
                     const mult = settleBet(k, next)
                     if (mult) totalReturn += amount * mult
                 }
-                const profit = totalReturn - totalStake
+                const profit = totalReturn - stake
                 if (totalReturn > 0) addWinnings(totalReturn, 'Sic Bo return')
+                const effectiveMult = stake > 0 ? totalReturn / stake : 0
                 setLastWon(profit > 0)
                 setBurstKey(k => k + 1)
-                playSound(profit > 0 ? 'win' : 'loss')
+                if (effectiveMult >= 8) {
+                    playSound('bigwin')
+                    setBigWin({ trigger: Date.now(), profit, multiplier: effectiveMult })
+                } else {
+                    playSound(profit > 0 ? 'win' : 'loss')
+                }
                 session.record({
                     id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                     label: `${next.join('+')}=${next.reduce((a, b) => a + b, 0)}`,
-                    profit, betAmount: totalStake,
+                    profit, betAmount: stake,
                     meta: { dice: next, total: next.reduce((a, b) => a + b, 0) },
                 })
                 showToast(profit >= 0 ? 'win' : 'loss', `Sic Bo ${next.reduce((a, b) => a + b, 0)}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
@@ -100,6 +132,7 @@ export default function SicBoGame() {
                     runningRound={running}
                     actionLabel={`Roll Dice (${formatCredits(totalStake)})`}
                     onPlay={performPlay}
+                    lastBet={lastTotal}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Chip</label>
@@ -109,7 +142,10 @@ export default function SicBoGame() {
                             ))}
                         </div>
                     </div>
-                    <button className="bp-bet-btn" onClick={clear} disabled={!totalStake}>Clear bets</button>
+                    <div className="bp-row">
+                        <button className="bp-bet-btn" onClick={clear} disabled={!totalStake}>Clear</button>
+                        <button className="bp-bet-btn" onClick={restoreLast} disabled={!Object.keys(lastChips).length}>Repeat</button>
+                    </div>
                 </BetPanel>
             }
             aside={
@@ -120,14 +156,24 @@ export default function SicBoGame() {
             }
         >
             <div className={`sb-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+                <RecentResultsStrip results={session.stats.lastResults} />
                 {shaking ? (
                     <div className="sb-cup-area">
-                        <div className="sb-cup shaking"><span>?</span><span>?</span><span>?</span></div>
+                        <div className="sb-cup shaking">
+                            <SicBoDie value={null} revealed={false} />
+                            <SicBoDie value={null} revealed={false} />
+                            <SicBoDie value={null} revealed={false} />
+                        </div>
                     </div>
                 ) : (
                     <div className="sb-dice">
                         {dice.map((v, i) => (
-                            <span key={i} className={`sb-die ${revealed[i] ? 'revealed' : ''} ${revealed[i] && lastWon && bets['triple-any'] ? 'triple-win' : ''}`} style={{ animationDelay: `${i * 100}ms` }}>{revealed[i] ? v : '?'}</span>
+                            <SicBoDie
+                                key={i}
+                                value={v}
+                                revealed={revealed[i]}
+                                className={revealed[i] && lastWon && bets['triple-any'] ? 'triple-win' : ''}
+                            />
                         ))}
                     </div>
                 )}
@@ -156,12 +202,11 @@ export default function SicBoGame() {
                         ))}
                     </div>
 
-                    <div className="sb-row-label">Single Dice</div>
+                    <div className="sb-row-label">Single Dice <small>· pays 2× for 1, 3× for 2, 4× for 3 of a kind</small></div>
                     <div className="sb-row singles">
                         {[1, 2, 3, 4, 5, 6].map(n => (
-                            <div key={n} className={`sb-cell ${cellOn(`single-${n}`) ? 'has-bet' : ''}`} onClick={() => addBet(`single-${n}`)}>
+                            <div key={n} className={`sb-cell ${cellOn(`single-${n}`) ? 'has-bet' : ''}`} onClick={() => addBet(`single-${n}`)} title="Pays 2×/3×/4× for 1, 2, or 3 of this number">
                                 {n}
-                                <span className="sb-payout">2x/3x/4x</span>
                                 {cellOn(`single-${n}`) && <span className="sb-payout">{formatCredits(bets[`single-${n}`])}</span>}
                             </div>
                         ))}
@@ -192,6 +237,7 @@ export default function SicBoGame() {
 
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={16} color="#ff8f3d" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={0.486} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

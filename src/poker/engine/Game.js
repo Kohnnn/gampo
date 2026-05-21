@@ -226,7 +226,20 @@ function advanceStreet(state) {
     } else if (next.street === 'river') {
         return concludeHand(next)
     }
+    // Mark street transition in history so panels can split action by street.
+    next.history.push({ type: 'street', street: next.street })
     next.toAct = nextActiveIndex(next, next.buttonIndex)
+
+    // QA v4: when no one is active to act (everyone all-in / folded), keep
+    // burning streets until showdown so the hand can never freeze waiting on
+    // a phantom turn.
+    if (next.toAct < 0) {
+        const stillLive = next.players.filter(p => p.status !== 'folded' && p.status !== 'sittingOut')
+        if (stillLive.length <= 1 || next.street === 'river') {
+            return concludeHand(next)
+        }
+        return advanceStreet(next)
+    }
     return next
 }
 

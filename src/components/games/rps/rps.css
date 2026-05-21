@@ -7,6 +7,14 @@
     padding: 32px 12px;
     transition: box-shadow 0.4s ease;
     border-radius: 16px;
+    /* Scope decorative gradient/grid so it never bleeds outside the panel
+       (eval report Section 3 / RPS). */
+    contain: layout paint;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 50% 0%, rgba(239, 71, 111, 0.10), transparent 60%),
+        linear-gradient(180deg, rgba(15, 33, 46, 0.55), rgba(10, 25, 35, 0.55));
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .rps-versus {

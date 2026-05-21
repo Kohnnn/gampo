@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, pickWeighted } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession, Asset } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './slots.css'
@@ -69,7 +69,9 @@ export default function SlotsGame() {
         : { rows: 4, cols: 6, paylines: null }
     const totalCells = variantConfig.rows * variantConfig.cols
     const themeSymbols = themes[theme].symbols
-    const [reels, setReels] = useState(() => Array.from({ length: totalCells }, () => themeSymbols[themeSymbols.length - 1]))
+    // Pre-fill with non-blank symbols so the idle grid shows real artwork.
+    const visibleSymbols = themeSymbols.filter(s => s.multiplier > 0)
+    const [reels, setReels] = useState(() => Array.from({ length: totalCells }, (_, i) => visibleSymbols[i % visibleSymbols.length]))
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Slots')) {
@@ -84,11 +86,33 @@ export default function SlotsGame() {
         setWinningCells([])
         const next = Array.from({ length: totalCells }, () => pickWeighted(themeSymbols, () => nextRoll('slots').roll))
         setReels(next)
+        // Anticipation slowdown: if the first columns share a paying symbol on
+        // any payline, the remaining columns take longer to land — Stake/Pragmatic
+        // style suspense (Phase F game-feel).
+        const colDelays = []
+        let runningDelay = 0
+        for (let c = 1; c <= variantConfig.cols; c++) {
+            runningDelay += 220
+            // Detect "anticipation": column c-1 stopped, and rows[c-1] in some payline
+            // share an id. Trigger from column 3 onward only.
+            let anticipating = false
+            if (variantConfig.paylines && c >= 3) {
+                for (const line of variantConfig.paylines) {
+                    const settledIds = line.slice(0, c - 1).map(idx => next[idx]?.id)
+                    if (settledIds.length >= 2 && settledIds.every(id => id && id === settledIds[0])) {
+                        const sym = themeSymbols.find(s => s.id === settledIds[0])
+                        if (sym && sym.multiplier > 0) { anticipating = true; break }
+                    }
+                }
+            }
+            if (anticipating) runningDelay += 480
+            colDelays.push(runningDelay)
+        }
         for (let c = 1; c <= variantConfig.cols; c++) {
             window.setTimeout(() => {
                 playSound('flip')
                 setStoppedCols(c)
-            }, c * 220)
+            }, colDelays[c - 1])
         }
         let multiplier = 0
         const winSet = new Set()
@@ -115,7 +139,7 @@ export default function SlotsGame() {
         }
         const returnAmount = betAmount * multiplier
         const profit = returnAmount - betAmount
-        const totalDelay = variantConfig.cols * 220 + 200
+        const totalDelay = colDelays[colDelays.length - 1] + 200
         window.setTimeout(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Slots return')
             setWinningCells(Array.from(winSet))
@@ -186,7 +210,14 @@ export default function SlotsGame() {
             }
         >
             <div className={`slots-stage ${lastWon && !running ? 'win-flash' : ''}`}>
-                <div className="slots-frame slots-theme-pad">
+                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                {lastWon && !running && (
+                    <div className="slots-win-callout">
+                        <span>Line win</span>
+                        <strong>{session.history[0]?.multiplier?.toFixed?.(2) || session.history[0]?.multiplier || '0'}×</strong>
+                    </div>
+                )}
+                <div className={`slots-frame slots-theme-pad ${lastWon && !running ? 'slots-win-frame' : ''}`}>
                     <div className="slots-grid" style={{ gridTemplateColumns: `repeat(${variantConfig.cols}, 1fr)` }}>
                         {reels.map((symbol, index) => {
                             const col = index % variantConfig.cols

@@ -4,7 +4,8 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './chickencross.css'
@@ -29,6 +30,9 @@ export default function ChickenCrossGame() {
     const [splat, setSplat] = useState(false)
     const [carKey, setCarKey] = useState(0)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
+    const { schedule, cancelAll } = useCancellableTimeouts()
 
     const config = PRESETS[risk]
     const multiplier = Number(Math.pow(config.growth, lane).toFixed(2))
@@ -36,6 +40,7 @@ export default function ChickenCrossGame() {
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (phase === 'crossing') { resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Chicken Cross')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('click')
         setActiveBet(betAmount)
         setLane(0)
@@ -46,6 +51,7 @@ export default function ChickenCrossGame() {
 
     const cross = () => {
         if (lane >= LANES) { cashout(); return }
+        // Cosmetic-only car flyby (independent of game outcome).
         if (Math.random() < 0.3) setCarKey(k => k + 1)
         const safe = nextRoll('chickencross').roll < config.safe
         if (safe) {
@@ -57,7 +63,7 @@ export default function ChickenCrossGame() {
         setSplat(true)
         session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `Splat L${lane}`, profit: -activeBet, betAmount: activeBet, meta: { risk, lane } })
         showToast('loss', 'Chicken hit', `-${formatCredits(activeBet)}`)
-        window.setTimeout(() => {
+        schedule(() => {
             setPhase('idle')
             setActiveBet(0)
             setLane(0)
@@ -70,13 +76,18 @@ export default function ChickenCrossGame() {
         const returnAmount = activeBet * multiplier
         const profit = returnAmount - activeBet
         addWinnings(returnAmount, 'Chicken Cross return')
-        playSound('win')
+        if (multiplier >= 5) {
+            playSound('bigwin')
+            setBigWin({ trigger: Date.now(), profit, multiplier })
+        } else {
+            playSound('win')
+        }
         setBurstKey(k => k + 1)
         session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${multiplier}×`, profit, betAmount: activeBet, multiplier, meta: { risk, lane } })
         showToast('win', 'Chicken cashed out', `+${formatCredits(profit)}`)
         setPhase('idle')
         setActiveBet(0)
-        window.setTimeout(() => setLane(0), 800)
+        schedule(() => setLane(0), 800)
     }
 
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
@@ -91,10 +102,14 @@ export default function ChickenCrossGame() {
                 <BetPanel
                     balance={balance}
                     initialBet={5}
-                    runningRound={phase === 'crossing'}
+                    runningRound={false}
                     actionLabel="Start Crossing"
                     onPlay={performPlay}
                     disableAuto
+                    lastBet={lastBet}
+                    playPhase={phase === 'crossing' && lane > 0 ? 'in-round' : null}
+                    playLabel={phase === 'crossing' && lane > 0 ? `Cashout ${multiplier.toFixed(2)}×` : 'Start Crossing'}
+                    onPlayPhaseAction={cashout}
                 >
                     <div className="bp-section">
                         <label className="bp-label">Difficulty</label>
@@ -109,9 +124,13 @@ export default function ChickenCrossGame() {
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
             <div className="cc-stage">
+                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className="cc-road">
                     {Array.from({ length: LANES + 1 }, (_, i) => (
                         <div key={i} className={`cc-lane ${i === lane ? 'current' : ''} ${i < lane ? 'crossed' : ''} ${splat && i === lane ? 'splat' : ''}`}>
+                            {i === 0 && phase === 'idle' && (
+                                <span className="cc-chicken idle" aria-hidden="true">{'\uD83D\uDC25'}</span>
+                            )}
                             {i === lane && phase === 'crossing' && (
                                 <span className={`cc-chicken ${splat ? 'splatted' : 'hopping'}`}>{splat ? '\uD83D\uDCA5' : '\uD83D\uDC25'}</span>
                             )}
@@ -122,11 +141,11 @@ export default function ChickenCrossGame() {
                 </div>
                 <div className="cc-action-btns">
                     <button disabled={phase !== 'crossing'} onClick={cross}>Cross next</button>
-                    <button className={`cc-cashout ${phase === 'crossing' && lane > 0 ? 'fx-pulse' : ''}`} disabled={phase !== 'crossing' || lane === 0} onClick={cashout}>Cashout {multiplier.toFixed(2)}×</button>
                 </div>
                 <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>Lane <strong>{lane}/{LANES}</strong></p>
                 {burstKey > 0 && phase === 'idle' && session.history[0]?.profit > 0 && <Particles key={burstKey} count={18} color="#ffcf5a" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={Math.pow(config.safe, Math.max(1, lane + 1))} payoutMultiplier={Math.max(1, multiplier)} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

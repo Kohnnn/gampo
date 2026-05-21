@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, sampleUniqueNumbers } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './lottery.css'
@@ -23,6 +23,7 @@ export default function LotteryGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [lastWon, setLastWon] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
 
     const toggle = (n) => {
         if (drawing) return
@@ -32,6 +33,7 @@ export default function LotteryGame() {
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (selected.length !== 5) { showToast('error', 'Pick 5 numbers', 'Lottery requires 5 picks'); resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Lottery')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('tick')
         setDrawing(true); setDrawAnim([])
         const next = sampleUniqueNumbers({ max: 36, count: 5, random: () => nextRoll('lottery').roll })
@@ -66,7 +68,7 @@ export default function LotteryGame() {
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={drawing} actionLabel="Draw Lottery" onPlay={performPlay}>
+                <BetPanel balance={balance} initialBet={5} runningRound={drawing} actionLabel="Draw Lottery" onPlay={performPlay} lastBet={lastBet}>
                     <button className="bp-bet-btn" disabled={drawing} onClick={() => setSelected(sampleUniqueNumbers({ max: 36, count: 5, random: () => nextRoll('lottery').roll }))}>Quick pick</button>
                     <div className="bp-bal-line"><span>Selected</span><strong>{selected.length}/5</strong></div>
                 </BetPanel>
@@ -74,7 +76,18 @@ export default function LotteryGame() {
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
             <div className="lottery-stage">
+                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className={`lot-tumbler ${drawing ? 'shaking' : ''}`}>
+                    {/* Idle: rotating drum with ghost balls so the panel is never empty. */}
+                    {drawAnim.length === 0 && !drawing && (
+                        <div className="lot-drum" aria-hidden="true">
+                            <span className="lot-drum-ball b1">7</span>
+                            <span className="lot-drum-ball b2">14</span>
+                            <span className="lot-drum-ball b3">22</span>
+                            <span className="lot-drum-ball b4">31</span>
+                            <span className="lot-tumbler-hint">Pick 5 · then Draw</span>
+                        </div>
+                    )}
                     {drawAnim.map((n, i) => <span key={`${n}-${i}`} className="lot-ball">{n}</span>)}
                 </div>
                 <div className="lot-grid">

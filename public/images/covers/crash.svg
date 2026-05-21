@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Crash game cover">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#101f2b"/><stop offset="1" stop-color="#33140f"/></linearGradient>
+    <radialGradient id="glow" cx="70%" cy="35%" r="55%"><stop stop-color="#ff7a4f" stop-opacity=".85"/><stop offset="1" stop-color="#ff7a4f" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="640" height="360" rx="28" fill="url(#bg)"/>
+  <rect width="640" height="360" rx="28" fill="url(#glow)"/>
+  <path d="M56 286c92-66 158-103 238-114 81-12 164 4 290-82" fill="none" stroke="#00e701" stroke-width="12" stroke-linecap="round"/>
+  <path d="M409 96l126 42-91 89-25-55-65-14 43-22z" fill="#f4f7fb"/>
+  <path d="M354 136l65 36 25 55-44-29-46-4z" fill="#ff6b4a"/>
+  <path d="M334 162l-48 31 61 4z" fill="#ffcf5a" opacity=".9"/>
+  <text x="44" y="78" fill="#e9f3ff" font-family="Arial Black, Arial" font-size="48" font-weight="900">CRASH</text>
+  <text x="46" y="116" fill="#9fb6c7" font-family="Arial" font-size="22" font-weight="700">cash out before the rocket busts</text>
+</svg>

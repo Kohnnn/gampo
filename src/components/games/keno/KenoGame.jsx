@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, kenoPayout, sampleUniqueNumbers } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './keno.css'
@@ -19,6 +19,8 @@ export default function KenoGame() {
     const [drawAnim, setDrawAnim] = useState([])
     const [drawing, setDrawing] = useState(false)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
 
     const toggle = (n) => {
         if (drawing) return
@@ -28,6 +30,7 @@ export default function KenoGame() {
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (selected.length === 0) { resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Keno')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('tick')
         setDrawing(true); setDrawAnim([])
         const picks = sampleUniqueNumbers({ max: 40, count: 10, random: () => nextRoll('keno').roll })
@@ -39,7 +42,12 @@ export default function KenoGame() {
         window.setTimeout(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Keno return')
             setBurstKey(k => k + 1); setDrawing(false)
-            playSound(returnAmount > 0 ? 'win' : 'loss')
+            if (multiplier >= 8) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier })
+            } else {
+                playSound(returnAmount > 0 ? 'win' : 'loss')
+            }
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${hits}/${selected.length}`, profit, betAmount, multiplier })
             showToast(profit >= 0 ? 'win' : 'loss', `Keno ${hits} hits`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -56,7 +64,7 @@ export default function KenoGame() {
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={drawing} actionLabel="Draw Keno" onPlay={performPlay}>
+                <BetPanel balance={balance} initialBet={5} runningRound={drawing} actionLabel="Draw Keno" onPlay={performPlay} lastBet={lastBet}>
                     <button className="bp-bet-btn" disabled={drawing} onClick={() => setSelected(sampleUniqueNumbers({ max: 40, count: 5, random: () => nextRoll('keno').roll }))}>Quick pick 5</button>
                     <div className="bp-bal-line"><span>Selected</span><strong>{selected.length}/10</strong></div>
                 </BetPanel>
@@ -64,6 +72,7 @@ export default function KenoGame() {
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
             <div className="keno-stage">
+                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className="keno-grid">
                     {Array.from({ length: 40 }, (_, i) => i + 1).map(n => {
                         const isSel = selected.includes(n)
@@ -80,6 +89,7 @@ export default function KenoGame() {
                 </div>
                 {burstKey > 0 && session.history[0]?.profit > 0 && <Particles key={burstKey} count={16} color="#ffcf5a" />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
             <EducationPanel definition={definition} betAmount={5} winProbability={estimatedChance} payoutMultiplier={kenoPayout(Math.max(1, selected.length), Math.max(1, Math.ceil(selected.length / 2)))} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

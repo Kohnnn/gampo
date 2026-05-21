@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 1,
+  "format": "6max-cash-100bb",
+  "notes": "Postflop charts keyed by (texture, position-pair, action-context, street). Heuristic charts derived from common solver outputs. Frequencies are approximate and per-action; sizings are typical c-bet families. v1 covers a small but meaningful slice and falls back to a generic chart when a specific texture is not authored.",
+  "textures": {
+    "rainbow-high": {
+      "label": "Rainbow A/K/Q-high disconnected",
+      "exampleBoards": ["As 7d 2c", "Kd 7s 2c", "Qh 6s 2d"]
+    },
+    "rainbow-paired-high": {
+      "label": "Rainbow paired A/K-high",
+      "exampleBoards": ["Ks Kd 4c", "As Ad 7c"]
+    },
+    "two-tone-middling": {
+      "label": "Two-tone T/9/8-high with FD",
+      "exampleBoards": ["Th 9h 4d", "8c 7c 4d"]
+    },
+    "two-tone-low-conn": {
+      "label": "Two-tone low-connected",
+      "exampleBoards": ["7c 6c 4d", "5h 4h 3c"]
+    },
+    "mono-mid": {
+      "label": "Monotone middling",
+      "exampleBoards": ["Th 8h 5h"]
+    },
+    "rainbow-low": {
+      "label": "Rainbow low disconnected",
+      "exampleBoards": ["7s 4d 2c"]
+    }
+  },
+  "matchup": {
+    "BTN-vs-BB": {
+      "rfi-call": {
+        "flop": {
+          "rainbow-high": {
+            "advantage": { "nut": 18, "range": 6 },
+            "mdf": 0.6,
+            "sizings": [
+              { "size": "33%", "freq": 0.78 },
+              { "size": "75%", "freq": 0.08 },
+              { "size": "check", "freq": 0.14 }
+            ],
+            "value": ["AA", "KK", "AKs", "AKo", "AQs", "AQo", "AJs", "ATs", "A9s", "A5s"],
+            "bluff": ["KQs", "T9s", "98s", "87s", "76s", "65s", "54s"],
+            "marginal": ["TT", "99", "88", "77", "QJs", "JTs"]
+          },
+          "rainbow-paired-high": {
+            "advantage": { "nut": 22, "range": 8 },
+            "mdf": 0.5,
+            "sizings": [
+              { "size": "33%", "freq": 0.85 },
+              { "size": "check", "freq": 0.15 }
+            ],
+            "value": ["KK", "AA", "KQs", "KJs", "KTs", "QQ"],
+            "bluff": ["A5s", "A4s", "T9s", "98s", "87s", "76s"],
+            "marginal": ["QJs", "JTs"]
+          },
+          "two-tone-middling": {
+            "advantage": { "nut": 6, "range": 2 },
+            "mdf": 0.62,
+            "sizings": [
+              { "size": "33%", "freq": 0.45 },
+              { "size": "75%", "freq": 0.25 },
+              { "size": "check", "freq": 0.30 }
+            ],
+            "value": ["TT", "99", "88", "AhXh", "ATs", "T9s", "98s"],
+            "bluff": ["AhKh", "AhQh", "AhJh", "KhQh", "KhJh"],
+            "marginal": ["JhTh", "QhJh", "QhTh"]
+          },
+          "two-tone-low-conn": {
+            "advantage": { "nut": 4, "range": 0 },
+            "mdf": 0.65,
+            "sizings": [
+              { "size": "33%", "freq": 0.40 },
+              { "size": "check", "freq": 0.60 }
+            ],
+            "value": ["77", "66", "55", "44", "76s", "65s", "54s"],
+            "bluff": ["AhJh", "AhTh", "KhQh", "KhJh"],
+            "marginal": ["A7s", "A6s", "A5s"]
+          },
+          "mono-mid": {
+            "advantage": { "nut": 12, "range": -2 },
+            "mdf": 0.68,
+            "sizings": [
+              { "size": "33%", "freq": 0.50 },
+              { "size": "75%", "freq": 0.05 },
+              { "size": "check", "freq": 0.45 }
+            ],
+            "value": ["AhX", "KhQh", "KhJh", "QhJh"],
+            "bluff": ["AsKs", "AsQs"],
+            "marginal": ["TT", "99", "88", "77"]
+          },
+          "rainbow-low": {
+            "advantage": { "nut": 6, "range": 1 },
+            "mdf": 0.62,
+            "sizings": [
+              { "size": "33%", "freq": 0.65 },
+              { "size": "check", "freq": 0.35 }
+            ],
+            "value": ["AA", "KK", "QQ", "JJ", "TT", "99", "88", "77"],
+            "bluff": ["KQs", "QJs", "JTs", "T9s", "98s"],
+            "marginal": ["AKo", "AQo", "AJo"]
+          }
+        },
+        "turn": {
+          "rainbow-high": {
+            "advantage": { "nut": 14, "range": 4 },
+            "mdf": 0.55,
+            "sizings": [
+              { "size": "50%", "freq": 0.55 },
+              { "size": "75%", "freq": 0.15 },
+              { "size": "check", "freq": 0.30 }
+            ],
+            "value": ["AA", "KK", "AK", "AQ", "TPTK"],
+            "bluff": ["FD", "OESD", "GS+BDFD"],
+            "marginal": ["TP weak kicker", "PP < TP"]
+          },
+          "two-tone-middling": {
+            "advantage": { "nut": 4, "range": 0 },
+            "mdf": 0.6,
+            "sizings": [
+              { "size": "50%", "freq": 0.40 },
+              { "size": "check", "freq": 0.60 }
+            ],
+            "value": ["sets", "two pair", "TPTK"],
+            "bluff": ["NFD", "OESD"],
+            "marginal": ["TP weak"]
+          },
+          "default": {
+            "advantage": { "nut": 6, "range": 2 },
+            "mdf": 0.55,
+            "sizings": [
+              { "size": "50%", "freq": 0.45 },
+              { "size": "check", "freq": 0.55 }
+            ],
+            "value": ["nut hands"],
+            "bluff": ["draws"],
+            "marginal": ["medium hands"]
+          }
+        },
+        "river": {
+          "rainbow-high": {
+            "advantage": { "nut": 12, "range": 3 },
+            "mdf": 0.5,
+            "sizings": [
+              { "size": "75%", "freq": 0.40 },
+              { "size": "overbet", "freq": 0.10 },
+              { "size": "check", "freq": 0.50 }
+            ],
+            "value": ["nut hands", "two pair+"],
+            "bluff": ["missed FD", "missed OESD"],
+            "marginal": ["TP weak kicker"]
+          },
+          "default": {
+            "advantage": { "nut": 4, "range": 1 },
+            "mdf": 0.5,
+            "sizings": [
+              { "size": "50%", "freq": 0.30 },
+              { "size": "check", "freq": 0.70 }
+            ],
+            "value": ["nuts"],
+            "bluff": ["missed draws"],
+            "marginal": ["bluff catchers"]
+          }
+        }
+      }
+    },
+    "CO-vs-BB": {
+      "rfi-call": {
+        "flop": {
+          "rainbow-high": {
+            "advantage": { "nut": 14, "range": 5 },
+            "mdf": 0.6,
+            "sizings": [
+              { "size": "33%", "freq": 0.72 },
+              { "size": "75%", "freq": 0.06 },
+              { "size": "check", "freq": 0.22 }
+            ],
+            "value": ["AA", "KK", "AKs", "AKo", "AQs", "AJs"],
+            "bluff": ["KQs", "T9s", "98s", "87s", "76s"],
+            "marginal": ["TT", "99", "88", "77", "QJs", "JTs"]
+          },
+          "rainbow-paired-high": {
+            "advantage": { "nut": 18, "range": 7 },
+            "mdf": 0.52,
+            "sizings": [
+              { "size": "33%", "freq": 0.80 },
+              { "size": "check", "freq": 0.20 }
+            ],
+            "value": ["KK", "AA", "KQs", "KJs", "QQ"],
+            "bluff": ["A5s", "A4s", "T9s", "98s", "87s"],
+            "marginal": ["JTs", "QJs"]
+          },
+          "two-tone-middling": {
+            "advantage": { "nut": 4, "range": 1 },
+            "mdf": 0.64,
+            "sizings": [
+              { "size": "33%", "freq": 0.40 },
+              { "size": "75%", "freq": 0.20 },
+              { "size": "check", "freq": 0.40 }
+            ],
+            "value": ["TT", "99", "88", "ATs", "T9s", "98s"],
+            "bluff": ["AhKh", "AhQh", "KhQh", "KhJh"],
+            "marginal": ["JTs", "QJs", "QTs"]
+          },
+          "two-tone-low-conn": {
+            "advantage": { "nut": 2, "range": -1 },
+            "mdf": 0.66,
+            "sizings": [
+              { "size": "33%", "freq": 0.32 },
+              { "size": "check", "freq": 0.68 }
+            ],
+            "value": ["77", "66", "55", "76s", "65s", "54s"],
+            "bluff": ["AhJh", "AhTh", "KhQh"],
+            "marginal": ["A7s", "A6s"]
+          },
+          "mono-mid": {
+            "advantage": { "nut": 8, "range": -3 },
+            "mdf": 0.7,
+            "sizings": [
+              { "size": "33%", "freq": 0.42 },
+              { "size": "check", "freq": 0.58 }
+            ],
+            "value": ["AhX", "KhQh", "KhJh"],
+            "bluff": ["AsKs", "AsQs"],
+            "marginal": ["TT", "99", "88"]
+          },
+          "rainbow-low": {
+            "advantage": { "nut": 4, "range": 0 },
+            "mdf": 0.62,
+            "sizings": [
+              { "size": "33%", "freq": 0.58 },
+              { "size": "check", "freq": 0.42 }
+            ],
+            "value": ["AA", "KK", "QQ", "JJ", "TT", "99", "88"],
+            "bluff": ["KQs", "QJs", "JTs", "T9s"],
+            "marginal": ["AKo", "AQo"]
+          }
+        }
+      }
+    },
+    "MP-vs-BB": {
+      "rfi-call": {
+        "flop": {
+          "rainbow-high": {
+            "advantage": { "nut": 16, "range": 7 },
+            "mdf": 0.58,
+            "sizings": [
+              { "size": "33%", "freq": 0.65 },
+              { "size": "75%", "freq": 0.10 },
+              { "size": "check", "freq": 0.25 }
+            ],
+            "value": ["AA", "KK", "AKs", "AQs", "AJs", "ATs"],
+            "bluff": ["KQs", "T9s", "98s", "87s"],
+            "marginal": ["TT", "99", "88", "77"]
+          },
+          "rainbow-paired-high": {
+            "advantage": { "nut": 20, "range": 9 },
+            "mdf": 0.5,
+            "sizings": [
+              { "size": "33%", "freq": 0.78 },
+              { "size": "check", "freq": 0.22 }
+            ],
+            "value": ["KK", "AA", "KQs", "KJs", "QQ"],
+            "bluff": ["A5s", "T9s", "98s"],
+            "marginal": ["JTs", "QJs"]
+          },
+          "two-tone-middling": {
+            "advantage": { "nut": 5, "range": 2 },
+            "mdf": 0.62,
+            "sizings": [
+              { "size": "33%", "freq": 0.38 },
+              { "size": "75%", "freq": 0.18 },
+              { "size": "check", "freq": 0.44 }
+            ],
+            "value": ["TT", "99", "88", "ATs"],
+            "bluff": ["AhKh", "AhQh", "KhQh"],
+            "marginal": ["JTs", "QJs"]
+          },
+          "two-tone-low-conn": {
+            "advantage": { "nut": 3, "range": 0 },
+            "mdf": 0.66,
+            "sizings": [
+              { "size": "33%", "freq": 0.30 },
+              { "size": "check", "freq": 0.70 }
+            ],
+            "value": ["77", "66", "55"],
+            "bluff": ["AhJh", "AhTh"],
+            "marginal": ["A7s", "A6s"]
+          },
+          "mono-mid": {
+            "advantage": { "nut": 9, "range": -2 },
+            "mdf": 0.7,
+            "sizings": [
+              { "size": "33%", "freq": 0.40 },
+              { "size": "check", "freq": 0.60 }
+            ],
+            "value": ["AhX", "KhQh"],
+            "bluff": ["AsKs"],
+            "marginal": ["TT", "99"]
+          },
+          "rainbow-low": {
+            "advantage": { "nut": 5, "range": 1 },
+            "mdf": 0.62,
+            "sizings": [
+              { "size": "33%", "freq": 0.55 },
+              { "size": "check", "freq": 0.45 }
+            ],
+            "value": ["AA", "KK", "QQ", "JJ", "TT", "99"],
+            "bluff": ["KQs", "QJs", "JTs"],
+            "marginal": ["AKo", "AQo"]
+          }
+        }
+      }
+    },
+    "BTN-vs-SB": {
+      "rfi-call": {
+        "flop": {
+          "rainbow-high": {
+            "advantage": { "nut": 12, "range": 4 },
+            "mdf": 0.6,
+            "sizings": [
+              { "size": "33%", "freq": 0.70 },
+              { "size": "75%", "freq": 0.10 },
+              { "size": "check", "freq": 0.20 }
+            ],
+            "value": ["AA", "KK", "AKs", "AKo", "AQs", "AJs"],
+            "bluff": ["KQs", "T9s", "98s", "87s", "76s"],
+            "marginal": ["TT", "99", "88", "77", "QJs"]
+          },
+          "rainbow-paired-high": {
+            "advantage": { "nut": 16, "range": 6 },
+            "mdf": 0.54,
+            "sizings": [
+              { "size": "33%", "freq": 0.80 },
+              { "size": "check", "freq": 0.20 }
+            ],
+            "value": ["KK", "AA", "KQs", "KJs", "QQ"],
+            "bluff": ["A5s", "T9s", "98s", "87s"],
+            "marginal": ["QJs", "JTs"]
+          },
+          "two-tone-middling": {
+            "advantage": { "nut": 4, "range": 1 },
+            "mdf": 0.64,
+            "sizings": [
+              { "size": "33%", "freq": 0.42 },
+              { "size": "75%", "freq": 0.20 },
+              { "size": "check", "freq": 0.38 }
+            ],
+            "value": ["TT", "99", "88", "ATs"],
+            "bluff": ["AhKh", "AhQh", "KhQh"],
+            "marginal": ["JTs", "QJs", "QTs"]
+          },
+          "two-tone-low-conn": {
+            "advantage": { "nut": 3, "range": 0 },
+            "mdf": 0.66,
+            "sizings": [
+              { "size": "33%", "freq": 0.36 },
+              { "size": "check", "freq": 0.64 }
+            ],
+            "value": ["77", "66", "55", "76s", "65s"],
+            "bluff": ["AhJh", "AhTh", "KhQh"],
+            "marginal": ["A7s", "A6s", "A5s"]
+          },
+          "mono-mid": {
+            "advantage": { "nut": 10, "range": -2 },
+            "mdf": 0.7,
+            "sizings": [
+              { "size": "33%", "freq": 0.45 },
+              { "size": "check", "freq": 0.55 }
+            ],
+            "value": ["AhX", "KhQh", "KhJh"],
+            "bluff": ["AsKs", "AsQs"],
+            "marginal": ["TT", "99", "88"]
+          },
+          "rainbow-low": {
+            "advantage": { "nut": 5, "range": 1 },
+            "mdf": 0.62,
+            "sizings": [
+              { "size": "33%", "freq": 0.60 },
+              { "size": "check", "freq": 0.40 }
+            ],
+            "value": ["AA", "KK", "QQ", "JJ", "TT", "99", "88"],
+            "bluff": ["KQs", "QJs", "JTs", "T9s"],
+            "marginal": ["AKo", "AQo", "AJo"]
+          }
+        }
+      }
+    },
+    "SB-vs-BB": {
+      "rfi-call": {
+        "flop": {
+          "rainbow-high": {
+            "advantage": { "nut": 8, "range": 3 },
+            "mdf": 0.62,
+            "sizings": [
+              { "size": "33%", "freq": 0.50 },
+              { "size": "75%", "freq": 0.15 },
+              { "size": "check", "freq": 0.35 }
+            ],
+            "value": ["AA", "KK", "AKs", "AKo", "AQs"],
+            "bluff": ["KQs", "T9s", "98s", "87s"],
+            "marginal": ["TT", "99", "88", "77"]
+          },
+          "rainbow-paired-high": {
+            "advantage": { "nut": 14, "range": 5 },
+            "mdf": 0.54,
+            "sizings": [
+              { "size": "33%", "freq": 0.78 },
+              { "size": "check", "freq": 0.22 }
+            ],
+            "value": ["KK", "AA", "KQs", "QQ"],
+            "bluff": ["A5s", "T9s", "98s"],
+            "marginal": ["JTs", "QJs"]
+          },
+          "two-tone-middling": {
+            "advantage": { "nut": 2, "range": 0 },
+            "mdf": 0.66,
+            "sizings": [
+              { "size": "33%", "freq": 0.32 },
+              { "size": "check", "freq": 0.68 }
+            ],
+            "value": ["TT", "99", "88", "ATs"],
+            "bluff": ["AhKh", "AhQh"],
+            "marginal": ["JTs", "QTs"]
+          },
+          "two-tone-low-conn": {
+            "advantage": { "nut": 1, "range": -1 },
+            "mdf": 0.68,
+            "sizings": [
+              { "size": "33%", "freq": 0.25 },
+              { "size": "check", "freq": 0.75 }
+            ],
+            "value": ["77", "66", "55"],
+            "bluff": ["AhJh", "AhTh"],
+            "marginal": ["A7s", "A6s"]
+          },
+          "mono-mid": {
+            "advantage": { "nut": 6, "range": -3 },
+            "mdf": 0.7,
+            "sizings": [
+              { "size": "33%", "freq": 0.35 },
+              { "size": "check", "freq": 0.65 }
+            ],
+            "value": ["AhX", "KhQh"],
+            "bluff": ["AsKs"],
+            "marginal": ["TT", "99"]
+          },
+          "rainbow-low": {
+            "advantage": { "nut": 3, "range": 1 },
+            "mdf": 0.62,
+            "sizings": [
+              { "size": "33%", "freq": 0.50 },
+              { "size": "check", "freq": 0.50 }
+            ],
+            "value": ["AA", "KK", "QQ", "JJ", "TT", "99"],
+            "bluff": ["KQs", "QJs", "JTs"],
+            "marginal": ["AKo", "AQo"]
+          }
+        }
+      }
+    },
+    "default": {
+      "rfi-call": {
+        "flop": {
+          "default": {
+            "advantage": { "nut": 0, "range": 0 },
+            "mdf": 0.6,
+            "sizings": [
+              { "size": "33%", "freq": 0.55 },
+              { "size": "check", "freq": 0.45 }
+            ],
+            "value": ["AA", "KK", "QQ", "JJ", "TT"],
+            "bluff": ["KQs", "QJs", "JTs", "T9s"],
+            "marginal": ["AKo", "AQo", "AJo"]
+          }
+        }
+      }
+    }
+  },
+  "exploits": {
+    "overfold": {
+      "label": "Opponent overfolds vs c-bet",
+      "delta": "Increase c-bet frequency by ~12% across boards. Add small-size bluffs (any backdoor).",
+      "evDelta": { "gto": 0.42, "exploit": 0.61, "unit": "bb" }
+    },
+    "station": {
+      "label": "Calling station",
+      "delta": "Cut bluff frequency to ~30% of GTO. Increase value-bet sizing one tier.",
+      "evDelta": { "gto": 0.42, "exploit": 0.55, "unit": "bb" }
+    },
+    "maniac": {
+      "label": "Maniac (raises light)",
+      "delta": "Tighten c-bets to ~50% of GTO; trap medium-strong hands by check-calling.",
+      "evDelta": { "gto": 0.42, "exploit": 0.49, "unit": "bb" }
+    }
+  }
+}

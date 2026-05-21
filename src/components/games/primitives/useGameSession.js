@@ -2,6 +2,7 @@
 // + derived live stats (totals, win rate, biggest hit, RTP, streaks).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { recordPnl } from '../../../hooks/useGlobalPnl'
 
 const HISTORY_LIMIT = 200
 
@@ -31,7 +32,17 @@ export default function useGameSession(gameId) {
             writeArr(key, next)
             return next
         })
-    }, [key])
+        // Mirror to the global PnL aggregator so StatsPanel can show
+        // session/game/all-time profit without each game re-implementing it.
+        try {
+            recordPnl({
+                gameId,
+                profit: entry.profit,
+                betAmount: entry.betAmount,
+                label: entry.label,
+            })
+        } catch { /* ignore */ }
+    }, [key, gameId])
 
     const clear = useCallback(() => {
         writeArr(key, [])

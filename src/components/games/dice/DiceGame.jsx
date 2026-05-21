@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { dicePayout, formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './dice.css'
@@ -99,6 +99,21 @@ export default function DiceGame() {
             }
         >
             <div className={`dice-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                <div className="dice-pips" aria-label="Last 4 rolls">
+                    {Array.from({ length: 4 }, (_, i) => {
+                        const item = session.history[i]
+                        const empty = !item
+                        const won = !empty && (item.profit || 0) >= 0
+                        const label = empty ? '?' : (item.label || '—')
+                        return (
+                            <div key={i} className={`dice-pip ${empty ? 'empty' : won ? 'won' : 'lost'}`}>
+                                <span className="dice-pip-label">{label}</span>
+                                <span className="dice-pip-tag">{empty ? 'roll' : won ? 'win' : 'loss'}</span>
+                            </div>
+                        )
+                    })}
+                </div>
                 <div className="dice-outcome-wrap">
                     <div className={`dice-big ${lastWon === true ? 'win' : lastWon === false ? 'loss' : ''}`}>
                         <NumberRoll value={lastRoll === null ? 0 : Number(lastRoll.toFixed(2))} format={v => lastRoll === null ? '--.--' : v.toFixed(2)} />

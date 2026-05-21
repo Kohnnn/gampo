@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+@import url('../components/games/primitives/primitives.css');
+@import url('../components/ui/card-face.css');
 
 /* ===== CSS Variables - Exact GamPo Colors ===== */
 :root {
@@ -785,8 +787,13 @@ body {
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 4px 12px 12px;
+    padding: 8px 12px 8px;
     transition: opacity 0.2s ease;
+}
+
+.nav-section.compact {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
 }
 
 .app-sidebar-hidden .nav-title {
@@ -797,6 +804,8 @@ body {
 }
 
 .nav-item {
+    width: 100%;
+    border: 0;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -804,9 +813,18 @@ body {
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     text-decoration: none;
+    background: transparent;
     font-size: 15px;
     font-weight: 600;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
     transition: background-color 0.2s ease, color 0.2s ease, padding 0.2s ease, justify-content 0.2s ease;
+}
+
+.nav-item-action {
+    appearance: none;
+    box-shadow: none;
 }
 
 .app-sidebar-hidden .nav-item {
@@ -852,6 +870,16 @@ body {
     flex-direction: column;
     overflow: hidden;
     background: var(--bg-primary);
+    transition: padding-right 0.2s ease;
+}
+
+/* ChatDock floats in the bottom-right corner. Per QA v3 (2026-05-21) the
+   layout no longer reserves a right gutter — the panel sits over content as
+   a true overlay. Layout-shift is avoided entirely. */
+@media (min-width: 1100px) {
+    html.chat-open .main-content {
+        padding-right: 0;
+    }
 }
 
 /* ===== Game Title Bar ===== */
@@ -1556,6 +1584,83 @@ body {
     font-size: 12px;
 }
 
+/* ===== Universal tremor (game-feel screen shake) ===== */
+.gampo-shake {
+    animation: gampoShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    transform-origin: center;
+}
+
+.gampo-shake-lg {
+    animation: gampoShakeLg 0.7s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    transform-origin: center;
+}
+
+@keyframes gampoShake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-3px, 1px, 0); }
+    40%, 60% { transform: translate3d(3px, -1px, 0); }
+}
+
+@keyframes gampoShakeLg {
+    8%  { transform: translate3d(-4px, 2px, 0) rotate(-0.4deg); }
+    16% { transform: translate3d(5px, -3px, 0) rotate(0.4deg); }
+    24% { transform: translate3d(-6px, 3px, 0) rotate(-0.6deg); }
+    36% { transform: translate3d(6px, -3px, 0) rotate(0.6deg); }
+    50% { transform: translate3d(-4px, 2px, 0); }
+    72% { transform: translate3d(3px, -1px, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gampo-shake, .gampo-shake-lg { animation: none; }
+}
+
+.not-found,
+.route-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    min-height: 60vh;
+    color: var(--text-primary);
+    text-align: center;
+    padding: 32px 16px;
+}
+
+.not-found h1,
+.route-error h1 {
+    font-size: 28px;
+    font-weight: 950;
+    margin: 0;
+}
+
+.not-found p,
+.route-error p {
+    color: var(--text-secondary);
+    margin: 0;
+    max-width: 480px;
+}
+
+.not-found-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.route-error-msg {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(237, 66, 69, 0.4);
+    color: #ff8a8c;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    max-width: 540px;
+    overflow-x: auto;
+}
+
 .route-spinner {
     width: 20px;
     height: 20px;
@@ -1602,9 +1707,7 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-.gampo-reduce-motion .main-content,
+.gampo-reduce-motion .main-content { animation: none; }
 @media (prefers-reduced-motion: reduce) {
     .main-content { animation: none; }
 }
-
-@import url('../components/games/primitives/primitives.css');

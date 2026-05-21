@@ -1,20 +1,88 @@
 # Changelog
 
-## 2026-05 - Phase 8: BigWinOverlay, polish, quick actions
+## 2026-05 - Phase 9: BigWinOverlay full coverage + ESC dismiss + screen-shake
 
 Build mode: yes. Compliance: still fake-credit only.
 
+### BigWinOverlay backported across all eligible games
+
+Phase 8 wired BigWinOverlay into 9 games. Phase 9 backports it to the rest, completing coverage:
+
+| Game | Threshold | New in Phase 9 |
+|------|-----------|----------------|
+| Dice | 5× | (Phase 8) |
+| Limbo | 5× | (Phase 8) |
+| Wheel | 5× | (Phase 8) |
+| Roulette | effective 5× | (Phase 8) |
+| Slots | 5× | (Phase 8) |
+| Tower | 5× | (Phase 8) |
+| Lottery | 8× | (Phase 8) |
+| Video Poker | 9× | (Phase 8) |
+| Guess Number | any 9.4× hit | (Phase 8) |
+| **Baccarat** | effective 5× | ✓ |
+| **Sic Bo** | effective 8× | ✓ |
+| **Casino War** | tie-win (3×) | ✓ |
+| **Hi-Lo** | when payout ≥ 5× | ✓ |
+| **Color Pick** | any win (3.84×) | ✓ |
+| **RPS** | any win (2.91×) | ✓ |
+| **Coin Flip** | rebet only (no big-win) | ✓ |
+| **Keno** | 8× | ✓ |
+| **Chicken Cross** | 5× | ✓ |
+
+Total: **17 simulator games** now have full BigWinOverlay coverage.
+
+### Rebet support added everywhere
+
+`lastBet` state is tracked and passed to `<BetPanel>` in every game that didn't already have it. The Rebet quick-action button is now functional across the entire simulator suite. Active in: Dice, Limbo, Wheel, Slots, Guess, Hi-Lo, Coin Flip, Color, RPS, Keno (plus existing).
+
+### BigWinOverlay UX improvements
+
+The overlay now:
+
+- **Click-to-dismiss** — clicking anywhere on the overlay hides it before the 2.4s timeout
+- **Keyboard dismissal** — `Escape`, `Enter`, or `Space` immediately hides the overlay
+- **Auto screen-shake** — when triggered, applies the `screen-shake` class to the active `.gs-playfield` for 500ms (uses the existing 0.45s shake keyframe)
+- **Dismiss hint** — small "tap or press ESC to dismiss" footer text inside the overlay card
+- All effects respect `prefers-reduced-motion` and the in-app reduced-motion toggle (existing rules in `fx.css`)
+
+### Audio
+
+`bigwin` cue (16-bit synth arpeggio) consistently plays for all qualifying wins across the 17 games. Standard `win` / `loss` / `click` cues remain unchanged.
+
+### Bundle
+
+| Chunk | Size | Gzip |
+|-------|-----:|-----:|
+| `index.js` (initial) | 76.83 KB | 23.94 KB |
+| All other chunks | unchanged from Phase 8 | |
+
+BigWinOverlay backport added < 1 KB to the shared primitives chunk; no per-game chunk grew measurably.
+
+### Tests
+
+- 26/26 passing across 5 test files. No regressions.
+
+### Documentation
+
+- `docs/changelog.md` — this entry.
+- `docs/animations.md` — full per-game BigWinOverlay coverage table updated.
+
+### Known limitations / next pass
+
+- **Crash, Plinko, Mines** still use their own engines (outside the new shell) and have no BigWinOverlay yet. Backporting requires shell migration first.
+- **Blackjack** still on `SimulatorGame.jsx`; per-game refactor + BigWinOverlay deferred.
+- Chip-stack visualization on Roulette/Baccarat/Sic Bo cells is a single chip badge today; physical stack visualization remains future work.
+- Plinko/Crash/Mines bitmap asset wiring (rocket, gem, bomb sprites) deferred.
+
+## 2026-05 - Phase 8: BigWinOverlay, polish, quick actions
+
+(see prior entry below for Phase 8 details)
+
 ### New shared primitive: BigWinOverlay
 
-- Full-screen win-celebration overlay with three tiers based on multiplier:
-  - **BIG WIN** (≥5×) — gold rays, gold border-image, 96px multiplier text
-  - **HUGE WIN** (≥15×) — pink accent, 120px text
-  - **MEGA WIN** (≥50×) — purple/pink border-image, 144px text, brighter halo
-- 24-particle radial burst with per-segment delay
-- Bevel-bordered card with brass border-image
-- Conic-gradient ray sweep (3s rotation)
-- 2.4s lifecycle with fade in/out
-- Auto-dismiss + non-blocking (`pointer-events: none`)
+- Three tiers based on multiplier: BIG WIN (5–14×), HUGE WIN (15–49×), MEGA WIN (50×+)
+- Conic-gradient ray sweep, brass border-image, 24-particle radial burst
+- 2.4s lifecycle, fade in/out, non-blocking
 
 ### Quick-action shortcuts in BetPanel
 

@@ -1,4 +1,8 @@
 .color-stage {
+    /* QA v4: scope decorative gradients to the panel so they never bleed
+       into the sidebar / right rail. */
+    contain: layout paint;
+    overflow: hidden;
     width: 100%;
     display: flex;
     flex-direction: column;

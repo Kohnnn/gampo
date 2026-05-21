@@ -65,21 +65,21 @@ This keeps `framer-motion` out of the home/lobby chunk. It only ships when the u
 | Mines           | Hover lift + flip + bomb burst                                                                        |
 | **Dice**        | Glowing marker, win-zone fill, NumberRoll, particle burst, audio, **BigWinOverlay (≥5×)**             |
 | **Limbo**       | Rocket gauge, drifting starfield, NumberRoll, particle burst, audio, **BigWinOverlay (≥5×)**          |
-| **Coin Flip**   | 3D rotateY coin (front/back+edge), 0.9s flip, particle ring, audio                                    |
+| **Coin Flip**   | 3D rotateY coin (front/back+edge), 0.9s flip, particle ring, audio, rebet support                     |
 | **Wheel**       | Smooth 2.1s ease-out spin, biased landing, particle burst, audio, **BigWinOverlay (≥5×)**             |
-| **Color Pick**  | Spinning spectrum disc with pointer, decelerating land, color paint result, audio                     |
+| **Color Pick**  | Spinning spectrum disc with pointer, decelerating land, color paint result, audio, **BigWinOverlay (any 3.84× win)** |
 | **Guess Number**| Spinning orb, win/loss state shadow, sparkle particles, audio, **BigWinOverlay (any 9.4× hit)**       |
-| **RPS**         | Side slam-in, winner scale, loser desaturate, push shake, particle burst, audio                       |
-| **Hi-Lo**       | Card flip, win/loss border, streak counter with fire flair at 3+, audio                               |
+| **RPS**         | Side slam-in, winner scale, loser desaturate, push shake, particle burst, audio, **BigWinOverlay (any 2.91× win)** |
+| **Hi-Lo**       | Card flip, win/loss border, streak counter with fire flair at 3+, audio, **BigWinOverlay (≥5×)**      |
 | **Blackjack**   | Real card render, hidden hole-card, chip-fly, 500-hand study runner                                   |
-| **Baccarat**    | Squeeze reveal (700ms delay), bead road, win/loss flash, particles, audio                             |
-| **Casino War**  | Card slam from sides, Go-To-War tie option, win/loss flash, particles, audio                          |
+| **Baccarat**    | Squeeze reveal (700ms delay), bead road, win/loss flash, particles, audio, **BigWinOverlay (effective ≥5×)** |
+| **Casino War**  | Card slam from sides, Go-To-War tie option, win/loss flash, particles, audio, **BigWinOverlay (tie-win 3×)** |
 | **Video Poker** | Paytable highlight, real card render, hold-pin animation, deal stagger, audio, **BigWinOverlay (≥9×)**|
 | **Tower**       | Parallax climb, current tile pulse, fall rotate-drop, cashout pulse, particles, audio, **BigWinOverlay (≥5×)** |
-| **Chicken Cross**| Chicken sprite (hop/splat states), occasional car flyby chrome, cashout pulse, particles, audio      |
+| **Chicken Cross**| Chicken sprite (hop/splat states), occasional car flyby chrome, cashout pulse, particles, audio, **BigWinOverlay (≥5×)** |
 | **Lottery**     | Tumbler shake + drop-by-drop ball reveal, hit cells gold scale-pop, sparkle particles, audio, **BigWinOverlay (≥8×)** |
-| **Keno**        | Drop-by-drop drawn balls, hit cells scale-pop with green glow, audio                                  |
-| **Sic Bo**      | Cup shake → dice tumble out one by one, triple-win glow, win/loss flash, audio                        |
+| **Keno**        | Drop-by-drop drawn balls, hit cells scale-pop with green glow, audio, **BigWinOverlay (≥8×)**         |
+| **Sic Bo**      | Cup shake → dice tumble out one by one, triple-win glow, win/loss flash, audio, **BigWinOverlay (effective ≥8×)** |
 | **Slots**       | True reel-by-reel stop, cluster-glow on winning cells, particles, audio, **BigWinOverlay (≥5×)**      |
 | **Roulette**    | Real spinning wheel (37 segments, correct order), counter-rotating ball, decelerate landing, audio, **BigWinOverlay (effective ≥5×)** |
 
@@ -109,6 +109,15 @@ if (multiplier >= 5) {
 ```
 
 The `trigger` prop is any monotonically increasing value (Date.now() works). `BigWinOverlay` auto-shows for 2.4s then hides; reuses the same component instance across plays.
+
+### Phase 9 UX upgrades
+
+- **Click-to-dismiss** — clicking anywhere on the overlay hides it immediately.
+- **Keyboard dismissal** — `Escape`, `Enter`, or `Space` dismisses early.
+- **Auto screen-shake** — when triggered, applies the `screen-shake` class to the active `.gs-playfield` for 500ms.
+- **Dismiss hint** — small "tap or press ESC to dismiss" footer text inside the overlay card.
+
+All effects respect `prefers-reduced-motion` and the in-app reduced-motion toggle.
 
 ## Quick-action shortcuts
 

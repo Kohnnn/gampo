@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Mines game cover">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f212e"/><stop offset="1" stop-color="#07161f"/></linearGradient><radialGradient id="g" cx="72%" cy="34%" r="55%"><stop stop-color="#41d6ff" stop-opacity=".55"/><stop offset="1" stop-color="#41d6ff" stop-opacity="0"/></radialGradient></defs>
+  <rect width="640" height="360" rx="28" fill="url(#bg)"/><rect width="640" height="360" rx="28" fill="url(#g)"/>
+  <g transform="translate(270 74)"><rect x="0" y="0" width="76" height="76" rx="16" fill="#132f3f" stroke="#41d6ff"/><path d="M38 12l22 26-22 26-22-26z" fill="#9af0ff"/><rect x="92" y="0" width="76" height="76" rx="16" fill="#132f3f" stroke="#29485a"/><circle cx="130" cy="38" r="22" fill="#121820"/><path d="M130 9v18m0 22v18m-29-29h18m22 0h18" stroke="#ff5a5d" stroke-width="6" stroke-linecap="round"/></g>
+  <g transform="translate(178 166)"><rect width="76" height="76" rx="16" fill="#132f3f" stroke="#41d6ff"/><path d="M38 12l22 26-22 26-22-26z" fill="#9af0ff"/><rect x="92" width="76" height="76" rx="16" fill="#132f3f" stroke="#41d6ff"/><path d="M130 12l22 26-22 26-22-26z" fill="#9af0ff"/><rect x="184" width="76" height="76" rx="16" fill="#132f3f" stroke="#29485a"/></g>
+  <text x="44" y="78" fill="#e9f3ff" font-family="Arial Black, Arial" font-size="48" font-weight="900">MINES</text>
+  <text x="46" y="116" fill="#9fb6c7" font-family="Arial" font-size="22" font-weight="700">reveal gems, avoid bombs</text>
+</svg>

@@ -1,5 +1,6 @@
 // Big win celebration overlay. Renders a fullscreen flash with the multiplier
 // and a halo of particles when the user wins big (multiplier >= threshold).
+// ESC key dismisses early.
 
 import { useEffect, useState } from 'react'
 import { formatCredits } from '../../../utils/simulationMath'
@@ -19,12 +20,33 @@ export default function BigWinOverlay({ profit, multiplier, trigger, threshold =
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [trigger])
 
+    useEffect(() => {
+        if (!visible) return
+        const onKey = (e) => {
+            if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') setVisible(false)
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [visible])
+
+    useEffect(() => {
+        if (!visible) return
+        const main = document.querySelector('.gs-playfield')
+        if (!main) return
+        main.classList.add('screen-shake')
+        const t = window.setTimeout(() => main.classList.remove('screen-shake'), 500)
+        return () => {
+            main.classList.remove('screen-shake')
+            window.clearTimeout(t)
+        }
+    }, [visible])
+
     if (!visible) return null
 
     const tier = data.multiplier >= 50 ? 'mega' : data.multiplier >= 15 ? 'huge' : 'big'
 
     return (
-        <div className={`bigwin-overlay tier-${tier}`} aria-live="polite">
+        <div className={`bigwin-overlay tier-${tier}`} aria-live="polite" onClick={() => setVisible(false)}>
             <div className="bigwin-rays" />
             <div className="bigwin-content">
                 <span className="bigwin-tag">
@@ -32,6 +54,7 @@ export default function BigWinOverlay({ profit, multiplier, trigger, threshold =
                 </span>
                 <strong className="bigwin-mult">{data.multiplier.toFixed(2)}×</strong>
                 <span className="bigwin-profit">+{formatCredits(data.profit)}</span>
+                <small className="bigwin-dismiss">tap or press ESC to dismiss</small>
             </div>
             <div className="bigwin-particles">
                 {Array.from({ length: 24 }, (_, i) => {

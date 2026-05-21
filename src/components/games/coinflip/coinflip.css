@@ -25,14 +25,26 @@
     transform-style: preserve-3d;
     transition: transform 0.85s cubic-bezier(0.2, 0.8, 0.2, 1);
     filter: drop-shadow(0 24px 48px rgba(0, 0, 0, 0.5));
+    /* Idle: gentle continuous Y-axis rotation so the coin always feels alive. */
+    animation: coinIdleSpin 7s ease-in-out infinite;
 }
 
 .coin3d-stage.flipping .coin3d { animation: coinFlipBig 1s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@keyframes coinIdleSpin {
+    0%   { transform: rotateY(0deg) rotateX(6deg); }
+    50%  { transform: rotateY(180deg) rotateX(-6deg); }
+    100% { transform: rotateY(360deg) rotateX(6deg); }
+}
 
 @keyframes coinFlipBig {
     0% { transform: rotateY(0) rotateX(0) translateY(0); }
     50% { transform: rotateY(540deg) rotateX(20deg) translateY(-30px); }
     100% { transform: rotateY(900deg) rotateX(15deg) translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .coin3d { animation: none; }
 }
 
 .coin3d-face {
@@ -57,6 +69,17 @@
     height: 75%;
     object-fit: contain;
     filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+    mix-blend-mode: multiply;
+    border-radius: 50%;
+}
+
+.coin-choice img {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff8c0, #ffe680 50%, #c98e1e 100%);
 }
 
 .coin3d-edge {
@@ -86,8 +109,6 @@
     gap: 8px;
     transition: all 0.15s;
 }
-
-.coin-choice img { width: 64px; height: 64px; object-fit: contain; }
 
 .coin-choice:hover { color: var(--text-primary); border-color: var(--accent-yellow, #ffcf5a); }
 

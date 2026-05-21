@@ -3,6 +3,7 @@
 
 import { Link } from 'react-router-dom'
 import { formatCredits } from '../../../utils/simulationMath'
+import GameToolbar from './GameToolbar'
 
 export default function GameShell({
     definition,
@@ -14,7 +15,9 @@ export default function GameShell({
     children,
     aside,
     titleBarExtras,
+    helpHref,
 }) {
+    const extras = titleBarExtras !== undefined ? titleBarExtras : <GameToolbar helpHref={helpHref} />
     return (
         <div className="game-shell" style={{ '--accent': accent, '--shell-backdrop': backdrop ? `url("${backdrop}")` : 'none' }}>
             <div className="gs-titlebar">
@@ -23,7 +26,7 @@ export default function GameShell({
                     <h1>{title || definition?.name}</h1>
                     <small>{definition?.category}</small>
                 </div>
-                <div className="gs-titlebar-extras">{titleBarExtras}</div>
+                <div className="gs-titlebar-extras">{extras}</div>
                 <div className="gs-balance">
                     <span>Balance</span>
                     <strong>{formatCredits(balance || 0)}</strong>

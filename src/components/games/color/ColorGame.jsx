@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, GameShell, HistoryDrawer, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './color.css'
@@ -28,10 +28,13 @@ export default function ColorGame() {
     const [rotation, setRotation] = useState(0)
     const [lastWon, setLastWon] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [lastBet, setLastBet] = useState(null)
     const payout = 3.84
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Color Pick')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('tick')
         setSpinning(true)
         const idx = Math.floor(nextRoll('color').roll * COLORS.length)
@@ -48,7 +51,12 @@ export default function ColorGame() {
             setLastWon(won)
             setBurstKey(k => k + 1)
             setSpinning(false)
-            playSound(won ? 'win' : 'loss')
+            if (won) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier: payout })
+            } else {
+                playSound('loss')
+            }
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: next.label, profit, betAmount, multiplier: won ? payout : 0 })
             showToast(won ? 'win' : 'loss', `Color ${next.label}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -64,7 +72,7 @@ export default function ColorGame() {
             accent="#7c5cff"
             backdrop="/assets/games/backdrops/backdrop-neon-grid.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={spinning} actionLabel="Pick Color" onPlay={performPlay}>
+                <BetPanel balance={balance} initialBet={5} runningRound={spinning} actionLabel="Pick Color" onPlay={performPlay} lastBet={lastBet}>
                     <div className="bp-section">
                         <label className="bp-label">Color</label>
                         <div className="color-choices">
@@ -79,11 +87,13 @@ export default function ColorGame() {
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
             <div className={`color-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} style={{ '--result-color': result?.color }}>
+                <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="color-pointer" />
                 <div className="color-spectrum" style={{ transform: `rotate(${rotation}deg)` }} />
                 <div className="color-result-label">{result?.label || 'Pick'}</div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={20} color={result?.color || '#fff'} />}
             </div>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={3} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.25} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

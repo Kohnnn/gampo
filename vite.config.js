@@ -10,6 +10,8 @@ export default defineConfig({
         },
     },
     server: {
+        host: '0.0.0.0',
+        allowedHosts: ['vdklbvkzbd1g.share.zrok.io'],
         port: 5173,
         open: false,
         watch: {
@@ -23,7 +25,6 @@ export default defineConfig({
             output: {
                 manualChunks: {
                     'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-                    'antd-vendor': ['antd', '@ant-design/icons'],
                     'phaser': ['phaser'],
                     'matter': ['matter-js'],
                     'chart': ['chart.js'],

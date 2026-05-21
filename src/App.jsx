@@ -1,7 +1,8 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route } from 'react-router-dom'
-import { App as AntApp } from 'antd'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
+import NotFoundPage from './components/NotFoundPage'
+import ErrorBoundary from './components/ErrorBoundary'
 import HomePage from './pages/HomePage'
 
 // Casino lobby surfaces (small, eager)
@@ -19,14 +20,13 @@ import {
 } from './pages/CasinoPages'
 
 // Heavy game pages: lazy-load
-const CrashPage = lazy(() => import('./pages/CrashPage'))
-const PlinkoPage = lazy(() => import('./pages/PlinkoPage'))
-const DinoPage = lazy(() => import('./pages/DinoPage'))
-const MinesPage = lazy(() => import('./pages/MinesPage'))
 const SportsPage = lazy(() => import('./pages/SportsPage'))
-const SimulatorGame = lazy(() => import('./components/SimulatorGames/SimulatorGame'))
 
-// Refactored per-game routes (sub-batch A + B + C)
+// Refactored per-game routes (sub-batch A + B + C + D)
+const CrashGame = lazy(() => import('./components/games/crash/CrashGame'))
+const PlinkoGame = lazy(() => import('./components/games/plinko/PlinkoGame'))
+const DinoGame = lazy(() => import('./components/games/dino/DinoGame'))
+const MinesGame = lazy(() => import('./components/games/mines/MinesGame'))
 const DiceGame = lazy(() => import('./components/games/dice/DiceGame'))
 const LimboGame = lazy(() => import('./components/games/limbo/LimboGame'))
 const WheelGame = lazy(() => import('./components/games/wheel/WheelGame'))
@@ -45,6 +45,7 @@ const VideoPokerGame = lazy(() => import('./components/games/videopoker/VideoPok
 const LotteryGame = lazy(() => import('./components/games/lottery/LotteryGame'))
 const KenoGame = lazy(() => import('./components/games/keno/KenoGame'))
 const ChickenCrossGame = lazy(() => import('./components/games/chickencross/ChickenCrossGame'))
+const BlackjackGame = lazy(() => import('./components/games/blackjack/BlackjackGame'))
 const PokerGame = lazy(() => import('./components/PokerGame/PokerGame'))
 
 function RouteFallback() {
@@ -57,53 +58,59 @@ function RouteFallback() {
 }
 
 function lazied(element) {
-    return <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+    return (
+        <ErrorBoundary>
+            <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+        </ErrorBoundary>
+    )
 }
 
 function App() {
     return (
-        <AntApp>
-            <Routes>
-                <Route path="/" element={<Layout />}>
-                    <Route index element={<HomePage />} />
-                    <Route path="originals" element={<OriginalsPage />} />
-                    <Route path="slots-lobby" element={<SlotsLobbyPage />} />
-                    <Route path="live" element={<LiveStudioPage />} />
-                    <Route path="missions" element={<MissionsPage />} />
-                    <Route path="vip" element={<VipPage />} />
-                    <Route path="learn" element={<LearnPage />} />
-                    <Route path="activity" element={<ActivityPage />} />
-                    <Route path="verify" element={<VerifyPage />} />
-                    <Route path="race" element={<RacePage />} />
-                    <Route path="promotions" element={<PromotionsPage />} />
-                    <Route path="crash" element={lazied(<CrashPage />)} />
-                    <Route path="plinko" element={lazied(<PlinkoPage />)} />
-                    <Route path="dino" element={lazied(<DinoPage />)} />
-                    <Route path="mines" element={lazied(<MinesPage />)} />
-                    <Route path="sports" element={lazied(<SportsPage />)} />
-                    <Route path="dice" element={lazied(<DiceGame />)} />
-                    <Route path="limbo" element={lazied(<LimboGame />)} />
-                    <Route path="keno" element={lazied(<KenoGame />)} />
-                    <Route path="wheel" element={lazied(<WheelGame />)} />
-                    <Route path="roulette" element={lazied(<RouletteGame />)} />
-                    <Route path="blackjack" element={lazied(<SimulatorGame fixedGameId="blackjack" />)} />
-                    <Route path="slots" element={lazied(<SlotsGame />)} />
-                    <Route path="coinflip" element={lazied(<CoinFlipGame />)} />
-                    <Route path="rps" element={lazied(<RpsGame />)} />
-                    <Route path="guess" element={lazied(<GuessGame />)} />
-                    <Route path="hilo" element={lazied(<HiloGame />)} />
-                    <Route path="baccarat" element={lazied(<BaccaratGame />)} />
-                    <Route path="sicbo" element={lazied(<SicBoGame />)} />
-                    <Route path="videopoker" element={lazied(<VideoPokerGame />)} />
-                    <Route path="color" element={lazied(<ColorGame />)} />
-                    <Route path="tower" element={lazied(<TowerGame />)} />
-                    <Route path="lottery" element={lazied(<LotteryGame />)} />
-                    <Route path="war" element={lazied(<CasinoWarGame />)} />
-                    <Route path="chickencross" element={lazied(<ChickenCrossGame />)} />
-                    <Route path="poker" element={lazied(<PokerGame />)} />
-                </Route>
-            </Routes>
-        </AntApp>
+        <Routes>
+            <Route path="/" element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="originals" element={<OriginalsPage />} />
+                <Route path="slots-lobby" element={<SlotsLobbyPage />} />
+                <Route path="live" element={<LiveStudioPage />} />
+                <Route path="missions" element={<MissionsPage />} />
+                <Route path="vip" element={<VipPage />} />
+                <Route path="learn" element={<LearnPage />} />
+                <Route path="activity" element={<ActivityPage />} />
+                <Route path="verify" element={<VerifyPage />} />
+                <Route path="race" element={<RacePage />} />
+                <Route path="promotions" element={<PromotionsPage />} />
+                <Route path="crash" element={lazied(<CrashGame />)} />
+                <Route path="plinko" element={lazied(<PlinkoGame />)} />
+                <Route path="dino" element={lazied(<DinoGame />)} />
+                <Route path="mines" element={lazied(<MinesGame />)} />
+                <Route path="sports" element={lazied(<SportsPage />)} />
+                <Route path="dice" element={lazied(<DiceGame />)} />
+                <Route path="limbo" element={lazied(<LimboGame />)} />
+                <Route path="keno" element={lazied(<KenoGame />)} />
+                <Route path="wheel" element={lazied(<WheelGame />)} />
+                <Route path="roulette" element={lazied(<RouletteGame />)} />
+                <Route path="blackjack" element={lazied(<BlackjackGame />)} />
+                <Route path="slots" element={lazied(<SlotsGame />)} />
+                <Route path="coinflip" element={lazied(<CoinFlipGame />)} />
+                <Route path="rps" element={lazied(<RpsGame />)} />
+                <Route path="guess" element={lazied(<GuessGame />)} />
+                <Route path="hilo" element={lazied(<HiloGame />)} />
+                <Route path="hilocards" element={<Navigate to="/hilo" replace />} />
+                <Route path="baccarat" element={lazied(<BaccaratGame />)} />
+                <Route path="sicbo" element={lazied(<SicBoGame />)} />
+                <Route path="videopoker" element={lazied(<VideoPokerGame />)} />
+                <Route path="color" element={lazied(<ColorGame />)} />
+                <Route path="colorpick" element={<Navigate to="/color" replace />} />
+                <Route path="tower" element={lazied(<TowerGame />)} />
+                <Route path="lottery" element={lazied(<LotteryGame />)} />
+                <Route path="war" element={lazied(<CasinoWarGame />)} />
+                <Route path="casinowar" element={<Navigate to="/war" replace />} />
+                <Route path="chickencross" element={lazied(<ChickenCrossGame />)} />
+                <Route path="poker" element={lazied(<PokerGame />)} />
+                <Route path="*" element={<NotFoundPage />} />
+            </Route>
+        </Routes>
     )
 }
 

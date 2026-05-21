@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Dino Run game cover">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#151f2b"/><stop offset="1" stop-color="#3a2b08"/></linearGradient><radialGradient id="g" cx="65%" cy="40%" r="60%"><stop stop-color="#ffcf5a" stop-opacity=".55"/><stop offset="1" stop-color="#ffcf5a" stop-opacity="0"/></radialGradient></defs>
+  <rect width="640" height="360" rx="28" fill="url(#bg)"/><rect width="640" height="360" rx="28" fill="url(#g)"/>
+  <path d="M44 282h552" stroke="#ffcf5a" stroke-width="10" stroke-linecap="round"/>
+  <path d="M242 219h76v-45h44v-40h62v34h-32v28h44v33h-66v34h-38v-34h-52v34h-38z" fill="#e9f3ff"/>
+  <circle cx="406" cy="150" r="7" fill="#071109"/>
+  <path d="M486 248l20-45 20 45zm58 0l15-34 15 34z" fill="#ff6b4a"/>
+  <path d="M112 238c48-26 88-39 120-39" stroke="#00e701" stroke-width="8" stroke-linecap="round" opacity=".8"/>
+  <text x="44" y="78" fill="#e9f3ff" font-family="Arial Black, Arial" font-size="48" font-weight="900">DINO RUN</text>
+  <text x="46" y="116" fill="#9fb6c7" font-family="Arial" font-size="22" font-weight="700">survive jumps as risk compounds</text>
+</svg>

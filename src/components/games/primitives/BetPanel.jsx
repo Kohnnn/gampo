@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Play, Pause, ChevronsRight, Settings, Sliders, RotateCcw } from 'lucide-react'
 import { formatCredits } from '../../../utils/simulationMath'
+import { withTimeout } from '../../../utils/scheduling'
 
 const TABS = ['manual', 'auto', 'strategy']
 
@@ -26,6 +27,18 @@ export default function BetPanel({
     children, // game-specific controls injected into manual tab body
     autoChildren, // optional extra auto controls
     lastBet = null,
+    // Mid-round CTA support: when playPhase is set, BetPanel hides the bet input
+    // controls (or marks them disabled) and the bp-play button becomes the in-round
+    // primary action ("Climb", "Cashout", "Draw", etc).
+    playPhase = null, // null | 'idle' | 'in-round'
+    playLabel = null, // optional override for bp-play label
+    onPlayPhaseAction = null, // called instead of onPlay when playPhase === 'in-round'
+    // QA v4: per-game timeout budget for the autoplay loop. Stops a stuck
+    // round from hanging the loop forever.
+    autoTimeoutMs = 15000,
+    // QA v4: gap between consecutive auto-play rounds. Plinko sets this to 500
+    // so multiple balls drop at a clean cadence.
+    autoIntervalMs = 120,
 }) {
     const [tab, setTab] = useState('manual')
     const [betAmount, setBetAmount] = useState(initialBet)
@@ -65,6 +78,10 @@ export default function BetPanel({
     }, [onStop])
 
     const handlePlay = useCallback(async () => {
+        if (playPhase === 'in-round') {
+            if (onPlayPhaseAction) await onPlayPhaseAction()
+            return
+        }
         if (tab === 'manual') {
             if (!onPlay) return
             await onPlay({ betAmount, mode: 'manual' })
@@ -94,7 +111,20 @@ export default function BetPanel({
                 stopAuto()
                 break
             }
-            const result = await Promise.resolve(onPlay({ betAmount: currentBet, mode: 'auto' }))
+            // QA v4: race the round against a timeout so a stuck game
+            // can't hang the autoplay loop. The game's own state should
+            // recover on its next render; we just unblock the loop.
+            const raced = await withTimeout(
+                Promise.resolve(onPlay({ betAmount: currentBet, mode: 'auto' })),
+                autoTimeoutMs,
+            )
+            if (raced.timedOut) {
+                // eslint-disable-next-line no-console
+                console.warn('[BetPanel] autoplay round timed out after', autoTimeoutMs, 'ms')
+                stopAuto()
+                break
+            }
+            const result = raced.value || {}
             const profit = Number(result?.profit) || 0
             sessionProfit.current += profit
             // stop conditions
@@ -111,15 +141,78 @@ export default function BetPanel({
             }
             currentBet = Math.min(maxBet, currentBet)
             if (autoLeft.current !== Infinity) autoLeft.current -= 1
-            // small breathing room so UI can render
-            await new Promise(res => setTimeout(res, 120))
+            // Configurable cadence between rounds. Plinko uses 500 so balls
+            // drop in a continuous shower. Default 120 keeps every other game
+            // feeling snappy.
+            await new Promise(res => setTimeout(res, autoIntervalMs))
         }
         autoRunning.current = false
-    }, [tab, onPlay, betAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto])
+    }, [tab, onPlay, betAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs])
 
     useEffect(() => () => { autoRunning.current = false }, [])
 
+    // Keyboard shortcuts. Disabled when typing in any input/textarea, when modifiers
+    // (ctrl/cmd/alt) are held, and when an auto round is in progress to keep things safe.
+    useEffect(() => {
+        const onKey = (e) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return
+            const tag = (e.target?.tagName || '').toLowerCase()
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+            if (e.target?.isContentEditable) return
+            switch (e.key) {
+                case ' ': // Space: play / stop autobet / in-round CTA
+                    e.preventDefault()
+                    handlePlay()
+                    break
+                case 's':
+                case 'S':
+                    if (autoRunning.current) {
+                        e.preventDefault()
+                        stopAuto()
+                    }
+                    break
+                case 'r':
+                case 'R':
+                    if (lastBet) {
+                        e.preventDefault()
+                        rebet()
+                    }
+                    break
+                case 'h':
+                case 'H':
+                    e.preventDefault()
+                    half()
+                    break
+                case 'd':
+                case 'D':
+                    e.preventDefault()
+                    double()
+                    break
+                case '+':
+                case '=':
+                    e.preventDefault()
+                    setBetAmount(v => Math.min(maxBet, Number((v + Math.max(0.01, v * 0.1)).toFixed(2))))
+                    break
+                case '-':
+                case '_':
+                    e.preventDefault()
+                    setBetAmount(v => Math.max(minBet, Number((v - Math.max(0.01, v * 0.1)).toFixed(2))))
+                    break
+                default:
+                    break
+            }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [handlePlay, stopAuto, lastBet, rebet, half, double, maxBet, minBet])
+
     const isAutoLive = tab === 'auto' && autoRunning.current
+    const inRound = playPhase === 'in-round'
+    const playButtonLabel = (() => {
+        if (inRound) return playLabel || 'Continue'
+        if (isAutoLive) return 'Stop Autobet'
+        return tab === 'auto' ? 'Start Autobet' : (playLabel || actionLabel)
+    })()
 
     return (
         <div className="bp-panel">
@@ -209,11 +302,11 @@ export default function BetPanel({
                 </div>
             )}
 
-            <button className={`bp-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''}`}
-                disabled={runningRound && !isAutoLive}
+            <button className={`bp-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''} ${inRound ? 'in-round' : ''}`}
+                disabled={runningRound && !isAutoLive && !inRound}
                 onClick={handlePlay}
             >
-                {isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {tab === 'auto' ? 'Start Autobet' : actionLabel}</>}
+                {isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>}
             </button>
         </div>
     )

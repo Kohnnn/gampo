@@ -14,18 +14,18 @@ export const casinoSections = [
 
 export const sourceNotes = [
     {
-        name: 'Originals-style shell',
-        source: 'root app and originals clone reference',
+        name: 'Casino shell architecture',
+        source: 'GamPo Lab',
         use: 'Compact dark side navigation, practice balance header, originals game surfaces.',
     },
     {
-        name: 'Xaxino arcade assets',
-        source: 'example/xaxino/assets/templates/basic',
+        name: 'Arcade asset language',
+        source: 'GamPo Lab',
         use: 'Dice, coin, rock-paper-scissors, card and slot imagery adapted into React simulators.',
     },
     {
-        name: 'Laravel casino lobby patterns',
-        source: 'example/laravel-social-gaming-lite-12 and opensource-casino-v10',
+        name: 'Casino lobby patterns',
+        source: 'GamPo Lab',
         use: 'Large catalogue sections, provider rows, missions, VIP progression, activity-led shell.',
     },
 ]
@@ -63,6 +63,15 @@ export const featuredCollections = [
 
 export const liveStudioTables = [
     {
+        id: 'poker-live',
+        name: 'Live Poker Lab',
+        gamePath: '/poker',
+        host: 'Persona Table',
+        viewers: 211,
+        pace: 'Hand-by-hand',
+        lesson: 'Mixed bot personas make ranges, pressure, and table talk feel less scripted.',
+    },
+    {
         id: 'roulette-live',
         name: 'Roulette Studio',
         gamePath: '/roulette',
@@ -95,31 +104,53 @@ export const missions = [
     {
         id: 'edge-check',
         title: 'Edge Check',
-        target: 'Play three different games and compare EV.',
-        reward: 'Practice badge',
+        target: 'Play three different originals and compare RTP, hit rate, and volatility before changing bet size.',
+        reward: 'EV Scout badge',
         progress: 0.35,
     },
     {
         id: 'bankroll-guard',
         title: 'Bankroll Guard',
-        target: 'Keep every bet under 2% of balance for ten plays.',
-        reward: 'Risk badge',
+        target: 'Keep every bet under 2% of balance for ten plays, then review the PnL curve.',
+        reward: 'Risk Shield badge',
         progress: 0.6,
+    },
+    {
+        id: 'poker-persona-read',
+        title: 'Read The Table',
+        target: 'Play one poker orbit and identify one tight, one balanced, and one aggressive bot.',
+        reward: 'Table Read badge',
+        progress: 0.15,
+    },
+    {
+        id: 'seed-verify',
+        title: 'Verify The Roll',
+        target: 'Open the provably fair lab, inspect nonce movement, and rotate seeds once.',
+        reward: 'Fairness badge',
+        progress: 0.45,
     },
     {
         id: 'sports-vig',
         title: 'Spot The Vig',
-        target: 'Build a sportsbook ticket after reading overround.',
-        reward: 'Odds badge',
+        target: 'Build a sportsbook ticket only after reading overround and implied probability.',
+        reward: 'Odds Lens badge',
         progress: 0.2,
+    },
+    {
+        id: 'slots-volatility',
+        title: 'Volatility Safari',
+        target: 'Run ten slot spins, mark the biggest dry streak, and compare it with the paytable.',
+        reward: 'Variance badge',
+        progress: 0.08,
     },
 ]
 
 export const vipLevels = [
-    { tier: 'Observer', threshold: 0, perk: 'Risk glossary unlocked' },
-    { tier: 'Analyst', threshold: 250, perk: 'Rollover calculator unlocked' },
-    { tier: 'Strategist', threshold: 1000, perk: 'Volatility comparison unlocked' },
-    { tier: 'Quant', threshold: 5000, perk: 'Session review unlocked' },
+    { tier: 'Observer', threshold: 0, perk: 'Risk glossary, guided quests, and beginner lesson paths unlocked' },
+    { tier: 'Analyst', threshold: 250, perk: 'Rollover calculator, PnL review prompts, and EV comparison drills unlocked' },
+    { tier: 'Strategist', threshold: 1000, perk: 'Poker persona notes, volatility comparison, and session goals unlocked' },
+    { tier: 'Quant', threshold: 5000, perk: 'Advanced seed verification, model-vs-odds lab, and table review unlocked' },
+    { tier: 'Archivist', threshold: 15000, perk: 'Long-run variance archive and personal practice curriculum unlocked' },
 ]
 
 export const slotCatalog = [

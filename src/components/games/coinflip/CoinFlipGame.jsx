@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, StatsOverlay, useGameSession, Asset } from '../primitives'
+import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './coinflip.css'
@@ -22,10 +22,12 @@ export default function CoinFlipGame() {
     const [flipping, setFlipping] = useState(false)
     const [lastWon, setLastWon] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
+    const [lastBet, setLastBet] = useState(null)
     const payout = 1.96
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Coin Flip')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        setLastBet(betAmount)
         playSound('flip')
         setFlipping(true)
         const next = nextRoll('coinflip').roll < 0.5 ? 'head' : 'tail'
@@ -53,7 +55,7 @@ export default function CoinFlipGame() {
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={flipping} actionLabel="Flip Coin" onPlay={performPlay} lastBet={null}>
+                <BetPanel balance={balance} initialBet={5} runningRound={flipping} actionLabel="Flip Coin" onPlay={performPlay} lastBet={lastBet}>
                     <div className="bp-section">
                         <label className="bp-label">Pick</label>
                         <div className="coin-choices">
@@ -71,6 +73,7 @@ export default function CoinFlipGame() {
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
             <div className={`coinflip-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+                <RecentResultsStrip results={session.stats.lastResults} />
                 <div className={`coin3d-stage ${flipping ? 'flipping' : ''}`}>
                     <div className="coin3d">
                         <div className="coin3d-face front"><Asset src={HEAD} fallback={<span style={{ fontSize: 48 }}>👑</span>} /></div>
