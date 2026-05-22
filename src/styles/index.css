@@ -827,6 +827,53 @@ body {
     box-shadow: none;
 }
 
+.nav-game-search {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 0 10px 8px;
+}
+.nav-game-search span {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.nav-game-search input {
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.24);
+    color: var(--text-primary);
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 800;
+}
+.nav-game-group {
+    padding: 0 0 4px;
+}
+.nav-game-group summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    list-style: none;
+}
+.nav-game-group summary::-webkit-details-marker { display: none; }
+.nav-game-group summary b {
+    color: var(--text-secondary);
+    font-size: 10px;
+}
+
 .app-sidebar-hidden .nav-item {
     padding: 10px 0;
     justify-content: center;

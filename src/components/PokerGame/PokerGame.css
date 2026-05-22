@@ -711,13 +711,20 @@
 /* === GTO QA v4 upgrades === */
 .gto-suggestion {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     gap: 10px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.32);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 12px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(0, 231, 1, 0.10), rgba(0, 0, 0, 0.34));
+    border: 1px solid rgba(0, 231, 1, 0.18);
     flex-wrap: wrap;
+}
+.gto-decision-head {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
 }
 .gto-suggestion-label {
     font-size: 10px;
@@ -728,7 +735,8 @@
 }
 .gto-suggestion strong {
     font-weight: 950;
-    font-size: 14px;
+    font-size: 24px;
+    text-transform: uppercase;
 }
 .gto-suggestion small {
     width: 100%;
@@ -740,13 +748,34 @@
 .gto-suggestion.tone-call  strong { color: #2af04a; }
 .gto-suggestion.tone-fold  strong { color: var(--text-secondary); }
 .gto-mini-bars {
-    flex: 1;
+    width: 100%;
     display: flex;
     height: 8px;
     border-radius: 4px;
     overflow: hidden;
     background: rgba(255, 255, 255, 0.06);
 }
+
+.gto-mix-list {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+.gto-mix-list span {
+    border-radius: 8px;
+    padding: 6px 7px;
+    background: rgba(0, 0, 0, 0.22);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+}
+.gto-mix-list .raise b { color: #ff7a7c; }
+.gto-mix-list .call b { color: #2af04a; }
+.gto-mix-list .fold b { color: var(--text-muted); }
 .gto-mini-bars .bar { height: 100%; }
 .gto-mini-bars .bar.raise { background: #ed4245; }
 .gto-mini-bars .bar.call  { background: #00b428; }

@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useMemo, useState } from 'react'
 
 const navSections = [
     {
@@ -43,30 +44,30 @@ const sidebarActions = [
 ]
 
 const gameItems = [
-    { icon: 'poker', label: 'Live Poker', path: '/poker' },
-    { icon: 'crash', label: 'Crash', path: '/crash' },
-    { icon: 'plinko', label: 'Plinko', path: '/plinko' },
-    { icon: 'dino', label: 'Dino Run', path: '/dino' },
-    { icon: 'mines', label: 'Mines', path: '/mines' },
-    { icon: 'dice', label: 'Dice', path: '/dice' },
-    { icon: 'limbo', label: 'Limbo', path: '/limbo' },
-    { icon: 'keno', label: 'Keno', path: '/keno' },
-    { icon: 'wheel', label: 'Wheel', path: '/wheel' },
-    { icon: 'roulette', label: 'Roulette', path: '/roulette' },
-    { icon: 'blackjack', label: 'Blackjack', path: '/blackjack' },
-    { icon: 'baccarat', label: 'Baccarat', path: '/baccarat' },
-    { icon: 'war', label: 'Casino War', path: '/war' },
-    { icon: 'sicbo', label: 'Sic Bo', path: '/sicbo' },
-    { icon: 'videopoker', label: 'Video Poker', path: '/videopoker' },
-    { icon: 'color', label: 'Color Pick', path: '/color' },
-    { icon: 'tower', label: 'Tower', path: '/tower' },
-    { icon: 'chickencross', label: 'Chicken Cross', path: '/chickencross' },
-    { icon: 'lottery', label: 'Lottery', path: '/lottery' },
-    { icon: 'slots', label: 'Slots', path: '/slots' },
-    { icon: 'coinflip', label: 'Coin Flip', path: '/coinflip' },
-    { icon: 'rps', label: 'RPS', path: '/rps' },
-    { icon: 'guess', label: 'Guess Number', path: '/guess' },
-    { icon: 'hilo', label: 'Hi-Lo Cards', path: '/hilo' },
+    { group: 'Featured', icon: 'poker', label: 'Live Poker', path: '/poker' },
+    { group: 'Featured', icon: 'crash', label: 'Crash', path: '/crash' },
+    { group: 'Featured', icon: 'plinko', label: 'Plinko', path: '/plinko' },
+    { group: 'Featured', icon: 'mines', label: 'Mines', path: '/mines' },
+    { group: 'Originals', icon: 'dino', label: 'Dino Run', path: '/dino' },
+    { group: 'Originals', icon: 'dice', label: 'Dice', path: '/dice' },
+    { group: 'Originals', icon: 'limbo', label: 'Limbo', path: '/limbo' },
+    { group: 'Originals', icon: 'keno', label: 'Keno', path: '/keno' },
+    { group: 'Originals', icon: 'wheel', label: 'Wheel', path: '/wheel' },
+    { group: 'Tables', icon: 'roulette', label: 'Roulette', path: '/roulette' },
+    { group: 'Tables', icon: 'blackjack', label: 'Blackjack', path: '/blackjack' },
+    { group: 'Tables', icon: 'baccarat', label: 'Baccarat', path: '/baccarat' },
+    { group: 'Tables', icon: 'war', label: 'Casino War', path: '/war' },
+    { group: 'Tables', icon: 'sicbo', label: 'Sic Bo', path: '/sicbo' },
+    { group: 'Cards', icon: 'videopoker', label: 'Video Poker', path: '/videopoker' },
+    { group: 'Cards', icon: 'hilo', label: 'Hi-Lo Cards', path: '/hilo' },
+    { group: 'Arcade', icon: 'color', label: 'Color Pick', path: '/color' },
+    { group: 'Arcade', icon: 'tower', label: 'Tower', path: '/tower' },
+    { group: 'Arcade', icon: 'chickencross', label: 'Chicken Cross', path: '/chickencross' },
+    { group: 'Arcade', icon: 'lottery', label: 'Lottery', path: '/lottery' },
+    { group: 'Arcade', icon: 'slots', label: 'Slots', path: '/slots' },
+    { group: 'Arcade', icon: 'coinflip', label: 'Coin Flip', path: '/coinflip' },
+    { group: 'Arcade', icon: 'rps', label: 'RPS', path: '/rps' },
+    { group: 'Arcade', icon: 'guess', label: 'Guess Number', path: '/guess' },
 ]
 
 // SVG glyphs (stroked outlines). 24x24 viewBox.
@@ -117,6 +118,16 @@ const icons = {
 }
 
 function Sidebar({ isOpen, toggleSidebar }) {
+    const [gameSearch, setGameSearch] = useState('')
+    const groupedGames = useMemo(() => {
+        const q = gameSearch.trim().toLowerCase()
+        const filtered = q ? gameItems.filter(item => item.label.toLowerCase().includes(q) || item.group.toLowerCase().includes(q)) : gameItems
+        return filtered.reduce((acc, item) => {
+            if (!acc[item.group]) acc[item.group] = []
+            acc[item.group].push(item)
+            return acc
+        }, {})
+    }, [gameSearch])
     return (
         <aside className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''}`}>
             <div className="sidebar-header">
@@ -173,18 +184,27 @@ function Sidebar({ isOpen, toggleSidebar }) {
 
                 <div className="nav-section">
                     <h3 className="nav-title">Games</h3>
-                    {gameItems.map((item) => (
-                        <NavLink
-                            key={item.path}
-                            to={item.path}
-                            title={item.label}
-                            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                        >
-                            <span className="nav-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[item.icon] || icons.dice}</svg>
-                            </span>
-                            <span>{item.label}</span>
-                        </NavLink>
+                    <label className="nav-game-search">
+                        <span>Search games</span>
+                        <input value={gameSearch} onChange={e => setGameSearch(e.target.value)} placeholder="Crash, poker, cards..." />
+                    </label>
+                    {Object.entries(groupedGames).map(([group, items]) => (
+                        <details key={group} className="nav-game-group" open={group === 'Featured' || gameSearch.trim()}>
+                            <summary>{group}<b>{items.length}</b></summary>
+                            {items.map((item) => (
+                                <NavLink
+                                    key={item.path}
+                                    to={item.path}
+                                    title={item.label}
+                                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                                >
+                                    <span className="nav-icon">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[item.icon] || icons.dice}</svg>
+                                    </span>
+                                    <span>{item.label}</span>
+                                </NavLink>
+                            ))}
+                        </details>
                     ))}
                 </div>
             </nav>

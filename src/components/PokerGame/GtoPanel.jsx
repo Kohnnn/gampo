@@ -55,6 +55,11 @@ export default function GtoPanel({ state }) {
     const suggestion = heroCell ? pickAction(heroCell) : null
     const filterCode = search.trim().toUpperCase()
     const liveMetrics = metricsForState(state, payload)
+    const heroMix = heroCell ? [
+        { key: 'raise', label: 'Raise', value: heroCell.raise || 0 },
+        { key: 'call', label: 'Call', value: heroCell.call || 0 },
+        { key: 'fold', label: 'Fold', value: heroCell.fold || 0 },
+    ] : []
 
     return (
         <div className="gto-panel">
@@ -68,13 +73,18 @@ export default function GtoPanel({ state }) {
                 <div className="gto-ctx-line muted">{payload.note}</div>
                 {suggestion && heroCell && (
                     <div className={`gto-suggestion tone-${suggestion.tone}`}>
-                        <span className="gto-suggestion-label">Suggested</span>
-                        <strong>{suggestion.label}</strong>
+                        <div className="gto-decision-head">
+                            <span className="gto-suggestion-label">Primary decision</span>
+                            <strong>{suggestion.label}</strong>
+                        </div>
                         <small>{explainSuggestion(suggestion, liveMetrics)}</small>
                         <div className="gto-mini-bars" aria-label={`Mix raise ${(heroCell.raise * 100).toFixed(0)} call ${(heroCell.call * 100).toFixed(0)} fold ${(heroCell.fold * 100).toFixed(0)}`}>
                             <span className="bar raise" style={{ width: `${heroCell.raise * 100}%` }} />
                             <span className="bar call"  style={{ width: `${heroCell.call * 100}%` }} />
                             <span className="bar fold"  style={{ width: `${heroCell.fold * 100}%` }} />
+                        </div>
+                        <div className="gto-mix-list">
+                            {heroMix.map(item => <span key={item.key} className={item.key}>{item.label} <b>{(item.value * 100).toFixed(0)}%</b></span>)}
                         </div>
                     </div>
                 )}
