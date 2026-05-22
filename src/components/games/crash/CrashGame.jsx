@@ -22,6 +22,7 @@ import PlayerStrip from './PlayerStrip'
 import './crash.css'
 
 const HOUSE_EDGE = 0.01
+const TARGET_PRESETS = [1.25, 1.5, 2, 3, 5, 10, 25, 50, 100]
 
 function rollCrashMultiplier(uniform) {
     const u = Math.max(1e-9, Math.min(1 - 1e-9, uniform))
@@ -239,7 +240,7 @@ export default function CrashGame() {
                             className="bp-bet-input"
                         />
                         <div className="bp-quick-actions">
-                            {[1.5, 2, 3, 5, 10].map(t => (
+                            {TARGET_PRESETS.map(t => (
                                 <button key={t} onClick={() => !inRound && setTarget(t)}>{t}×</button>
                             ))}
                         </div>
@@ -247,6 +248,11 @@ export default function CrashGame() {
                     <div className="bp-bal-line">
                         <span>Hit chance</span>
                         <strong>{((1 - HOUSE_EDGE) / target * 100).toFixed(1)}%</strong>
+                    </div>
+                    <div className="crash-odds-card">
+                        <div><span>Target</span><strong>{target.toFixed(2)}×</strong></div>
+                        <div><span>Profit on 5 GC</span><strong>+{formatCredits(5 * (target - 1))}</strong></div>
+                        <div><span>Bust risk</span><strong>{(100 - ((1 - HOUSE_EDGE) / target * 100)).toFixed(1)}%</strong></div>
                     </div>
                 </BetPanel>
             }

@@ -9,3 +9,16 @@
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.6:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.29.144.1:[1m5173[22m/[39m
 [2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m1:04:38 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/primitives/HistoryDrawer.jsx[22m
+[2m1:05:11 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m1:05:43 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/plinko/PlinkoGame.jsx, /src/components/games/wheel/WheelGame.jsx, /src/components/games/keno/KenoGame.jsx, /src/components/games/crash/CrashGame.jsx, /src/components/games/mines/MinesGame.jsx, /src/components/games/dino/DinoGame.jsx, /src/components/games/limbo/LimboGame.jsx, /src/components/games/roulette/RouletteGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx, /src/components/games/baccarat/BaccaratGame.jsx, /src/components/games/war/CasinoWarGame.jsx, /src/components/games/lottery/LotteryGame.jsx, /src/components/games/guess/GuessGame.jsx, /src/components/games/rps/RpsGame.jsx, /src/components/games/hilo/HiloGame.jsx, /src/components/games/chickencross/ChickenCrossGame.jsx, /src/components/games/slots/SlotsGame.jsx, /src/components/games/color/ColorGame.jsx, /src/components/games/videopoker/VideoPokerGame.jsx, /src/components/games/sicbo/SicBoGame.jsx, /src/components/games/tower/TowerGame.jsx, /src/components/games/dice/DiceGame.jsx, /src/components/games/coinflip/CoinFlipGame.jsx, /src/components/PokerGame/HandHistoryTab.jsx[22m
+[2m1:06:12 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/crash/CrashGame.jsx[22m
+[2m1:06:28 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/crash/crash.css[22m
+[2m1:06:46 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PokerGame/GtoPanel.jsx[22m
+[2m1:07:07 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/PokerGame/PokerGame.css[22m
+[2m1:07:43 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/roulette/RouletteGame.jsx[22m
+[2m1:07:53 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/roulette/RouletteGame.jsx[22m
+[2m1:08:15 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/roulette/roulette.css[22m
+[2m1:08:32 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m1:09:18 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.jsx[22m
+[2m1:09:40 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
@@ -73,6 +73,18 @@ export default function SlotsGame() {
     const visibleSymbols = themeSymbols.filter(s => s.multiplier > 0)
     const [reels, setReels] = useState(() => Array.from({ length: totalCells }, (_, i) => visibleSymbols[i % visibleSymbols.length]))
 
+    useEffect(() => {
+        if (!running) return undefined
+        const id = window.setInterval(() => {
+            setReels(prev => prev.map((symbol, index) => {
+                const col = index % variantConfig.cols
+                if (col < stoppedCols) return symbol
+                return themeSymbols[Math.floor(Math.random() * themeSymbols.length)]
+            }))
+        }, 90)
+        return () => window.clearInterval(id)
+    }, [running, stoppedCols, themeSymbols, variantConfig.cols])
+
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Slots')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`)
@@ -141,6 +153,7 @@ export default function SlotsGame() {
         const profit = returnAmount - betAmount
         const totalDelay = colDelays[colDelays.length - 1] + 200
         window.setTimeout(() => {
+            setReels(next)
             if (returnAmount > 0) addWinnings(returnAmount, 'Slots return')
             setWinningCells(Array.from(winSet))
             setBurstKey(k => k + 1)

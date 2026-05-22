@@ -4,11 +4,12 @@ import { formatCredits } from '../../../utils/simulationMath'
 
 export default function HistoryDrawer({ history, onClear }) {
     return (
-        <div className="hd-panel">
-            <div className="hd-header">
+        <details className="hd-panel">
+            <summary className="hd-header">
                 <span>History</span>
+                <strong>{history.length}</strong>
                 {history.length > 0 && <button className="hd-clear" onClick={onClear}>Clear</button>}
-            </div>
+            </summary>
             <div className="hd-list">
                 {history.length === 0 ? (
                     <p className="hd-empty">No plays yet.</p>
@@ -21,6 +22,6 @@ export default function HistoryDrawer({ history, onClear }) {
                     </div>
                 ))}
             </div>
-        </div>
+        </details>
     )
 }

@@ -193,7 +193,7 @@ export default function RouletteGame() {
                 </div>
 
                 <div className="rou-board">
-                    <div className="rou-cell zero" data-bet={cellBet(0) || ''}
+                    <div className={`rou-cell zero ${result === 0 ? 'winner' : ''}`} data-bet={cellBet(0) || ''}
                         onClick={() => addBet('straight', { n: 0 })}
                         style={cellBet(0) ? {} : {}}
                         data-has={cellBet(0) ? 'yes' : ''}
@@ -202,7 +202,7 @@ export default function RouletteGame() {
                         {[0, 1, 2].map(rowIdx => (
                             BOARD_NUMBERS[rowIdx].map(n => (
                                 <div key={n}
-                                    className={`rou-cell ${colorOf(n)} ${cellBet(n) ? 'has-bet' : ''}`}
+                                    className={`rou-cell ${colorOf(n)} ${cellBet(n) ? 'has-bet' : ''} ${result === n ? 'winner' : ''}`}
                                     data-bet={cellBet(n) || ''}
                                     onClick={() => addBet('straight', { n })}
                                 >{n}</div>
@@ -211,51 +211,52 @@ export default function RouletteGame() {
                     </div>
                 </div>
 
-                <div className="rou-extra-row">
-                    {[
-                        { type: 'dozen1', label: '1st 12' },
-                        { type: 'dozen2', label: '2nd 12' },
-                        { type: 'dozen3', label: '3rd 12' },
-                        { type: 'col1', label: 'Col 1' },
-                        { type: 'col2', label: 'Col 2' },
-                        { type: 'col3', label: 'Col 3' },
-                    ].map(row => (
-                        <div key={row.type}
-                            className={`rou-extra-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
-                            onClick={() => addBet(row.type)}
-                        >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
-                    ))}
-                </div>
-
-                <div className="rou-extra-row">
-                    {[
-                        { type: 'low', label: '1-18' },
-                        { type: 'even', label: 'Even' },
-                        { type: 'red', label: 'Red' },
-                        { type: 'black', label: 'Black' },
-                        { type: 'odd', label: 'Odd' },
-                        { type: 'high', label: '19-36' },
-                    ].map(row => (
-                        <div key={row.type}
-                            className={`rou-extra-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
-                            onClick={() => addBet(row.type)}
-                        >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
-                    ))}
-                </div>
-
-                <div className="rou-racetrack">
-                    {[
-                        { type: 'voisins', label: 'Voisins du Zéro (17 nums)' },
-                        { type: 'tier', label: 'Tier (12 nums)' },
-                        { type: 'orphelins', label: 'Orphelins (8 nums)' },
-                        { type: 'zeroNeighbours', label: 'Zero Neighbours (7)' },
-                    ].map(row => (
-                        <div key={row.type}
-                            className={`rou-track-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
-                            onClick={() => addBet(row.type)}
-                        >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
-                    ))}
-                </div>
+                <details className="rou-advanced">
+                    <summary>Advanced bets</summary>
+                    <div className="rou-extra-row">
+                        {[
+                            { type: 'dozen1', label: '1st 12' },
+                            { type: 'dozen2', label: '2nd 12' },
+                            { type: 'dozen3', label: '3rd 12' },
+                            { type: 'col1', label: 'Col 1' },
+                            { type: 'col2', label: 'Col 2' },
+                            { type: 'col3', label: 'Col 3' },
+                        ].map(row => (
+                            <div key={row.type}
+                                className={`rou-extra-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
+                                onClick={() => addBet(row.type)}
+                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
+                        ))}
+                    </div>
+                    <div className="rou-extra-row">
+                        {[
+                            { type: 'low', label: '1-18' },
+                            { type: 'even', label: 'Even' },
+                            { type: 'red', label: 'Red' },
+                            { type: 'black', label: 'Black' },
+                            { type: 'odd', label: 'Odd' },
+                            { type: 'high', label: '19-36' },
+                        ].map(row => (
+                            <div key={row.type}
+                                className={`rou-extra-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
+                                onClick={() => addBet(row.type)}
+                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
+                        ))}
+                    </div>
+                    <div className="rou-racetrack">
+                        {[
+                            { type: 'voisins', label: 'Voisins du Zéro (17 nums)' },
+                            { type: 'tier', label: 'Tier (12 nums)' },
+                            { type: 'orphelins', label: 'Orphelins (8 nums)' },
+                            { type: 'zeroNeighbours', label: 'Zero Neighbours (7)' },
+                        ].map(row => (
+                            <div key={row.type}
+                                className={`rou-track-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
+                                onClick={() => addBet(row.type)}
+                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
+                        ))}
+                    </div>
+                </details>
             </div>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={18 / 37} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />

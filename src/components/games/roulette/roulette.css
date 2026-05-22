@@ -2,7 +2,7 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 12px;
     align-items: center;
     transition: box-shadow 0.4s ease;
     /* Scope the diamond/grid background to the game canvas only — fixes the
@@ -10,7 +10,7 @@
     contain: layout paint;
     overflow: hidden;
     border-radius: 14px;
-    padding: 16px;
+    padding: 12px;
     background:
         radial-gradient(circle at 70% 100%, rgba(20, 160, 80, 0.06), transparent 65%),
         linear-gradient(180deg, rgba(15, 33, 46, 0.55), rgba(10, 25, 35, 0.55));
@@ -19,7 +19,7 @@
 
 .rou-wheel-area {
     position: relative;
-    width: min(400px, 80vw);
+    width: min(330px, 72vw);
     aspect-ratio: 1;
     display: grid;
     place-items: center;
@@ -170,14 +170,14 @@
 
 .rou-board {
     width: 100%;
-    max-width: 820px;
+    max-width: 760px;
     background: linear-gradient(180deg, #0c5e35, #064d24);
     background-image:
         radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 60%),
         repeating-linear-gradient(0deg, transparent 0 20px, rgba(0, 0, 0, 0.05) 20px 21px);
     border: 3px solid #6f4a09;
     border-radius: 12px;
-    padding: 10px;
+    padding: 8px;
     display: grid;
     grid-template-columns: 44px repeat(13, 1fr);
     gap: 3px;
@@ -186,7 +186,7 @@
 
 .rou-cell {
     aspect-ratio: 1;
-    min-height: 36px;
+    min-height: 30px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 4px;
     color: #fff;
@@ -198,6 +198,19 @@
     transition: all 0.15s;
     position: relative;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.rou-cell.winner {
+    outline: 3px solid #ffe680;
+    outline-offset: -3px;
+    box-shadow: 0 0 22px rgba(255, 207, 90, 0.7), inset 0 0 18px rgba(255, 207, 90, 0.35);
+    animation: rouWinnerPulse 0.9s ease-in-out 3;
+    z-index: 2;
+}
+
+@keyframes rouWinnerPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
 }
 
 .rou-cell:hover {
@@ -250,11 +263,36 @@
 
 .rou-extra-row {
     width: 100%;
-    max-width: 820px;
+    max-width: 760px;
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 6px;
 }
+
+.rou-advanced {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.rou-advanced summary {
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.24);
+    color: var(--text-secondary);
+    padding: 9px 12px;
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    list-style: none;
+}
+.rou-advanced summary::-webkit-details-marker { display: none; }
+.rou-advanced[open] summary { color: #ffe680; border-color: rgba(255, 207, 90, 0.35); }
+.rou-advanced[open] .rou-extra-row,
+.rou-advanced[open] .rou-racetrack { margin-top: 8px; }
 
 .rou-extra-cell {
     background: linear-gradient(180deg, #0c5e35, #064d24);
@@ -379,4 +417,3 @@
 }
 
 .rou-summary strong { color: var(--text-primary); }
-

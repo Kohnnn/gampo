@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { recordPnl } from '../../../hooks/useGlobalPnl'
 
 const HISTORY_LIMIT = 200
+const mirroredIds = new Set()
 
 function readArr(key) {
     try {
@@ -35,12 +36,17 @@ export default function useGameSession(gameId) {
         // Mirror to the global PnL aggregator so StatsPanel can show
         // session/game/all-time profit without each game re-implementing it.
         try {
-            recordPnl({
-                gameId,
-                profit: entry.profit,
-                betAmount: entry.betAmount,
-                label: entry.label,
-            })
+            const mirrorId = `${gameId}:${entry.id || entry.ts || entry.label}`
+            if (!mirroredIds.has(mirrorId)) {
+                mirroredIds.add(mirrorId)
+                if (mirroredIds.size > 1000) mirroredIds.clear()
+                recordPnl({
+                    gameId,
+                    profit: entry.profit,
+                    betAmount: entry.betAmount,
+                    label: entry.label,
+                })
+            }
         } catch { /* ignore */ }
     }, [key, gameId])
 
