@@ -67,3 +67,7 @@ console.log(data[0].url || data[0].b64_json.slice(0, 40));
 | `black-forest-labs` (FLUX) | `image` | `size` -> exact width/height |
 | `runwayml` | `image` | `size` -> ratio; async |
 | `sdwebui`, `comfyui` | — | Localhost noAuth (`:7860` / `:8188`) |
+
+## Notes
+
+use the latest cx/gpt-5.5-image model

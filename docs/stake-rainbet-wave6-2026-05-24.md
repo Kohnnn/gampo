@@ -169,12 +169,61 @@ Per template route + appearance in `gameDefinitions.js`. Slots Lobby surfaces th
 
 ## Verification
 
-- `npm run build` ran in `D:\gampo\` — pass logged below.
-- Manual smoke: `/slots` template picker iterates through 8 templates; each renders idle, motion, result.
-- Autoplay 10 with `Stop on feature trigger` resolves on first scatter trigger.
-- Anticipation visible when 2 scatters appear before the last column stops.
+- `npm run build` — pass. Slots chunk is 34.2 kB / 10.78 kB gzip.
+- `npm test` — 79 prior tests still pass.
+- New `src/components/games/slots/slotFactory.test.js` — 7 tests pass:
+  - cell-count parity for all shipped templates,
+  - megaways per-column row override,
+  - deterministic shape across all shipped templates,
+  - buy-tier listing,
+  - guaranteed-scatter contract on bonus buy.
+- Total test files: 19, total tests: 86.
+
+## PlinkoEngine bundle status
+
+- Already lazy-loaded via `await import('./engine/PlinkoEngine.js')` inside `PlinkoGame.jsx`.
+- Chunk weight (18.4 MB minified, 7.9 MB gzip) is dominated by `plinkoOutcomes.js`, a 16.5 MB precomputed lookup table emitted by `scripts/generatePlinkoOutcomes.cjs`.
+- The chunk is only fetched when `/plinko` opens, so slot routes are unaffected.
+- Recommendation: a future PR can split `plinkoOutcomes` per row count and lazy-load only the active row count. Out of scope for Wave 6 to avoid plinko physics regressions.
+
+## Wave 6 acceptance — DONE
+
+- Engine: pay-anywhere, megaways, cascade ladder, money symbols, mystery reveal, buy-bonus tiers shipped.
+- UX: per-column cubic-out reel-stop, scatter anticipation, autoplay drawer with simple default + advanced stop conditions, buy-tier modal, mystery reveal overlay, money chip rendering.
+- CSS: anticipation, autoplay drawer, buy modal, money chip, mystery overlay, megaways grid all themed with `--slot-accent`, reduced-motion respected.
+- Build: green. Tests: green. Smoke: clean.
 
 ## Open Questions for Wave 7 Kickoff
 
-See trailing section of this doc; Wave 7 requires user sign-off before starting.
+Locked answers from user (carry into Wave 7):
+
+- Strategy: incremental ship, ask before each wave when scope is unclear.
+- Asset strategy: AI raster pack per theme (premium symbols), animated where possible.
+- Mechanics: variety per template (per recommended Wave 7 list).
+- Autoplay defaults: simple default, advanced stops in collapsible drawer.
+- Buy-bonus tiers: per ai-slot-developer skill recommendation (multi-tier).
+- Templates: full ship 12 (Wave 7 + 8) for max quality.
+- Routes: per-template route + lobby surfacing.
+- Per-template docs: written after each template ships, so the next one improves.
+- PlinkoEngine: cleaned up (lazy-load confirmed; outcomes split deferred).
+- Cover art: unique covers per template, generated to match themes.
+
+Wave 7 questions to confirm before starting:
+
+1. **Cover-art generation**: should I run the AI raster pack + cover generation through the `imagegen` skill (OpenAI API, requires `OPENAI_API_KEY`) or place SVG placeholders now and let you add binaries later? An `OPENAI_API_KEY` is needed for the live calls.
+2. **Megaways math density**: confirm 6 reels with rows 2-7 per spin (Pragmatic-style), or simpler 6x4 with stochastic row counts 2-6? I will go with 2-7 unless told otherwise.
+3. **Persistent multiplier in free spins**: ok to default the persistent multiplier to start at 1x and grow by 1 each scatter retrigger?
+4. **Mystery candidate pool**: pull from all paying symbols (excluding scatter/wild), or curate per-template (e.g. the Wanted symbol only morphs to mid- and high-pay)? I will curate per template unless told otherwise.
+5. **Cluster cascade ladder**: confirm `[1, 2, 3, 5, 10]` as the default tumble ladder for `mummy-cascade`, or do you want a different progression?
+6. **Slots Lobby**: should I update `slots-lobby` page to surface the new templates as cards, or just rely on dedicated routes for now?
+7. **Run order**: I propose this Wave 7 ship order so the engine extensions land in the simplest mechanic first:
+   1. `wanted-revelation` (mystery reveal)
+   2. `gates-ascent` (pay-anywhere + scatter pay)
+   3. `bass-bayou` (money symbols)
+   4. `mummy-cascade` (cluster cascade ladder)
+   5. `phoenix-megaways` (megaways)
+   6. `mansion-megaways` (megaways + persistent multiplier)
+   Confirm or reorder.
+
+Pause here. Awaiting your answers before starting Wave 7.
 

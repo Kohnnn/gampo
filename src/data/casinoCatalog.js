@@ -154,35 +154,24 @@ export const vipLevels = [
 ]
 
 export const slotCatalog = [
-    'Amazing Sevens',
-    'Aztec Practice',
-    'Banana Party',
-    'Bars and Sevens',
-    'Ancient Forest',
-    'Beach Holiday',
-    'Bells on Fire',
-    'Diamond Trail',
-    'Lucky Lantern',
-    'Cyber Fruits',
-    'Royal Vault',
-    'Neon Treasure',
-].map((name, index) => ({
+    { name: 'Vault Rush', path: '/slots', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/slots.png' },
+    { name: 'River Catcher', path: '/slots', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/slots.png' },
+    { name: 'Dust Rail Bounty', path: '/slots', volatility: 'Medium high', rtp: 0.94, image: '/images/covers/generated/slots.png' },
+    { name: 'Storm Banner', path: '/slots', volatility: 'High', rtp: 0.95, image: '/images/covers/generated/slots.png' },
+    { name: 'Bassline Bonus', path: '/slots', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/slots.png' },
+    { name: 'Scarab Spin', path: '/scarab-spin', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/slots.png' },
+    { name: 'Bars', path: '/bars', volatility: 'Low', rtp: 0.95, image: '/images/covers/generated/slots.png' },
+    { name: 'Blue Samurai', path: '/blue-samurai', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/slots.png' },
+    { name: 'Wanted Revelation', path: '/wanted-revelation', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/wanted-revelation.png' },
+    { name: 'Gates of Ascent', path: '/gates-ascent', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/gates-ascent.png' },
+    { name: 'Bass Bayou Collect', path: '/bass-bayou', volatility: 'Medium high', rtp: 0.945, image: '/images/covers/generated/bass-bayou.png' },
+    { name: 'Mummy Cascade', path: '/mummy-cascade', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/mummy-cascade.png' },
+    { name: 'Phoenix Megaways', path: '/phoenix-megaways', volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/phoenix-megaways.png' },
+    { name: 'Mansion Megaways', path: '/mansion-megaways', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/mansion-megaways.png' },
+].map((entry, index) => ({
     id: `slot-${index + 1}`,
-    name,
-    path: '/slots',
-    provider: ['GamPo Lab', 'Xaxino Set', 'Open Arcade'][index % 3],
-    volatility: ['Low', 'Medium', 'High'][index % 3],
-    rtp: [0.94, 0.955, 0.965][index % 3],
-    image: `/example-assets/xaxino/game/${[
-        '610515f76a27a1627723255.jpg',
-        '61051a9ed28511627724446.jpg',
-        '61051cb37ad601627724979.jpg',
-        '61051d8469d731627725188.jpg',
-        '610521608fde21627726176.jpg',
-        '61052482a60ed1627726978.jpg',
-        '610526fa315241627727610.jpg',
-        '6345218eda3c71665474958.jpg',
-    ][index % 8]}`,
+    provider: 'GamPo Lab',
+    ...entry,
 }))
 
 export const fullGameCatalog = [
