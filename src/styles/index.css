@@ -23,6 +23,19 @@
 
     --border-color: #2f4553;
 
+    /* Color-role tokens. Use these instead of raw colors so games stay
+       consistent across the casino:
+       - bet-marker: "your active bet" / chips on cells. Blue, neutral.
+       - feature-gold: only for big-win, jackpot, VIP / premium signals.
+       - warn: real warnings (cap reached, max bet exceeded). Amber.       */
+    --bet-marker: #6db7ff;
+    --bet-marker-soft: rgba(109, 183, 255, 0.18);
+    --bet-marker-strong: rgba(109, 183, 255, 0.5);
+    --feature-gold: #ffe680;
+    --feature-gold-soft: rgba(255, 207, 90, 0.18);
+    --warn: #ffcf5a;
+    --warn-soft: rgba(255, 207, 90, 0.18);
+
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
     --radius-sm: 4px;

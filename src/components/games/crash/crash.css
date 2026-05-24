@@ -6,6 +6,19 @@
     height: 100%;
 }
 
+.crash-deck {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+    gap: 12px;
+    align-items: stretch;
+    flex: 1;
+    min-height: 480px;
+}
+
+@media (max-width: 1100px) {
+    .crash-deck { grid-template-columns: 1fr; }
+}
+
 .crash-screen {
     position: relative;
     flex: 1;
@@ -61,6 +74,92 @@
 
 .crash-screen.busted { box-shadow: inset 0 0 0 2px rgba(237, 66, 69, 0.6); }
 .crash-screen.cashed { box-shadow: inset 0 0 0 2px rgba(0, 231, 1, 0.6); }
+.crash-screen.betting { box-shadow: inset 0 0 0 2px rgba(109, 183, 255, 0.5); }
+
+.crash-countdown {
+    font-size: 96px;
+    font-weight: 950;
+    letter-spacing: -0.04em;
+    color: #9cc8ff;
+    text-shadow: 0 0 28px rgba(109, 183, 255, 0.55), 0 0 12px rgba(0, 0, 0, 0.45);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+@media (max-width: 1023px) {
+    .crash-countdown { font-size: 64px; }
+}
+
+.crash-side-rail {
+    background: rgba(3, 12, 19, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+}
+
+.crash-rail-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.crash-rail-head strong { color: var(--text-primary); }
+
+.crash-side-rail ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+    max-height: 540px;
+}
+
+.crash-side-rail li {
+    display: grid;
+    grid-template-columns: 12px 1.1fr 0.6fr 0.6fr 0.7fr;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.crash-side-rail .crash-rail-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.crash-rail-name { color: var(--text-primary); }
+.crash-rail-bet { text-align: right; }
+.crash-rail-target { text-align: right; color: var(--text-muted); }
+.crash-side-rail li strong { text-align: right; font-weight: 950; }
+
+.crash-side-rail li.cashed strong { color: var(--accent-green); }
+.crash-side-rail li.busted strong { color: var(--accent-red); }
+.crash-side-rail li.flying strong { color: #9cc8ff; }
+.crash-side-rail li.pending strong { color: var(--text-muted); }
+
+@keyframes crashRailIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.crash-side-rail li { animation: crashRailIn 0.22s ease both; }
 
 .crash-chart-wrap {
     position: relative;
@@ -143,6 +242,23 @@
 .crash-screen.cashed .crash-mult-num {
     color: #2af04a;
     text-shadow: 0 0 32px rgba(0, 231, 1, 0.6);
+}
+
+.crash-missed {
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.44);
+    border: 1px solid rgba(42, 240, 74, 0.32);
+    color: rgba(235, 255, 239, 0.9);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.crash-missed.danger {
+    border-color: rgba(237, 66, 69, 0.42);
+    color: #ff8a8c;
 }
 
 .crash-tag {
@@ -251,6 +367,30 @@
 .crash-player-row.pending .crash-player-result {
     color: #ffcf5a;
     animation: crashLiveBlink 0.8s ease-in-out infinite;
+}
+
+.crash-cash-pop {
+    position: absolute;
+    z-index: 12;
+    pointer-events: none;
+    transform: translate(calc(-50% + (var(--pop-index) * 16px)), -125%);
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(3, 16, 24, 0.86);
+    border: 1px solid color-mix(in srgb, var(--pop-color) 70%, transparent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42), 0 0 18px color-mix(in srgb, var(--pop-color) 42%, transparent);
+    animation: crashCashPop 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes crashCashPop {
+    0% { opacity: 0; transform: translate(calc(-50% + (var(--pop-index) * 16px)), -70%) scale(0.82); }
+    18% { opacity: 1; }
+    100% { opacity: 0; transform: translate(calc(-50% + (var(--pop-index) * 16px)), -190%) scale(1); }
 }
 
 @keyframes crashLiveBlink {

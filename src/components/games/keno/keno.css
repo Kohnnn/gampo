@@ -36,8 +36,8 @@
 }
 
 .keno-grid button.drawn {
-    background: linear-gradient(160deg, rgba(255, 207, 90, 0.3), rgba(176, 122, 22, 0.4));
-    border-color: rgba(255, 207, 90, 0.7);
+    background: linear-gradient(160deg, rgba(109, 183, 255, 0.32), rgba(76, 130, 198, 0.4));
+    border-color: rgba(109, 183, 255, 0.7);
     animation: kenoDraw 0.4s ease backwards;
 }
 

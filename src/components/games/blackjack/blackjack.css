@@ -128,10 +128,10 @@
     align-items: center;
     gap: 8px;
     padding: 10px 12px;
-    background: rgba(255, 207, 90, 0.12);
-    border: 1px solid rgba(255, 207, 90, 0.4);
+    background: rgba(109, 183, 255, 0.14);
+    border: 1px solid rgba(109, 183, 255, 0.42);
     border-radius: 8px;
-    color: #ffe680;
+    color: var(--bet-marker);
     font-size: 12px;
 }
 .bj-insurance button {

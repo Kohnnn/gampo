@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
@@ -10,6 +10,29 @@ import EducationPanel from '../../EducationPanel'
 import './roulette.css'
 
 const CHIP_VALUES = [1, 5, 25, 100, 500]
+const SIM_NAMES = ['Kira', 'Reno', 'Mika', 'Jules', 'Vex', 'Nia', 'Sable', 'Ozzy', 'Tess', 'Rune']
+const BETTING_OPEN_MS = 6000
+
+function makeSimPlayers(number = null) {
+    return Array.from({ length: 8 }, (_, i) => {
+        const bet = [1, 5, 10, 25, 50][Math.floor(Math.random() * 5)]
+        const pickType = Math.random()
+        const type = pickType < 0.5 ? 'color' : pickType < 0.75 ? 'dozen' : 'straight'
+        const colorPick = Math.random() < 0.5 ? 'red' : 'black'
+        const straight = Math.floor(Math.random() * 37)
+        const label = type === 'color' ? colorPick : type === 'dozen' ? `${1 + Math.floor(Math.random() * 3)}st 12`.replace('1st', '1st').replace('2st', '2nd').replace('3st', '3rd') : `${straight}`
+        const won = number === null ? null : type === 'color' ? colorOf(number) === colorPick : type === 'dozen' ? number > 0 && Math.ceil(number / 12) === Number(label[0]) : number === straight
+        const payout = won ? bet * (type === 'straight' ? 35 : type === 'dozen' ? 3 : 2) : 0
+        return {
+            id: `${i}-${Math.random().toString(16).slice(2, 6)}`,
+            name: SIM_NAMES[(i + Math.floor(Math.random() * SIM_NAMES.length)) % SIM_NAMES.length],
+            bet,
+            label,
+            won,
+            payout,
+        }
+    })
+}
 
 // Bet type ids: stored as { id, type, params, amount }
 function bestBetForCell(numbers, amount, type, params) {
@@ -28,9 +51,14 @@ export default function RouletteGame() {
     const [spinning, setSpinning] = useState(false)
     const [wheelRotation, setWheelRotation] = useState(0)
     const [ballRotation, setBallRotation] = useState(0)
+    const [ballRadius, setBallRadius] = useState('46%')
+    const [bettingMs, setBettingMs] = useState(0)
+    const bettingTickRef = useRef(null)
+    const wheelAreaRef = useRef(null)
     const [history, setHistory] = useState([])
     const [lastWon, setLastWon] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [simPlayers, setSimPlayers] = useState(() => makeSimPlayers())
     // Snapshot of last placed chips, kept across spins for Rebet + Auto re-bet.
     const [lastChips, setLastChips] = useState([])
     const [lastTotal, setLastTotal] = useState(null)
@@ -76,44 +104,76 @@ export default function RouletteGame() {
         setLastChips(activeBets.map(b => ({ type: b.type, params: b.params, amount: b.amount })))
         setLastTotal(stake)
         playSound('tick')
-        setSpinning(true)
+
+        // Pre-roll: simulated bettors are populated immediately so the
+        // table feels live during the betting countdown. The actual wheel
+        // result is rolled now (RNG is fair) but the spin animation only
+        // begins after the 6s betting countdown elapses.
         const { roll: r } = nextRoll('roulette')
         const number = Math.floor(r * 37)
-        const idx = WHEEL_ORDER.indexOf(number)
-        const segAngle = 360 / 37
-        const targetAngle = idx * segAngle
-        setWheelRotation(prev => prev + 360 * 5 + targetAngle)
-        setBallRotation(prev => prev - 360 * 8 - targetAngle)
-        window.setTimeout(() => {
-            // settle
-            let totalReturn = 0
-            for (const bet of activeBets) {
-                const m = makeBet(bet.type, bet.params)
-                if (m.numbers.includes(number)) totalReturn += bet.amount * m.payout
+        setSimPlayers(makeSimPlayers(number))
+
+        // Begin spin animation.
+        const beginSpin = () => {
+            setSpinning(true)
+            const idx = WHEEL_ORDER.indexOf(number)
+            const segAngle = 360 / 37
+            const targetAngle = 360 - idx * segAngle
+            setBallRadius('46%')
+            setWheelRotation(prev => prev + 360 * 6 + 96)
+            setBallRotation(prev => prev - 360 * 9 + targetAngle + 4)
+            window.setTimeout(() => setBallRadius('28%'), 1500)
+            window.setTimeout(() => {
+                // settle
+                let totalReturn = 0
+                for (const bet of activeBets) {
+                    const m = makeBet(bet.type, bet.params)
+                    if (m.numbers.includes(number)) totalReturn += bet.amount * m.payout
+                }
+                const profit = totalReturn - stake
+                if (totalReturn > 0) addWinnings(totalReturn, 'Roulette return')
+                const effectiveMult = stake > 0 ? totalReturn / stake : 0
+                setResult(number)
+                setLastWon(profit > 0)
+                setSpinning(false)
+                setHistory(prev => [number, ...prev].slice(0, 18))
+                if (effectiveMult >= 5) {
+                    playSound('bigwin')
+                    setBigWin({ trigger: Date.now(), profit, multiplier: effectiveMult })
+                } else {
+                    playSound(profit > 0 ? 'win' : 'loss')
+                }
+                session.record({
+                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    label: `${number} ${colorOf(number)}`,
+                    profit, betAmount: stake,
+                    meta: { number, color: colorOf(number), legs: activeBets.length },
+                })
+                showToast(profit >= 0 ? 'win' : 'loss', `Roulette ${number}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+                setBets([]) // clear placed bets after spin; lastChips snapshot keeps Auto/Rebet alive
+                resolve({ profit })
+            }, 3200)
+        }
+
+        // Trigger 6s betting open countdown if mode is manual; auto-loop
+        // skips the countdown to keep the loop tight.
+        if (mode === 'auto') {
+            beginSpin()
+        } else {
+            setBettingMs(BETTING_OPEN_MS)
+            const start = performance.now()
+            const beat = () => {
+                const remaining = Math.max(0, BETTING_OPEN_MS - (performance.now() - start))
+                setBettingMs(remaining)
+                if (remaining <= 0) {
+                    setBettingMs(0)
+                    beginSpin()
+                    return
+                }
+                bettingTickRef.current = window.requestAnimationFrame(beat)
             }
-            const profit = totalReturn - stake
-            if (totalReturn > 0) addWinnings(totalReturn, 'Roulette return')
-            const effectiveMult = stake > 0 ? totalReturn / stake : 0
-            setResult(number)
-            setLastWon(profit > 0)
-            setSpinning(false)
-            setHistory(prev => [number, ...prev].slice(0, 18))
-            if (effectiveMult >= 5) {
-                playSound('bigwin')
-                setBigWin({ trigger: Date.now(), profit, multiplier: effectiveMult })
-            } else {
-                playSound(profit > 0 ? 'win' : 'loss')
-            }
-            session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-                label: `${number} ${colorOf(number)}`,
-                profit, betAmount: stake,
-                meta: { number, color: colorOf(number), legs: activeBets.length },
-            })
-            showToast(profit >= 0 ? 'win' : 'loss', `Roulette ${number}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
-            setBets([]) // clear placed bets after spin; lastChips snapshot keeps Auto/Rebet alive
-            resolve({ profit })
-        }, 2400)
+            bettingTickRef.current = window.requestAnimationFrame(beat)
+        }
     })
 
     const meta = result === null ? null : { color: colorOf(result) }
@@ -169,30 +229,56 @@ export default function RouletteGame() {
         >
             <div className={`roulette-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
-                <div className="rou-wheel-area">
-                    <div className="rou-wheel" style={{ transform: `rotate(${wheelRotation}deg)`, transition: spinning ? 'transform 2.3s cubic-bezier(0.16, 1, 0.3, 1)' : 'none' }}>
-                        {WHEEL_ORDER.map((n, i) => {
-                            const angle = i * (360 / 37)
-                            return (
-                                <span key={n} className={`rou-seg ${colorOf(n)}`} style={{ transform: `rotate(${angle}deg) translateY(-90px)` }}>{n}</span>
-                            )
-                        })}
+                <div className="rou-top-deck">
+                    <div className="rou-wheel-area" ref={wheelAreaRef} style={{ '--ball-radius': ballRadius }}>
+                        <div className="rou-wheel" style={{ transform: `rotate(${wheelRotation}deg)`, transition: spinning ? 'transform 3.2s cubic-bezier(0.08, 0.72, 0.12, 1)' : 'none' }}>
+                            <img className="rou-wheel-texture" src="/images/generated/roulette-wheel-premium.png" alt="" />
+                            <div className="rou-pocket-ring">
+                                {WHEEL_ORDER.map((n, i) => {
+                                    const angle = i * (360 / 37)
+                                    return (
+                                        <span key={n} className={`rou-seg ${colorOf(n)}`} style={{ transform: `rotate(${angle}deg) translateY(-44%) rotate(${-angle}deg)` }}>{n}</span>
+                                    )
+                                })}
+                            </div>
+                            <div className="rou-spindle" />
+                        </div>
+                        <div className="rou-ball-track" style={{ transform: `rotate(${ballRotation}deg)` }}>
+                            <span className={`rou-ball ${spinning ? 'spinning' : ''}`} />
+                        </div>
+                        <div className={`rou-num-pop ${meta?.color || ''} ${result === null ? 'idle' : ''}`}>
+                            {result === null ? <span aria-hidden="true">⟳</span> : result}
+                        </div>
                     </div>
-                    <div className="rou-ball-track" style={{ transform: `rotate(${ballRotation}deg)`, transition: spinning ? 'transform 2.3s cubic-bezier(0.16, 1, 0.3, 1)' : 'none' }}>
-                        <span className="rou-ball" />
+                    <div className="rou-recent-rail-col">
+                        <div className="rou-live-head"><span>Recent spins</span><strong>{spinning ? 'Rolling' : bettingMs > 0 ? `Betting ${(bettingMs / 1000).toFixed(1)}s` : result === null ? 'Open' : `${result} ${colorOf(result)}`}</strong></div>
+                        <div className="rou-recent-rail">
+                            {history.length === 0 ? <span className="sim-muted">No spins yet</span> : history.map((n, i) => (
+                                <span key={i} className={`rou-history-pill ${colorOf(n)}`}>{n}</span>
+                            ))}
+                        </div>
+                        {bettingMs > 0 && (
+                            <div className="rou-bet-banner">
+                                <span>BETTING OPEN</span>
+                                <strong>{(bettingMs / 1000).toFixed(1)}s</strong>
+                            </div>
+                        )}
                     </div>
-                    <div className={`rou-num-pop ${meta?.color || ''} ${result === null ? 'idle' : ''}`}>
-                        {result === null ? <span aria-hidden="true">⟳</span> : result}
+                    <div className="rou-feed-col">
+                        <div className="rou-live-head"><span>Live table</span><strong>{simPlayers.length} bettors</strong></div>
+                        <ul className="rou-player-feed" aria-label="Simulated roulette players">
+                            {simPlayers.map(p => (
+                                <li key={p.id} className={p.won === null ? 'pending' : p.won ? 'won' : 'lost'}>
+                                    <span>{p.name}</span>
+                                    <em>{p.label}</em>
+                                    <strong>{p.won === null ? `${p.bet} GC` : p.won ? `+${p.payout.toFixed(2)}` : `-${p.bet}`}</strong>
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 </div>
 
-                <div className="rou-history">
-                    {history.length === 0 ? <span className="sim-muted">No spins yet</span> : history.map((n, i) => (
-                        <span key={i} className={`rou-history-pill ${colorOf(n)}`}>{n}</span>
-                    ))}
-                </div>
-
-                <div className="rou-board">
+                <div className="rou-board" aria-label="Roulette betting table">
                     <div className={`rou-cell zero ${result === 0 ? 'winner' : ''}`} data-bet={cellBet(0) || ''}
                         onClick={() => addBet('straight', { n: 0 })}
                         style={cellBet(0) ? {} : {}}

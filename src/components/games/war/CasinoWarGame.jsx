@@ -1,11 +1,27 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import {
+    BetPanel,
+    BigWinOverlay,
+    GameShell,
+    HistoryDrawer,
+    RecentResultsStrip,
+    StatsOverlay,
+    useGameSession,
+    MultiplierBadge,
+    ResultToast,
+    ActionLockOverlay,
+    CoreStageFrame,
+    ROUND_EVENTS,
+    useRoundMachine,
+} from '../primitives'
+import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
@@ -33,7 +49,9 @@ export default function CasinoWarGame() {
     const definition = findGameDefinition('war')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('war')
     const session = useGameSession('war')
+    const preloader = useOriginalsPreloader('war')
 
     const shoeRef = useRef(buildShuffledShoe())
     const drawCard = () => {
@@ -50,13 +68,23 @@ export default function CasinoWarGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [pendingBet, setPendingBet] = useState(0)
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
     const { schedule, cancelAll } = useCancellableTimeouts()
+
+    const machine = useRoundMachine({})
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Casino War')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
         cancelAll()
         setLastBet(betAmount)
+        setToast(null)
         playSound('deal')
+        sfx.play('click')
+        machine.start([
+            { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { betAmount }, at: 0 },
+            { index: 1, type: ROUND_EVENTS.INPUT_LOCK, payload: {}, at: 0 },
+            { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount }, at: 0 },
+        ], { autoFinish: false })
         setSlamming(true)
         setPendingBet(betAmount)
         const player = drawCard()
@@ -64,23 +92,29 @@ export default function CasinoWarGame() {
         const pv = rankValue(player.rank); const dv = rankValue(dealer.rank)
         schedule(() => {
             setSlamming(false)
+            sfx.play('reveal')
             if (pv > dv) {
                 addWinnings(betAmount * 2, 'Casino War return')
                 setHand({ player, dealer, outcome: 'win' })
-                setBurstKey(k => k + 1); playSound('win')
+                setBurstKey(k => k + 1); playSound('win'); sfx.play('win')
                 session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: 'Win', profit: betAmount, betAmount, meta: { player, dealer } })
+                setToast({ kind: 'win', multiplier: 2, amount: betAmount, message: 'War win' })
+                machine.finish({ kind: 'win', profit: betAmount, multiplier: 2 })
                 showToast('win', 'War win', `+${formatCredits(betAmount)}`)
                 setPhase('idle'); resolve({ profit: betAmount })
             } else if (pv === dv) {
                 setTiedHand({ player, dealer })
                 setHand({ player, dealer, outcome: 'tie' })
                 setPhase('tied')
+                setToast({ kind: 'push', message: 'Tie! Surrender or Go to War' })
                 showToast('bet', 'Tie!', 'Surrender or Go to War')
                 resolve({ profit: 0 })
             } else {
                 setHand({ player, dealer, outcome: 'loss' })
-                playSound('loss')
+                playSound('loss'); sfx.play('lose')
                 session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: 'Loss', profit: -betAmount, betAmount, meta: { player, dealer } })
+                setToast({ kind: 'lose', amount: -betAmount, message: 'War loss' })
+                machine.finish({ kind: 'lose', profit: -betAmount, multiplier: 0 })
                 showToast('loss', 'War loss', `-${formatCredits(betAmount)}`)
                 setPhase('idle'); resolve({ profit: -betAmount })
             }
@@ -130,6 +164,7 @@ export default function CasinoWarGame() {
             balance={balance}
             accent="#ff7ab6"
             backdrop="/assets/games/backdrops/backdrop-felt-green.png"
+            variant="stake"
             panel={
                 <BetPanel balance={balance} initialBet={5} runningRound={slamming || phase === 'tied'} actionLabel="Draw Cards" onPlay={performPlay} lastBet={lastBet}>
                     <div className="bp-bal-line"><span>Win</span><strong>2×</strong></div>
@@ -144,30 +179,35 @@ export default function CasinoWarGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div className={`war-stage ${hand?.outcome === 'win' || hand?.outcome === 'tie-win' ? 'win-flash' : (hand?.outcome === 'loss' || hand?.outcome === 'tie-loss') ? 'loss-flash' : ''}`}>
-                <RecentResultsStrip results={session.stats.lastResults} />
-                <div className={`war-row ${slamming ? 'slamming' : ''}`}>
-                    <div className="war-side">
-                        <span>You</span>
-                        <div className={`war-card-slot ${hand?.outcome === 'win' || hand?.outcome === 'tie-win' ? 'win' : (hand?.outcome === 'loss' || hand?.outcome === 'tie-loss') ? 'loss' : ''}`}>
-                            {hand?.player
-                                ? <CardFace rank={hand.player.rank} suit={hand.player.suit} dealing size="lg" />
-                                : <CardBack size="lg" />}
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="war-stage-frame">
+                <div className={`war-stage ${hand?.outcome === 'win' || hand?.outcome === 'tie-win' ? 'win-flash' : (hand?.outcome === 'loss' || hand?.outcome === 'tie-loss') ? 'loss-flash' : ''}`}>
+                    <RecentResultsStrip results={session.stats.lastResults} />
+                    <div className={`war-row ${slamming ? 'slamming' : ''}`}>
+                        <div className="war-side">
+                            <span>You</span>
+                            <div className={`war-card-slot ${hand?.outcome === 'win' || hand?.outcome === 'tie-win' ? 'win' : (hand?.outcome === 'loss' || hand?.outcome === 'tie-loss') ? 'loss' : ''}`}>
+                                {hand?.player
+                                    ? <CardFace rank={hand.player.rank} suit={hand.player.suit} dealing size="lg" />
+                                    : <CardBack size="lg" />}
+                            </div>
+                        </div>
+                        <strong className="war-versus">VS</strong>
+                        <div className="war-side">
+                            <span>Dealer</span>
+                            <div className={`war-card-slot ${hand?.outcome === 'loss' || hand?.outcome === 'tie-loss' ? 'win' : (hand?.outcome === 'win' || hand?.outcome === 'tie-win') ? 'loss' : ''}`}>
+                                {hand?.dealer
+                                    ? <CardFace rank={hand.dealer.rank} suit={hand.dealer.suit} dealing size="lg" />
+                                    : <CardBack size="lg" />}
+                            </div>
                         </div>
                     </div>
-                    <strong className="war-versus">VS</strong>
-                    <div className="war-side">
-                        <span>Dealer</span>
-                        <div className={`war-card-slot ${hand?.outcome === 'loss' || hand?.outcome === 'tie-loss' ? 'win' : (hand?.outcome === 'win' || hand?.outcome === 'tie-win') ? 'loss' : ''}`}>
-                            {hand?.dealer
-                                ? <CardFace rank={hand.dealer.rank} suit={hand.dealer.suit} dealing size="lg" />
-                                : <CardBack size="lg" />}
-                        </div>
-                    </div>
+                    <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>{hand ? `Result: ${hand.outcome.toUpperCase()}` : 'Higher rank wins'}</p>
+                    <MultiplierBadge label="Pay" value={2} suffix="x" size="sm" state={slamming ? 'active' : hand?.outcome?.includes('win') ? 'win' : hand?.outcome?.includes('loss') ? 'bust' : 'idle'} />
+                    {(hand?.outcome === 'win' || hand?.outcome === 'tie-win') && burstKey > 0 && <Particles key={burstKey} count={14} color="#ff7ab6" />}
+                    <ActionLockOverlay active={slamming} label="Drawing..." />
+                    <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
-                <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>{hand ? `Result: ${hand.outcome.toUpperCase()}` : 'Higher rank wins'}</p>
-                {(hand?.outcome === 'win' || hand?.outcome === 'tie-win') && burstKey > 0 && <Particles key={burstKey} count={14} color="#ff7ab6" />}
-            </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={3} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.467} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>

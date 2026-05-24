@@ -2,21 +2,42 @@
 // Player picks how many bombs are on a 5x5 grid, places a bet, then reveals tiles.
 // Each safe reveal raises the multiplier; cashing out pays bet × multiplier.
 // Hitting a bomb ends the round at -bet. Pure JS, deterministic via fairRng.
+//
+// Wave 2 retrofit: drives toast/lock/sfx through the round event machine.
+// Math is unchanged; events are emitted alongside the existing engine so a
+// future deterministic replay can read the round transcript.
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import {
+    BetPanel,
+    BigWinOverlay,
+    GameShell,
+    HistoryDrawer,
+    RecentResultsStrip,
+    StatsOverlay,
+    useGameSession,
+    MultiplierBadge,
+    ResultToast,
+    ActionLockOverlay,
+    CoreStageFrame,
+    ROUND_EVENTS,
+    useRoundMachine,
+} from '../primitives'
+import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './mines.css'
 
 const GRID = 25
 const HOUSE_EDGE = 0.01
+const SIM_NAMES = ['Wynn', 'Mira', 'Lev', 'Kaia', 'Reno', 'Vex', 'Juno']
 
 // Multiplier after k safe picks given m bombs (no edge); we apply (1 - edge) at output.
 function multiplierFor(picks, bombs) {
@@ -44,7 +65,9 @@ export default function MinesGame() {
     const definition = findGameDefinition('mines') || { name: 'Mines', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('mines')
     const session = useGameSession('mines-shell')
+    const preloader = useOriginalsPreloader('mines')
 
     const [bombs, setBombs] = useState(3)
     const [phase, setPhase] = useState('idle') // idle | playing | busted | cashed
@@ -54,7 +77,14 @@ export default function MinesGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [burstKey, setBurstKey] = useState(0)
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
+    const [simFeed, setSimFeed] = useState(() => SIM_NAMES.map((name, i) => ({ id: `${name}-${i}`, name, picks: i + 1, mult: multiplierFor(i + 1, 3), cashed: i % 4 !== 0 })))
     const { schedule, cancelAll } = useCancellableTimeouts()
+
+    // Imperative round machine. Mines emits events as the player interacts
+    // (per-pick) rather than a fully pre-baked event list, so we use the
+    // machine's `finish` for bust/cashout and start with an empty event list.
+    const machine = useRoundMachine({})
 
     const picks = revealed.length
     const currentMult = useMemo(() => multiplierFor(picks, bombs), [picks, bombs])
@@ -70,9 +100,31 @@ export default function MinesGame() {
         setBombSet(placeBombs(bombs))
         setRevealed([])
         setPhase('playing')
+        setToast(null)
         playSound('click')
+        sfx.play('click')
+        // Emit round start through the machine. We don't pre-bake a full
+        // event list because Mines is per-pick.
+        machine.start([
+            { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { bombs, betAmount }, at: 0 },
+            { index: 1, type: ROUND_EVENTS.INPUT_LOCK, payload: {}, at: 0 },
+            { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount, bombs }, at: 0 },
+        ], { autoFinish: false })
         resolve({ profit: 0 })
     })
+
+    const pushSimResult = () => {
+        const simBombs = [1, 3, 5, 10][Math.floor(Math.random() * 4)]
+        const picks = 1 + Math.floor(Math.random() * Math.min(8, GRID - simBombs))
+        const cashed = Math.random() > 0.24
+        setSimFeed(prev => [{
+            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            name: SIM_NAMES[Math.floor(Math.random() * SIM_NAMES.length)],
+            picks,
+            mult: cashed ? multiplierFor(picks, simBombs) : 0,
+            cashed,
+        }, ...prev].slice(0, 7))
+    }
 
     const reveal = (idx) => {
         if (!inRound || revealed.includes(idx) || !bombSet) return
@@ -80,6 +132,7 @@ export default function MinesGame() {
             const next = [...revealed, idx]
             setRevealed(next)
             playSound('explode')
+            sfx.play('lose')
             setBurstKey(k => k + 1)
             session.record({
                 id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
@@ -88,6 +141,9 @@ export default function MinesGame() {
                 meta: { bombs, hit: idx },
             })
             showToast('loss', 'Mines bust', `-${formatCredits(stake)}`)
+            setToast({ kind: 'lose', amount: -stake, message: 'Mines bust' })
+            machine.finish({ won: false, profit: -stake, picks: next.length, hit: idx })
+            pushSimResult()
             setPhase('busted')
             schedule(() => setPhase('idle'), 1100)
             return
@@ -95,13 +151,14 @@ export default function MinesGame() {
         const next = [...revealed, idx]
         setRevealed(next)
         playSound('flip')
+        sfx.play('reveal')
         // Sparkle burst on every safe diamond reveal (Phase F game-feel).
         setBurstKey(k => k + 1)
         // If the player has cleared every safe square, auto-cashout.
         if (next.length >= GRID - bombs) cashOut(next)
     }
 
-    const cashOut = (revealedOverride) => {
+    const cashOut = useCallback((revealedOverride) => {
         const list = revealedOverride || revealed
         if (!inRound || list.length === 0) return
         const m = multiplierFor(list.length, bombs)
@@ -113,6 +170,7 @@ export default function MinesGame() {
         } else {
             playSound('win')
         }
+        sfx.play('cashout')
         setBurstKey(k => k + 1)
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
@@ -121,9 +179,12 @@ export default function MinesGame() {
             meta: { bombs, picks: list.length },
         })
         showToast('win', 'Mines cashed out', `+${formatCredits(profit)}`)
+        setToast({ kind: 'cashout', amount: profit, multiplier: m, message: 'Mines cashed out' })
+        machine.finish({ won: true, profit, multiplier: m, picks: list.length })
+        pushSimResult()
         setPhase('cashed')
         schedule(() => setPhase('idle'), 1100)
-    }
+    }, [revealed, inRound, bombs, stake, addWinnings, playSound, sfx, session, showToast, machine, schedule])
 
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
 
@@ -133,6 +194,7 @@ export default function MinesGame() {
             balance={balance}
             accent="#6db7ff"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
+            variant="stake"
             panel={
                 <BetPanel
                     balance={balance}
@@ -172,40 +234,57 @@ export default function MinesGame() {
                 </>
             }
         >
-            <div className={`mines-stage phase-${phase}`}>
-                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                <div className="mines-grid">
-                    {Array.from({ length: GRID }, (_, i) => {
-                        const isRevealed = revealed.includes(i)
-                        const isBomb = bombSet?.has(i)
-                        const showBomb = (phase === 'busted' || phase === 'cashed') && isBomb
-                        const isHit = phase === 'busted' && isBomb && revealed[revealed.length - 1] === i
-                        const flipped = isRevealed || showBomb
-                        return (
-                            <button
-                                key={i}
-                                disabled={!inRound}
-                                className={`mines-cell ${flipped ? 'flipped' : ''} ${isRevealed ? 'revealed' : ''} ${showBomb ? 'bomb' : ''} ${isHit ? 'hit' : ''}`}
-                                onClick={() => reveal(i)}
-                                aria-label={flipped ? (isBomb ? 'Bomb' : 'Diamond') : 'Hidden cell'}
-                            >
-                                <span className="mines-face mines-face-back" aria-hidden="true" />
-                                <span className="mines-face mines-face-front" aria-hidden="true">
-                                    {isBomb ? (
-                                        <>
-                                            <img src="/images/mines/bomb.svg" alt="" className="mines-art" />
-                                            {isHit && <img src="/images/mines/bomb_effect.gif" alt="" className="mines-burst" />}
-                                        </>
-                                    ) : (
-                                        <img src="/images/mines/diamond.svg" alt="" className="mines-art" />
-                                    )}
-                                </span>
-                            </button>
-                        )
-                    })}
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="mines-stage-frame">
+                <div className={`mines-stage phase-${phase}`}>
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <div className="mines-live-rail">
+                        {simFeed.map(p => (
+                            <span key={p.id} className={p.cashed ? 'cashed' : 'busted'}>
+                                <em>{p.name}</em>
+                                <strong>{p.cashed ? `${p.mult.toFixed(2)}×` : 'BOOM'}</strong>
+                                <small>{p.picks} picks</small>
+                            </span>
+                        ))}
+                    </div>
+                    <div className="mines-multiplier-row">
+                        <MultiplierBadge label="Current" value={currentMult} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="sm" />
+                        <MultiplierBadge label="Next pick" value={nextMult} size="sm" />
+                    </div>
+                    <div className="mines-grid">
+                        {Array.from({ length: GRID }, (_, i) => {
+                            const isRevealed = revealed.includes(i)
+                            const isBomb = bombSet?.has(i)
+                            const showBomb = (phase === 'busted' || phase === 'cashed') && isBomb
+                            const isHit = phase === 'busted' && isBomb && revealed[revealed.length - 1] === i
+                            const flipped = isRevealed || showBomb
+                            return (
+                                <button
+                                    key={i}
+                                    disabled={!inRound}
+                                    className={`mines-cell ${flipped ? 'flipped' : ''} ${isRevealed ? 'revealed' : ''} ${showBomb ? 'bomb' : ''} ${isHit ? 'hit' : ''}`}
+                                    onClick={() => reveal(i)}
+                                    aria-label={flipped ? (isBomb ? 'Bomb' : 'Diamond') : 'Hidden cell'}
+                                >
+                                    <span className="mines-face mines-face-back" aria-hidden="true" />
+                                    <span className="mines-face mines-face-front" aria-hidden="true">
+                                        {isBomb ? (
+                                            <>
+                                                <img src="/images/mines/bomb.svg" alt="" className="mines-art" />
+                                                {isHit && <img src="/images/mines/bomb_effect.gif" alt="" className="mines-burst" />}
+                                            </>
+                                        ) : (
+                                            <img src="/images/mines/diamond.svg" alt="" className="mines-art" />
+                                        )}
+                                    </span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                    {(phase === 'cashed' || phase === 'playing') && burstKey > 0 && <Particles key={burstKey} count={phase === 'cashed' ? 22 : 8} color={phase === 'cashed' ? '#6db7ff' : '#9bf08a'} />}
+                    <ActionLockOverlay active={phase === 'busted'} label="Bust" />
+                    <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
-                {(phase === 'cashed' || phase === 'playing') && burstKey > 0 && <Particles key={burstKey} count={phase === 'cashed' ? 22 : 8} color={phase === 'cashed' ? '#6db7ff' : '#9bf08a'} />}
-            </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={(GRID - bombs) / GRID} payoutMultiplier={currentMult} balance={balance} recentProfit={recentProfit} />
         </GameShell>

@@ -110,12 +110,12 @@
     transition: all 0.15s;
 }
 
-.coin-choice:hover { color: var(--text-primary); border-color: var(--accent-yellow, #ffcf5a); }
+.coin-choice:hover { color: var(--text-primary); border-color: var(--bet-marker); }
 
 .coin-choice.active {
-    color: #ffcf5a;
-    border-color: #ffcf5a;
-    background: rgba(255, 207, 90, 0.12);
-    box-shadow: 0 0 18px rgba(255, 207, 90, 0.4);
+    color: var(--bet-marker);
+    border-color: var(--bet-marker);
+    background: var(--bet-marker-soft);
+    box-shadow: 0 0 18px rgba(109, 183, 255, 0.34);
 }
 

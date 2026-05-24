@@ -8,10 +8,26 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import {
+    BetPanel,
+    BigWinOverlay,
+    GameShell,
+    HistoryDrawer,
+    RecentResultsStrip,
+    StatsOverlay,
+    useGameSession,
+    MultiplierBadge,
+    ResultToast,
+    ActionLockOverlay,
+    CoreStageFrame,
+    ROUND_EVENTS,
+    useRoundMachine,
+} from '../primitives'
+import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './plinko.css'
 
@@ -31,6 +47,7 @@ function loadEngine() {
 const HOUSE_EDGE = 0.01
 const ROW_OPTIONS = [8, 10, 12, 14, 16]
 const RISK_OPTIONS = ['low', 'medium', 'high']
+const SIM_NAMES = ['Reno', 'Kira', 'Vex', 'Nia', 'Ozzy', 'Mika', 'Rune', 'Tess']
 
 const BALL_TYPES = {
     normal:   { id: 'normal',   name: 'Basic',    color: '#ff4d4f', image: '/images/coins/coin_original.svg', cost: 1,  bonus: 1  },
@@ -55,7 +72,9 @@ export default function PlinkoGame() {
     const definition = findGameDefinition('plinko') || { name: 'Plinko', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('plinko')
     const session = useGameSession('plinko-shell')
+    const preloader = useOriginalsPreloader('plinko')
 
     const canvasRef = useRef(null)
     const engineRef = useRef(null)
@@ -73,6 +92,24 @@ export default function PlinkoGame() {
     const [payouts, setPayouts] = useState(null)
     const [binColors, setBinColors] = useState(null)
     const [engineReady, setEngineReady] = useState(false)
+    const [toast, setToast] = useState(null)
+    const [simFeed, setSimFeed] = useState(() => SIM_NAMES.map((name, i) => ({ id: `${name}-${i}`, name, mult: [0.4, 0.7, 1.1, 2, 5][i % 5], bet: 1 + i })))
+
+    // Wave 2 lightweight machine. Emits round-start on each drop and
+    // round-result on each ball settlement; sim feed and physics flow
+    // unchanged.
+    const machine = useRoundMachine({})
+
+    useEffect(() => {
+        const id = window.setInterval(() => {
+            setSimFeed(prev => {
+                const name = SIM_NAMES[Math.floor(Math.random() * SIM_NAMES.length)]
+                const mult = [0.2, 0.4, 0.7, 1.1, 1.5, 2, 5, 9, 16][Math.floor(Math.random() * 9)]
+                return [{ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, name, mult, bet: [1, 2, 5, 10, 25][Math.floor(Math.random() * 5)] }, ...prev].slice(0, 8)
+            })
+        }, 1500)
+        return () => window.clearInterval(id)
+    }, [])
 
     useEffect(() => {
         if (!canvasRef.current) return
@@ -151,6 +188,7 @@ export default function PlinkoGame() {
         setLastBet(betAmount)
         setActiveDrops(n => n + 1)
         playSound('tick')
+        sfx.play('click')
 
         // Galton walk to determine the bin via fair RNG.
         let binIndex = 0
@@ -162,6 +200,14 @@ export default function PlinkoGame() {
         engine.updateBetAmount(betAmount)
         const droppedBall = engine.dropBall(binIndex, ballType, { color: ball.color, image: ball.image })
         const ballId = droppedBall.id
+
+        // Lightweight Wave 2 round events: start + lock at drop time. The
+        // result event fires at bucket-hit settlement below.
+        machine.start([
+            { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { ballId, rows, risk, ballType, betAmount }, at: 0 },
+            { index: 1, type: ROUND_EVENTS.INPUT_LOCK, payload: { ballId }, at: 0 },
+            { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount: cost, ballId }, at: 0 },
+        ], { autoFinish: false })
 
         // For autoplay, resolve right away so the loop drops the next ball.
         // Settlement runs async via the settle map below.
@@ -194,11 +240,19 @@ export default function PlinkoGame() {
             } else {
                 playSound(profit > 0 ? 'win' : 'loss')
             }
+            sfx.play(profit > 0 ? 'win' : 'lose')
+            machine.finish({ won: profit > 0, profit, multiplier: mult, binIndex: bi })
+            setToast({
+                kind: profit > 0 ? 'win' : 'lose',
+                multiplier: mult,
+                amount: profit,
+                message: `Plinko bin ${bi}`,
+            })
             showToast(profit >= 0 ? 'win' : 'loss', `Plinko ${mult.toFixed(2)}×`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             setActiveDrops(n => Math.max(0, n - 1))
             if (mode !== 'auto') resolve({ profit })
         })
-    }), [payouts, ballType, rows, risk, placeBet, addWinnings, playSound, showToast, session])
+    }), [payouts, ballType, rows, risk, placeBet, addWinnings, playSound, sfx, showToast, session, machine])
 
     // Quick-drop button — schedules N drops at 500ms each, regardless of the
     // BetPanel's autoplay tab. Lets the player spam-drop a Ruby/Sapphire run
@@ -226,6 +280,7 @@ export default function PlinkoGame() {
             balance={balance}
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
+            variant="stake"
             panel={
                 <BetPanel
                     balance={balance}
@@ -287,30 +342,42 @@ export default function PlinkoGame() {
                 </>
             }
         >
-            <div className="plinko-stage">
-                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                <div className="plinko-canvas-wrap">
-                    <canvas ref={canvasRef} className="plinko-canvas" />
-                    {payouts && binColors && (
-                        <div className="plinko-bins" style={{ '--bins': payouts.length }}>
-                            {payouts.map((m, i) => (
-                                <div
-                                    key={i}
-                                    className={`plinko-bin-chip ${i === highlightBin ? 'hit' : ''}`}
-                                    style={{ background: binColors.background[i], boxShadow: `0 4px 0 ${binColors.shadow[i]}` }}
-                                >
-                                    {m}{m < 100 ? '×' : ''}
-                                </div>
+            <CoreStageFrame minHeight={580} maxWidth={920} loading={!preloader.ready || !engineReady} className="plinko-stage-frame">
+                <div className="plinko-stage">
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <div className="plinko-canvas-wrap">
+                        <div className="plinko-live-rail">
+                            {simFeed.map(p => (
+                                <span key={p.id} className={p.mult >= 2 ? 'hot' : p.mult < 1 ? 'cold' : ''}>
+                                    <em>{p.name}</em><strong>{p.mult.toFixed(1)}×</strong>
+                                </span>
                             ))}
                         </div>
-                    )}
+                        <canvas ref={canvasRef} className="plinko-canvas" />
+                        {payouts && binColors && (
+                            <div className="plinko-bins" style={{ '--bins': payouts.length }}>
+                                {payouts.map((m, i) => (
+                                    <div
+                                        key={i}
+                                        className={`plinko-bin-chip ${i === highlightBin ? 'hit' : ''}`}
+                                        style={{ background: binColors.background[i], boxShadow: `0 4px 0 ${binColors.shadow[i]}` }}
+                                    >
+                                        {m}{m < 100 ? '×' : ''}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="plinko-meta">
+                        <MultiplierBadge label="Last" value={Number(lastMultiplier) || 0} state={lastMultiplier && lastMultiplier > 1 ? 'win' : 'idle'} size="sm" />
+                        <span>Rows <strong>{rows}</strong></span>
+                        <span>Risk <strong>{risk}</strong></span>
+                        <span>In flight <strong>{activeDrops}</strong></span>
+                    </div>
+                    <ResultToast result={toast} onDismiss={() => setToast(null)} />
+                    <ActionLockOverlay active={!engineReady} label="Loading..." />
                 </div>
-                <div className="plinko-meta">
-                    <span>Last <strong>{lastMultiplier ? `${Number(lastMultiplier).toFixed(2)}×` : '—'}</strong></span>
-                    <span>Rows <strong>{rows}</strong></span>
-                    <span>Risk <strong>{risk}</strong></span>
-                </div>
-            </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={15} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.5} payoutMultiplier={expected} balance={balance} recentProfit={recentProfit} />
         </GameShell>

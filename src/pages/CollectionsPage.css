@@ -1,0 +1,154 @@
+/* CS-skin collections catalog. Read-only browse view of the curated
+   dataset. Shared with the simulator's /cases route via /data/cs-cases.json. */
+
+.collections-page {
+    padding: 24px;
+    color: var(--text-primary, #fff);
+    max-width: 1280px;
+    margin: 0 auto;
+}
+
+.collections-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.collections-head h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+    font-weight: 950;
+    letter-spacing: 0.02em;
+}
+.collections-head p {
+    margin: 0;
+    color: var(--text-secondary, #b1bad3);
+    font-size: 12px;
+    max-width: 720px;
+}
+
+.collections-tier-filter {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.collections-tier-filter button {
+    padding: 8px 12px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-secondary, #b1bad3);
+    font-weight: 800;
+    font-size: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.collections-tier-filter button.active {
+    color: #fff;
+    border-color: rgba(255, 209, 102, 0.5);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.collections-search {
+    width: 100%;
+    max-width: 320px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-primary, #fff);
+}
+
+.collections-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.collection-card {
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(15, 22, 28, 0.7);
+    overflow: hidden;
+}
+.collection-card-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(0, 0, 0, 0.32);
+}
+.collection-card-head img {
+    width: 96px;
+    height: 64px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 8px;
+}
+.collection-card-head h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 900;
+}
+.collection-card-head small {
+    color: var(--text-secondary, #b1bad3);
+    font-size: 11px;
+}
+.collection-tier-pill {
+    margin-left: auto;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.32);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #b1bad3);
+}
+.collection-tier-pill.low { color: #7bd389; border-color: rgba(123, 211, 137, 0.45); }
+.collection-tier-pill.mid { color: #6fb6ff; border-color: rgba(111, 182, 255, 0.45); }
+.collection-tier-pill.high { color: #ffd166; border-color: rgba(255, 209, 102, 0.5); }
+
+.collection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    padding: 12px 14px 16px;
+}
+.collection-skin {
+    padding: 6px;
+    border-radius: 10px;
+    border: 2px solid var(--rarity-color, rgba(255, 255, 255, 0.1));
+    background: rgba(0, 0, 0, 0.32);
+}
+.collection-skin img {
+    width: 100%;
+    height: 70px;
+    object-fit: contain;
+}
+.collection-skin small {
+    display: block;
+    margin-top: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--text-primary, #fff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.collection-skin .rarity-line {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2px;
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--rarity-color, var(--text-secondary, #b1bad3));
+}
+.collection-skin .rarity-line span:last-child { color: #fff; }

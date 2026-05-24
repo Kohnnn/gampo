@@ -28,7 +28,7 @@ function shuffle(arr) {
 
 export const STREETS = ['preflop', 'flop', 'turn', 'river', 'showdown']
 
-export function createInitialState({ players, sb = 1, bb = 2, buttonIndex = 0 }) {
+export function createInitialState({ players, sb = 1, bb = 2, ante = 0, buttonIndex = 0 }) {
     return {
         players: players.map(p => ({
             id: p.id, name: p.name, stack: p.stack, hole: [],
@@ -39,7 +39,7 @@ export function createInitialState({ players, sb = 1, bb = 2, buttonIndex = 0 })
         community: [],
         pot: 0,
         sidePots: [],
-        sb, bb,
+        sb, bb, ante,
         buttonIndex,
         toAct: -1,
         currentBet: 0,
@@ -90,6 +90,12 @@ export function startHand(state) {
     // Move button to next eligible seat
     next.buttonIndex = nextActiveIndex(next, next.buttonIndex)
     if (next.buttonIndex < 0) return next
+    // Post antes before blinds so tournament-style levels can be simulated.
+    if (next.ante > 0) {
+        for (let a = 0; a < next.players.length; a++) {
+            if (next.players[a].status === 'active') postBlind(next, a, next.ante, 'ante')
+        }
+    }
     // Post blinds (heads-up: button posts SB)
     const live = next.players.filter(p => p.status === 'active')
     let sbIdx, bbIdx
@@ -118,14 +124,14 @@ export function startHand(state) {
     return next
 }
 
-function postBlind(state, idx, amount) {
+function postBlind(state, idx, amount, type = 'blind') {
     const p = state.players[idx]
     const pay = Math.min(p.stack, amount)
     p.stack -= pay
     p.putIn += pay
     state.pot += pay
     if (p.stack === 0) p.status = 'allin'
-    state.history.push({ type: 'blind', player: p.id, amount: pay })
+    state.history.push({ type, player: p.id, amount: pay })
 }
 
 export function legalActions(state) {

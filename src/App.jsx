@@ -47,7 +47,19 @@ const KenoGame = lazy(() => import('./components/games/keno/KenoGame'))
 const ChickenCrossGame = lazy(() => import('./components/games/chickencross/ChickenCrossGame'))
 const BlackjackGame = lazy(() => import('./components/games/blackjack/BlackjackGame'))
 const PokerGame = lazy(() => import('./components/PokerGame/PokerGame'))
-
+const FlipGame = lazy(() => import('./components/games/flip/FlipGame'))
+const DiamondsGame = lazy(() => import('./components/games/diamonds/DiamondsGame'))
+const DartsGame = lazy(() => import('./components/games/darts/DartsGame'))
+const PumpGame = lazy(() => import('./components/games/pump/PumpGame'))
+const SlideGame = lazy(() => import('./components/games/slide/SlideGame'))
+const MolesGame = lazy(() => import('./components/games/moles/MolesGame'))
+const SnakesGame = lazy(() => import('./components/games/snakes/SnakesGame'))
+const CasesGame = lazy(() => import('./components/games/cases/CasesGame'))
+const CollectionsPage = lazy(() => import('./pages/CollectionsPage'))
+const DrillGame = lazy(() => import('./components/games/drill/DrillGame'))
+const PacksGame = lazy(() => import('./components/games/packs/PacksGame'))
+const TomeOfLifeGame = lazy(() => import('./components/games/tomeoflife/TomeOfLifeGame'))
+const TarotGame = lazy(() => import('./components/games/tarot/TarotGame'))
 function RouteFallback() {
     return (
         <div className="route-fallback">
@@ -108,6 +120,22 @@ function App() {
                 <Route path="casinowar" element={<Navigate to="/war" replace />} />
                 <Route path="chickencross" element={lazied(<ChickenCrossGame />)} />
                 <Route path="poker" element={lazied(<PokerGame />)} />
+                <Route path="flip" element={lazied(<FlipGame />)} />
+                <Route path="diamonds" element={lazied(<DiamondsGame />)} />
+                <Route path="darts" element={lazied(<DartsGame />)} />
+                <Route path="pump" element={lazied(<PumpGame />)} />
+                <Route path="slide" element={lazied(<SlideGame />)} />
+                <Route path="moles" element={lazied(<MolesGame />)} />
+                <Route path="snakes" element={lazied(<SnakesGame />)} />
+                <Route path="cases" element={lazied(<CasesGame />)} />
+                <Route path="collections" element={lazied(<CollectionsPage />)} />
+                <Route path="drill" element={lazied(<DrillGame />)} />
+                <Route path="packs" element={lazied(<PacksGame />)} />
+                <Route path="tomeoflife" element={lazied(<TomeOfLifeGame />)} />
+                <Route path="tarot" element={lazied(<TarotGame />)} />
+                <Route path="scarab-spin" element={lazied(<SlotsGame initialTemplateId="scarab-spin" />)} />
+                <Route path="bars" element={lazied(<SlotsGame initialTemplateId="bars" />)} />
+                <Route path="blue-samurai" element={lazied(<SlotsGame initialTemplateId="blue-samurai" />)} />
                 <Route path="*" element={<NotFoundPage />} />
             </Route>
         </Routes>

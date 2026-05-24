@@ -1,10 +1,26 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import {
+    BetPanel,
+    BigWinOverlay,
+    GameShell,
+    HistoryDrawer,
+    RecentResultsStrip,
+    StatsOverlay,
+    useGameSession,
+    MultiplierBadge,
+    ResultToast,
+    ActionLockOverlay,
+    CoreStageFrame,
+    ROUND_EVENTS,
+    useRoundMachine,
+} from '../primitives'
+import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
 import { buildBigEyeBoy, buildBigRoad, buildCockroachPig, buildSmallRoad } from './roads'
 import CardFace, { CardBack } from '../../ui/CardFace'
@@ -73,7 +89,9 @@ export default function BaccaratGame() {
     const definition = findGameDefinition('baccarat')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('baccarat')
     const session = useGameSession('baccarat')
+    const preloader = useOriginalsPreloader('baccarat')
 
     const [bets, setBets] = useState({}) // { banker: amount, player: amount, tie: amount, pair_p: amount, pair_b: amount, big: amount, small: amount }
     const [chip, setChip] = useState(5)
@@ -97,6 +115,9 @@ export default function BaccaratGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [lastChips, setLastChips] = useState({})
     const [lastTotal, setLastTotal] = useState(null)
+    const [toast, setToast] = useState(null)
+
+    const machine = useRoundMachine({})
 
     const totalStake = Object.values(bets).reduce((s, v) => s + (v || 0), 0)
     const addBet = (key) => setBets(prev => ({ ...prev, [key]: (prev[key] || 0) + chip }))
@@ -121,7 +142,14 @@ export default function BaccaratGame() {
         if (!placeBet(stake, 'Baccarat')) { showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`); resolve({ profit: 0 }); return }
         setLastChips({ ...activeBets })
         setLastTotal(stake)
+        setToast(null)
         playSound('deal')
+        sfx.play('click')
+        machine.start([
+            { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { stake }, at: 0 },
+            { index: 1, type: ROUND_EVENTS.INPUT_LOCK, payload: {}, at: 0 },
+            { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount: stake, bets: activeBets }, at: 0 },
+        ], { autoFinish: false })
         setRunning(true)
         const next = drawBaccaratHand()
         const playerScore = handTotal(next.player)
@@ -160,6 +188,14 @@ export default function BaccaratGame() {
         } else {
             playSound(profit > 0 ? 'win' : 'loss')
         }
+        sfx.play(profit > 0 ? 'win' : 'lose')
+        setToast({
+            kind: profit > 0 ? 'win' : profit === 0 ? 'push' : 'lose',
+            multiplier: effectiveMult > 0 ? effectiveMult : null,
+            amount: profit,
+            message: `Baccarat ${outcome === 'B' ? 'Banker' : outcome === 'P' ? 'Player' : 'Tie'}`,
+        })
+        machine.finish({ kind: outcome, profit, multiplier: effectiveMult, playerScore, bankerScore })
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
             label: `${outcome} ${playerScore}-${bankerScore}`,
@@ -184,6 +220,7 @@ export default function BaccaratGame() {
             balance={balance}
             accent="#9f252a"
             backdrop="/assets/games/backdrops/backdrop-felt-green.png"
+            variant="stake"
             panel={
                 <BetPanel
                     balance={balance}
@@ -214,80 +251,87 @@ export default function BaccaratGame() {
                 </>
             }
         >
-            <div className={`bac-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
-                <RecentResultsStrip results={session.stats.lastResults} />
-                {!hand && totalStake <= 0 && (
-                    <p className="bac-hint">Place chips on Banker / Player / Tie, then deal.</p>
-                )}
-                <div className="bac-table">
-                    <div className="bac-side">
-                        <h3>Player</h3>
-                        <div className="bac-score">{hand ? handTotal(hand.player) : '--'}</div>
-                        <div className="bac-cards">
-                            {(hand?.player || [{}, {}]).map((c, i) => c.rank ? (
-                                <CardFace key={i} rank={c.rank} suit={c.suit} dealing size="md" />
-                            ) : <CardBack key={i} size="md" />)}
+            <CoreStageFrame minHeight={620} maxWidth={960} loading={!preloader.ready} className="bac-stage-frame">
+                <div className={`bac-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+                    <RecentResultsStrip results={session.stats.lastResults} />
+                    {!hand && totalStake <= 0 && (
+                        <p className="bac-hint">Place chips on Banker / Player / Tie, then deal.</p>
+                    )}
+                    <div className="bac-meta">
+                        <MultiplierBadge label="Stake" value={totalStake} suffix="" size="sm" state={running ? 'active' : 'idle'} />
+                    </div>
+                    <div className="bac-table">
+                        <div className="bac-side">
+                            <h3>Player</h3>
+                            <div className="bac-score">{hand ? handTotal(hand.player) : '--'}</div>
+                            <div className="bac-cards">
+                                {(hand?.player || [{}, {}]).map((c, i) => c.rank ? (
+                                    <CardFace key={i} rank={c.rank} suit={c.suit} dealing size="md" />
+                                ) : <CardBack key={i} size="md" />)}
+                            </div>
+                        </div>
+                        <div className="bac-side">
+                            <h3>Banker</h3>
+                            <div className="bac-score">{hand ? handTotal(hand.banker) : '--'}</div>
+                            <div className="bac-cards">
+                                {(hand?.banker || [{}, {}]).map((c, i) => c.rank ? (
+                                    <CardFace key={i} rank={c.rank} suit={c.suit} dealing size="md" />
+                                ) : <CardBack key={i} size="md" />)}
+                            </div>
                         </div>
                     </div>
-                    <div className="bac-side">
-                        <h3>Banker</h3>
-                        <div className="bac-score">{hand ? handTotal(hand.banker) : '--'}</div>
-                        <div className="bac-cards">
-                            {(hand?.banker || [{}, {}]).map((c, i) => c.rank ? (
-                                <CardFace key={i} rank={c.rank} suit={c.suit} dealing size="md" />
-                            ) : <CardBack key={i} size="md" />)}
-                        </div>
-                    </div>
-                </div>
 
-                <div className="bac-bets">
-                    {[
-                        { key: 'banker', label: 'Banker 1.95×', cls: 'banker' },
-                        { key: 'player', label: 'Player 2×', cls: 'player' },
-                        { key: 'tie', label: 'Tie 9×', cls: 'tie' },
-                        { key: 'pair_p', label: 'Player Pair 12×', cls: 'player' },
-                        { key: 'pair_b', label: 'Banker Pair 12×', cls: 'banker' },
-                        { key: 'big', label: 'Big 1.54×', cls: 'tie' },
-                    ].map(b => (
-                        <div key={b.key} className={`bac-bet-cell ${b.cls} ${bets[b.key] ? 'has-bet' : ''}`} onClick={() => addBet(b.key)}>
-                            {b.label}{bets[b.key] ? ` · ${formatCredits(bets[b.key])}` : ''}
-                        </div>
-                    ))}
-                </div>
+                    <div className="bac-bets">
+                        {[
+                            { key: 'banker', label: 'Banker 1.95×', cls: 'banker' },
+                            { key: 'player', label: 'Player 2×', cls: 'player' },
+                            { key: 'tie', label: 'Tie 9×', cls: 'tie' },
+                            { key: 'pair_p', label: 'Player Pair 12×', cls: 'player' },
+                            { key: 'pair_b', label: 'Banker Pair 12×', cls: 'banker' },
+                            { key: 'big', label: 'Big 1.54×', cls: 'tie' },
+                        ].map(b => (
+                            <div key={b.key} className={`bac-bet-cell ${b.cls} ${bets[b.key] ? 'has-bet' : ''}`} onClick={() => addBet(b.key)}>
+                                {b.label}{bets[b.key] ? ` · ${formatCredits(bets[b.key])}` : ''}
+                            </div>
+                        ))}
+                    </div>
 
-                <div className="bac-roads">
-                    <div className="bac-road-card">
-                        <h4>Big Road</h4>
-                        <div className="bac-road-grid">
-                            {bigRoad.map((col, ci) => col.items.map((it, ri) => (
-                                <div key={`${ci}-${ri}`} className={`bac-road-cell ${it.type === 'B' ? 'banker' : it.type === 'P' ? 'player' : 'tie'}`} style={{ gridRow: ri + 1, gridColumn: ci + 1 }} />
-                            )))}
+                    <div className="bac-roads">
+                        <div className="bac-road-card">
+                            <h4>Big Road</h4>
+                            <div className="bac-road-grid">
+                                {bigRoad.map((col, ci) => col.items.map((it, ri) => (
+                                    <div key={`${ci}-${ri}`} className={`bac-road-cell ${it.type === 'B' ? 'banker' : it.type === 'P' ? 'player' : 'tie'}`} style={{ gridRow: ri + 1, gridColumn: ci + 1 }} />
+                                )))}
+                            </div>
+                        </div>
+                        <div className="bac-road-card">
+                            <h4>Big Eye Boy</h4>
+                            <div className="bac-road-grid">
+                                {bigEye.slice(0, 36).map((d, i) => (
+                                    <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
+                                ))}
+                            </div>
+                            <h4 style={{ marginTop: 4 }}>Small Road</h4>
+                            <div className="bac-road-grid">
+                                {smallRoad.slice(0, 36).map((d, i) => (
+                                    <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
+                                ))}
+                            </div>
+                            <h4 style={{ marginTop: 4 }}>Cockroach Pig</h4>
+                            <div className="bac-road-grid">
+                                {cockroachPig.slice(0, 36).map((d, i) => (
+                                    <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
+                                ))}
+                            </div>
                         </div>
                     </div>
-                    <div className="bac-road-card">
-                        <h4>Big Eye Boy</h4>
-                        <div className="bac-road-grid">
-                            {bigEye.slice(0, 36).map((d, i) => (
-                                <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
-                            ))}
-                        </div>
-                        <h4 style={{ marginTop: 4 }}>Small Road</h4>
-                        <div className="bac-road-grid">
-                            {smallRoad.slice(0, 36).map((d, i) => (
-                                <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
-                            ))}
-                        </div>
-                        <h4 style={{ marginTop: 4 }}>Cockroach Pig</h4>
-                        <div className="bac-road-grid">
-                            {cockroachPig.slice(0, 36).map((d, i) => (
-                                <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
-                            ))}
-                        </div>
-                    </div>
-                </div>
 
-                {lastWon && burstKey > 0 && <Particles key={burstKey} count={14} color="#f6c85f" />}
-            </div>
+                    {lastWon && burstKey > 0 && <Particles key={burstKey} count={14} color="#f6c85f" />}
+                    <ActionLockOverlay active={running} label="Dealing..." />
+                    <ResultToast result={toast} onDismiss={() => setToast(null)} />
+                </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={0.4586} payoutMultiplier={1.95} balance={balance} recentProfit={recentProfit} />
         </GameShell>

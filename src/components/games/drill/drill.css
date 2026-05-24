@@ -1,0 +1,76 @@
+/* Stake-style Drill. Vertical mineshaft with material layers stacked
+   from surface to bedrock. Each layer the player drills through pays
+   more but adds bust risk. */
+
+.drill-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    border-radius: inherit;
+    background:
+        linear-gradient(180deg, rgba(40, 60, 90, 0.4) 0%, rgba(70, 50, 30, 0.65) 30%, rgba(40, 25, 12, 0.85) 100%),
+        linear-gradient(180deg, #2a201a 0%, #100a06 100%);
+}
+
+.drill-shaft {
+    display: grid;
+    grid-template-columns: 220px;
+    gap: 4px;
+}
+
+.drill-layer {
+    height: 48px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    color: var(--text-primary, #fff);
+    font-weight: 800;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    transition: background 200ms, transform 200ms;
+}
+.drill-layer.cleared { opacity: 0.65; transform: translateX(2px); }
+.drill-layer.current {
+    box-shadow: 0 0 18px -8px rgba(255, 209, 102, 0.7);
+    border-color: var(--accent, #ffd166);
+}
+.drill-layer.bust {
+    background: rgba(237, 66, 69, 0.32);
+    border-color: rgba(237, 66, 69, 0.6);
+    color: #ffd2d3;
+}
+
+.drill-layer .mult {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary, #b1bad3);
+}
+.drill-layer.cleared .mult { color: var(--text-primary, #fff); }
+
+.drill-actions {
+    display: flex;
+    gap: 8px;
+}
+.drill-action-chip {
+    padding: 10px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.32);
+    color: var(--text-primary, #fff);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+.drill-action-chip.cashout { background: rgba(0, 231, 1, 0.16); border-color: rgba(0, 231, 1, 0.5); }
+.drill-action-chip:disabled { opacity: 0.45; cursor: not-allowed; }

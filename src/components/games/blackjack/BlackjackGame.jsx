@@ -5,13 +5,29 @@
 // Extracted from the legacy SimulatorGame.jsx (Blackjack section) and reshaped
 // to use GameShell + BetPanel + StatsOverlay + HistoryDrawer.
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, scoreBlackjackHand } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import {
+    BetPanel,
+    BigWinOverlay,
+    GameShell,
+    HistoryDrawer,
+    RecentResultsStrip,
+    StatsOverlay,
+    useGameSession,
+    MultiplierBadge,
+    ResultToast,
+    ActionLockOverlay,
+    CoreStageFrame,
+    ROUND_EVENTS,
+    useRoundMachine,
+} from '../primitives'
+import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './blackjack.css'
@@ -89,7 +105,9 @@ export default function BlackjackGame() {
     const definition = findGameDefinition('blackjack') || { name: 'Blackjack', category: 'Tables' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('blackjack')
     const session = useGameSession('blackjack-shell')
+    const preloader = useOriginalsPreloader('blackjack')
 
     const [decks, setDecks] = useState(4)
     const [hitsSoft17, setHitsSoft17] = useState(false)
@@ -104,6 +122,20 @@ export default function BlackjackGame() {
     const [studyRunning, setStudyRunning] = useState(false)
     const [studyResults, setStudyResults] = useState(null)
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
+
+    const handleEvent = useCallback((ev) => {
+        if (!ev) return
+        switch (ev.type) {
+            case ROUND_EVENTS.STAGE_SELECT:
+                if (ev.payload?.kind === 'deal') sfx.play('reveal')
+                break
+            default:
+                break
+        }
+    }, [sfx])
+
+    const machine = useRoundMachine({ onEvent: handleEvent })
 
     const drawTop = (sourceShoe) => [sourceShoe[0], sourceShoe.slice(1)]
     const ensureShoe = (source) => (source.length < decks * 13) ? buildShoe(decks) : source
@@ -142,6 +174,14 @@ export default function BlackjackGame() {
         } else {
             playSound(profit >= 0 ? 'win' : 'loss')
         }
+        sfx.play(profit > 0 ? 'win' : profit === 0 ? 'reveal' : 'lose')
+        setToast({
+            kind: profit > 0 ? 'win' : profit === 0 ? 'push' : 'lose',
+            multiplier: multiplier > 0 ? multiplier : null,
+            amount: profit,
+            message: `Blackjack ${label}`,
+        })
+        machine.finish({ kind: label.toLowerCase(), profit, multiplier, playerScore, dealerScore })
         showToast(profit >= 0 ? 'win' : profit === 0 ? 'bet' : 'loss', `Blackjack ${label}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         setPhase('idle')
         setActiveBet(0)
@@ -157,7 +197,15 @@ export default function BlackjackGame() {
             return
         }
         setLastBet(betAmount)
+        setToast(null)
         playSound('deal')
+        sfx.play('click')
+        machine.start([
+            { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { betAmount, decks, hitsSoft17 }, at: 0 },
+            { index: 1, type: ROUND_EVENTS.INPUT_LOCK, payload: {}, at: 0 },
+            { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount }, at: 0 },
+            { index: 3, type: ROUND_EVENTS.STAGE_SELECT, payload: { kind: 'deal' }, at: 60 },
+        ], { autoFinish: false })
         let nextShoe = ensureShoe(shoe)
         const initialPlayer = []
         const initialDealer = []
@@ -329,6 +377,7 @@ export default function BlackjackGame() {
             balance={balance}
             accent="#8aceff"
             backdrop="/assets/games/backdrops/backdrop-felt-green.png"
+            variant="stake"
             panel={
                 <BetPanel
                     balance={balance}
@@ -372,34 +421,41 @@ export default function BlackjackGame() {
                 </>
             }
         >
-            <div className="bj-stage">
-                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                <Hand
-                    label={`Dealer ${dealer.length && phase !== 'playing' ? scoreBlackjackHand(dealer) : phase === 'playing' && dealer[0] ? `(${dealerUpValue(dealer[0])})` : '--'}`}
-                    cards={dealer}
-                    hideHole={phase === 'playing'}
-                    emptyHint={phase === 'idle' ? 'Press Deal to start' : null}
-                />
-                <Hand
-                    label={`Player ${player.length ? playerScore : '--'}`}
-                    cards={player}
-                    emptyHint={phase === 'idle' ? 'Pick decks · S17/H17 · then Deal' : null}
-                />
-                <div className="bj-actions">
-                    <button disabled={phase !== 'playing'} onClick={hit}>Hit</button>
-                    <button disabled={phase !== 'playing'} onClick={stand}>Stand</button>
-                    <button disabled={phase !== 'playing' || player.length !== 2} onClick={doubleDown}>Double</button>
-                    <button disabled={phase !== 'playing' || player.length !== 2} onClick={surrender}>Surrender</button>
-                </div>
-                {insuranceOffered && (
-                    <div className="bj-insurance">
-                        <span>Dealer shows Ace · Insurance?</span>
-                        <button onClick={takeInsurance}>Yes ({formatCredits(activeBet / 2)})</button>
-                        <button onClick={() => setInsuranceOffered(false)}>Decline</button>
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="bj-stage-frame">
+                <div className="bj-stage">
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <Hand
+                        label={`Dealer ${dealer.length && phase !== 'playing' ? scoreBlackjackHand(dealer) : phase === 'playing' && dealer[0] ? `(${dealerUpValue(dealer[0])})` : '--'}`}
+                        cards={dealer}
+                        hideHole={phase === 'playing'}
+                        emptyHint={phase === 'idle' ? 'Press Deal to start' : null}
+                    />
+                    <Hand
+                        label={`Player ${player.length ? playerScore : '--'}`}
+                        cards={player}
+                        emptyHint={phase === 'idle' ? 'Pick decks · S17/H17 · then Deal' : null}
+                    />
+                    <div className="bj-actions">
+                        <button disabled={phase !== 'playing'} onClick={hit}>Hit</button>
+                        <button disabled={phase !== 'playing'} onClick={stand}>Stand</button>
+                        <button disabled={phase !== 'playing' || player.length !== 2} onClick={doubleDown}>Double</button>
+                        <button disabled={phase !== 'playing' || player.length !== 2} onClick={surrender}>Surrender</button>
                     </div>
-                )}
-                <p className="bj-hint">{hint}</p>
-            </div>
+                    {insuranceOffered && (
+                        <div className="bj-insurance">
+                            <span>Dealer shows Ace · Insurance?</span>
+                            <button onClick={takeInsurance}>Yes ({formatCredits(activeBet / 2)})</button>
+                            <button onClick={() => setInsuranceOffered(false)}>Decline</button>
+                        </div>
+                    )}
+                    <p className="bj-hint">{hint}</p>
+                    <div className="bj-meta">
+                        <MultiplierBadge label="Bet" value={activeBet || 0} suffix="" size="sm" state={inRound ? 'active' : 'idle'} />
+                    </div>
+                    <ActionLockOverlay active={false} />
+                    <ResultToast result={toast} onDismiss={() => setToast(null)} />
+                </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={2.4} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.43} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>
