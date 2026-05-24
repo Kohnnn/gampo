@@ -58,22 +58,16 @@ All 18 simulator games now own their own folders with shell + autoplay + per-gam
 - **Multi-table tournament** — single-table tournament with blind levels, then SNGs.
 - **Blackjack refactor** — currently still in `SimulatorGame.jsx`; move into per-game module with the new shell, plus split, study-mode UI charts.
 
-### Sportsbook 1:1 polish
+### Sportsbook education
 
-Brainstorm captured for the next pass:
+The dense sportsbook shell, provider fallback, mobile search, event detail, and betslip surfaces are in place. Next sportsbook work should deepen the learning layer without making the main interface feel like a lesson page.
 
-- **Layout density**. Three-pane layout: leagues sidebar (left, with crests), markets center (rich), bet slip rail (right, with parlay pulls).
-- **Sport tabs** with the generated crest art per sport (NFL, MLB, NBA, NHL, EPL, F1, Esports).
-- **Live odds drift** — animate price changes between refreshes (already partial; needs sub-second smooth interpolation).
-- **In-play games** — fake live games with scoreboard, possession, time, animated odds.
-- **Same-game multi (SGM)** — stack legs from one fixture; warn on correlated legs.
-- **Cash out** — sell back a settling ticket at a synthetic offer; explain the math.
-- **Bet builder** — markets like player props, totals, both teams to score; mock player props from a pool.
-- **Race / leaderboard** — wager race shell already exists; tie it to sport bet volume.
-- **Statistic widgets** — head-to-head, recent form, league table from TheSportsDB.
-- **Settled-ticket cards** — show outcome, screenshot-style summary; share-button (clipboard only).
-- **Promotions strip** — odds boosts (illustrative only), no real promotions.
-- **Mobile bet slip** — sticky bottom drawer.
+- **Closing line value (CLV)** — compare accepted odds to later synthetic/provider odds movement and explain whether the user beat the close.
+- **Consensus pricing** — when multiple providers/bookmakers are available, show no-vig consensus and highlight outlier prices for learning only.
+- **Bankroll drills** — add practice stake sizing prompts, drawdown simulations, and risk-of-ruin examples inside the Odds Coach.
+- **Provider source badges** — explain which rows are synthetic, SportsGameOdds, PandaScore, odds-api.io, API-Football, or The Odds API, with token/privacy caveats.
+- **Market literacy packs** — compact coach lessons for props, totals, spreads, racing place markets, outrights, and same-game correlation.
+- **Cashout lesson mode** — show a synthetic offer and the haircut math, but keep it practice-credit only.
 
 ### Other
 

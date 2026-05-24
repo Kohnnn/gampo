@@ -43,6 +43,86 @@ const SYMBOL_STYLE = [
 ].join(', ')
 
 const TEMPLATES = {
+    'vault-rush': {
+        skin: 'bank',
+        cover: 'a giant chrome bank vault door cracked open with golden coins pouring out, deep navy and gold gradient backdrop',
+        symbols: {
+            hero: 'a chrome vault door with combination wheel, single icon, polished metal',
+            mid1: 'a stack of gold coins next to a polished diamond gem, single icon',
+            mid2: 'a vintage pocket watch with gold chain, single icon',
+            bonus: 'a glowing red bonus key card stamped with star, single icon',
+        },
+    },
+    'river-catcher': {
+        skin: 'catcher',
+        cover: 'a wooden fishing boat at dawn with a glowing fish on the line, lily pads, soft mist, golden hour light',
+        symbols: {
+            hero: 'a curved fishing hook with glowing pearl drop, single icon',
+            mid1: 'a translucent pearl on a clamshell, single icon',
+            mid2: 'a tin bait container with worms, cartoon style, single icon',
+            bonus: 'a swirling shell amulet glowing teal, single icon',
+        },
+    },
+    'dust-rail': {
+        skin: 'western',
+        cover: 'a steam locomotive crossing a desert at sunset with a sheriff badge floating above the tracks, gold and rust tones',
+        symbols: {
+            hero: 'a single ornate revolver with engraved barrel, brushed steel, single icon',
+            mid1: 'a skull with cowboy hat, cartoon-realistic, single icon',
+            mid2: 'a steam locomotive icon, side view, single building, dust trails',
+            bonus: 'a bronze sheriff badge stamped with star, single icon',
+        },
+    },
+    'storm-banner': {
+        skin: 'mythic',
+        cover: 'a valkyrie holding a glowing banner over a storm-lit battlefield, cool blue and silver tones',
+        symbols: {
+            hero: 'a winged valkyrie helmet, single bust portrait, polished silver',
+            mid1: 'a crossed war hammer and lightning bolt, brushed metal, single icon',
+            mid2: 'a single feathered wing with frost crystals, single icon',
+            bonus: 'a rune-carved amulet with silver edge, glowing teal, single icon',
+        },
+    },
+    'bassline-bonus': {
+        skin: 'rock',
+        cover: 'a neon stage with a flying electric guitar surrounded by cyan and magenta light beams, vinyl records floating',
+        symbols: {
+            hero: 'a single neon-pink electric guitar, glossy, single icon',
+            mid1: 'a chrome amplifier stack with glowing knobs, single icon',
+            mid2: 'a vinyl record disc with neon edge, single icon',
+            bonus: 'a glowing concert ticket with star, magenta neon, single icon',
+        },
+    },
+    'scarab-spin': {
+        skin: 'mythic',
+        cover: 'a glowing emerald scarab beetle on golden hieroglyph stone, warm desert lighting, no readable text',
+        symbols: {
+            hero: 'a stylized pharaoh mask, gold and lapis blue, single bust portrait',
+            mid1: 'a stylized eye of horus icon, gold edges',
+            mid2: 'a single ankh cross of gold with hieroglyph etching',
+            bonus: 'a glowing emerald scarab beetle, gold rim, single icon',
+        },
+    },
+    'bars': {
+        skin: 'classic',
+        cover: 'three classic slot machine sevens lined up with golden bars below, deep red and gold backdrop, retro casino vibe',
+        symbols: {
+            hero: 'a single chrome 7 with gold gleam, classic slot icon style',
+            mid1: 'three stacked golden bars labeled BBB, classic slot icon',
+            mid2: 'a single red bell with gold trim, classic slot icon',
+            bonus: 'a pair of bright red cherries on a stem, classic slot icon',
+        },
+    },
+    'blue-samurai': {
+        skin: 'cyber',
+        cover: 'a blue samurai warrior holding a glowing katana under cyberpunk neon skyline, electric blue and white accents',
+        symbols: {
+            hero: 'a stylized samurai shogun helmet, glowing blue, single bust portrait',
+            mid1: 'a curved blue katana sword with gold tsuba, single icon',
+            mid2: 'a cherry blossom with neon pink edges, single icon',
+            bonus: 'a stylized cyber dragon head with glowing eyes, single icon',
+        },
+    },
     'wanted-revelation': {
         skin: 'wanted',
         cover: 'a single weathered wanted poster pinned to wood, golden bounty seal, no readable text, sandstorm dust, sun-flare backdrop',
@@ -101,6 +181,66 @@ const TEMPLATES = {
             mid1: 'a single ornate skeleton key with bone-shaped bow, brass',
             mid2: 'a wax-sealed letter with red ribbon, single envelope',
             bonus: 'a candelabra with three lit candles, ghostly blue flame',
+        },
+    },
+    'ghostblade-strike': {
+        skin: 'ronin',
+        cover: 'a translucent blue ronin samurai with a ghostly katana, sakura petals swirling, moonlit cliff, cinematic neon-blue rim light',
+        symbols: {
+            hero: 'a glowing ghost samurai mask, single bust, blue energy haze, no eyes visible',
+            mid1: 'a single curved katana with blue spirit flame trailing, polished steel',
+            mid2: 'a sakura blossom emblem with five petals and a teal core',
+            bonus: 'a glowing kanji-style amulet medallion with single rune, no readable text, blue spirit flame',
+        },
+    },
+    'iron-fist': {
+        skin: 'iron',
+        cover: 'a gritty boxing arena with a single oversized iron-spiked gauntlet glowing orange, sparks flying, smoky red light',
+        symbols: {
+            hero: 'a clenched armored gauntlet fist, single icon, orange and chrome, sparks',
+            mid1: 'a single boxing-style championship belt buckle medallion, brushed chrome with star',
+            mid2: 'a stylized fight bell with crack across surface, brass and ember sparks',
+            bonus: 'a glowing red fight gong with kanji-style stars in the center, no readable text',
+        },
+    },
+    'coop-cluck': {
+        skin: 'coop',
+        cover: 'a cartoon mother chicken hen mascot wearing a chef apron, surrounded by a flock of chicks under a barn, midday sun, friendly stylized',
+        symbols: {
+            hero: 'a single golden chicken hen mascot bust, big eyes, friendly cartoon',
+            mid1: 'a single sunny-side egg with bold yolk, glossy white, drop shadow',
+            mid2: 'a wooden barn silo icon with red roof and flag, single building',
+            bonus: 'a basket overflowing with golden eggs, ribbon banner above, cartoon-realistic',
+        },
+    },
+    'miko-spirit': {
+        skin: 'spirit',
+        cover: 'a single floating paper lantern with cherry blossoms drifting against a misty mountain at dusk, magenta and warm coral light',
+        symbols: {
+            hero: 'a young anime-style spirit shrine maiden mask icon, single bust, soft glow',
+            mid1: 'a single paper lantern with magenta light, swirling smoke wisps',
+            mid2: 'a stylized fox spirit head with three tails, single bust, white fur and pink markings',
+            bonus: 'a glowing torii gate amulet medallion, magenta runes, no readable text',
+        },
+    },
+    'forge-anvil': {
+        skin: 'forge',
+        cover: 'a thunderous blacksmith forge cavern with a single glowing molten coin on a stone anvil, sparks flying, warm orange and ember light',
+        symbols: {
+            hero: 'a stylized molten gold coin half-submerged in lava, splashes of light',
+            mid1: 'a single forging hammer with rune-etched head, brass and steel',
+            mid2: 'a glowing stone anvil with crackling embers across the surface',
+            bonus: 'a dragon-claw clasp holding a glowing red gem orb, embers swirling',
+        },
+    },
+    'gummy-drops': {
+        skin: 'gummy',
+        cover: 'a glossy candyland with translucent gummy hearts and rings tumbling on a pastel pink and purple rainbow conveyor, sweet cute mood',
+        symbols: {
+            hero: 'a single translucent gummy bear, glossy strawberry red, soft drop shadow',
+            mid1: 'a translucent gummy heart icon, glossy pink, no text',
+            mid2: 'a glossy gummy ring lifesaver, translucent rainbow stripes',
+            bonus: 'a glowing wrapped lollipop with twirl pattern and stick, pastel colors',
         },
     },
 }

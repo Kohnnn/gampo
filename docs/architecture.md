@@ -33,11 +33,12 @@ src/
     casinoCatalog.js      # lobby sections, slots, missions, vip
   pages/
     HomePage.jsx          # lobby with category rows
-    SportsPage.jsx        # sportsbook lab
+    SportsPage.jsx        # thin /sports wrapper
     CasinoPages.jsx       # originals, slots lobby, live, missions, vip, learn, activity, verify, race
     PlinkoPage.jsx etc.   # game wrappers
+  sportsbook/             # sportsbook shell, data, feed adapters, math, state, education, components
   styles/
-    casino.css, sports.css, education.css, home.css, index.css
+    casino.css, sportsbook.css, education.css, home.css, index.css
   utils/
     simulationMath.js     # RTP, EV, vig, kelly-style helpers
     ProvablyFair.js       # seed/nonce hashing (legacy)
@@ -52,10 +53,19 @@ src/
 
 `App.jsx` mounts everything under `Layout`. Each game has a top-level path; `/originals`, `/slots-lobby`, `/live`, `/missions`, `/vip`, `/learn`, `/activity`, `/verify`, `/race`, and `/sports` are first-class lobby surfaces.
 
+## Sportsbook
+
+- `/sports` mounts `SportsbookShell` from `src/sportsbook/`.
+- `sportsbookData.js` provides synthetic Gampo fixtures, market groups, live clocks, scores, suspended odds, and odds drift.
+- `sportsbookFeed.js` merges optional provider feeds with the synthetic fallback.
+- `sportsbookEducation.js` powers the contextual Odds Coach for odds cells, market groups, betslip tickets, and settled-ticket review.
+- `server/sportsbookProviderProxy.js` exposes a local `/api/sportsbook/free-feed` development proxy so provider tokens remain server-side.
+
 ## RNG model
 
 - Most games use `Math.random` for in-game outcomes today.
-- `simulationMath.js` exposes `createSeededRandom(seed)` that returns a deterministic generator. The sportsbook lab seeds daily fixtures with `gampo-sports-<date>` so all users see consistent data per day.
+- `simulationMath.js` exposes `createSeededRandom(seed)` that returns a deterministic generator. The sportsbook uses it for synthetic fixtures and odds drift so the market surface is stable enough to inspect.
+- Sportsbook settlement uses `createRoundRng` through `sportsbookMath.js`, not direct `Math.random`, so practice tickets can be reviewed deterministically.
 - `provably-fair` page reads recent transactions and shows their stable IDs as a verification surface. The roadmap calls for surfacing per-roll seed/nonce in every game.
 
 ## Bundle

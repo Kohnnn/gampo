@@ -11,8 +11,9 @@ import HandHistoryTab, { recordHand } from './HandHistoryTab'
 import './PokerGame.css'
 
 const BUY_INS = [1000, 5000, 25000, 100000, 500000]
-const SNG_HAND_LIMIT = 12
-const LEVEL_HANDS = 4
+const SNG_HAND_LIMIT = 60
+const LEVEL_HANDS = 6
+const BOT_THINK_MS = 1100
 const BOT_PERSONAS = [
     { name: 'lucky_lemur', avatar: 1, aggression: 0.52, chat: ['glgl', 'small pot poker', 'river saved me'] },
     { name: 'binary_bee', avatar: 2, aggression: 0.38, chat: ['range says call', 'too many bluffs?', 'checking back'] },
@@ -24,44 +25,61 @@ const BOT_PERSONAS = [
     { name: 'river_raccoon', avatar: 3, aggression: 0.58, chat: ['river spot', 'show me', 'thin call'] },
     { name: 'solver_sam', avatar: 4, aggression: 0.61, chat: ['mixed node', 'spr matters', 'balanced enough'] },
     { name: 'bubble_ace', avatar: 5, aggression: 0.43, chat: ['survive first', 'ladder brain', 'no punt'] },
+    { name: 'value_vix', avatar: 1, aggression: 0.55, chat: ['thin value!', 'snap call', 'two-pair good'] },
+    { name: 'donk_dora', avatar: 2, aggression: 0.65, chat: ['donk lead', 'no time to waste', 'shove it'] },
+    { name: 'mtt_max', avatar: 3, aggression: 0.7, chat: ['final-table mode', 'icm pressure', 'short stack ammo'] },
+    { name: 'straddle_sue', avatar: 4, aggression: 0.78, chat: ['straddle pot', 'open jam', 'level it up'] },
+    { name: 'fish_finn', avatar: 5, aggression: 0.34, chat: ['call call call', 'I had a draw', 'nh'] },
 ]
 const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => `/assets/games/poker/poker-avatar-${i}.png`)
+
 function blindLevelForHand(handNumber) {
     const level = Math.floor((handNumber - 1) / LEVEL_HANDS)
     const bb = 20 * (2 ** level)
-    return { level: level + 1, sb: Math.floor(bb / 2), bb, ante: level >= 3 ? Math.floor(bb / 10) : 0 }
+    return { level: level + 1, sb: Math.floor(bb / 2), bb, ante: level >= 2 ? Math.max(1, Math.floor(bb / 8)) : 0 }
+}
+
+// Wave 12: cash-game format keeps blinds and ante locked at the buy-in level.
+function cashGameLevel() {
+    return { level: 1, sb: 5, bb: 10, ante: 0 }
 }
 
 function suitGlyph(s) { return s === 'h' ? '\u2665' : s === 'd' ? '\u2666' : s === 's' ? '\u2660' : '\u2663' }
 function suitClass(s) { return (s === 'h' || s === 'd') ? 'red' : 'black' }
 function rankPretty(r) { return r === 'T' ? '10' : r }
 
+const DIFFICULTY_TUNING = { beginner: -0.18, intermediate: -0.06, advanced: 0.06 }
+
+function difficultyRoll() {
+    const r = Math.random()
+    if (r < 0.18) return 'beginner'
+    if (r < 0.74) return 'intermediate'
+    return 'advanced'
+}
+
+function makePersona(slotId, usedNames) {
+    const pool = BOT_PERSONAS.filter(p => !usedNames.has(p.name))
+    const candidates = pool.length ? pool : BOT_PERSONAS
+    const base = candidates[Math.floor(Math.random() * candidates.length)]
+    const difficulty = difficultyRoll()
+    return {
+        ...base,
+        id: slotId,
+        difficulty,
+        aggression: Math.max(0.18, Math.min(0.92, base.aggression + DIFFICULTY_TUNING[difficulty])),
+        avatar: BOT_AVATARS[base.avatar - 1],
+    }
+}
+
 function samplePersonas() {
-    const difficultyRoll = () => {
-        const r = Math.random()
-        if (r < 0.1) return 'beginner'
-        if (r < 0.7) return 'intermediate'
-        return 'advanced'
+    const used = new Set()
+    const out = []
+    for (let i = 0; i < 5; i += 1) {
+        const persona = makePersona(`bot${i}`, used)
+        used.add(persona.name)
+        out.push(persona)
     }
-    const difficultyTuning = {
-        beginner: -0.18,
-        intermediate: -0.06,
-        advanced: 0.06,
-    }
-    return BOT_PERSONAS
-        .map(p => ({ p, sort: Math.random() }))
-        .sort((a, b) => a.sort - b.sort)
-        .slice(0, 5)
-        .map(({ p }, i) => {
-            const difficulty = difficultyRoll()
-            return {
-                ...p,
-                id: `bot${i}`,
-                difficulty,
-                aggression: Math.max(0.18, Math.min(0.92, p.aggression + difficultyTuning[difficulty])),
-                avatar: BOT_AVATARS[p.avatar - 1],
-            }
-        })
+    return out
 }
 
 function botLine(persona, decision, state) {
@@ -98,23 +116,30 @@ export default function PokerGame() {
     const [raiseAmount, setRaiseAmount] = useState(null)
     const [tab, setTab] = useState('gto')
     const [buyIn, setBuyIn] = useState(1000)
+    // Wave 12: format selector
+    const [format, setFormat] = useState('sng') // 'sng' | 'cash'
     const [handNumber, setHandNumber] = useState(1)
     const [sngComplete, setSngComplete] = useState(false)
     const [bubbles, setBubbles] = useState({})
+    const [confirmCashout, setConfirmCashout] = useState(false)
+    const [rotationLog, setRotationLog] = useState([])
+    // Wave 12: rebuy prompt for the human + chip motion + time bank
+    const [rebuyPrompt, setRebuyPrompt] = useState(false)
+    const [chipMotions, setChipMotions] = useState([]) // [{ id, seat, amount, ts }]
+    const [thinkProgress, setThinkProgress] = useState(0) // 0..1 for current bot
     const stepTimer = useRef(null)
     const lastRecordedShowdown = useRef(null)
-    // Hero stack at the start of the current hand. Used to derive accurate
-    // per-hand profit at showdown (final stack − snapshot).
     const heroStartStackRef = useRef(0)
     const lastHandStartHistoryLen = useRef(-1)
+    const initialBuyInRef = useRef(0)
+    const lastPutInRef = useRef({})
+    const thinkRafRef = useRef(null)
+    const thinkStartRef = useRef(0)
 
     useEffect(() => {
-        // Lazy preload GTO data once mounted so the panel doesn't block on first open.
         preloadGto()
     }, [])
 
-    // Snapshot hero stack on each new hand. We detect "new hand" by watching
-    // for the engine resetting community + history at the start of preflop.
     useEffect(() => {
         if (!state || !state.players?.length) return
         const hero = state.players.find(p => p.isHuman)
@@ -122,64 +147,114 @@ export default function PokerGame() {
         const street = state.street
         const handStartedNow = street === 'preflop' && state.community.length === 0 && lastHandStartHistoryLen.current !== state.history.length
         if (handStartedNow && hero.lastAction === null) {
-            // Hero stack here already had blinds posted; add hero.putIn to recover the
-            // pre-blind starting stack.
             heroStartStackRef.current = hero.stack + (hero.putIn || 0)
             lastHandStartHistoryLen.current = state.history.length
             lastRecordedShowdown.current = null
         }
     }, [state])
 
-    const startSession = () => {
+    // Wave 12: detect putIn deltas and emit chip-motion animations on each seat.
+    useEffect(() => {
+        if (!state) {
+            lastPutInRef.current = {}
+            return
+        }
+        const motions = []
+        const next = {}
+        for (let i = 0; i < state.players.length; i += 1) {
+            const p = state.players[i]
+            const key = p.id
+            const put = p.putIn || 0
+            const prev = lastPutInRef.current[key] ?? 0
+            if (put > prev) {
+                motions.push({
+                    id: `${key}-${state.history.length}-${Math.random().toString(16).slice(2, 6)}`,
+                    seat: i,
+                    amount: put - prev,
+                    ts: Date.now(),
+                })
+            }
+            next[key] = put
+        }
+        lastPutInRef.current = next
+        if (motions.length) {
+            setChipMotions(prev => [...prev.slice(-12), ...motions])
+            const ids = motions.map(m => m.id)
+            window.setTimeout(() => {
+                setChipMotions(prev => prev.filter(m => !ids.includes(m.id)))
+            }, 1100)
+        }
+    }, [state])
+
+    const startSession = (selectedFormat = format) => {
         if (balance < buyIn) {
             showToast('error', `Need ${formatCredits(buyIn)}`, 'Add credits to sit down')
             return
         }
         if (!placeBet(buyIn, 'Poker buy-in')) return
-        const blindLevel = blindLevelForHand(1)
+        const blindLevel = selectedFormat === 'cash' ? cashGameLevel() : blindLevelForHand(1)
         const personas = samplePersonas()
         const seats = [
             { id: 'you', name: 'you', stack: buyIn, isHuman: true },
             ...personas.map(p => ({ id: p.id, name: p.name, stack: buyIn, avatar: p.avatar, persona: p })),
         ]
         const init = createInitialState({ players: seats, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante, buttonIndex: 4 })
+        initialBuyInRef.current = buyIn
+        setFormat(selectedFormat)
         setState(startHand(init))
         setHandNumber(1)
         setSngComplete(false)
         setSeated(true)
+        setRotationLog([])
+        setConfirmCashout(false)
+        setRebuyPrompt(false)
+        setChipMotions([])
+        setThinkProgress(0)
         playSound('deal')
     }
 
+    // Wave 12: bot decision driver with time-bank progress bar.
     useEffect(() => {
         if (!state) return
         if (state.street === 'showdown') return
-        // QA v4 watchdog: if there's no live actor mid-hand, force-advance.
         if (state.toAct < 0) {
             const stepTimerId = window.setTimeout(() => {
                 setState(prev => {
                     if (!prev || prev.street === 'showdown' || prev.toAct >= 0) return prev
-                    return applyAction(prev, { type: 'check' }) // benign no-op kicks the engine
+                    return applyAction(prev, { type: 'check' })
                 })
             }, 250)
             return () => window.clearTimeout(stepTimerId)
         }
         const p = state.players[state.toAct]
-        if (!p || p.isHuman) return
-        // Bot acts after a short think time. Tracked per-turn so a stale
-        // cleanup can't clobber the pending bot.
-        const seatId = `${state.toAct}-${state.history.length}`
+        if (!p || p.isHuman) {
+            setThinkProgress(0)
+            return
+        }
+        // Animate think progress.
+        thinkStartRef.current = performance.now()
+        setThinkProgress(0)
+        const tick = () => {
+            const elapsed = performance.now() - thinkStartRef.current
+            const ratio = Math.min(1, elapsed / BOT_THINK_MS)
+            setThinkProgress(ratio)
+            if (ratio < 1) thinkRafRef.current = window.requestAnimationFrame(tick)
+        }
+        thinkRafRef.current = window.requestAnimationFrame(tick)
         const decideTimer = window.setTimeout(() => {
             const persona = p.persona || { aggression: 0.5, chat: ['nice'] }
             const blindPressure = Math.min(0.1, Math.max(0, (state.bb || 20) / Math.max(1, p.stack + (p.putIn || 0))) * 0.55)
+            const anteFactor = state.ante > 0 ? 0.04 : 0
             const decision = HeuristicBot({
                 state,
                 seatIndex: state.toAct,
-                aggression: Math.min(0.96, persona.aggression + blindPressure),
+                aggression: Math.min(0.96, persona.aggression + blindPressure + anteFactor),
                 difficulty: persona.difficulty || 'intermediate',
             })
             setState(prev => applyAction(prev, decision))
+            setThinkProgress(0)
             playSound(decision.type === 'fold' ? 'click' : decision.type === 'raise' ? 'flip' : 'tick')
-            if (Math.random() < 0.46) {
+            if (Math.random() < 0.42) {
                 const text = botLine(persona, decision, state)
                 setChat(prev => [...prev.slice(-30), { id: Date.now(), user: p.name, text }])
                 setBubbles(prev => ({ ...prev, [p.id]: text }))
@@ -189,9 +264,7 @@ export default function PokerGame() {
                     return next
                 }), 2800)
             }
-        }, 700)
-        // QA v4 escape hatch: if a bot's turn doesn't resolve in 5s for any
-        // reason, auto-fold them so the table can never deadlock.
+        }, BOT_THINK_MS)
         const escapeTimer = window.setTimeout(() => {
             setState(prev => {
                 if (!prev || prev.street === 'showdown') return prev
@@ -202,10 +275,12 @@ export default function PokerGame() {
                 return applyAction(prev, { type: 'fold' })
             })
         }, 5000)
-        stepTimer.current = { decideTimer, escapeTimer, seatId }
+        stepTimer.current = { decideTimer, escapeTimer }
         return () => {
             window.clearTimeout(decideTimer)
             window.clearTimeout(escapeTimer)
+            if (thinkRafRef.current) window.cancelAnimationFrame(thinkRafRef.current)
+            setThinkProgress(0)
         }
     }, [state, playSound])
 
@@ -213,14 +288,12 @@ export default function PokerGame() {
     const human = state ? state.players.find(p => p.isHuman) : null
     const isHumanTurn = state && state.toAct >= 0 && state.players[state.toAct]?.isHuman
 
-    // Record settled hand to history (once per showdown).
     useEffect(() => {
         if (!state || state.street !== 'showdown' || !human) return
         const sigKey = state.history.length + ':' + state.winners.map(w => `${w.id}:${w.share}`).join(',')
         if (lastRecordedShowdown.current === sigKey) return
         lastRecordedShowdown.current = sigKey
         const heroWin = state.winners.find(w => w.id === human.id)
-        // Hand profit = final hero stack (post-payout) minus the snapshot stack.
         const startStack = heroStartStackRef.current || 0
         const finalStack = human.stack || 0
         const handProfit = startStack > 0 ? (finalStack - startStack) : ((heroWin?.share || 0) - (human.putIn || 0))
@@ -232,6 +305,10 @@ export default function PokerGame() {
             betAmount: wagered,
             meta: { winners: state.winners.map(w => w.id), street: state.street, startStack, finalStack },
         })
+        // Wave 12: rebuy prompt when the human busts.
+        if ((human.stack || 0) <= 0) {
+            setRebuyPrompt(true)
+        }
     }, [state, human])
 
     const handleAction = (act) => {
@@ -240,20 +317,46 @@ export default function PokerGame() {
         setState(prev => applyAction(prev, act))
     }
 
+    const rotateBustedBots = (prev) => {
+        if (!prev) return prev
+        const next = structuredClone(prev)
+        const usedNames = new Set(next.players.map(p => p.persona?.name || p.name))
+        const reseat = []
+        const buyAmount = initialBuyInRef.current || buyIn
+        for (let i = 0; i < next.players.length; i += 1) {
+            const seat = next.players[i]
+            if (seat.isHuman) continue
+            if ((seat.stack || 0) > 0) continue
+            const fresh = makePersona(seat.id, usedNames)
+            usedNames.delete(seat.persona?.name || seat.name)
+            usedNames.add(fresh.name)
+            seat.name = fresh.name
+            seat.stack = buyAmount
+            seat.avatar = fresh.avatar
+            seat.persona = fresh
+            seat.status = 'active'
+            seat.putIn = 0
+            seat.lastAction = null
+            seat.hole = []
+            reseat.push(fresh.name)
+        }
+        if (reseat.length) {
+            setRotationLog(prevLog => [
+                { id: Date.now(), names: reseat, hand: handNumber + 1, ts: Date.now() },
+                ...prevLog,
+            ].slice(0, 10))
+        }
+        return next
+    }
+
     const nextHand = () => {
         if (!state) return
-        const dead = state.players.filter(p => p.stack <= 0).length === state.players.length - 1
-        if (dead) {
-            showToast('win', 'You broke the table', `Stack ${formatCredits(human?.stack || 0)}`)
-            const stack = human?.stack || 0
-            if (stack > 0) addWinnings(stack, 'Poker cashout')
-            setState(null); setSeated(false); return
-        }
         if ((human?.stack || 0) <= 0) {
-            showToast('loss', 'Busted', 'Buy-in lost')
-            setState(null); setSeated(false); return
+            // Trigger rebuy prompt instead of leaving immediately.
+            setRebuyPrompt(true)
+            return
         }
-        if (handNumber >= SNG_HAND_LIMIT) {
+        if (format === 'sng' && handNumber >= SNG_HAND_LIMIT) {
             const stack = human?.stack || 0
             if (stack > 0) addWinnings(stack, 'Poker sit-and-go cashout')
             setSngComplete(true)
@@ -261,16 +364,82 @@ export default function PokerGame() {
             setState(null); setSeated(false); return
         }
         const nextHandNumber = handNumber + 1
-        const blindLevel = blindLevelForHand(nextHandNumber)
+        const blindLevel = format === 'cash' ? cashGameLevel() : blindLevelForHand(nextHandNumber)
         setHandNumber(nextHandNumber)
-        setState(prev => dealNext({ ...prev, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante }))
+        setState(prev => {
+            const rotated = rotateBustedBots(prev)
+            return dealNext({ ...rotated, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante })
+        })
+        setConfirmCashout(false)
     }
 
-    const cashOut = () => {
+    const cashOut = (force = false) => {
         if (!state || !human) return
-        if (human.stack > 0) addWinnings(human.stack, 'Poker cashout')
-        showToast('bet', 'Left the table', `Cashed out ${formatCredits(human.stack || 0)}`)
-        setState(null); setSeated(false); setSngComplete(false)
+        const midHand = state.street !== 'showdown' && state.street !== 'idle' && human.status !== 'folded'
+        if (midHand && !force) {
+            setConfirmCashout(true)
+            return
+        }
+        const finalStack = human.stack || 0
+        if (finalStack > 0) addWinnings(finalStack, 'Poker cashout')
+        showToast('bet', 'Left the table', `Cashed out ${formatCredits(finalStack)}`)
+        setState(null); setSeated(false); setSngComplete(false); setConfirmCashout(false); setRebuyPrompt(false)
+    }
+
+    // Wave 12: cash-game top-up between hands.
+    const topUp = () => {
+        if (!state || !human) return
+        const buyAmount = initialBuyInRef.current || buyIn
+        const need = Math.max(0, buyAmount - (human.stack || 0))
+        if (need <= 0) {
+            showToast('info', 'Already at full buy-in', `${formatCredits(human.stack)}`)
+            return
+        }
+        if (balance < need) {
+            showToast('error', `Need ${formatCredits(need)}`, 'Add credits to top up')
+            return
+        }
+        if (!placeBet(need, 'Poker top-up')) return
+        setState(prev => {
+            if (!prev) return prev
+            const next = structuredClone(prev)
+            const seat = next.players.find(p => p.isHuman)
+            if (seat) {
+                seat.stack += need
+                if (seat.status === 'sittingOut') seat.status = 'active'
+            }
+            return next
+        })
+        showToast('bet', 'Topped up', `+${formatCredits(need)}`)
+    }
+
+    // Wave 12: rebuy. Adds the buy-in back to the human stack and dismisses the prompt.
+    const rebuy = () => {
+        if (!state || !human) return
+        const buyAmount = initialBuyInRef.current || buyIn
+        if (balance < buyAmount) {
+            showToast('error', `Need ${formatCredits(buyAmount)}`, 'Add credits to rebuy')
+            return
+        }
+        if (!placeBet(buyAmount, 'Poker rebuy')) return
+        setState(prev => {
+            if (!prev) return prev
+            const next = structuredClone(prev)
+            const seat = next.players.find(p => p.isHuman)
+            if (seat) {
+                seat.stack += buyAmount
+                seat.status = 'active'
+            }
+            return next
+        })
+        setRebuyPrompt(false)
+        showToast('bet', 'Rebought', `+${formatCredits(buyAmount)}`)
+    }
+
+    const declineRebuy = () => {
+        // Treat as cash-out leave with current (zero) stack.
+        showToast('loss', 'Busted', 'Buy-in lost')
+        setState(null); setSeated(false); setRebuyPrompt(false); setConfirmCashout(false)
     }
 
     const raiseRange = useMemo(() => {
@@ -288,6 +457,13 @@ export default function PokerGame() {
         setChatInput('')
     }
 
+    const blindLevel = state
+        ? (format === 'cash' ? cashGameLevel() : blindLevelForHand(handNumber))
+        : null
+    const profitInSession = state && human && initialBuyInRef.current
+        ? (human.stack || 0) - initialBuyInRef.current
+        : 0
+
     return (
         <div className="poker-page">
             <div className="poker-titlebar">
@@ -295,130 +471,239 @@ export default function PokerGame() {
                 <h1>Live Poker (No-Limit Hold'em, 6-max)</h1>
                 <div className="poker-balance"><span>Balance</span><strong>{formatCredits(balance)}</strong></div>
             </div>
+
             {!seated && (
                 <div className="poker-lobby">
-                    <h2>Choose sit-and-go buy-in</h2>
-                    <p>Fresh 6-handed sit-and-go. Blinds start 10/20, increase every 4 hands, antes begin at level 4, and the default event ends after 12 hands. Practice credits only.</p>
+                    <h2>Sit down</h2>
+                    <p>Fresh 6-handed table. Bots rotate when busted; rebuy any time. Practice credits only.</p>
+                    {/* Wave 12: format toggle */}
+                    <div className="poker-format-toggle" role="tablist" aria-label="Format">
+                        <button
+                            role="tab"
+                            aria-selected={format === 'sng'}
+                            className={format === 'sng' ? 'active' : ''}
+                            onClick={() => setFormat('sng')}
+                        >Sit-and-go ({SNG_HAND_LIMIT}h)</button>
+                        <button
+                            role="tab"
+                            aria-selected={format === 'cash'}
+                            className={format === 'cash' ? 'active' : ''}
+                            onClick={() => setFormat('cash')}
+                        >Cash game (5/10)</button>
+                    </div>
                     <div className="poker-buyin-options">
                         {BUY_INS.map(amount => (
                             <button key={amount} className={buyIn === amount ? 'active' : ''} disabled={balance < amount} onClick={() => setBuyIn(amount)}>{formatCredits(amount)}</button>
                         ))}
                     </div>
                     {sngComplete && <div className="pk-lobby-note">Last sit-and-go completed. Choose a stake to sit fresh.</div>}
-                    <button className="poker-buyin" disabled={balance < buyIn} onClick={startSession}>Sit Down {formatCredits(buyIn)}</button>
+                    <button className="poker-buyin" disabled={balance < buyIn} onClick={() => startSession(format)}>Sit Down {formatCredits(buyIn)}</button>
                 </div>
             )}
-            {seated && state && (
-                <div className="poker-layout">
-                    <div className="poker-table">
-                        <div className="poker-table-felt">
-                            <div className="pk-sng-status">
-                                <span>Hand {handNumber}/{SNG_HAND_LIMIT}</span>
-                                <span>Level {blindLevelForHand(handNumber).level}</span>
-                                <span>Blinds {formatCredits(state.sb)}/{formatCredits(state.bb)}</span>
-                                <span>Ante {formatCredits(state.ante || 0)}</span>
-                            </div>
-                            <div className="pk-pot">Pot {formatCredits(state.pot)}</div>
-                            <div className="pk-board">
-                                {state.community.map((c, i) => <PokerCard key={i} card={c} />)}
-                                {Array.from({ length: 5 - state.community.length }, (_, i) => (
-                                    <PokerCard key={`empty-${i}`} card={null} />
-                                ))}
-                            </div>
-                            <div className="pk-seats">
-                                {state.players.map((p, i) => (
-                                    <div key={p.id}
-                                        className={`pk-seat seat-${i} ${p.status} ${i === state.toAct ? 'on-turn' : ''} ${i === state.buttonIndex ? 'has-button' : ''}`}>
-                                        {p.avatar ? <img className="pk-avatar" src={p.avatar} alt="" /> : <div className="pk-avatar pk-you">YOU</div>}
-                                        <div className="pk-seat-info">
-                                            <span className="pk-name">{p.name}</span>
-                                            <span className="pk-stack">{formatCredits(p.stack)}</span>
-                                            {p.lastAction && <span className="pk-last">{p.lastAction}</span>}
-                                        </div>
-                                        <div className="pk-seat-cards">
-                                            {p.status === 'folded' || p.status === 'sittingOut' ? null : (
-                                                p.hole.length === 0 ? null : (
-                                                    p.isHuman || state.street === 'showdown'
-                                                        ? p.hole.map((c, j) => <PokerCard key={j} card={c} />)
-                                                        : p.hole.map((c, j) => <PokerCard key={j} card={c} hidden />)
-                                                )
-                                            )}
-                                        </div>
-                                        {bubbles[p.id] && <div className="pk-speech">{bubbles[p.id]}</div>}
-                                        {i === state.buttonIndex && <span className="pk-button-chip">D</span>}
-                                    </div>
-                                ))}
-                            </div>
+
+            {seated && state && blindLevel && (
+                <>
+                    <div className="pk-info-strip" role="status" aria-label="Hand info">
+                        <div className="pk-info-cell">
+                            <span>{format === 'cash' ? 'Hand' : 'Hand'}</span>
+                            <strong>
+                                {handNumber}
+                                {format === 'sng' && <em> / {SNG_HAND_LIMIT}</em>}
+                            </strong>
                         </div>
-                        <div className="pk-actions">
-                            {state.street === 'showdown' ? (
-                                <>
-                                    <div className="pk-winners">
-                                        {state.winners.map((w, i) => (
-                                            <div key={i}>{w.id} won {formatCredits(w.share)}{w.hand ? ` · ${w.hand}` : ''}</div>
-                                        ))}
-                                    </div>
-                                    <button className="pk-act primary" onClick={nextHand}>Next hand</button>
-                                    <button className="pk-act" onClick={cashOut}>Cash out</button>
-                                </>
-                            ) : (
-                                <>
-                                    {acts.map(a => {
-                                        if (a.type === 'fold') return <button key={a.type} className="pk-act fold" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'fold' })}>Fold</button>
-                                        if (a.type === 'check') return <button key={a.type} className="pk-act check" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'check' })}>Check</button>
-                                        if (a.type === 'call') return <button key={a.type} className="pk-act call" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'call' })}>Call {formatCredits(a.amount)}</button>
-                                        if (a.type === 'raise') {
-                                            const r = a
-                                            return (
-                                                <div key={a.type} className="pk-raise">
-                                                    <div className="pk-raise-presets">
-                                                        <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, Math.round(state.pot * 0.5))))}>½ pot</button>
-                                                        <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, Math.round(state.pot * 0.75))))}>¾ pot</button>
-                                                        <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, state.pot)))}>Pot</button>
-                                                        <button onClick={() => setRaiseAmount(r.max)}>Max</button>
-                                                    </div>
-                                                    <input type="range" min={r.min} max={r.max} value={raiseAmount ?? r.min} onChange={e => setRaiseAmount(Number(e.target.value))} />
-                                                    <button className="pk-act raise" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'raise', amount: raiseAmount ?? r.min })}>Raise to {formatCredits(raiseAmount ?? r.min)}</button>
-                                                </div>
-                                            )
-                                        }
-                                        return null
-                                    })}
-                                </>
-                            )}
+                        <div className="pk-info-cell">
+                            <span>Format</span>
+                            <strong>{format === 'cash' ? 'Cash' : 'SNG'}</strong>
                         </div>
+                        <div className="pk-info-cell">
+                            <span>Blinds</span>
+                            <strong>{formatCredits(blindLevel.sb)} / {formatCredits(blindLevel.bb)}</strong>
+                        </div>
+                        <div className="pk-info-cell">
+                            <span>Ante</span>
+                            <strong>{blindLevel.ante > 0 ? formatCredits(blindLevel.ante) : '—'}</strong>
+                        </div>
+                        <div className="pk-info-cell">
+                            <span>Pot</span>
+                            <strong className="pk-info-pot">{formatCredits(state.pot)}</strong>
+                        </div>
+                        <div className="pk-info-cell">
+                            <span>Your stack</span>
+                            <strong>{formatCredits(human?.stack || 0)}</strong>
+                        </div>
+                        <div className={`pk-info-cell pk-info-pl ${profitInSession >= 0 ? 'pos' : 'neg'}`}>
+                            <span>Session P/L</span>
+                            <strong>{profitInSession >= 0 ? '+' : ''}{formatCredits(profitInSession)}</strong>
+                        </div>
+                        {format === 'cash' && (
+                            <button className="pk-info-topup" onClick={topUp} title="Top up to full buy-in">
+                                Top Up
+                            </button>
+                        )}
+                        <button className="pk-info-cashout" onClick={() => cashOut(false)} title="Cash out and leave the table">
+                            Cash Out
+                        </button>
                     </div>
-                    <aside className="poker-sidebar">
-                        <div className="poker-tabs">
-                            <button className={`poker-tab ${tab === 'gto' ? 'active' : ''}`} onClick={() => setTab('gto')}>GTO</button>
-                            <button className={`poker-tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
-                            <button className={`poker-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>Chat</button>
+
+                    {rotationLog.length > 0 && (
+                        <div className="pk-rotation-log" aria-live="polite">
+                            <span>Seat rotation</span>
+                            {rotationLog.slice(0, 1).map(entry => (
+                                <em key={entry.id}>
+                                    Hand {entry.hand}: {entry.names.join(', ')} bought in
+                                </em>
+                            ))}
                         </div>
-                        {tab === 'gto' && (
-                            <div className="poker-sidebar-body">
-                                <GtoPanel state={state} />
+                    )}
+
+                    {confirmCashout && (
+                        <div className="pk-cashout-confirm" role="dialog" aria-label="Confirm cash out">
+                            <strong>Cash out mid-hand?</strong>
+                            <p>You'll fold this hand and leave the table with {formatCredits(human?.stack || 0)}. Bets already in the pot stay there.</p>
+                            <div className="pk-cashout-actions">
+                                <button className="pk-act" onClick={() => setConfirmCashout(false)}>Stay seated</button>
+                                <button className="pk-act primary" onClick={() => cashOut(true)}>Cash out & leave</button>
                             </div>
-                        )}
-                        {tab === 'history' && (
-                            <div className="poker-sidebar-body">
-                                <HandHistoryTab liveState={state} />
+                        </div>
+                    )}
+
+                    {rebuyPrompt && (
+                        <div className="pk-rebuy-prompt" role="dialog" aria-label="Rebuy">
+                            <strong>You're out of chips</strong>
+                            <p>Rebuy at {formatCredits(initialBuyInRef.current || buyIn)} to keep your seat, or leave the table.</p>
+                            <div className="pk-cashout-actions">
+                                <button className="pk-act" onClick={declineRebuy}>Leave table</button>
+                                <button className="pk-act primary" disabled={balance < (initialBuyInRef.current || buyIn)} onClick={rebuy}>Rebuy {formatCredits(initialBuyInRef.current || buyIn)}</button>
                             </div>
-                        )}
-                        {tab === 'chat' && (
-                            <div className="poker-sidebar-body poker-chat">
-                                <h3>Table chat</h3>
-                                <div className="pk-chat-banner">Simulated chat. Bots and you only.</div>
-                                <div className="pk-chat-list">
-                                    {chat.map(m => <div key={m.id} className={`pk-msg ${m.user === 'you' ? 'self' : ''}`}><span>{m.user}</span><b>{m.text}</b></div>)}
+                        </div>
+                    )}
+
+                    <div className="poker-layout">
+                        <div className="poker-table">
+                            <div className="poker-table-felt">
+                                <div className="pk-pot">Pot {formatCredits(state.pot)}</div>
+                                <div className="pk-board">
+                                    {state.community.map((c, i) => <PokerCard key={i} card={c} />)}
+                                    {Array.from({ length: 5 - state.community.length }, (_, i) => (
+                                        <PokerCard key={`empty-${i}`} card={null} />
+                                    ))}
                                 </div>
-                                <div className="pk-chat-input">
-                                    <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Say nh..." />
-                                    <button onClick={sendChat}>Send</button>
+                                <div className="pk-seats">
+                                    {state.players.map((p, i) => (
+                                        <div key={p.id}
+                                            className={`pk-seat seat-${i} ${p.status} ${i === state.toAct ? 'on-turn' : ''} ${i === state.buttonIndex ? 'has-button' : ''}`}>
+                                            {p.avatar ? <img className="pk-avatar" src={p.avatar} alt="" /> : <div className="pk-avatar pk-you">YOU</div>}
+                                            <div className="pk-seat-info">
+                                                <span className="pk-name">{p.name}</span>
+                                                <span className="pk-stack">{formatCredits(p.stack)}</span>
+                                                {p.persona?.difficulty && (
+                                                    <span className={`pk-diff ${p.persona.difficulty}`}>{p.persona.difficulty.slice(0, 3)}</span>
+                                                )}
+                                                {p.lastAction && <span className="pk-last">{p.lastAction}</span>}
+                                                {(p.putIn || 0) > 0 && state.street !== 'showdown' && (
+                                                    <span className="pk-bet">{formatCredits(p.putIn)}</span>
+                                                )}
+                                            </div>
+                                            <div className="pk-seat-cards">
+                                                {p.status === 'folded' || p.status === 'sittingOut' ? null : (
+                                                    p.hole.length === 0 ? null : (
+                                                        p.isHuman || state.street === 'showdown'
+                                                            ? p.hole.map((c, j) => <PokerCard key={j} card={c} />)
+                                                            : p.hole.map((c, j) => <PokerCard key={j} card={c} hidden />)
+                                                    )
+                                                )}
+                                            </div>
+                                            {bubbles[p.id] && <div className="pk-speech">{bubbles[p.id]}</div>}
+                                            {/* Wave 12: time-bank ring on the seat that's currently to act */}
+                                            {i === state.toAct && !p.isHuman && thinkProgress > 0 && (
+                                                <span className="pk-think-ring" style={{ '--p': thinkProgress }} aria-hidden="true" />
+                                            )}
+                                            {i === state.buttonIndex && <span className="pk-button-chip">D</span>}
+                                        </div>
+                                    ))}
                                 </div>
+                                {/* Wave 12: chip-into-pot motion overlay */}
+                                {chipMotions.map(motion => (
+                                    <span
+                                        key={motion.id}
+                                        className={`pk-chip-motion seat-${motion.seat}`}
+                                        aria-hidden="true"
+                                    >
+                                        +{formatCredits(motion.amount)}
+                                    </span>
+                                ))}
                             </div>
-                        )}
-                    </aside>
-                </div>
+                            <div className="pk-actions">
+                                {state.street === 'showdown' ? (
+                                    <>
+                                        <div className="pk-winners">
+                                            {state.winners.map((w, i) => (
+                                                <div key={i}>{w.id} won {formatCredits(w.share)}{w.hand ? ` · ${w.hand}` : ''}</div>
+                                            ))}
+                                        </div>
+                                        <button className="pk-act primary" onClick={nextHand}>Next hand</button>
+                                        <button className="pk-act" onClick={() => cashOut(true)}>Cash out</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        {acts.map(a => {
+                                            if (a.type === 'fold') return <button key={a.type} className="pk-act fold" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'fold' })}>Fold</button>
+                                            if (a.type === 'check') return <button key={a.type} className="pk-act check" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'check' })}>Check</button>
+                                            if (a.type === 'call') return <button key={a.type} className="pk-act call" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'call' })}>Call {formatCredits(a.amount)}</button>
+                                            if (a.type === 'raise') {
+                                                const r = a
+                                                return (
+                                                    <div key={a.type} className="pk-raise">
+                                                        <div className="pk-raise-presets">
+                                                            <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, Math.round(state.pot * 0.5))))}>½ pot</button>
+                                                            <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, Math.round(state.pot * 0.75))))}>¾ pot</button>
+                                                            <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, state.pot)))}>Pot</button>
+                                                            <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, state.pot * 1.5)))}>1.5× pot</button>
+                                                            <button onClick={() => setRaiseAmount(r.max)}>All-in</button>
+                                                        </div>
+                                                        <input type="range" min={r.min} max={r.max} value={raiseAmount ?? r.min} onChange={e => setRaiseAmount(Number(e.target.value))} />
+                                                        <button className="pk-act raise" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'raise', amount: raiseAmount ?? r.min })}>Raise to {formatCredits(raiseAmount ?? r.min)}</button>
+                                                    </div>
+                                                )
+                                            }
+                                            return null
+                                        })}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        <aside className="poker-sidebar">
+                            <div className="poker-tabs">
+                                <button className={`poker-tab ${tab === 'gto' ? 'active' : ''}`} onClick={() => setTab('gto')}>GTO</button>
+                                <button className={`poker-tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
+                                <button className={`poker-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>Chat</button>
+                            </div>
+                            {tab === 'gto' && (
+                                <div className="poker-sidebar-body">
+                                    <GtoPanel state={state} />
+                                </div>
+                            )}
+                            {tab === 'history' && (
+                                <div className="poker-sidebar-body">
+                                    <HandHistoryTab liveState={state} />
+                                </div>
+                            )}
+                            {tab === 'chat' && (
+                                <div className="poker-sidebar-body poker-chat">
+                                    <h3>Table chat</h3>
+                                    <div className="pk-chat-banner">Simulated chat. Bots and you only.</div>
+                                    <div className="pk-chat-list">
+                                        {chat.map(m => <div key={m.id} className={`pk-msg ${m.user === 'you' ? 'self' : ''}`}><span>{m.user}</span><b>{m.text}</b></div>)}
+                                    </div>
+                                    <div className="pk-chat-input">
+                                        <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Say nh..." />
+                                        <button onClick={sendChat}>Send</button>
+                                    </div>
+                                </div>
+                            )}
+                        </aside>
+                    </div>
+                </>
             )}
         </div>
     )

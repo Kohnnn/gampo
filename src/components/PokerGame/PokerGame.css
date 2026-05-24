@@ -4,6 +4,351 @@
     background: radial-gradient(circle at 20% 0%, rgba(255, 207, 90, 0.06), transparent 50%), var(--bg-primary);
 }
 
+/* Wave 11: persistent info strip outside the felt */
+
+.pk-info-strip {
+    max-width: 1480px;
+    margin: 0 auto 12px;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) auto;
+    gap: 8px;
+    align-items: stretch;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(15, 33, 46, 0.96), rgba(20, 39, 51, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+
+.pk-info-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.34);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    min-width: 0;
+}
+
+.pk-info-cell span {
+    color: var(--text-muted);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.pk-info-cell strong {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 950;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pk-info-cell strong em {
+    color: var(--text-muted);
+    font-style: normal;
+    font-weight: 900;
+    font-size: 11px;
+}
+
+.pk-info-pot {
+    color: #ffe680 !important;
+    text-shadow: 0 0 12px rgba(255, 207, 90, 0.5);
+}
+
+.pk-info-pl.pos strong { color: var(--accent-green); }
+.pk-info-pl.neg strong { color: var(--accent-red); }
+
+.pk-info-cashout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    border-radius: 10px;
+    border: 1px solid rgba(237, 66, 69, 0.55);
+    background: linear-gradient(180deg, rgba(237, 66, 69, 0.22), rgba(150, 30, 30, 0.18));
+    color: #ff7d8c;
+    font-weight: 950;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.15s;
+}
+
+.pk-info-cashout:hover {
+    filter: brightness(1.18);
+    transform: translateY(-1px);
+}
+
+@media (max-width: 1100px) {
+    .pk-info-strip {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .pk-info-cashout {
+        grid-column: 1 / -1;
+        height: 44px;
+    }
+}
+
+.pk-rotation-log {
+    max-width: 1480px;
+    margin: -6px auto 8px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: rgba(20, 117, 225, 0.14);
+    border: 1px solid rgba(20, 117, 225, 0.32);
+    color: #d8eaff;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    animation: pkRotationIn 0.3s ease both;
+}
+
+.pk-rotation-log span {
+    color: #6db7ff;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 10px;
+}
+
+.pk-rotation-log em {
+    font-style: normal;
+}
+
+@keyframes pkRotationIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.pk-cashout-confirm {
+    max-width: 1480px;
+    margin: 0 auto 10px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(237, 66, 69, 0.16), rgba(40, 12, 16, 0.94));
+    border: 1px solid rgba(237, 66, 69, 0.45);
+    color: var(--text-primary);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.pk-cashout-confirm strong {
+    color: #ffd9da;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.pk-cashout-confirm p {
+    margin: 6px 0 12px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.pk-cashout-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pk-cashout-actions .pk-act { height: 40px; padding: 0 16px; }
+
+.pk-diff {
+    border-radius: 999px;
+    padding: 1px 6px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.pk-diff.beginner { background: rgba(20, 117, 225, 0.2); color: #6db7ff; }
+.pk-diff.intermediate { background: rgba(255, 207, 90, 0.18); color: #ffe680; }
+.pk-diff.advanced { background: rgba(237, 66, 69, 0.2); color: #ff8d99; }
+
+.pk-bet {
+    background: rgba(0, 231, 1, 0.16);
+    color: #b6f5b1;
+    border: 1px solid rgba(0, 231, 1, 0.4);
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.04em;
+}
+
+/* Wave 12: format toggle, top-up, rebuy prompt, chip motion, time-bank ring */
+
+.poker-format-toggle {
+    display: inline-flex;
+    background: rgba(0, 0, 0, 0.34);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 4px;
+    gap: 4px;
+    margin: 0 0 14px;
+}
+
+.poker-format-toggle button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 8px 14px;
+    border-radius: 7px;
+    font: inherit;
+    font-weight: 950;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.poker-format-toggle button.active {
+    background: var(--accent-green);
+    color: #071109;
+}
+
+.poker-format-toggle button:hover:not(.active) {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.pk-info-topup {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(20, 117, 225, 0.55);
+    background: linear-gradient(180deg, rgba(20, 117, 225, 0.22), rgba(10, 70, 130, 0.18));
+    color: #6db7ff;
+    font-weight: 950;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.15s;
+    margin-right: 4px;
+}
+
+.pk-info-topup:hover {
+    filter: brightness(1.18);
+    transform: translateY(-1px);
+}
+
+.pk-rebuy-prompt {
+    max-width: 1480px;
+    margin: 0 auto 10px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 207, 90, 0.14), rgba(40, 28, 8, 0.94));
+    border: 1px solid rgba(255, 207, 90, 0.55);
+    color: var(--text-primary);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+    animation: pkRebuyIn 0.3s ease-out both;
+}
+
+.pk-rebuy-prompt strong {
+    color: #ffe680;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.pk-rebuy-prompt p {
+    margin: 6px 0 12px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+@keyframes pkRebuyIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Chip-into-pot motion */
+
+.pk-chip-motion {
+    position: absolute;
+    z-index: 4;
+    pointer-events: none;
+    color: #ffe680;
+    font-weight: 950;
+    font-size: 13px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6), 0 0 12px rgba(255, 207, 90, 0.6);
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.5));
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 207, 90, 0.6);
+    animation: pkChipFly 1s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+.pk-chip-motion::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255, 207, 90, 0.55), transparent 70%);
+    opacity: 0.6;
+    z-index: -1;
+}
+
+/* Per-seat origin transforms for the chip-fly motion. The motion ends at the
+   pot which is positioned at left:50%; top:28%; on the felt. */
+
+.pk-chip-motion.seat-0 { left: 50%; bottom: 110px; transform: translateX(-50%); }
+.pk-chip-motion.seat-1 { left: 16%; bottom: 30%; }
+.pk-chip-motion.seat-2 { left: 8%; top: 32%; }
+.pk-chip-motion.seat-3 { left: 50%; top: 90px; transform: translateX(-50%); }
+.pk-chip-motion.seat-4 { right: 8%; top: 32%; }
+.pk-chip-motion.seat-5 { right: 16%; bottom: 30%; }
+
+@keyframes pkChipFly {
+    0% { opacity: 0; transform: scale(0.4); }
+    25% { opacity: 1; transform: scale(1.05); }
+    100% {
+        opacity: 0;
+        transform: translate(var(--cx, 0px), var(--cy, -90px)) scale(0.7);
+    }
+}
+
+.pk-chip-motion.seat-0 { --cx: 0px; --cy: -120px; }
+.pk-chip-motion.seat-1 { --cx: 130px; --cy: -80px; }
+.pk-chip-motion.seat-2 { --cx: 200px; --cy: 0px; }
+.pk-chip-motion.seat-3 { --cx: 0px; --cy: 120px; }
+.pk-chip-motion.seat-4 { --cx: -200px; --cy: 0px; }
+.pk-chip-motion.seat-5 { --cx: -130px; --cy: -80px; }
+
+/* Time-bank ring around the seat that is currently to act (bots only). */
+
+.pk-think-ring {
+    position: absolute;
+    inset: -6px;
+    border-radius: 16px;
+    pointer-events: none;
+    background: conic-gradient(
+        var(--accent-green) calc(var(--p, 0) * 360deg),
+        rgba(255, 255, 255, 0.08) calc(var(--p, 0) * 360deg) 360deg
+    );
+    -webkit-mask: radial-gradient(circle, transparent 60%, #000 62%);
+            mask: radial-gradient(circle, transparent 60%, #000 62%);
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+}
+
 .poker-titlebar {
     max-width: 1480px;
     margin: 0 auto 14px;
@@ -119,28 +464,11 @@
 }
 
 .pk-sng-status {
-    position: absolute;
-    z-index: 3;
-    left: 50%;
-    top: 8%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 6px;
-    width: min(82%, 640px);
+    display: none;
 }
 
 .pk-sng-status span {
-    padding: 5px 8px;
-    border-radius: 999px;
-    background: rgba(3, 8, 12, 0.62);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: var(--text-secondary);
-    font-size: 11px;
-    font-weight: 950;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    display: none;
 }
 
 .pk-pot {
@@ -184,12 +512,39 @@
     font-weight: 950;
     font-size: 16px;
     border: 2px solid rgba(255, 255, 255, 0.1);
-    animation: pkCardDeal 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 
 @keyframes pkCardDeal {
-    from { transform: translateY(-40px) rotate(-15deg) scale(0.8); opacity: 0; }
-    to { transform: translateY(0) rotate(0) scale(1); opacity: 1; }
+    0% {
+        transform: translateY(-60px) rotate(-180deg) scale(0.6);
+        opacity: 0;
+        filter: brightness(1.4) drop-shadow(0 0 12px rgba(255, 207, 90, 0.6));
+    }
+    50% {
+        transform: translateY(0) rotate(-90deg) scale(0.92);
+        opacity: 1;
+        filter: brightness(1.2);
+    }
+    80% {
+        transform: translateY(0) rotate(-8deg) scale(1.04);
+    }
+    100% {
+        transform: translateY(0) rotate(0) scale(1);
+        opacity: 1;
+        filter: brightness(1);
+    }
+}
+
+/* Hole-card flip: snap a brief reveal animation when the card content
+   transitions from hidden to face-up at showdown. */
+.pk-card:not(.empty):not(.hidden) {
+    animation: pkCardDeal 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pk-card:not(.empty):not(.hidden) {
+        animation: none;
+    }
 }
 
 .pk-card.red { color: #c93237; }
@@ -496,6 +851,89 @@
     .poker-layout { grid-template-columns: 1fr; }
     .poker-chat { max-height: none; }
     .poker-sidebar { max-height: none; }
+}
+
+/* Wave 15: tablet and mobile responsive scaling */
+
+@media (max-width: 760px) {
+    .poker-page { padding: 8px; }
+    .poker-titlebar {
+        grid-template-columns: 1fr auto;
+        padding: 10px 12px;
+        gap: 10px;
+    }
+    .poker-titlebar h1 { font-size: 14px; line-height: 1.15; }
+    .poker-back { font-size: 10px; }
+    .poker-balance strong { font-size: 14px; }
+    .poker-balance span { font-size: 9px; }
+
+    .poker-lobby { padding: 22px 18px; margin: 24px auto; }
+    .poker-buyin-options {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pk-info-strip {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        padding: 6px 8px;
+    }
+    .pk-info-cell {
+        padding: 5px 8px;
+    }
+    .pk-info-cell strong { font-size: 12px; }
+    .pk-info-cell span { font-size: 8px; }
+    .pk-info-cashout,
+    .pk-info-topup {
+        grid-column: span 3;
+        height: 38px;
+    }
+
+    .poker-table { padding: 10px; }
+    .poker-table-felt {
+        aspect-ratio: 4 / 5;
+        border-width: 8px;
+        border-radius: 140px / 220px;
+    }
+    .pk-pot { font-size: 14px; padding: 4px 11px; }
+    .pk-board { gap: 4px; }
+    .pk-card { width: 38px; height: 56px; padding: 4px; font-size: 12px; }
+    .pk-rank { font-size: 13px; }
+    .pk-suit { font-size: 18px; }
+
+    .pk-seat {
+        padding: 5px 7px;
+        min-width: 70px;
+        gap: 3px;
+    }
+    .pk-avatar { width: 30px; height: 30px; }
+    .pk-seat-info .pk-name { font-size: 10px; }
+    .pk-seat-info .pk-stack { font-size: 10px; }
+    .pk-seat-info .pk-last { font-size: 9px; }
+    .pk-seat-cards .pk-card { width: 22px; height: 32px; padding: 2px; }
+    .pk-seat-cards .pk-rank { font-size: 9px; }
+    .pk-seat-cards .pk-suit { font-size: 11px; }
+    .pk-button-chip { width: 18px; height: 18px; font-size: 9px; }
+
+    .pk-actions { gap: 6px; margin-top: 12px; }
+    .pk-act { height: 42px; padding: 0 14px; font-size: 12px; }
+    .pk-raise { padding: 8px; gap: 6px; }
+    .pk-raise-presets button { padding: 5px 10px; font-size: 10px; }
+}
+
+@media (max-width: 480px) {
+    .poker-titlebar h1 { font-size: 12px; }
+    .pk-info-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pk-info-cashout,
+    .pk-info-topup { grid-column: span 2; }
+    .poker-table-felt {
+        aspect-ratio: 3 / 4;
+    }
+    .pk-card { width: 30px; height: 44px; padding: 3px; font-size: 10px; }
+    .pk-rank { font-size: 11px; }
+    .pk-suit { font-size: 14px; }
+    .pk-seat { min-width: 60px; padding: 4px 6px; }
+    .pk-seat-cards .pk-card { width: 18px; height: 26px; }
+    .pk-act { height: 38px; padding: 0 10px; font-size: 11px; }
 }
 
 /* === Tabbed sidebar === */

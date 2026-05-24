@@ -7,6 +7,16 @@
     min-width: 280px;
 }
 
+/* Wave 13: when the playfield already has a sibling aside (StatsOverlay,
+   HistoryDrawer), the EducationPanel inside the playfield duplicates that
+   metadata and squeezes the slot/game stage. Hide it on viewports that
+   already display the right-side aside. */
+@media (min-width: 1100px) {
+    .gs-playfield .education-panel {
+        display: none;
+    }
+}
+
 .education-panel-header {
     display: flex;
     justify-content: space-between;

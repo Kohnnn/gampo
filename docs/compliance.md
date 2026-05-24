@@ -16,7 +16,7 @@ GamPo is an educational fake-credit simulator. The compliance posture is intenti
 
 - Fake-credit ledger called Practice Credits / GC.
 - Educational copy explaining RTP, EV, vig, overround, volatility, hit frequency, bankroll risk.
-- Synthetic sportsbook fixtures, with a best-effort live read from a free public sports API (currently TheSportsDB) when available. The fetch is read-only and used only to populate fixture names; settlement is local and synthetic.
+- Synthetic sportsbook fixtures, with optional server-side provider reads for sports schedules and displayed odds. Provider data is read-only input; ticket acceptance and settlement stay local and synthetic.
 - Look-alike lobby rhythm and category rows inspired by mainstream crypto-casino UX patterns, written using GamPo's own CSS and assets.
 
 ## Wording sweeps
@@ -36,4 +36,10 @@ If these appear in user-facing surfaces, rewrite them as practice-credit equival
 
 ## Sportsbook fetch
 
-`SportsPage.jsx` performs one optional fetch to TheSportsDB's public endpoint to enrich the fixture list with real club names. It does not stake real money against the live data, does not transmit any user data, and falls back silently to fully synthetic fixtures.
+`/sports` is a fake-credit sportsbook simulator. `SportsPage.jsx` is a thin wrapper around `src/sportsbook/*`.
+
+The local Vite proxy at `/api/sportsbook/free-feed` can read server-side provider tokens from `.env.local` and fetch SportsGameOdds, PandaScore, odds-api.io, and API-Football. Do not move these tokens into `VITE_` variables or expose token values in docs, browser code, logs, screenshots, or client bundles.
+
+The provider feed does not submit orders, collect user data, or settle against provider markets. It only populates event names, status, and displayed odds when available. The app falls back to The Odds API if configured and then to fully synthetic Gampo fixtures. All settlement remains deterministic local practice-credit simulation.
+
+The Odds Coach may analyze displayed prices, but its copy must stay educational and must not promise profitable prediction.

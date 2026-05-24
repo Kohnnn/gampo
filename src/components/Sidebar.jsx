@@ -41,33 +41,84 @@ const sidebarActions = [
         icon: 'pnl', label: 'PnL Stats',
         onClick: () => document.dispatchEvent(new CustomEvent('gampo:open-chat', { detail: { tab: 'stats' } })),
     },
+    {
+        icon: 'progress', label: 'Achievements',
+        onClick: () => document.dispatchEvent(new CustomEvent('gampo:open-chat', { detail: { tab: 'progress' } })),
+    },
 ]
 
+// Wave 17 regroup: keep Gampo originals on top under "Featured" + "Originals",
+// then surface Slots / Tables / Cards / Arcade with the full catalog. Each
+// group's open-by-default state is set so Featured + Slots show by default.
 const gameItems = [
+    // Featured (Gampo originals — always on top)
     { group: 'Featured', icon: 'poker', label: 'Live Poker', path: '/poker' },
     { group: 'Featured', icon: 'crash', label: 'Crash', path: '/crash' },
     { group: 'Featured', icon: 'plinko', label: 'Plinko', path: '/plinko' },
     { group: 'Featured', icon: 'mines', label: 'Mines', path: '/mines' },
+    { group: 'Featured', icon: 'dice', label: 'Dice', path: '/dice' },
+    { group: 'Featured', icon: 'limbo', label: 'Limbo', path: '/limbo' },
+    { group: 'Featured', icon: 'keno', label: 'Keno', path: '/keno' },
+    { group: 'Featured', icon: 'wheel', label: 'Wheel', path: '/wheel' },
+
+    // Originals (extended Gampo arcade originals)
     { group: 'Originals', icon: 'dino', label: 'Dino Run', path: '/dino' },
-    { group: 'Originals', icon: 'dice', label: 'Dice', path: '/dice' },
-    { group: 'Originals', icon: 'limbo', label: 'Limbo', path: '/limbo' },
-    { group: 'Originals', icon: 'keno', label: 'Keno', path: '/keno' },
-    { group: 'Originals', icon: 'wheel', label: 'Wheel', path: '/wheel' },
+    { group: 'Originals', icon: 'tower', label: 'Tower', path: '/tower' },
+    { group: 'Originals', icon: 'chickencross', label: 'Chicken Cross', path: '/chickencross' },
+    { group: 'Originals', icon: 'coinflip', label: 'Coin Flip', path: '/coinflip' },
+    { group: 'Originals', icon: 'rps', label: 'RPS', path: '/rps' },
+    { group: 'Originals', icon: 'guess', label: 'Guess Number', path: '/guess' },
+    { group: 'Originals', icon: 'color', label: 'Color Pick', path: '/color' },
+    { group: 'Originals', icon: 'lottery', label: 'Lottery', path: '/lottery' },
+
+    // Slots (factory + 20 templates)
+    { group: 'Slots', icon: 'slots', label: 'Slot Factory', path: '/slots' },
+    { group: 'Slots', icon: 'slots', label: 'Vault Rush', path: '/slots' },
+    { group: 'Slots', icon: 'slots', label: 'River Catcher', path: '/slots' },
+    { group: 'Slots', icon: 'slots', label: 'Dust Rail Bounty', path: '/slots' },
+    { group: 'Slots', icon: 'slots', label: 'Storm Banner', path: '/slots' },
+    { group: 'Slots', icon: 'slots', label: 'Bassline Bonus', path: '/slots' },
+    { group: 'Slots', icon: 'slots', label: 'Scarab Spin', path: '/scarab-spin' },
+    { group: 'Slots', icon: 'slots', label: 'Bars', path: '/bars' },
+    { group: 'Slots', icon: 'slots', label: 'Blue Samurai', path: '/blue-samurai' },
+    { group: 'Slots', icon: 'slots', label: 'Wanted Revelation', path: '/wanted-revelation' },
+    { group: 'Slots', icon: 'slots', label: 'Gates of Ascent', path: '/gates-ascent' },
+    { group: 'Slots', icon: 'slots', label: 'Bass Bayou', path: '/bass-bayou' },
+    { group: 'Slots', icon: 'slots', label: 'Mummy Cascade', path: '/mummy-cascade' },
+    { group: 'Slots', icon: 'slots', label: 'Phoenix Megaways', path: '/phoenix-megaways' },
+    { group: 'Slots', icon: 'slots', label: 'Mansion Megaways', path: '/mansion-megaways' },
+    { group: 'Slots', icon: 'slots', label: 'Ghostblade Strike', path: '/ghostblade-strike' },
+    { group: 'Slots', icon: 'slots', label: 'Iron Fist', path: '/iron-fist' },
+    { group: 'Slots', icon: 'slots', label: 'Coop Cluck', path: '/coop-cluck' },
+    { group: 'Slots', icon: 'slots', label: 'Miko Spirit', path: '/miko-spirit' },
+    { group: 'Slots', icon: 'slots', label: 'Forge Anvil', path: '/forge-anvil' },
+    { group: 'Slots', icon: 'slots', label: 'Gummy Drops', path: '/gummy-drops' },
+
+    // Tables
     { group: 'Tables', icon: 'roulette', label: 'Roulette', path: '/roulette' },
     { group: 'Tables', icon: 'blackjack', label: 'Blackjack', path: '/blackjack' },
     { group: 'Tables', icon: 'baccarat', label: 'Baccarat', path: '/baccarat' },
     { group: 'Tables', icon: 'war', label: 'Casino War', path: '/war' },
     { group: 'Tables', icon: 'sicbo', label: 'Sic Bo', path: '/sicbo' },
+
+    // Cards
     { group: 'Cards', icon: 'videopoker', label: 'Video Poker', path: '/videopoker' },
     { group: 'Cards', icon: 'hilo', label: 'Hi-Lo Cards', path: '/hilo' },
-    { group: 'Arcade', icon: 'color', label: 'Color Pick', path: '/color' },
-    { group: 'Arcade', icon: 'tower', label: 'Tower', path: '/tower' },
-    { group: 'Arcade', icon: 'chickencross', label: 'Chicken Cross', path: '/chickencross' },
-    { group: 'Arcade', icon: 'lottery', label: 'Lottery', path: '/lottery' },
-    { group: 'Arcade', icon: 'slots', label: 'Slots', path: '/slots' },
-    { group: 'Arcade', icon: 'coinflip', label: 'Coin Flip', path: '/coinflip' },
-    { group: 'Arcade', icon: 'rps', label: 'RPS', path: '/rps' },
-    { group: 'Arcade', icon: 'guess', label: 'Guess Number', path: '/guess' },
+
+    // Arcade (newer originals + cases)
+    { group: 'Arcade', icon: 'slots', label: 'Cases', path: '/cases' },
+    { group: 'Arcade', icon: 'slots', label: 'Drill', path: '/drill' },
+    { group: 'Arcade', icon: 'slots', label: 'Packs', path: '/packs' },
+    { group: 'Arcade', icon: 'slots', label: 'Tome of Life', path: '/tomeoflife' },
+    { group: 'Arcade', icon: 'slots', label: 'Tarot', path: '/tarot' },
+    { group: 'Arcade', icon: 'slots', label: 'Flip', path: '/flip' },
+    { group: 'Arcade', icon: 'slots', label: 'Diamonds', path: '/diamonds' },
+    { group: 'Arcade', icon: 'slots', label: 'Darts', path: '/darts' },
+    { group: 'Arcade', icon: 'slots', label: 'Pump', path: '/pump' },
+    { group: 'Arcade', icon: 'slots', label: 'Slide', path: '/slide' },
+    { group: 'Arcade', icon: 'slots', label: 'Moles', path: '/moles' },
+    { group: 'Arcade', icon: 'slots', label: 'Snakes', path: '/snakes' },
+    { group: 'Arcade', icon: 'slots', label: 'Collections', path: '/collections' },
 ]
 
 // SVG glyphs (stroked outlines). 24x24 viewBox.
@@ -89,6 +140,7 @@ const icons = {
     // actions
     chat:        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z" />,
     pnl:         <path d="M3 17h4v4H3v-4zm6-6h4v10H9V11zm6-8h4v18h-4V3z" />,
+    progress:    <path d="M12 2 9.6 7.5 4 8.3l4.1 3.9L7 18l5-2.6L17 18l-1.1-5.8L20 8.3l-5.6-.8L12 2z" />,
 
     // games
     crash:       <path d="M14 2h7v7l-3-3-5 5-3-3-7 7L2 13l9-9 3 3 0 -5z" />,
@@ -189,11 +241,11 @@ function Sidebar({ isOpen, toggleSidebar }) {
                         <input value={gameSearch} onChange={e => setGameSearch(e.target.value)} placeholder="Crash, poker, cards..." />
                     </label>
                     {Object.entries(groupedGames).map(([group, items]) => (
-                        <details key={group} className="nav-game-group" open={group === 'Featured' || gameSearch.trim()}>
+                        <details key={group} className="nav-game-group" open={group === 'Featured' || group === 'Slots' || gameSearch.trim()}>
                             <summary>{group}<b>{items.length}</b></summary>
                             {items.map((item) => (
                                 <NavLink
-                                    key={item.path}
+                                    key={`${group}-${item.label}-${item.path}`}
                                     to={item.path}
                                     title={item.label}
                                     className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}

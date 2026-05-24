@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import Header from './Header'
 import Sidebar from './Sidebar'
 import ChatDock from './ChatDock'
+import AchievementToast from './AchievementToast'
 
 const SIDEBAR_KEY = 'gampo_sidebar_open'
 
@@ -36,6 +37,7 @@ function Layout() {
                 </main>
             </div>
             <ChatDock />
+            <AchievementToast />
         </div>
     )
 }

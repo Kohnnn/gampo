@@ -13,7 +13,7 @@ GamPo is an educational, fake-credit casino and sportsbook simulator. The goal i
 - `games/originals.md` - originals games, math, RTP, payouts.
 - `games/casino.md` - card and table games (blackjack, baccarat, roulette, war).
 - `games/slots.md` - slots variants, themes, math model.
-- `games/sportsbook.md` - sportsbook lab, fixtures, parlay/system math.
+- `games/sportsbook.md` - fake-credit sportsbook, provider fallback, odds education, parlay/system math.
 
 ## Read this first
 

@@ -20,6 +20,12 @@ const TEMPLATES = {
     'mummy-cascade': 'mummy',
     'phoenix-megaways': 'phoenix',
     'mansion-megaways': 'mansion',
+    'ghostblade-strike': 'ronin',
+    'iron-fist': 'iron',
+    'coop-cluck': 'coop',
+    'miko-spirit': 'spirit',
+    'forge-anvil': 'forge',
+    'gummy-drops': 'gummy',
 }
 
 const SYMBOL_STYLE = [
