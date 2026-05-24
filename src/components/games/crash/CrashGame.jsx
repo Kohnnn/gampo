@@ -6,23 +6,40 @@
 // Visuals: canvas chart with rocket/exhaust sprites + explosion GIF on crash.
 // A small simulated "other players" strip is sampled per round.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, clamp } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useTremor, triggerTremor } from '../../../utils/tremor'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import {
+    BetPanel,
+    BigWinOverlay,
+    GameShell,
+    HistoryDrawer,
+    RecentResultsStrip,
+    StatsOverlay,
+    useGameSession,
+    MultiplierBadge,
+    ResultToast,
+    ActionLockOverlay,
+    CoreStageFrame,
+    ROUND_EVENTS,
+    buildEvents,
+    useRoundMachine,
+} from '../primitives'
+import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import CrashChart from './CrashChart'
-import PlayerStrip from './PlayerStrip'
 import './crash.css'
 
 const HOUSE_EDGE = 0.01
 const TARGET_PRESETS = [1.25, 1.5, 2, 3, 5, 10, 25, 50, 100]
+const BETTING_OPEN_MS = 3500
 
 function rollCrashMultiplier(uniform) {
     const u = Math.max(1e-9, Math.min(1 - 1e-9, uniform))
@@ -31,9 +48,24 @@ function rollCrashMultiplier(uniform) {
     return Math.max(1.0, Math.floor(m * 100) / 100)
 }
 
-// Time → multiplier curve. ~1.06× per second.
+// Time → multiplier curve, Rainbet-style. Slow ease-in for first 5s
+// (~1.07× per second) then accelerates (~1.10× per second) so big rounds
+// build tension faster.
 function multiplierAt(t) {
-    return Math.max(1, Math.pow(1.06, t))
+    if (t <= 0) return 1
+    if (t < 5) return Math.pow(1.07, t)
+    return Math.pow(1.07, 5) * Math.pow(1.10, t - 5)
+}
+
+// Inverse of multiplierAt. Used to bake a deterministic event timeline
+// when we know the bust target up front.
+function solveBustTimeSec(bust) {
+    if (bust <= 1) return 0
+    const fiveSecPeak = Math.pow(1.07, 5)
+    if (bust <= fiveSecPeak) {
+        return Math.log(bust) / Math.log(1.07)
+    }
+    return 5 + Math.log(bust / fiveSecPeak) / Math.log(1.10)
 }
 
 const SIM_NAMES = ['Lyra', 'Reno', 'Kaia', 'Ozzy', 'Nia', 'Vex', 'Mika', 'Juno', 'Sable', 'Rune', 'Pixie', 'Quark', 'Tess', 'Echo', 'Wynn', 'Zev', 'Mira', 'Lev', 'Kit', 'Rhea']
@@ -66,7 +98,9 @@ export default function CrashGame() {
     const definition = findGameDefinition('crash') || { name: 'Crash', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('crash')
     const session = useGameSession('crash-shell')
+    const preloader = useOriginalsPreloader('crash')
 
     const [phase, setPhase] = useState('idle')
     const [multiplier, setMultiplier] = useState(1)
@@ -74,19 +108,54 @@ export default function CrashGame() {
     const [target, setTarget] = useState(2)
     const [crashedAt, setCrashedAt] = useState(null)
     const [cashedAt, setCashedAt] = useState(null)
+    const [missedAt, setMissedAt] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [burstKey, setBurstKey] = useState(0)
     const [lastBet, setLastBet] = useState(null)
     const [players, setPlayers] = useState(() => simulatePlayers(2.2))
+    const [bettingMs, setBettingMs] = useState(0)
+    const [pendingBet, setPendingBet] = useState(null)
+    const [toast, setToast] = useState(null)
 
     const tickRef = useRef(null)
     const startTsRef = useRef(0)
     const bustRef = useRef(0)
     const settleRef = useRef(null)
+    const cashoutRef = useRef(null)
     const stakeRef = useRef(0)
     const screenRef = useTremor()
     const lastTickMultRef = useRef(1)
+    const bettingDeadlineRef = useRef(0)
+    const bettingTickRef = useRef(null)
+    const pendingResolveRef = useRef(null)
     const { schedule, cancelAll } = useCancellableTimeouts()
+
+    // Wave 2 deterministic round machine. Crash drives the multiplier
+    // through pre-baked events: betting countdown, ramp checkpoints, bust
+    // marker, result. The 60fps rAF still drives smooth multiplier
+    // animation on top of the event timeline so the chart stays smooth.
+    const handleEvent = useCallback((ev) => {
+        if (!ev) return
+        switch (ev.type) {
+            case ROUND_EVENTS.ANIMATION_CHECKPOINT:
+                if (ev.payload?.kind === 'tick') sfx.play('tick')
+                break
+            case ROUND_EVENTS.ROUND_RESULT: {
+                const { kind, profit, multiplier: m } = ev.payload || {}
+                if (kind === 'cashed') {
+                    setToast({ kind: 'cashout', amount: profit, multiplier: m, message: 'Cashed out' })
+                    sfx.play('cashout')
+                } else if (kind === 'bust') {
+                    setToast({ kind: 'lose', amount: -Math.abs(profit), message: `Crashed ${m.toFixed(2)}x` })
+                    sfx.play('lose')
+                }
+                break
+            }
+            default:
+                break
+        }
+    }, [sfx])
+    const machine = useRoundMachine({ onEvent: handleEvent })
 
     useEffect(() => () => {
         if (tickRef.current) window.cancelAnimationFrame(tickRef.current)
@@ -114,7 +183,7 @@ export default function CrashGame() {
     }, [phase])
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (phase === 'running') { resolve({ profit: 0 }); return }
+        if (phase === 'running' || phase === 'cashed' || phase === 'betting') { resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Crash')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`)
             resolve({ profit: 0 }); return
@@ -128,86 +197,201 @@ export default function CrashGame() {
         setPlayers(simulatePlayers(bust))
         setCrashedAt(null)
         setCashedAt(null)
+        setMissedAt(null)
         setMultiplier(1)
         setElapsed(0)
-        setPhase('running')
-        startTsRef.current = performance.now()
+        setPendingBet(betAmount)
+        setToast(null)
+        cashoutRef.current = null
+        // Start a Rainbet-style "Betting open" countdown. Sim players visibly
+        // queue bets during this window. The actual round (rocket flight)
+        // doesn't start until the countdown elapses.
+        setPhase('betting')
+        bettingDeadlineRef.current = performance.now() + BETTING_OPEN_MS
+        setBettingMs(BETTING_OPEN_MS)
         playSound('tick')
+        sfx.play('click')
+        pendingResolveRef.current = resolve
 
-        settleRef.current = (outcome) => {
-            settleRef.current = null
-            if (tickRef.current) { window.cancelAnimationFrame(tickRef.current); tickRef.current = null }
-            const profit = outcome.profit
-            const eff = outcome.effective
-            session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-                label: outcome.cashed ? `Cashed ${eff.toFixed(2)}×` : `Bust ${bust.toFixed(2)}×`,
-                profit, betAmount,
-                multiplier: outcome.cashed ? eff : 0,
-                meta: { bust, cashedAt: outcome.cashed ? eff : null },
-            })
-            if (outcome.cashed) {
-                addWinnings(betAmount * eff, 'Crash return')
-                if (eff >= 5) {
+        // Wave 2 deterministic event timeline. The bust point and result
+        // are computed up front; visual rAF below renders the smooth
+        // multiplier on top of these events.
+        const bustTimeSec = solveBustTimeSec(bust)
+        const busts = bustTimeSec * 1000
+        const events = buildEvents(api => {
+            api.push(ROUND_EVENTS.ROUND_START, { bust, betAmount, target }, 0)
+            api.push(ROUND_EVENTS.INPUT_LOCK, {}, 0)
+            api.push(ROUND_EVENTS.BET_ACCEPTED, { betAmount, bettingMs: BETTING_OPEN_MS }, 0)
+            // Periodic checkpoints so audio + replay tooling can scrub.
+            const checkpointEvery = 350
+            for (let off = checkpointEvery; off < busts; off += checkpointEvery) {
+                const tSec = off / 1000
+                api.push(ROUND_EVENTS.MULTIPLIER_UPDATE, { value: multiplierAt(tSec) }, BETTING_OPEN_MS + off)
+                api.push(ROUND_EVENTS.ANIMATION_CHECKPOINT, { kind: 'tick' }, BETTING_OPEN_MS + off)
+            }
+            api.push(ROUND_EVENTS.RNG_REVEAL, { bust }, BETTING_OPEN_MS + busts)
+        })
+        machine.start(events, { autoFinish: false })
+
+        const beat = () => {
+            const remaining = Math.max(0, bettingDeadlineRef.current - performance.now())
+            setBettingMs(remaining)
+            if (remaining <= 0) {
+                if (bettingTickRef.current) { window.cancelAnimationFrame(bettingTickRef.current); bettingTickRef.current = null }
+                startRound()
+                return
+            }
+            bettingTickRef.current = window.requestAnimationFrame(beat)
+        }
+        bettingTickRef.current = window.requestAnimationFrame(beat)
+
+        const startRound = () => {
+            setPhase('running')
+            setBettingMs(0)
+            setPendingBet(null)
+            const betAmount = stakeRef.current
+            const bust = bustRef.current
+            startTsRef.current = performance.now()
+
+            settleRef.current = (outcome) => {
+                settleRef.current = null
+                if (tickRef.current) { window.cancelAnimationFrame(tickRef.current); tickRef.current = null }
+                const profit = outcome.profit
+                const eff = outcome.effective
+                session.record({
+                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    label: outcome.cashed ? `Cashed ${eff.toFixed(2)}×` : `Bust ${bust.toFixed(2)}×`,
+                    profit, betAmount,
+                    multiplier: outcome.cashed ? eff : 0,
+                    meta: { bust, cashedAt: outcome.cashed ? eff : null },
+                })
+                if (outcome.cashed) {
+                    if (eff >= 5) {
+                        playSound('bigwin')
+                        setBigWin({ trigger: Date.now(), profit, multiplier: eff })
+                        triggerTremor(screenRef, 'lg')
+                    } else {
+                        playSound('win')
+                    }
+                } else {
+                    playSound('explode')
+                    triggerTremor(screenRef, 'lg')
+                    setPhase('crashed')
+                }
+                showToast(profit >= 0 ? 'win' : 'loss', outcome.cashed ? 'Cashed out' : 'Crashed', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+                machine.finish({
+                    kind: outcome.cashed ? 'cashed' : 'bust',
+                    profit,
+                    multiplier: eff,
+                    bust,
+                })
+                schedule(() => setPhase('idle'), 1400)
+                cashoutRef.current = null
+                pendingResolveRef.current = null
+                resolve({ profit })
+            }
+
+            const cashRound = (m) => {
+                if (cashoutRef.current || !settleRef.current) return false
+                const effective = Number(m.toFixed(2))
+                const profit = stakeRef.current * (effective - 1)
+                cashoutRef.current = { effective, profit }
+                setCashedAt(effective)
+                setPhase('cashed')
+                addWinnings(stakeRef.current * effective, 'Crash return')
+                session.record({
+                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    label: `Cashed ${effective.toFixed(2)}×`,
+                    profit,
+                    betAmount,
+                    multiplier: effective,
+                    meta: { bust, cashedAt: effective },
+                })
+                if (effective >= 5) {
                     playSound('bigwin')
-                    setBigWin({ trigger: Date.now(), profit, multiplier: eff })
+                    setBigWin({ trigger: Date.now(), profit, multiplier: effective })
                     triggerTremor(screenRef, 'lg')
                 } else {
                     playSound('win')
                 }
                 setBurstKey(k => k + 1)
-                setPhase('cashed')
-            } else {
-                playSound('explode')
-                triggerTremor(screenRef, 'lg')
-                setPhase('crashed')
+                showToast('win', 'Cashed out', `+${formatCredits(profit)}`)
+                return true
             }
-            showToast(profit >= 0 ? 'win' : 'loss', outcome.cashed ? 'Cashed out' : 'Crashed', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
-            schedule(() => setPhase('idle'), 1400)
-            resolve({ profit })
-        }
 
-        const tick = () => {
-            const now = performance.now()
-            const t = (now - startTsRef.current) / 1000
-            const m = multiplierAt(t)
-            setElapsed(t)
-            if (m >= target && target > 1.0 && bustRef.current >= target) {
-                setMultiplier(target)
-                setCashedAt(target)
-                const profit = stakeRef.current * (target - 1)
-                settleRef.current?.({ cashed: true, effective: target, profit })
-                return
+            const tick = () => {
+                const now = performance.now()
+                const t = (now - startTsRef.current) / 1000
+                const m = multiplierAt(t)
+                setElapsed(t)
+                if (!cashoutRef.current && m >= target && target > 1.0 && bustRef.current >= target) {
+                    cashRound(target)
+                }
+                if (m >= bustRef.current) {
+                    setMultiplier(bustRef.current)
+                    setCrashedAt(bustRef.current)
+                    if (cashoutRef.current) {
+                        setMissedAt(bustRef.current)
+                        playSound('explode')
+                        settleRef.current = null
+                        if (tickRef.current) { window.cancelAnimationFrame(tickRef.current); tickRef.current = null }
+                        schedule(() => setPhase('idle'), 2200)
+                        const cashedProfit = cashoutRef.current.profit
+                        cashoutRef.current = null
+                        pendingResolveRef.current = null
+                        resolve({ profit: cashedProfit })
+                    } else {
+                        settleRef.current?.({ cashed: false, effective: bustRef.current, profit: -stakeRef.current })
+                    }
+                    return
+                }
+                // Per-0.1× tick audio for tactile feel.
+                if (m - lastTickMultRef.current >= 0.1) {
+                    lastTickMultRef.current = m
+                    playSound('tick')
+                }
+                setMultiplier(m)
+                tickRef.current = window.requestAnimationFrame(tick)
             }
-            if (m >= bustRef.current) {
-                setMultiplier(bustRef.current)
-                setCrashedAt(bustRef.current)
-                settleRef.current?.({ cashed: false, effective: bustRef.current, profit: -stakeRef.current })
-                return
-            }
-            // Per-0.1× tick audio for tactile feel.
-            if (m - lastTickMultRef.current >= 0.1) {
-                lastTickMultRef.current = m
-                playSound('tick')
-            }
-            setMultiplier(m)
+            lastTickMultRef.current = 1
             tickRef.current = window.requestAnimationFrame(tick)
         }
-        lastTickMultRef.current = 1
-        tickRef.current = window.requestAnimationFrame(tick)
     })
 
     const cashOut = () => {
         if (phase !== 'running') return
         const m = multiplier
-        setCashedAt(m)
-        const profit = stakeRef.current * (m - 1)
-        settleRef.current?.({ cashed: true, effective: m, profit })
+        const effective = Number(m.toFixed(2))
+        if (cashoutRef.current || !settleRef.current) return
+        const profit = stakeRef.current * (effective - 1)
+        cashoutRef.current = { effective, profit }
+        setCashedAt(effective)
+        setPhase('cashed')
+        addWinnings(stakeRef.current * effective, 'Crash return')
+        session.record({
+            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            label: `Cashed ${effective.toFixed(2)}×`,
+            profit,
+            betAmount: stakeRef.current,
+            multiplier: effective,
+            meta: { bust: bustRef.current, cashedAt: effective },
+        })
+        if (effective >= 5) {
+            playSound('bigwin')
+            setBigWin({ trigger: Date.now(), profit, multiplier: effective })
+            triggerTremor(screenRef, 'lg')
+        } else {
+            playSound('win')
+        }
+        setBurstKey(k => k + 1)
+        showToast('win', 'Cashed out', `+${formatCredits(profit)}`)
+        machine.finish({ kind: 'cashed', profit, multiplier: effective, bust: bustRef.current })
     }
 
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
-    const inRound = phase === 'running'
-    const tagText = phase === 'crashed' ? 'BUST' : phase === 'cashed' ? 'CASHED' : null
+    const inRound = phase === 'running' || phase === 'cashed' || phase === 'betting'
+    const tagText = phase === 'crashed' ? 'BUST' : phase === 'cashed' ? 'CASHED - STILL FLYING' : phase === 'betting' ? 'BETTING OPEN' : null
+    const bettingSeconds = (bettingMs / 1000).toFixed(1)
 
     return (
         <GameShell
@@ -215,6 +399,7 @@ export default function CrashGame() {
             balance={balance}
             accent="#ff7ab6"
             backdrop="/assets/games/backdrops/backdrop-stars.png"
+            variant="stake"
             panel={
                 <BetPanel
                     balance={balance}
@@ -263,22 +448,65 @@ export default function CrashGame() {
                 </>
             }
         >
-            <div className={`crash-stage phase-${phase}`}>
-                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                <div ref={screenRef} className={`crash-screen ${phase === 'crashed' ? 'busted' : ''} ${phase === 'cashed' ? 'cashed' : ''}`}>
-                    <CrashChart phase={phase} multiplier={multiplier} elapsedTime={elapsed} />
-                    <div className="crash-mult">
-                        <span className="crash-mult-num">{multiplier.toFixed(2)}<span className="crash-mult-x">×</span></span>
-                        {tagText && <span className={`crash-tag ${phase === 'cashed' ? 'good' : ''}`}>{tagText}</span>}
+            <CoreStageFrame minHeight={580} maxWidth={960} loading={!preloader.ready} className="crash-stage-frame">
+                <div className={`crash-stage phase-${phase}`}>
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <div className="crash-deck">
+                        <div ref={screenRef} className={`crash-screen ${phase === 'crashed' ? 'busted' : ''} ${phase === 'cashed' ? 'cashed' : ''} ${phase === 'betting' ? 'betting' : ''}`}>
+                            <CrashChart phase={phase === 'betting' ? 'idle' : phase} multiplier={multiplier} elapsedTime={elapsed} players={players} />
+                            <div className="crash-mult">
+                                {phase === 'betting' ? (
+                                    <>
+                                        <span className="crash-countdown">{bettingSeconds}s</span>
+                                        <span className="crash-tag">BETTING OPEN</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="crash-mult-num">{multiplier.toFixed(2)}<span className="crash-mult-x">×</span></span>
+                                        {tagText && <span className={`crash-tag ${phase === 'cashed' ? 'good' : ''}`}>{tagText}</span>}
+                                        {cashedAt && phase === 'cashed' && <span className="crash-missed">You locked {cashedAt.toFixed(2)}×. Current miss: {Math.max(0, multiplier - cashedAt).toFixed(2)}×</span>}
+                                        {missedAt && <span className="crash-missed danger">Missed runway: {missedAt.toFixed(2)}×</span>}
+                                    </>
+                                )}
+                            </div>
+                            {burstKey > 0 && phase === 'cashed' && <Particles key={burstKey} count={20} color="#ff7ab6" />}
+                        </div>
+                        <aside className="crash-side-rail" aria-label="Live crash players">
+                            <div className="crash-rail-head">
+                                <span>Live bets</span>
+                                <strong>{players.length}</strong>
+                            </div>
+                            <ul>
+                                {players.map(p => {
+                                    const liveCashed = (phase === 'running' || phase === 'cashed') && p.cashed && multiplier >= p.target
+                                    const isBetting = phase === 'betting'
+                                    const state = isBetting ? 'pending' : liveCashed ? 'cashed' : phase === 'crashed' ? (p.cashed ? 'cashed' : 'busted') : 'flying'
+                                    return (
+                                        <li key={p.id} className={state}>
+                                            <span className="crash-rail-dot" style={{ background: p.color }} />
+                                            <span className="crash-rail-name">{p.name}</span>
+                                            <span className="crash-rail-bet">{p.bet.toFixed(2)}</span>
+                                            <span className="crash-rail-target">@{p.target.toFixed(2)}×</span>
+                                            <strong>
+                                                {isBetting ? 'queued'
+                                                    : state === 'cashed' ? `+${(p.bet * (p.cashedAt - 1)).toFixed(2)}`
+                                                    : state === 'busted' ? `-${p.bet.toFixed(2)}`
+                                                    : 'live'}
+                                            </strong>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
+                        </aside>
                     </div>
-                    {burstKey > 0 && phase === 'cashed' && <Particles key={burstKey} count={20} color="#ff7ab6" />}
+                    <div className="crash-meta">
+                        <MultiplierBadge label="Target" value={target} state={inRound ? 'active' : 'idle'} size="sm" />
+                        <span>{phase === 'betting' ? `Round opens in ${bettingSeconds}s` : phase === 'crashed' ? `Last bust ${crashedAt?.toFixed(2)}×` : phase === 'cashed' ? `Cashed ${cashedAt?.toFixed(2)}×` : phase === 'running' ? `Live ${multiplier.toFixed(2)}×` : 'Stable'}</span>
+                    </div>
+                    <ActionLockOverlay active={phase === 'crashed'} label="Bust" />
+                    <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
-                <div className="crash-meta">
-                    <span>Target <strong>{target.toFixed(2)}×</strong></span>
-                    <span>{phase === 'crashed' ? `Last bust ${crashedAt?.toFixed(2)}×` : phase === 'cashed' ? `Cashed ${cashedAt?.toFixed(2)}×` : phase === 'running' ? `Live ${multiplier.toFixed(2)}×` : 'Stable'}</span>
-                </div>
-                <PlayerStrip players={players} phase={phase} multiplier={multiplier} />
-            </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={(1 - HOUSE_EDGE) / target} payoutMultiplier={target} balance={balance} recentProfit={recentProfit} />
         </GameShell>

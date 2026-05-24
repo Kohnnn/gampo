@@ -36,9 +36,19 @@
 }
 .poker-lobby h2 { color: var(--text-primary); margin: 0 0 8px; font-size: 24px; }
 .poker-lobby p { color: var(--text-secondary); margin: 0 0 20px; font-size: 14px; line-height: 1.5; }
+.pk-lobby-note {
+    margin: 0 0 14px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: rgba(109, 183, 255, 0.12);
+    border: 1px solid rgba(109, 183, 255, 0.32);
+    color: var(--bet-marker);
+    font-size: 12px;
+    font-weight: 900;
+}
 .poker-buyin-options {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
     margin-bottom: 18px;
 }
@@ -106,6 +116,31 @@
         inset 0 4px 12px rgba(255, 255, 255, 0.06),
         0 24px 56px rgba(0, 0, 0, 0.5);
     overflow: hidden;
+}
+
+.pk-sng-status {
+    position: absolute;
+    z-index: 3;
+    left: 50%;
+    top: 8%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    width: min(82%, 640px);
+}
+
+.pk-sng-status span {
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: rgba(3, 8, 12, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .pk-pot {
@@ -780,6 +815,59 @@
 .gto-mini-bars .bar.raise { background: #ed4245; }
 .gto-mini-bars .bar.call  { background: #00b428; }
 .gto-mini-bars .bar.fold  { background: rgba(255, 255, 255, 0.16); }
+
+.gto-insight-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.gto-insight-grid div,
+.gto-ev-deltas span {
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 7px 8px;
+}
+
+.gto-insight-grid span,
+.gto-ev-deltas span {
+    color: var(--text-muted);
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.gto-insight-grid strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 950;
+}
+
+.gto-ev-deltas {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.gto-ev-deltas span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.gto-ev-deltas b {
+    color: var(--text-primary);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.gto-ev-deltas .raise b { color: #ff7a7c; }
+.gto-ev-deltas .call b { color: #2af04a; }
+.gto-ev-deltas .fold b { color: var(--text-secondary); }
 
 .gto-metric-grid {
     display: grid;

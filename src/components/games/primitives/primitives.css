@@ -424,7 +424,7 @@ input:focus-visible,
 
 .so-pill.win { color: var(--accent-green); background: rgba(0, 231, 1, 0.18); border-color: rgba(0, 231, 1, 0.3); }
 .so-pill.loss { color: var(--accent-red); background: rgba(237, 66, 69, 0.18); border-color: rgba(237, 66, 69, 0.3); }
-.so-pill.push { color: #ffcf5a; background: rgba(255, 207, 90, 0.18); border-color: rgba(255, 207, 90, 0.3); }
+.so-pill.push { color: #9cc8ff; background: rgba(109, 183, 255, 0.14); border-color: rgba(109, 183, 255, 0.26); }
 
 .so-empty {
     color: var(--text-secondary);
@@ -521,7 +521,7 @@ input:focus-visible,
 
 .hd-row.win { border-left-color: var(--accent-green); }
 .hd-row.loss { border-left-color: var(--accent-red); }
-.hd-row.push { border-left-color: #ffcf5a; }
+.hd-row.push { border-left-color: #6db7ff; }
 
 .hd-label {
     color: var(--text-primary);
@@ -726,15 +726,15 @@ input:focus-visible,
     width: 18px;
     height: 4px;
     border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #ffe680, #c98e1e 60%);
+    background: radial-gradient(circle at 35% 30%, #eef6ff, #6db7ff 60%);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
     margin-top: -2px;
     border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 .chip-stack-overlay .chip-amount {
-    background: radial-gradient(circle at 35% 30%, #ffe680, #c98e1e 60%);
-    color: #1a1a1a;
+    background: radial-gradient(circle at 35% 30%, #eef6ff, #6db7ff 60%);
+    color: #06121b;
     border-radius: 50%;
     width: 22px;
     height: 22px;
@@ -1135,7 +1135,7 @@ input:focus-visible,
 
 .bml-row.bml-win .bml-value { color: var(--accent-green); }
 .bml-row.bml-loss .bml-value { color: var(--accent-red); }
-.bml-row.bml-warn .bml-value { color: var(--accent-yellow); }
+.bml-row.bml-warn .bml-value { color: #9cc8ff; }
 
 /* === Mobile collapse: stacked layout with sticky bet panel at bottom === */
 
@@ -1289,3 +1289,294 @@ input:focus-visible,
 }
 .gampo-reduce-motion .hotkey-backdrop,
 .gampo-reduce-motion .hotkey-card { animation: none !important; }
+
+/* === Wave 1 Stake/Rainbet primitives === */
+
+/* SegmentedModeTabs */
+.seg-tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.seg-sm { padding: 3px; }
+.seg-lg { padding: 6px; }
+.seg-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-secondary, #b1bad3);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease, transform 80ms ease;
+}
+.seg-sm .seg-tab { height: 30px; font-size: 11px; padding: 0 10px; }
+.seg-lg .seg-tab { height: 40px; font-size: 13px; padding: 0 14px; }
+.seg-tab:hover:not(:disabled) { color: var(--text-primary, #fff); background: rgba(255, 255, 255, 0.04); }
+.seg-tab:active:not(:disabled) { transform: scale(0.98); }
+.seg-tab.active {
+    color: var(--text-primary, #fff);
+    background: rgba(0, 0, 0, 0.42);
+    border-color: var(--accent, #00e701);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
+}
+.seg-tab:disabled { opacity: 0.45; cursor: not-allowed; }
+.seg-tab-icon { display: inline-flex; }
+
+/* MultiplierBadge */
+.mx-badge {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text-primary, #fff);
+    font-variant-numeric: tabular-nums;
+    transition: border-color 160ms ease, background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+.mx-sm { padding: 6px 10px; }
+.mx-lg { padding: 12px 18px; }
+.mx-label {
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #b1bad3);
+}
+.mx-value {
+    font-size: 18px;
+    font-weight: 950;
+    line-height: 1;
+}
+.mx-sm .mx-value { font-size: 14px; }
+.mx-lg .mx-value { font-size: 28px; }
+.mx-active {
+    border-color: var(--accent, #00e701);
+    box-shadow: 0 0 18px -8px var(--accent, #00e701);
+}
+.mx-win {
+    border-color: #00e701;
+    background: rgba(0, 231, 1, 0.12);
+}
+.mx-bust {
+    border-color: #ed4245;
+    background: rgba(237, 66, 69, 0.12);
+}
+
+/* ResultToast */
+.rt-toast {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translate(-50%, -8px);
+    z-index: 12;
+    min-width: 180px;
+    max-width: 320px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(15, 22, 28, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary, #fff);
+    box-shadow: 0 14px 40px -16px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+.rt-toast.in {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+.rt-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+.rt-msg {
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary, #b1bad3);
+}
+.rt-mult {
+    font-size: 18px;
+    font-weight: 950;
+    color: var(--text-primary, #fff);
+    font-variant-numeric: tabular-nums;
+}
+.rt-amount {
+    margin-top: 4px;
+    font-size: 14px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.rt-win { border-color: rgba(0, 231, 1, 0.55); }
+.rt-win .rt-mult, .rt-win .rt-amount { color: #2af04a; }
+.rt-cashout { border-color: rgba(0, 165, 255, 0.55); }
+.rt-cashout .rt-mult, .rt-cashout .rt-amount { color: #65c8ff; }
+.rt-lose { border-color: rgba(237, 66, 69, 0.5); }
+.rt-lose .rt-amount { color: #ff7a7c; }
+.rt-push { border-color: rgba(255, 255, 255, 0.18); }
+
+/* ActionLockOverlay */
+.action-lock {
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 12px;
+    border-radius: inherit;
+}
+.action-lock.block { pointer-events: auto; cursor: not-allowed; background: rgba(0, 0, 0, 0.04); }
+.action-lock.pass { pointer-events: none; background: transparent; }
+.action-lock-label {
+    pointer-events: none;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--text-primary, #fff);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* CoreStageFrame */
+.core-stage {
+    position: relative;
+    width: 100%;
+    border-radius: 16px;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+}
+.core-stage-body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+.core-stage.is-loading .core-stage-body {
+    visibility: hidden;
+}
+.core-stage-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+}
+.core-stage-skeleton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+.core-stage-skeleton-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #b1bad3);
+}
+.core-stage-spinner {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--accent, #00e701);
+    animation: core-stage-spin 0.7s linear infinite;
+}
+@keyframes core-stage-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* AudioToggle */
+.audio-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--text-secondary, #b1bad3);
+    cursor: pointer;
+    transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.audio-toggle:hover { color: var(--text-primary, #fff); border-color: rgba(255, 255, 255, 0.18); }
+.audio-toggle.muted { color: rgba(237, 66, 69, 0.85); }
+
+/* GameShell variant tokens */
+.gs-variant-stake { --shell-tone: #1a2e39; }
+.gs-variant-rainbet { --shell-tone: #14182a; }
+
+/* === End Wave 1 primitives === */
+
+/* === Wave 5 Rainbet polish === */
+
+/* Tighter game titlebar + toolbar */
+.gs-titlebar {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.gs-titlebar h1 {
+    font-size: 18px;
+    letter-spacing: 0.01em;
+}
+
+.gs-titlebar small {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* Stronger stage framing */
+.core-stage {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+        0 18px 48px -24px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Tighter bet-panel sections */
+.bp-section {
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.bp-tabs { padding: 3px; }
+.bp-tab { height: 32px; font-size: 11px; }
+
+/* More visible recent-results rail */
+.recent-results-strip {
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.32);
+    border-radius: 10px;
+    box-shadow: 0 0 14px -10px rgba(255, 255, 255, 0.18);
+}
+
+/* === End Wave 5 polish === */

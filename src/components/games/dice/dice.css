@@ -177,7 +177,7 @@
 }
 
 .dice-meta-card.target strong { color: var(--accent-green); }
-.dice-meta-card.payout strong { color: #ffcf5a; }
+.dice-meta-card.payout strong { color: var(--bet-marker); }
 .dice-meta-card.chance strong { color: #58a6ff; }
 
 .dice-pips {

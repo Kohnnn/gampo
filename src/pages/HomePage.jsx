@@ -219,10 +219,13 @@ export function GameGrid({ games }) {
                 <Link key={game.id} to={game.path} className="casino-game-card" style={{ '--accent': game.accent || '#00e701' }}>
                     <div className="casino-game-art">
                         {game.image ? <img src={game.image} alt="" /> : <span>{game.name.slice(0, 2)}</span>}
+                        <div className="casino-game-titlemark">
+                            <span>{game.category?.split(' ')[0] || 'Game'}</span>
+                            <strong>{game.name}</strong>
+                        </div>
                     </div>
                     <div className="casino-game-body">
                         <span>{game.provider || game.category || 'GamPo Lab'}</span>
-                        <h2>{game.name}</h2>
                         <div>
                             <b>RTP {game.rtp ? `${(game.rtp * 100).toFixed(1)}%` : 'Lab'}</b>
                             <b>{game.volatility || 'Variable'}</b>

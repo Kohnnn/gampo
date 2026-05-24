@@ -1,10 +1,26 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import {
+    BetPanel,
+    BigWinOverlay,
+    GameShell,
+    HistoryDrawer,
+    RecentResultsStrip,
+    StatsOverlay,
+    useGameSession,
+    MultiplierBadge,
+    ResultToast,
+    ActionLockOverlay,
+    CoreStageFrame,
+    ROUND_EVENTS,
+    useRoundMachine,
+} from '../primitives'
+import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
@@ -60,7 +76,9 @@ export default function VideoPokerGame() {
     const definition = findGameDefinition('videopoker')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('videopoker')
     const session = useGameSession('videopoker')
+    const preloader = useOriginalsPreloader('videopoker')
 
     const [cards, setCards] = useState([])
     const [held, setHeld] = useState([])
@@ -71,12 +89,23 @@ export default function VideoPokerGame() {
     const [dealKey, setDealKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
+    const [lastMultiplier, setLastMultiplier] = useState(0)
+
+    const machine = useRoundMachine({})
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (phase === 'draw') { resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Video Poker')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
         setLastBet(betAmount)
+        setToast(null)
         playSound('deal')
+        sfx.play('click')
+        machine.start([
+            { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { betAmount }, at: 0 },
+            { index: 1, type: ROUND_EVENTS.INPUT_LOCK, payload: {}, at: 0 },
+            { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount }, at: 0 },
+        ], { autoFinish: false })
         setCards(buildShuffledDeck().slice(0, 5))
         setHeld([])
         setActiveBet(betAmount)
@@ -88,6 +117,7 @@ export default function VideoPokerGame() {
 
     const draw = () => {
         playSound('flip')
+        sfx.play('reveal')
         const remainder = buildShuffledDeck().filter(card => !cards.some(e => e.rank === card.rank && e.suit === card.suit))
         let idx = 0
         const finalCards = cards.map((c, i) => held.includes(i) ? c : remainder[idx++])
@@ -99,6 +129,7 @@ export default function VideoPokerGame() {
         setPhase('idle')
         setActiveBet(0)
         setOutcomeKey(outcome.label)
+        setLastMultiplier(outcome.multiplier)
         setBurstKey(k => k + 1)
         setDealKey(k => k + 1)
         if (outcome.multiplier >= 9) {
@@ -107,6 +138,14 @@ export default function VideoPokerGame() {
         } else {
             playSound(returnAmount > 0 ? 'win' : 'loss')
         }
+        sfx.play(profit > 0 ? 'win' : 'lose')
+        setToast({
+            kind: profit > 0 ? 'win' : profit === 0 ? 'push' : 'lose',
+            multiplier: outcome.multiplier > 0 ? outcome.multiplier : null,
+            amount: profit,
+            message: outcome.label,
+        })
+        machine.finish({ kind: outcome.label, profit, multiplier: outcome.multiplier })
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
             label: outcome.label,
@@ -124,6 +163,7 @@ export default function VideoPokerGame() {
             balance={balance}
             accent="#8ae66e"
             backdrop="/assets/games/backdrops/backdrop-felt-green.png"
+            variant="stake"
             panel={
                 <BetPanel
                     balance={balance}
@@ -138,40 +178,49 @@ export default function VideoPokerGame() {
                     onPlayPhaseAction={draw}
                 >
                     <p className="bp-hint">Click cards to hold; Draw replaces unheld cards.</p>
+                    {Number.isFinite(lastMultiplier) && lastMultiplier > 0 && (
+                        <div className="bp-section">
+                            <MultiplierBadge label="Last hand" value={lastMultiplier} state="win" size="sm" />
+                        </div>
+                    )}
                 </BetPanel>
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div className="vp-stage">
-                <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                <div className="vp-paytable">
-                    {PAYTABLE.map(row => (
-                        <div key={row.key} className={`vp-paytable-row ${outcomeKey === row.key ? 'won' : ''}`}>
-                            <span>{row.key}</span><strong>{row.multiplier}×</strong>
-                        </div>
-                    ))}
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="vp-stage-frame">
+                <div className="vp-stage">
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <div className="vp-paytable">
+                        {PAYTABLE.map(row => (
+                            <div key={row.key} className={`vp-paytable-row ${outcomeKey === row.key ? 'won' : ''}`}>
+                                <span>{row.key}</span><strong>{row.multiplier}×</strong>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="vp-row">
+                        {phase === 'idle' && cards.length === 0 && (
+                            <div className="vp-empty-overlay">Click Deal to start</div>
+                        )}
+                        {(cards.length ? cards : Array.from({ length: 5 }, () => null)).map((card, i) => (
+                            <button
+                                key={`${dealKey}-${i}`}
+                                className={`vp-card-slot ${held.includes(i) ? 'held' : ''}`}
+                                disabled={!card || phase !== 'draw'}
+                                style={{ animationDelay: `${i * 90}ms` }}
+                                onClick={() => setHeld(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])}
+                            >
+                                {card
+                                    ? <CardFace rank={card.rank} suit={card.suit} dealing size="lg" />
+                                    : <CardBack size="lg" />}
+                                {held.includes(i) && <span className="vp-hold">HOLD</span>}
+                            </button>
+                        ))}
+                    </div>
+                    {outcomeKey && burstKey > 0 && <Particles key={burstKey} count={14} color="#8ae66e" />}
+                    <ActionLockOverlay active={false} />
+                    <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
-                <div className="vp-row">
-                    {phase === 'idle' && cards.length === 0 && (
-                        <div className="vp-empty-overlay">Click Deal to start</div>
-                    )}
-                    {(cards.length ? cards : Array.from({ length: 5 }, () => null)).map((card, i) => (
-                        <button
-                            key={`${dealKey}-${i}`}
-                            className={`vp-card-slot ${held.includes(i) ? 'held' : ''}`}
-                            disabled={!card || phase !== 'draw'}
-                            style={{ animationDelay: `${i * 90}ms` }}
-                            onClick={() => setHeld(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])}
-                        >
-                            {card
-                                ? <CardFace rank={card.rank} suit={card.suit} dealing size="lg" />
-                                : <CardBack size="lg" />}
-                            {held.includes(i) && <span className="vp-hold">HOLD</span>}
-                        </button>
-                    ))}
-                </div>
-                {outcomeKey && burstKey > 0 && <Particles key={burstKey} count={14} color="#8ae66e" />}
-            </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={9} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.45} payoutMultiplier={1.85} balance={balance} recentProfit={recentProfit} />
         </GameShell>

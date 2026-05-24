@@ -1,0 +1,83 @@
+/* Stake-style Tarot. 3-card spread with suit pick. */
+
+.tarot-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    border-radius: inherit;
+    background:
+        radial-gradient(ellipse at top, rgba(180, 120, 255, 0.18), transparent 60%),
+        linear-gradient(180deg, #1c0e2a 0%, #0a0418 100%);
+}
+
+.tarot-suit-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    width: 100%;
+    max-width: 540px;
+}
+.tarot-suit-chip {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.32);
+    color: var(--text-secondary, #b1bad3);
+    font-weight: 800;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: color 120ms, border-color 120ms, background 120ms;
+}
+.tarot-suit-chip .glyph { display: block; font-size: 22px; line-height: 1; margin-bottom: 4px; }
+.tarot-suit-chip:hover:not(:disabled) {
+    color: var(--text-primary, #fff);
+    border-color: rgba(180, 120, 255, 0.55);
+}
+.tarot-suit-chip.active {
+    color: #fff;
+    border-color: var(--accent, #b478ff);
+    background: rgba(180, 120, 255, 0.18);
+}
+.tarot-suit-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.tarot-spread {
+    display: grid;
+    grid-template-columns: repeat(3, 130px);
+    gap: 12px;
+}
+
+.tarot-card {
+    width: 130px;
+    height: 200px;
+    border-radius: 14px;
+    border: 2px solid var(--rarity, rgba(180, 120, 255, 0.4));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+    color: #fff;
+    background:
+        radial-gradient(ellipse at top, rgba(255, 255, 255, 0.06), transparent 60%),
+        linear-gradient(180deg, rgba(40, 22, 64, 0.85), rgba(20, 8, 36, 0.95));
+    transition: transform 220ms cubic-bezier(0.18, 0.89, 0.32, 1.15), border-color 220ms;
+}
+.tarot-card.hidden {
+    color: rgba(255, 255, 255, 0.5);
+    background:
+        radial-gradient(circle at 50% 30%, #5d3aa3, #2a1652 70%, #150924 100%);
+    border-color: rgba(180, 120, 255, 0.35);
+}
+.tarot-card-position { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary, #b1bad3); }
+.tarot-card-glyph { font-size: 60px; line-height: 1; }
+.tarot-card-name { font-size: 12px; font-weight: 900; text-align: center; line-height: 1.1; }
+.tarot-card-suit { font-size: 10px; font-weight: 800; color: var(--text-secondary, #b1bad3); }
+.tarot-card-mult { font-size: 13px; font-weight: 900; color: var(--rarity, var(--text-primary, #fff)); }
+.tarot-card.matched { box-shadow: 0 0 22px -8px var(--rarity, rgba(180, 120, 255, 0.7)); }

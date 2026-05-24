@@ -5,19 +5,23 @@
 // `multiplier` and `elapsedTime`. When phase==='idle' it loops a low-opacity
 // "ghost" preview curve so the screen is never empty.
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const ROCKET_SRC    = '/images/spaceship.png'
 const EXHAUST_SRC   = '/images/exhaust/exhaust02_preview.gif'
 const EXPLOSION_SRC = '/images/explosions/normal_explosion.gif'
 
-export default function CrashChart({ phase, multiplier, elapsedTime }) {
+export default function CrashChart({ phase, multiplier, elapsedTime, players = [] }) {
     const canvasRef = useRef(null)
     const rocketRef = useRef(null)
     const exhaustRef = useRef(null)
     const explosionRef = useRef(null)
     const sizeRef = useRef({ width: 0, height: 0, dpr: 1 })
+    const endpointRef = useRef({ x: 0, y: 0, angle: 0 })
+    const bustEndpointRef = useRef(null)
     const ghostTickRef = useRef({ raf: 0, t: 0 })
+    const explosionTickRef = useRef({ raf: 0, t: 0 })
+    const [, forceRender] = useState(0)
 
     const maxTime = useMemo(() => Math.max(elapsedTime + 2, 8), [elapsedTime])
     const maxMult = useMemo(() => Math.max(multiplier * 1.3, 2), [multiplier])
@@ -77,9 +81,58 @@ export default function CrashChart({ phase, multiplier, elapsedTime }) {
             canvas: canvasRef.current,
             size: sizeRef.current,
             phase, multiplier, elapsedTime, maxTime, maxMult,
-            rocketRef, exhaustRef, explosionRef,
+            rocketRef, exhaustRef, explosionRef, endpointRef,
+            bustEndpointRef,
         })
+        forceRender(v => (v + 1) % 100000)
     }, [phase, multiplier, elapsedTime, maxTime, maxMult])
+
+    // Crash phase: lock the explosion endpoint and run a small decay rAF
+    // so the canvas keeps animating instead of freezing on the last frame.
+    useEffect(() => {
+        if (phase !== 'crashed') {
+            cancelAnimationFrame(explosionTickRef.current.raf)
+            explosionTickRef.current.raf = 0
+            return
+        }
+        // Snapshot endpoint at the moment of bust.
+        if (endpointRef.current && (!bustEndpointRef.current || bustEndpointRef.current.lockedFor !== 'crash')) {
+            bustEndpointRef.current = { ...endpointRef.current, lockedFor: 'crash' }
+        }
+        const start = performance.now()
+        const step = () => {
+            const t = (performance.now() - start) / 1000
+            explosionTickRef.current.t = t
+            drawCanvas({
+                canvas: canvasRef.current,
+                size: sizeRef.current,
+                phase: 'crashed',
+                multiplier,
+                elapsedTime,
+                maxTime,
+                maxMult,
+                rocketRef,
+                exhaustRef,
+                explosionRef,
+                endpointRef,
+                bustEndpointRef,
+                bustDecay: t,
+            })
+            if (t < 1.4) explosionTickRef.current.raf = requestAnimationFrame(step)
+        }
+        explosionTickRef.current.raf = requestAnimationFrame(step)
+        return () => cancelAnimationFrame(explosionTickRef.current.raf)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase])
+
+    // Reset bust endpoint snapshot when leaving crashed state so next round
+    // starts cleanly.
+    useEffect(() => {
+        if (phase === 'idle') bustEndpointRef.current = null
+    }, [phase])
+
+    const endpoint = endpointRef.current
+    const livePopups = phase !== 'idle' ? players.filter(p => p.cashed && multiplier >= p.target && multiplier - p.target < 0.22) : []
 
     return (
         <div className="crash-chart-wrap">
@@ -87,11 +140,25 @@ export default function CrashChart({ phase, multiplier, elapsedTime }) {
             <img ref={rocketRef}    src={ROCKET_SRC}    alt="" className="crash-rocket"    />
             <img ref={exhaustRef}   src={EXHAUST_SRC}   alt="" className="crash-exhaust"   />
             <img ref={explosionRef} src={EXPLOSION_SRC} alt="" className="crash-explosion" />
+            {livePopups.map((p, index) => (
+                <span
+                    key={`${p.id}-${p.target}`}
+                    className="crash-cash-pop"
+                    style={{
+                        left: `${endpoint.x}px`,
+                        top: `${endpoint.y}px`,
+                        '--pop-index': index,
+                        '--pop-color': p.color,
+                    }}
+                >
+                    {p.name} +{(p.bet * (p.cashedAt - 1)).toFixed(2)}
+                </span>
+            ))}
         </div>
     )
 }
 
-function drawCanvas({ canvas, size, phase, multiplier, elapsedTime, maxTime, maxMult, rocketRef, exhaustRef, explosionRef }) {
+function drawCanvas({ canvas, size, phase, multiplier, elapsedTime, maxTime, maxMult, rocketRef, exhaustRef, explosionRef, endpointRef, bustEndpointRef, bustDecay = 0 }) {
     if (!canvas) return
     const { width, height, dpr } = size
     if (!width || !height) return
@@ -217,10 +284,11 @@ function drawCanvas({ canvas, size, phase, multiplier, elapsedTime, maxTime, max
     }
     const endX = pts[numPoints].x
     const endY = pts[numPoints].y
+    if (endpointRef?.current) endpointRef.current = { x: endX, y: endY, angle }
 
     // Position rocket / exhaust / explosion
     if (rocketRef?.current) {
-        if (phase === 'running') {
+        if (phase === 'running' || phase === 'cashed') {
             rocketRef.current.style.display = 'block'
             rocketRef.current.style.left = `${endX}px`
             rocketRef.current.style.top  = `${endY}px`
@@ -230,7 +298,7 @@ function drawCanvas({ canvas, size, phase, multiplier, elapsedTime, maxTime, max
         }
     }
     if (exhaustRef?.current) {
-        if (phase === 'running') {
+        if (phase === 'running' || phase === 'cashed') {
             exhaustRef.current.style.display = 'block'
             exhaustRef.current.style.left = `${endX}px`
             exhaustRef.current.style.top  = `${endY}px`
@@ -241,11 +309,21 @@ function drawCanvas({ canvas, size, phase, multiplier, elapsedTime, maxTime, max
     }
     if (explosionRef?.current) {
         if (phase === 'crashed') {
+            const ex = bustEndpointRef?.current || { x: endX, y: endY }
+            // Animate explosion: grow scale + drift up + fade out so the
+            // canvas doesn't appear frozen after bust.
+            const t = Math.max(0, Math.min(1, bustDecay / 1.4))
+            const scale = 1 + 0.6 * t
+            const drift = 24 * t
+            const alpha = Math.max(0, 1 - t * t)
             explosionRef.current.style.display = 'block'
-            explosionRef.current.style.left = `${endX}px`
-            explosionRef.current.style.top  = `${endY}px`
+            explosionRef.current.style.left = `${ex.x}px`
+            explosionRef.current.style.top  = `${ex.y - drift}px`
+            explosionRef.current.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`
+            explosionRef.current.style.opacity = alpha.toFixed(3)
         } else {
             explosionRef.current.style.display = 'none'
+            explosionRef.current.style.opacity = ''
         }
     }
 }

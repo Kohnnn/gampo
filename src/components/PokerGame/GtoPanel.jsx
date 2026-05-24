@@ -55,6 +55,7 @@ export default function GtoPanel({ state }) {
     const suggestion = heroCell ? pickAction(heroCell) : null
     const filterCode = search.trim().toUpperCase()
     const liveMetrics = metricsForState(state, payload)
+    const heroInsights = heroCell ? insightForHero(heroCell, state, payload, liveMetrics) : null
     const heroMix = heroCell ? [
         { key: 'raise', label: 'Raise', value: heroCell.raise || 0 },
         { key: 'call', label: 'Call', value: heroCell.call || 0 },
@@ -86,6 +87,13 @@ export default function GtoPanel({ state }) {
                         <div className="gto-mix-list">
                             {heroMix.map(item => <span key={item.key} className={item.key}>{item.label} <b>{(item.value * 100).toFixed(0)}%</b></span>)}
                         </div>
+                        {heroInsights && (
+                            <div className="gto-insight-grid">
+                                <div><span>Equity proxy</span><strong>{heroInsights.equity}</strong></div>
+                                <div><span>Best EV</span><strong>{heroInsights.bestEv}</strong></div>
+                                <div><span>Class</span><strong>{heroInsights.handClass}</strong></div>
+                            </div>
+                        )}
                     </div>
                 )}
                 {payload.mode === 'postflop' && (
@@ -101,6 +109,13 @@ export default function GtoPanel({ state }) {
                     <div><span>Range raise</span><strong>{liveMetrics.rangeRaise}</strong></div>
                     <div><span>Continue</span><strong>{liveMetrics.continueFreq}</strong></div>
                 </div>
+                {heroInsights && (
+                    <div className="gto-ev-deltas">
+                        {heroInsights.evDeltas.map(item => (
+                            <span key={item.key} className={item.key}>{item.label} <b>{item.value}</b></span>
+                        ))}
+                    </div>
+                )}
                 <div className="gto-search-row">
                     <input
                         type="text"
@@ -209,6 +224,39 @@ function explainSuggestion(suggestion, metrics) {
     if (suggestion.tone === 'call') return `Continue at price. Pot odds ${metrics.potOdds}.`
     if (suggestion.tone === 'fold') return `Low-frequency continue. Protect stack.`
     return `Mixed node. Randomize instead of autopiloting.`
+}
+
+function insightForHero(cell, state, payload, metrics) {
+    const raise = cell.raise || 0
+    const call = cell.call || 0
+    const fold = cell.fold || 0
+    const continueFreq = raise + call
+    const potOdds = Number.parseInt(metrics.potOdds, 10)
+    const equityRaw = Math.max(0.03, Math.min(0.97, 0.18 + raise * 0.46 + call * 0.28 - fold * 0.12 + (Number.isFinite(potOdds) ? potOdds / 500 : 0)))
+    const pressure = state.currentBet > 0 ? Math.max(0, state.currentBet - ((state.players.find(p => p.isHuman)?.putIn) || 0)) : 0
+    const pot = Math.max(1, state.pot || 1)
+    const raiseEv = (raise * pot * 0.72) - (1 - raise) * pressure * 0.45
+    const callEv = (call * pot * 0.5) - pressure * (0.28 + fold * 0.22)
+    const foldEv = -Math.max(0, pressure * 0.12)
+    const evs = [
+        { key: 'raise', label: 'Raise EV', raw: raiseEv },
+        { key: 'call', label: 'Call EV', raw: callEv },
+        { key: 'fold', label: 'Fold EV', raw: foldEv },
+    ].sort((a, b) => b.raw - a.raw)
+    return {
+        equity: `${(equityRaw * 100).toFixed(0)}%`,
+        bestEv: `${evs[0].label.replace(' EV', '')} ${evs[0].raw >= 0 ? '+' : ''}${evs[0].raw.toFixed(1)}`,
+        handClass: classifyHeroHand(cell, payload, continueFreq),
+        evDeltas: evs.map(item => ({ ...item, value: `${item.raw >= 0 ? '+' : ''}${item.raw.toFixed(1)}` })),
+    }
+}
+
+function classifyHeroHand(cell, payload, continueFreq) {
+    if ((cell.raise || 0) >= 0.58) return 'Value / pressure'
+    if ((cell.fold || 0) >= 0.62) return 'Low continue'
+    if (continueFreq >= 0.72) return 'Continue'
+    if (payload.mode === 'postflop' && payload.textureKey) return `Texture ${payload.textureKey}`
+    return 'Mixed marginal'
 }
 
 function Grid({ grid, heroHand, filterCode }) {

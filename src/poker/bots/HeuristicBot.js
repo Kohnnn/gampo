@@ -1,9 +1,9 @@
-// Heuristic poker bot. Uses pre-flop range tables and post-flop equity sampling.
+// Heuristic poker bot. Uses local strength/position heuristics and post-flop
+// equity sampling only. It intentionally does not fetch or read GTO chart data.
 // Trades correctness for speed: ~150 random rollouts per decision.
 
 import { Hand as SolverHand } from 'pokersolver'
 import { legalActions } from '../engine/Game'
-import { canonical } from '../util/handCanonicalize'
 import { rolesForSeats } from '../util/positions'
 import { classify } from '../util/textureClassify'
 
@@ -11,45 +11,6 @@ const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A']
 const SUITS = ['s', 'h', 'd', 'c']
 
 function rankIdx(r) { return RANKS.indexOf(r.toUpperCase()) }
-
-// Cached preflop ranges (lazy-loaded from /data/poker/preflop.json).
-let cachedPreflop = null
-let preflopPromise = null
-function ensurePreflop() {
-    if (cachedPreflop) return cachedPreflop
-    if (typeof fetch === 'undefined') return null
-    if (!preflopPromise) {
-        preflopPromise = fetch('/data/poker/preflop.json').then(r => r.json()).then(j => { cachedPreflop = j; return j }).catch(() => null)
-    }
-    return null // first decision uses heuristic; subsequent ones use the cache
-}
-
-let cachedPostflop = null
-let postflopPromise = null
-function ensurePostflop() {
-    if (cachedPostflop) return cachedPostflop
-    if (typeof fetch === 'undefined') return null
-    if (!postflopPromise) {
-        postflopPromise = fetch('/data/poker/postflop.json').then(r => r.json()).then(j => { cachedPostflop = j; return j }).catch(() => null)
-    }
-    return null
-}
-
-// Preflop strength via the same JSON the GTO chart panel uses. Falls back to the
-// numeric heuristic when the JSON is not yet cached or the cell is missing.
-function preflopFromRange(hole, role, vsContext) {
-    if (!cachedPreflop) return null
-    const code = canonical(hole)
-    if (!code) return null
-    const node = cachedPreflop.positions?.[role]
-    const rangeNode = node?.[vsContext || 'rfi'] || node?.['rfi']
-    const cell = rangeNode?.ranges?.[code]
-    if (!cell) return null
-    // Equity proxy: weight raise heavier than call.
-    const raise = Number(cell.raise) || 0
-    const call = Number(cell.call) || 0
-    return Math.min(0.95, 0.45 + raise * 0.4 + call * 0.18)
-}
 
 // Pre-flop hand strength heuristic on a 0-1 scale.
 function preflopStrength(hole) {
@@ -112,7 +73,7 @@ function postflopEquity(hole, community, opponents, samples = 120) {
     return (wins + ties * 0.5) / samples
 }
 
-export default function HeuristicBot({ state, seatIndex, aggression = 0.5 }) {
+export default function HeuristicBot({ state, seatIndex, aggression = 0.5, difficulty = 'intermediate' }) {
     const acts = legalActions(state)
     if (!acts.length) return { type: 'check' }
     const me = state.players[seatIndex]
@@ -124,61 +85,40 @@ export default function HeuristicBot({ state, seatIndex, aggression = 0.5 }) {
         if (!callAct) return 0
         return callAct.amount / (state.pot + callAct.amount + 0.0001)
     })()
-    // Preflop: prefer the published range JSON when cached.
     let equity
-    let postflopAggression = null
+    let texturePressure = 0
     if (street === 'preflop') {
-        ensurePreflop()
         const role = rolesForSeats(state.players.length, state.buttonIndex)[seatIndex]
-        const firstRaise = state.history.find(h => h.type === 'raise')
-        const vsContext = role === 'BB' && firstRaise
-            ? `vs-${rolesForSeats(state.players.length, state.buttonIndex)[state.players.findIndex(p => p.id === firstRaise.player)].toLowerCase()}-open`
-            : 'rfi'
-        equity = preflopFromRange(hole, role, vsContext) ?? preflopStrength(hole)
+        const roleNudge = role === 'BTN' ? 0.05 : role === 'CO' ? 0.035 : role === 'SB' ? -0.01 : role === 'BB' ? -0.025 : -0.04
+        const facedRaise = state.history.some(h => h.type === 'raise')
+        equity = preflopStrength(hole) + roleNudge - (facedRaise ? 0.055 : 0)
     } else {
         equity = postflopEquity(hole, state.community, opponents)
-        // Postflop: nudge aggression based on the matched texture's c-bet frequency.
-        ensurePostflop()
-        if (cachedPostflop && state.community?.length >= 3) {
-            const roles = rolesForSeats(state.players.length, state.buttonIndex)
-            const me = state.players[seatIndex]
-            const myRole = roles[seatIndex]
-            const heroRole = state.players.find(p => p.isHuman) ? roles[state.players.findIndex(p => p.isHuman)] : null
-            // Match the chart's matchup heuristic.
-            const matchupKey = heroRole
-                ? `${roles[state.buttonIndex]}-vs-${heroRole === 'BTN' ? roles[(state.buttonIndex + 1) % state.players.length] : heroRole}`
-                : null
+        if (state.community?.length >= 3) {
             const texture = classify(state.community)
-            const node = (matchupKey && cachedPostflop.matchup?.[matchupKey]?.['rfi-call']) || cachedPostflop.matchup?.default?.['rfi-call']
-            if (node) {
-                const streetNode = node[street] || node.flop
-                const flop = streetNode?.[texture?.key] || streetNode?.default
-                if (flop?.sizings?.length) {
-                    const totalBet = flop.sizings.filter(s => s.size !== 'check').reduce((sum, s) => sum + s.freq, 0)
-                    postflopAggression = totalBet
-                }
-            }
+            texturePressure = texture?.wetness === 'wet' ? -0.05 : texture?.paired ? 0.035 : 0.01
         }
     }
+    const difficultyAdjust = difficulty === 'beginner' ? -0.07 : difficulty === 'advanced' ? 0.06 : 0
+    equity = Math.max(0.02, Math.min(0.98, equity + difficultyAdjust))
+    equity = Math.max(0.02, Math.min(0.98, equity + texturePressure))
     const pressure = aggression * (equity - 0.5)
     // Decision tree
     const callAct = acts.find(a => a.type === 'call')
     const checkAct = acts.find(a => a.type === 'check')
     const raiseAct = acts.find(a => a.type === 'raise')
     if (checkAct && (!callAct || callAct.amount === 0)) {
-        // If we have a postflop aggression cue, use it to set c-bet probability when checked to.
-        if (raiseAct && street !== 'preflop' && postflopAggression != null) {
-            // Stronger hands always c-bet, weak hands c-bet at the texture's frequency.
-            const cbetThreshold = 0.6 - postflopAggression * 0.3
-            if (equity > cbetThreshold || Math.random() < postflopAggression * 0.5) {
-                const sizing = 0.33 + Math.min(0.5, equity * 0.4)
+        if (raiseAct && street !== 'preflop') {
+            const cbetChance = Math.max(0.08, Math.min(0.42, aggression * 0.26 + Math.max(0, equity - 0.58)))
+            if (equity > 0.72 || Math.random() < cbetChance) {
+                const sizing = 0.22 + Math.min(0.38, equity * 0.32)
                 const amount = Math.round(raiseAct.min + (raiseAct.max - raiseAct.min) * sizing)
                 return { type: 'raise', amount }
             }
             return { type: 'check' }
         }
-        if (raiseAct && equity > 0.65 + 0.1 * Math.random()) {
-            const amount = Math.round(raiseAct.min + (raiseAct.max - raiseAct.min) * Math.min(0.6, equity * 0.6))
+        if (raiseAct && equity > 0.72 + 0.08 * Math.random()) {
+            const amount = Math.round(raiseAct.min + (raiseAct.max - raiseAct.min) * Math.min(0.45, equity * 0.42))
             return { type: 'raise', amount }
         }
         return { type: 'check' }
@@ -187,8 +127,8 @@ export default function HeuristicBot({ state, seatIndex, aggression = 0.5 }) {
         if (equity < potOdds - 0.05) {
             return { type: 'fold' }
         }
-        if (equity > 0.7 + 0.1 * Math.random() && raiseAct) {
-            const amount = Math.round(raiseAct.min + (raiseAct.max - raiseAct.min) * Math.min(0.5, equity))
+        if (equity > 0.78 + 0.08 * Math.random() && raiseAct) {
+            const amount = Math.round(raiseAct.min + (raiseAct.max - raiseAct.min) * Math.min(0.38, equity * 0.42))
             return { type: 'raise', amount }
         }
         if (equity < 0.35 && callAct.amount > state.bb * 4 && Math.random() > pressure + 0.5) {

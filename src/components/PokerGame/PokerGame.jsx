@@ -10,7 +10,9 @@ import GtoPanel from './GtoPanel'
 import HandHistoryTab, { recordHand } from './HandHistoryTab'
 import './PokerGame.css'
 
-const BUY_INS = [200, 500, 1000, 10000]
+const BUY_INS = [1000, 5000, 25000, 100000, 500000]
+const SNG_HAND_LIMIT = 12
+const LEVEL_HANDS = 4
 const BOT_PERSONAS = [
     { name: 'lucky_lemur', avatar: 1, aggression: 0.52, chat: ['glgl', 'small pot poker', 'river saved me'] },
     { name: 'binary_bee', avatar: 2, aggression: 0.38, chat: ['range says call', 'too many bluffs?', 'checking back'] },
@@ -24,24 +26,47 @@ const BOT_PERSONAS = [
     { name: 'bubble_ace', avatar: 5, aggression: 0.43, chat: ['survive first', 'ladder brain', 'no punt'] },
 ]
 const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => `/assets/games/poker/poker-avatar-${i}.png`)
-const SB = 1
-const BB = 2
+function blindLevelForHand(handNumber) {
+    const level = Math.floor((handNumber - 1) / LEVEL_HANDS)
+    const bb = 20 * (2 ** level)
+    return { level: level + 1, sb: Math.floor(bb / 2), bb, ante: level >= 3 ? Math.floor(bb / 10) : 0 }
+}
 
 function suitGlyph(s) { return s === 'h' ? '\u2665' : s === 'd' ? '\u2666' : s === 's' ? '\u2660' : '\u2663' }
 function suitClass(s) { return (s === 'h' || s === 'd') ? 'red' : 'black' }
 function rankPretty(r) { return r === 'T' ? '10' : r }
 
 function samplePersonas() {
+    const difficultyRoll = () => {
+        const r = Math.random()
+        if (r < 0.1) return 'beginner'
+        if (r < 0.7) return 'intermediate'
+        return 'advanced'
+    }
+    const difficultyTuning = {
+        beginner: -0.18,
+        intermediate: -0.06,
+        advanced: 0.06,
+    }
     return BOT_PERSONAS
         .map(p => ({ p, sort: Math.random() }))
         .sort((a, b) => a.sort - b.sort)
         .slice(0, 5)
-        .map(({ p }, i) => ({ ...p, id: `bot${i}`, avatar: BOT_AVATARS[p.avatar - 1] }))
+        .map(({ p }, i) => {
+            const difficulty = difficultyRoll()
+            return {
+                ...p,
+                id: `bot${i}`,
+                difficulty,
+                aggression: Math.max(0.18, Math.min(0.92, p.aggression + difficultyTuning[difficulty])),
+                avatar: BOT_AVATARS[p.avatar - 1],
+            }
+        })
 }
 
 function botLine(persona, decision, state) {
     const pot = state?.pot || 0
-    if (decision.type === 'raise') return decision.amount > pot ? 'overbet pressure' : persona.chat[Math.floor(Math.random() * persona.chat.length)]
+    if (decision.type === 'raise') return decision.amount > pot ? (persona.difficulty === 'advanced' ? 'ICM pressure' : 'overbet pressure') : persona.chat[Math.floor(Math.random() * persona.chat.length)]
     if (decision.type === 'fold') return ['not defending that', 'too expensive', 'live to fight'][Math.floor(Math.random() * 3)]
     if (decision.type === 'call') return ['priced in', 'call and see', 'sticky one'][Math.floor(Math.random() * 3)]
     return ['check it', 'pot control', 'free card?'][Math.floor(Math.random() * 3)]
@@ -72,7 +97,9 @@ export default function PokerGame() {
     const [chatInput, setChatInput] = useState('')
     const [raiseAmount, setRaiseAmount] = useState(null)
     const [tab, setTab] = useState('gto')
-    const [buyIn, setBuyIn] = useState(200)
+    const [buyIn, setBuyIn] = useState(1000)
+    const [handNumber, setHandNumber] = useState(1)
+    const [sngComplete, setSngComplete] = useState(false)
     const [bubbles, setBubbles] = useState({})
     const stepTimer = useRef(null)
     const lastRecordedShowdown = useRef(null)
@@ -109,13 +136,16 @@ export default function PokerGame() {
             return
         }
         if (!placeBet(buyIn, 'Poker buy-in')) return
+        const blindLevel = blindLevelForHand(1)
         const personas = samplePersonas()
         const seats = [
             { id: 'you', name: 'you', stack: buyIn, isHuman: true },
             ...personas.map(p => ({ id: p.id, name: p.name, stack: buyIn, avatar: p.avatar, persona: p })),
         ]
-        const init = createInitialState({ players: seats, sb: SB, bb: BB, buttonIndex: 4 })
+        const init = createInitialState({ players: seats, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante, buttonIndex: 4 })
         setState(startHand(init))
+        setHandNumber(1)
+        setSngComplete(false)
         setSeated(true)
         playSound('deal')
     }
@@ -140,7 +170,13 @@ export default function PokerGame() {
         const seatId = `${state.toAct}-${state.history.length}`
         const decideTimer = window.setTimeout(() => {
             const persona = p.persona || { aggression: 0.5, chat: ['nice'] }
-            const decision = HeuristicBot({ state, seatIndex: state.toAct, aggression: persona.aggression })
+            const blindPressure = Math.min(0.1, Math.max(0, (state.bb || 20) / Math.max(1, p.stack + (p.putIn || 0))) * 0.55)
+            const decision = HeuristicBot({
+                state,
+                seatIndex: state.toAct,
+                aggression: Math.min(0.96, persona.aggression + blindPressure),
+                difficulty: persona.difficulty || 'intermediate',
+            })
             setState(prev => applyAction(prev, decision))
             playSound(decision.type === 'fold' ? 'click' : decision.type === 'raise' ? 'flip' : 'tick')
             if (Math.random() < 0.46) {
@@ -217,14 +253,24 @@ export default function PokerGame() {
             showToast('loss', 'Busted', 'Buy-in lost')
             setState(null); setSeated(false); return
         }
-        setState(prev => dealNext(prev))
+        if (handNumber >= SNG_HAND_LIMIT) {
+            const stack = human?.stack || 0
+            if (stack > 0) addWinnings(stack, 'Poker sit-and-go cashout')
+            setSngComplete(true)
+            showToast(stack >= buyIn ? 'win' : 'loss', 'Sit-and-go complete', `Final stack ${formatCredits(stack)}`)
+            setState(null); setSeated(false); return
+        }
+        const nextHandNumber = handNumber + 1
+        const blindLevel = blindLevelForHand(nextHandNumber)
+        setHandNumber(nextHandNumber)
+        setState(prev => dealNext({ ...prev, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante }))
     }
 
     const cashOut = () => {
         if (!state || !human) return
         if (human.stack > 0) addWinnings(human.stack, 'Poker cashout')
         showToast('bet', 'Left the table', `Cashed out ${formatCredits(human.stack || 0)}`)
-        setState(null); setSeated(false)
+        setState(null); setSeated(false); setSngComplete(false)
     }
 
     const raiseRange = useMemo(() => {
@@ -251,13 +297,14 @@ export default function PokerGame() {
             </div>
             {!seated && (
                 <div className="poker-lobby">
-                    <h2>Choose buy-in</h2>
-                    <p>Sit at a 6-handed table with five randomized bot personas. Practice credits only. No cash value.</p>
+                    <h2>Choose sit-and-go buy-in</h2>
+                    <p>Fresh 6-handed sit-and-go. Blinds start 10/20, increase every 4 hands, antes begin at level 4, and the default event ends after 12 hands. Practice credits only.</p>
                     <div className="poker-buyin-options">
                         {BUY_INS.map(amount => (
                             <button key={amount} className={buyIn === amount ? 'active' : ''} disabled={balance < amount} onClick={() => setBuyIn(amount)}>{formatCredits(amount)}</button>
                         ))}
                     </div>
+                    {sngComplete && <div className="pk-lobby-note">Last sit-and-go completed. Choose a stake to sit fresh.</div>}
                     <button className="poker-buyin" disabled={balance < buyIn} onClick={startSession}>Sit Down {formatCredits(buyIn)}</button>
                 </div>
             )}
@@ -265,6 +312,12 @@ export default function PokerGame() {
                 <div className="poker-layout">
                     <div className="poker-table">
                         <div className="poker-table-felt">
+                            <div className="pk-sng-status">
+                                <span>Hand {handNumber}/{SNG_HAND_LIMIT}</span>
+                                <span>Level {blindLevelForHand(handNumber).level}</span>
+                                <span>Blinds {formatCredits(state.sb)}/{formatCredits(state.bb)}</span>
+                                <span>Ante {formatCredits(state.ante || 0)}</span>
+                            </div>
                             <div className="pk-pot">Pot {formatCredits(state.pot)}</div>
                             <div className="pk-board">
                                 {state.community.map((c, i) => <PokerCard key={i} card={c} />)}
