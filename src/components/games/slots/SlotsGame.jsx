@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Gauge, Info, Play, RotateCcw, Sparkles, Ticket, Zap } from 'lucide-react'
+import { Gauge, Info, Play, RotateCcw, Sparkles, Square, Ticket, Zap } from 'lucide-react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
@@ -16,6 +16,9 @@ import {
 import EducationPanel from '../../EducationPanel'
 import {
     SLOT_TEMPLATES,
+    getBuyTiers,
+    getCellPositions,
+    getColumnRows,
     getSlotTemplate,
     makeInitialGrid,
     randomVisualSymbol,
@@ -28,6 +31,14 @@ const FEATURE_LABELS = {
     'free-spins': 'Free spins',
     wilds: 'Wild pulse',
     cascade: 'Cascade',
+    'money-collect': 'Money collect',
+    mystery: 'Mystery',
+}
+
+const AUTOPLAY_COUNTS = [10, 25, 50, 100]
+// Cubic-out easing for per-column stop delays.
+function cubicOut(t) {
+    return 1 - Math.pow(1 - t, 3)
 }
 
 export default function SlotsGame({ initialTemplateId } = {}) {
@@ -44,6 +55,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     const [templateId, setTemplateId] = useState(startId)
     const config = useMemo(() => getSlotTemplate(templateId), [templateId])
+    const cellPositions = useMemo(() => getCellPositions(config), [config])
     const [betAmount, setBetAmount] = useState(5)
     const [grid, setGrid] = useState(() => makeInitialGrid(startTemplate))
     const [running, setRunning] = useState(false)
@@ -53,15 +65,41 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [lastResult, setLastResult] = useState(null)
     const [lastStake, setLastStake] = useState(5)
     const [turbo, setTurbo] = useState(false)
-    const [bonusBuy, setBonusBuy] = useState(false)
+    const [bonusBuyTierId, setBonusBuyTierId] = useState(null)
+    const [showBuyModal, setShowBuyModal] = useState(false)
     const [freeSpins, setFreeSpins] = useState(0)
     const [coinMeter, setCoinMeter] = useState(0)
     const [showIntro, setShowIntro] = useState(Boolean(startTemplate.features?.introOverlay))
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
-    const [autoNote, setAutoNote] = useState(false)
+    const [showAutoplayDrawer, setShowAutoplayDrawer] = useState(false)
+    const [autoplayCount, setAutoplayCount] = useState(10)
+    const [autoplayInfinite, setAutoplayInfinite] = useState(false)
+    const [autoplayActive, setAutoplayActive] = useState(false)
+    const [autoplayRemaining, setAutoplayRemaining] = useState(0)
+    const [advancedStops, setAdvancedStops] = useState({
+        stopOnFeature: false,
+        stopOnBigWin: false,
+        bigWinThreshold: 10,
+        stopOnLoss: false,
+        lossPercent: 25,
+        stopOnGain: false,
+        gainPercent: 50,
+    })
+    const [anticipating, setAnticipating] = useState(false)
+    const [mysteryReveal, setMysteryReveal] = useState(null)
+
     const timers = useRef([])
     const ticker = useRef(null)
     const stoppedColsRef = useRef(startTemplate.layout.cols)
+    const autoplayBaselineRef = useRef(null)
+    const autoplayRemainingRef = useRef(0)
+    const autoplayInfiniteRef = useRef(false)
+    const autoplayPendingRef = useRef(false)
+    const stopsRef = useRef(advancedStops)
+    const buyTierIdRef = useRef(null)
+
+    useEffect(() => { stopsRef.current = advancedStops }, [advancedStops])
+    useEffect(() => { buyTierIdRef.current = bonusBuyTierId }, [bonusBuyTierId])
 
     const clearTimers = useCallback(() => {
         timers.current.forEach(id => window.clearTimeout(id))
@@ -85,23 +123,34 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setStoppedColumnState(config.layout.cols)
         setWinningCells([])
         setLastResult(null)
-        setBonusBuy(false)
+        setBonusBuyTierId(null)
+        setShowBuyModal(false)
         setFreeSpins(0)
         setCoinMeter(0)
         setShowIntro(Boolean(config.features?.introOverlay))
+        setAutoplayActive(false)
+        setAutoplayRemaining(0)
+        autoplayPendingRef.current = false
+        setAnticipating(false)
+        setMysteryReveal(null)
     }, [clearTimers, config, setStoppedColumnState])
 
     useEffect(() => () => clearTimers(), [clearTimers])
 
     const paylineMode = config.layout.evaluation === 'cluster'
         ? 'Cluster pays'
-        : config.layout.evaluation === 'ways'
-            ? 'Ways pays'
-            : 'Line pays'
+        : config.layout.evaluation === 'megaways'
+            ? 'Megaways'
+            : config.layout.evaluation === 'pay-anywhere'
+                ? 'Pay anywhere'
+                : config.layout.evaluation === 'ways'
+                    ? 'Ways pays'
+                    : 'Line pays'
 
-    const bonusCostMultiplier = config.features?.buyBonus?.costMultiplier || 0
-    const effectiveStake = round2(betAmount * (bonusBuy && config.controls.buyBonus ? bonusCostMultiplier : 1))
+    const buyTiers = useMemo(() => getBuyTiers(config), [config])
+    const activeBuyTier = useMemo(() => buyTiers.find(t => t.id === bonusBuyTierId) || null, [buyTiers, bonusBuyTierId])
     const canUseFreeSpin = freeSpins > 0
+    const effectiveStake = round2(betAmount * (activeBuyTier && config.controls?.buyBonus ? activeBuyTier.costMultiplier : 1))
 
     const setBet = useCallback((value) => {
         const next = Math.max(0.1, Math.min(10000, Number(value) || 0.1))
@@ -118,6 +167,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setLastResult({ ...result, profit, returnAmount, stake, baseBet, usedFreeSpin, usedBonusBuy })
         setRunning(false)
         setSpinPhase(result.multiplier > 0 ? 'win' : 'settled')
+        setAnticipating(false)
+        setMysteryReveal(result.mysteryReveal || null)
 
         if (returnAmount > 0) addWinnings(returnAmount, `${config.title} return`)
         if (usedFreeSpin) setFreeSpins(value => Math.max(0, value - 1))
@@ -158,10 +209,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             `${config.title} ${label}`,
             `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`,
         )
-        resolve({ profit, multiplier: result.multiplier })
+        resolve({ profit, multiplier: result.multiplier, featureEvents: result.featureEvents })
     }, [addWinnings, clearTimers, config, playSound, session, showToast])
 
-    const performSpin = useCallback(({ source = 'manual', bet = betAmount, buy = bonusBuy, free = canUseFreeSpin } = {}) => (
+    const performSpin = useCallback(({ source = 'manual', bet = betAmount, free = canUseFreeSpin, tierId = null } = {}) => (
         new Promise(resolve => {
             if (running) {
                 resolve({ profit: 0, skipped: true })
@@ -169,8 +220,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
             const baseBet = round2(Number(bet) || betAmount)
             const usedFreeSpin = Boolean(freeSpins > 0 && free)
-            const usedBonusBuy = Boolean(!usedFreeSpin && buy && config.controls.buyBonus)
-            const stake = usedFreeSpin ? 0 : round2(baseBet * (usedBonusBuy ? bonusCostMultiplier : 1))
+            const tier = !usedFreeSpin && tierId ? (buyTiers.find(t => t.id === tierId) || null) : null
+            const usedBonusBuy = Boolean(tier && config.controls.buyBonus)
+            const stake = usedFreeSpin ? 0 : round2(baseBet * (usedBonusBuy ? tier.costMultiplier : 1))
 
             if (!usedFreeSpin && !placeBet(stake, `${config.title} ${usedBonusBuy ? 'bonus buy' : 'spin'}`)) {
                 showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`)
@@ -179,10 +231,33 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
 
             clearTimers()
-            const result = resolveSlotSpin(config, { bonusBuy: usedBonusBuy, freeSpin: usedFreeSpin })
-            const stopDelay = turbo ? 95 : 230
-            const settleDelay = turbo ? 180 : 360
-            const totalDelay = (stopDelay * config.layout.cols) + settleDelay
+            const result = resolveSlotSpin(config, { bonusBuy: usedBonusBuy, buyTier: tier, freeSpin: usedFreeSpin })
+            const cols = config.layout.cols
+            const totalSettleDelay = turbo ? 180 : 360
+            const baseStop = turbo ? 80 : 200
+            // Compute per-column delays with cubic-out easing.
+            const colDelays = []
+            for (let col = 1; col <= cols; col += 1) {
+                const ratio = col / cols
+                colDelays.push(Math.round(baseStop * cols * cubicOut(ratio)))
+            }
+            // Anticipation: when ≥ scatterMin scatters land in the first stopped columns, slow remaining columns.
+            const scatterId = config.features?.scatter?.symbolId
+            const scatterMin = config.features?.anticipation?.scatterMin ?? 2
+            // Pre-count how many scatters appear in result before the last 2 columns.
+            let scatterEarlyCount = 0
+            if (scatterId) {
+                let cellCursor = 0
+                for (let col = 0; col < cols - 2; col += 1) {
+                    const colRows = getColumnRows(config, col)
+                    for (let row = 0; row < colRows; row += 1) {
+                        if (result.cells[cellCursor + row]?.id === scatterId) scatterEarlyCount += 1
+                    }
+                    cellCursor += colRows
+                }
+            }
+            const willAnticipate = scatterEarlyCount >= scatterMin
+            const anticipationFromCol = cols - 2
 
             setLastStake(stake)
             setRunning(true)
@@ -190,40 +265,119 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setWinningCells([])
             setLastResult(null)
             setStoppedColumnState(0)
+            setMysteryReveal(null)
+            setAnticipating(false)
             playSound('tick')
 
             ticker.current = window.setInterval(() => {
                 setGrid(prev => prev.map((cell, index) => {
-                    const col = index % config.layout.cols
+                    const { col } = cellPositions[index]
                     if (col < stoppedColsRef.current) return cell
                     return randomVisualSymbol(config)
                 }))
             }, turbo ? 55 : 85)
 
-            for (let col = 1; col <= config.layout.cols; col += 1) {
+            // Build per-col cumulative delays (with anticipation slowdown).
+            let cumulative = 0
+            for (let col = 1; col <= cols; col += 1) {
+                const delta = colDelays[col - 1] - (col >= 2 ? colDelays[col - 2] : 0)
+                const slow = willAnticipate && col >= anticipationFromCol + 1
+                const adjusted = slow ? Math.round(delta * 1.65) : delta
+                cumulative += adjusted
+                const captureCol = col
                 timers.current.push(window.setTimeout(() => {
                     playSound('flip')
-                    setStoppedColumnState(col)
+                    if (willAnticipate && captureCol === anticipationFromCol + 1) {
+                        setAnticipating(true)
+                    }
+                    setStoppedColumnState(captureCol)
                     setGrid(prev => prev.map((cell, index) => {
-                        const itemCol = index % config.layout.cols
-                        return itemCol < col ? result.cells[index] : cell
+                        const { col: itemCol } = cellPositions[index]
+                        return itemCol < captureCol ? result.cells[index] : cell
                     }))
-                }, stopDelay * col))
+                }, cumulative))
             }
 
+            const totalDelay = cumulative + totalSettleDelay
             timers.current.push(window.setTimeout(() => {
                 finishRound({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
             }, totalDelay))
         })
-    ), [betAmount, bonusBuy, bonusCostMultiplier, canUseFreeSpin, clearTimers, config, finishRound, freeSpins, placeBet, playSound, running, setStoppedColumnState, showToast, turbo])
+    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, finishRound, freeSpins, placeBet, playSound, running, setStoppedColumnState, showToast, turbo])
 
     const triggerStageSpin = useCallback(() => {
-        performSpin({ source: 'stage', bet: betAmount, buy: bonusBuy, free: canUseFreeSpin })
-    }, [betAmount, bonusBuy, canUseFreeSpin, performSpin])
+        const tierId = canUseFreeSpin ? null : buyTierIdRef.current
+        performSpin({ source: 'stage', bet: betAmount, free: canUseFreeSpin, tierId })
+    }, [betAmount, canUseFreeSpin, performSpin])
+
+    // Autoplay loop
+    const startAutoplay = useCallback(() => {
+        if (autoplayActive || running) return
+        autoplayBaselineRef.current = balance
+        autoplayInfiniteRef.current = autoplayInfinite
+        autoplayRemainingRef.current = autoplayInfinite ? Infinity : autoplayCount
+        autoplayPendingRef.current = false
+        setAutoplayActive(true)
+        setAutoplayRemaining(autoplayInfinite ? Infinity : autoplayCount)
+        setShowAutoplayDrawer(false)
+    }, [autoplayActive, autoplayCount, autoplayInfinite, balance, running])
+
+    const stopAutoplay = useCallback(() => {
+        setAutoplayActive(false)
+        setAutoplayRemaining(0)
+        autoplayRemainingRef.current = 0
+        autoplayInfiniteRef.current = false
+        autoplayPendingRef.current = false
+    }, [])
+
+    useEffect(() => {
+        if (!autoplayActive || running || autoplayPendingRef.current) return
+        if (autoplayRemainingRef.current === Infinity) {
+            // continue
+        } else if (autoplayRemainingRef.current <= 0) {
+            stopAutoplay()
+            return
+        }
+        autoplayPendingRef.current = true
+        const tierId = canUseFreeSpin ? null : buyTierIdRef.current
+        const id = window.setTimeout(() => {
+            performSpin({ source: 'auto', bet: betAmount, free: canUseFreeSpin, tierId }).then(outcome => {
+                autoplayPendingRef.current = false
+                if (!autoplayActive) return
+                if (autoplayRemainingRef.current !== Infinity) {
+                    autoplayRemainingRef.current = Math.max(0, autoplayRemainingRef.current - 1)
+                    setAutoplayRemaining(autoplayRemainingRef.current)
+                }
+                const stops = stopsRef.current
+                const baseline = autoplayBaselineRef.current ?? balance
+                if (stops.stopOnFeature && outcome?.featureEvents?.length) stopAutoplay()
+                else if (stops.stopOnBigWin && outcome?.multiplier >= stops.bigWinThreshold) stopAutoplay()
+                else if (stops.stopOnLoss && balance <= baseline * (1 - stops.lossPercent / 100)) stopAutoplay()
+                else if (stops.stopOnGain && balance >= baseline * (1 + stops.gainPercent / 100)) stopAutoplay()
+                else if (autoplayRemainingRef.current <= 0 && autoplayRemainingRef.current !== Infinity) stopAutoplay()
+            })
+        }, 220)
+        timers.current.push(id)
+    }, [autoplayActive, betAmount, balance, canUseFreeSpin, performSpin, running, stopAutoplay])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
     const meterTarget = config.features?.coinMeter?.target || 0
     const meterPercent = meterTarget ? Math.round((coinMeter / meterTarget) * 100) : 0
+
+    const handleBuyButton = useCallback(() => {
+        if (!buyTiers.length) return
+        if (canUseFreeSpin) return
+        setShowBuyModal(true)
+    }, [buyTiers.length, canUseFreeSpin])
+
+    const handlePickTier = useCallback((tier) => {
+        setBonusBuyTierId(tier.id)
+        setShowBuyModal(false)
+    }, [])
+
+    const handleClearTier = useCallback(() => {
+        setBonusBuyTierId(null)
+    }, [])
 
     return (
         <GameShell
@@ -240,7 +394,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             id="slot-template"
                             className="slot-template-select"
                             value={templateId}
-                            disabled={running}
+                            disabled={running || autoplayActive}
                             onChange={event => setTemplateId(event.target.value)}
                         >
                             {SLOT_TEMPLATES.map(template => (
@@ -261,11 +415,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 min="0.1"
                                 step="0.5"
                                 value={betAmount}
-                                disabled={running}
+                                disabled={running || autoplayActive}
                                 onChange={event => setBet(event.target.value)}
                             />
-                            <button type="button" onClick={() => setBet(betAmount / 2)} disabled={running}>1/2</button>
-                            <button type="button" onClick={() => setBet(betAmount * 2)} disabled={running}>2x</button>
+                            <button type="button" onClick={() => setBet(betAmount / 2)} disabled={running || autoplayActive}>1/2</button>
+                            <button type="button" onClick={() => setBet(betAmount * 2)} disabled={running || autoplayActive}>2x</button>
                         </div>
                         <div className="slot-panel-kpis">
                             <span><small>Stake</small><strong>{formatCredits(effectiveStake)}</strong></span>
@@ -284,28 +438,33 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         </button>
                         <button
                             type="button"
-                            className={autoNote ? 'active' : ''}
-                            onClick={() => setAutoNote(value => !value)}
+                            className={showAutoplayDrawer ? 'active' : ''}
+                            onClick={() => setShowAutoplayDrawer(value => !value)}
                             disabled={running}
-                            title="Autoplay contract placeholder; spin loop remains manual in this educational build."
                         >
-                            <RotateCcw size={15} /> Auto plan
+                            <RotateCcw size={15} /> Autoplay
                         </button>
-                        {config.controls.buyBonus && (
+                        {buyTiers.length > 0 && (
                             <button
                                 type="button"
-                                className={bonusBuy ? 'active danger' : ''}
-                                onClick={() => setBonusBuy(value => !value)}
-                                disabled={running || canUseFreeSpin}
+                                className={activeBuyTier ? 'active danger' : ''}
+                                onClick={activeBuyTier ? handleClearTier : handleBuyButton}
+                                disabled={running || canUseFreeSpin || autoplayActive}
+                                title={activeBuyTier ? `Buy active: ${activeBuyTier.label}` : 'Pick a buy tier'}
                             >
-                                <Ticket size={15} /> Buy {bonusCostMultiplier}x
+                                <Ticket size={15} /> {activeBuyTier ? `Buy: ${activeBuyTier.label}` : 'Buy Bonus'}
                             </button>
                         )}
                     </div>
 
-                    <button className="slot-panel-spin" type="button" onClick={() => performSpin({ source: 'panel', bet: betAmount, buy: bonusBuy, free: canUseFreeSpin })} disabled={running}>
+                    <button
+                        className="slot-panel-spin"
+                        type="button"
+                        onClick={() => performSpin({ source: 'panel', bet: betAmount, free: canUseFreeSpin, tierId: canUseFreeSpin ? null : bonusBuyTierId })}
+                        disabled={running || autoplayActive}
+                    >
                         <Play size={18} />
-                        {canUseFreeSpin ? 'Play Free Spin' : bonusBuy ? 'Buy Feature' : 'Spin'}
+                        {canUseFreeSpin ? 'Play Free Spin' : activeBuyTier ? `Buy ${activeBuyTier.label}` : 'Spin'}
                     </button>
 
                     <div className="slot-panel-section">
@@ -317,6 +476,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             {config.features?.scatter && <span>Scatter bonus</span>}
                             {config.features?.coinMeter && <span>Coin collect</span>}
                             {config.features?.expandingWilds && <span>Wild pulse</span>}
+                            {config.features?.cascade && <span>Cascade ladder</span>}
+                            {config.features?.mysterySymbol && <span>Mystery</span>}
                         </div>
                     </div>
                 </div>
@@ -328,7 +489,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 </>
             }
         >
-            <div className={`slot-factory-stage skin-${config.skin} phase-${spinPhase}`} style={{ '--slot-accent': config.accent }}>
+            <div className={`slot-factory-stage skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''}`} style={{ '--slot-accent': config.accent }}>
                 <div className="slot-stage-top">
                     <div>
                         <span className="slot-benchmark">Benchmark: {config.benchmark}</span>
@@ -348,23 +509,58 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
 
                     <div className="slot-reel-frame">
-                        <div className="slot-reel-grid" style={{ gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))` }}>
-                            {grid.map((item, index) => {
-                                const col = index % config.layout.cols
-                                const spinning = running && col >= stoppedCols
-                                const winning = winningCells.includes(index)
-                                return (
-                                    <div
-                                        key={`${index}-${item.id}`}
-                                        className={`slot-symbol-cell type-${item.type || 'pay'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''}`}
-                                        style={{ animationDelay: `${col * 45}ms` }}
-                                    >
-                                        <Asset src={item.asset} alt={item.label} fallback={<strong>{item.label}</strong>} />
-                                        <em>{item.label}</em>
-                                    </div>
-                                )
-                            })}
-                        </div>
+                        {config.layout.evaluation === 'megaways' ? (
+                            <div className="slot-megaways-grid" style={{ gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))` }}>
+                                {Array.from({ length: config.layout.cols }).map((_, col) => {
+                                    const colRows = getColumnRows(config, col)
+                                    const cellsInCol = []
+                                    let cursor = 0
+                                    for (let c = 0; c < col; c += 1) cursor += getColumnRows(config, c)
+                                    for (let r = 0; r < colRows; r += 1) cellsInCol.push({ index: cursor + r })
+                                    return (
+                                        <div key={`col-${col}`} className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''}`}>
+                                            {cellsInCol.map(({ index }) => {
+                                                const item = grid[index]
+                                                const spinning = running && col >= stoppedCols
+                                                const winning = winningCells.includes(index)
+                                                const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
+                                                return (
+                                                    <div
+                                                        key={`${index}-${item?.id || 'na'}`}
+                                                        className={`slot-symbol-cell type-${item?.type || 'pay'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''}`}
+                                                    >
+                                                        <Asset src={item?.asset} alt={item?.label} fallback={<strong>{item?.label}</strong>} />
+                                                        <em>{item?.label}</em>
+                                                        {moneyValue ? <i className="money-chip">{formatCredits(moneyValue)}</i> : null}
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                            <div className="slot-reel-grid" style={{ gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))` }}>
+                                {grid.map((item, index) => {
+                                    const { col } = cellPositions[index]
+                                    const spinning = running && col >= stoppedCols
+                                    const winning = winningCells.includes(index)
+                                    const inAnticipationCol = anticipating && col >= config.layout.cols - 2 && spinning
+                                    const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
+                                    return (
+                                        <div
+                                            key={`${index}-${item.id}`}
+                                            className={`slot-symbol-cell type-${item.type || 'pay'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${inAnticipationCol ? 'anticipating' : ''}`}
+                                            style={{ animationDelay: `${col * 45}ms` }}
+                                        >
+                                            <Asset src={item.asset} alt={item.label} fallback={<strong>{item.label}</strong>} />
+                                            <em>{item.label}</em>
+                                            {moneyValue ? <i className="money-chip">{formatCredits(moneyValue)}</i> : null}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     <div className="slot-feature-panel">
@@ -385,19 +581,26 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             <Ticket size={16} />
                             <span>{freeSpins} free spins</span>
                         </div>
+                        {autoplayActive && (
+                            <div className="slot-auto-indicator">
+                                <span>Autoplay</span>
+                                <strong>{autoplayRemaining === Infinity ? '∞' : autoplayRemaining}</strong>
+                                <button type="button" onClick={stopAutoplay}><Square size={12} /> Stop</button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="slot-stage-controls">
-                    <button type="button" className="slot-mini-btn" onClick={() => setBet(betAmount / 2)} disabled={running}>-</button>
+                    <button type="button" className="slot-mini-btn" onClick={() => setBet(betAmount / 2)} disabled={running || autoplayActive}>-</button>
                     <div className="slot-bet-readout">
-                        <small>{canUseFreeSpin ? 'Free spin' : bonusBuy ? 'Feature cost' : 'Bet'}</small>
+                        <small>{canUseFreeSpin ? 'Free spin' : activeBuyTier ? 'Feature cost' : 'Bet'}</small>
                         <strong>{formatCredits(effectiveStake)}</strong>
                     </div>
-                    <button type="button" className="slot-spin-btn" onClick={triggerStageSpin} disabled={running} aria-label="Spin slot">
+                    <button type="button" className="slot-spin-btn" onClick={triggerStageSpin} disabled={running || autoplayActive} aria-label="Spin slot">
                         <RotateCcw size={34} />
                     </button>
-                    <button type="button" className="slot-mini-btn" onClick={() => setBet(betAmount * 2)} disabled={running}>+</button>
+                    <button type="button" className="slot-mini-btn" onClick={() => setBet(betAmount * 2)} disabled={running || autoplayActive}>+</button>
                     <div className="slot-win-readout">
                         <small>Win</small>
                         <strong>{formatCredits(lastResult?.returnAmount || 0)}</strong>
@@ -410,6 +613,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <h3>{config.title}</h3>
                         <p>{config.featureText}</p>
                         <button type="button" onClick={() => setShowIntro(false)}>Spin it</button>
+                    </div>
+                )}
+
+                {mysteryReveal && !running && (
+                    <div className="slot-mystery-overlay" key={mysteryReveal.id}>
+                        <span>Mystery reveals</span>
+                        <strong>{mysteryReveal.label}</strong>
                     </div>
                 )}
 
@@ -428,6 +638,119 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 {FEATURE_LABELS[event.type] || event.type}: {event.label}
                             </span>
                         ))}
+                    </div>
+                )}
+
+                {showAutoplayDrawer && !running && (
+                    <div className="slot-autoplay-drawer" role="dialog" aria-label="Autoplay configuration">
+                        <header>
+                            <strong>Autoplay</strong>
+                            <button type="button" onClick={() => setShowAutoplayDrawer(false)}>Close</button>
+                        </header>
+                        <p className="slot-auto-banner">Practice credits only. Autoplay never spends real money.</p>
+                        <div className="slot-auto-counts">
+                            {AUTOPLAY_COUNTS.map(count => (
+                                <button
+                                    key={count}
+                                    type="button"
+                                    className={!autoplayInfinite && autoplayCount === count ? 'active' : ''}
+                                    onClick={() => { setAutoplayCount(count); setAutoplayInfinite(false) }}
+                                >
+                                    {count}
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                className={autoplayInfinite ? 'active' : ''}
+                                onClick={() => setAutoplayInfinite(value => !value)}
+                            >∞</button>
+                        </div>
+                        <details className="slot-auto-advanced">
+                            <summary>Advanced stop conditions</summary>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={advancedStops.stopOnFeature}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, stopOnFeature: e.target.checked }))}
+                                />
+                                Stop on feature trigger
+                            </label>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={advancedStops.stopOnBigWin}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, stopOnBigWin: e.target.checked }))}
+                                />
+                                Stop on win &ge;
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={advancedStops.bigWinThreshold}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, bigWinThreshold: Number(e.target.value) || 1 }))}
+                                />x
+                            </label>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={advancedStops.stopOnLoss}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, stopOnLoss: e.target.checked }))}
+                                />
+                                Stop if balance drops by
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="99"
+                                    step="1"
+                                    value={advancedStops.lossPercent}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, lossPercent: Number(e.target.value) || 1 }))}
+                                />%
+                            </label>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={advancedStops.stopOnGain}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, stopOnGain: e.target.checked }))}
+                                />
+                                Stop if balance grows by
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="500"
+                                    step="1"
+                                    value={advancedStops.gainPercent}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, gainPercent: Number(e.target.value) || 1 }))}
+                                />%
+                            </label>
+                        </details>
+                        <div className="slot-auto-actions">
+                            <button type="button" className="slot-auto-start" onClick={startAutoplay} disabled={autoplayActive}>
+                                <Play size={14} /> Start autoplay
+                            </button>
+                            <button type="button" className="slot-auto-stop" onClick={stopAutoplay} disabled={!autoplayActive}>
+                                <Square size={14} /> Stop
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {showBuyModal && (
+                    <div className="slot-buy-modal" role="dialog" aria-label="Buy bonus tier">
+                        <header>
+                            <strong>Buy Bonus</strong>
+                            <button type="button" onClick={() => setShowBuyModal(false)}>Close</button>
+                        </header>
+                        <p>Pick a tier; cost multiplier applies to your current bet.</p>
+                        <div className="slot-buy-tiers">
+                            {buyTiers.map(tier => (
+                                <button key={tier.id} type="button" onClick={() => handlePickTier(tier)}>
+                                    <strong>{tier.label}</strong>
+                                    <span>{tier.costMultiplier}x bet</span>
+                                    {tier.guaranteedScatters && <em>{tier.guaranteedScatters} scatters guaranteed</em>}
+                                    {tier.persistentMultiplier ? <em>+{tier.persistentMultiplier}x persistent</em> : null}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 

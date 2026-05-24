@@ -4,6 +4,13 @@ import { nextRoll } from '../../../utils/fairRng'
 const classic = '/assets/games/slots/classic'
 const cyber = '/assets/games/slots/cyber'
 const mythic = '/assets/games/slots/mythic'
+// Wave 7 themed packs
+const wanted = '/assets/games/slots/wanted'
+const olympus = '/assets/games/slots/olympus'
+const bayou = '/assets/games/slots/bayou'
+const mummy = '/assets/games/slots/mummy'
+const phoenix = '/assets/games/slots/phoenix'
+const mansion = '/assets/games/slots/mansion'
 
 function symbol(id, label, asset, weight, payout, extra = {}) {
     return { id, label, asset, weight, payout, ...extra }
@@ -255,6 +262,225 @@ export const SLOT_TEMPLATES = [
             symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
             symbol('rank-k', 'K', `${cyber}/slot-cyber-node.png`, 20, 0.5),
             symbol('samurai', 'SAMU', `${cyber}/slot-cyber-chip.png`, 7, 0, { type: 'wild' }),
+        ],
+    },
+
+    // ---- Wave 7 templates ----
+
+    {
+        id: 'wanted-revelation',
+        title: 'Wanted Revelation',
+        benchmark: 'Wanted Salvation / Sand and Ashes',
+        skin: 'wanted',
+        accent: '#f6a141',
+        rtpTarget: 0.945,
+        volatility: 'High',
+        layout: { rows: 4, cols: 5, evaluation: 'lines' },
+        backdrop: '/assets/games/backdrops/backdrop-parchment.png',
+        featureText: 'Each spin a Wanted symbol is revealed; every wanted cell morphs to that paying symbol before evaluation.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'star', trigger: 3, awardFreeSpins: 6, pay: 1.2 },
+            anticipation: { scatterMin: 2 },
+            mysterySymbol: {
+                id: 'wanted',
+                candidates: ['badge', 'watch', 'rope'],
+                chance: 1,
+            },
+            buyBonus: {
+                costMultiplier: 60,
+                guaranteedScatters: 3,
+                tiers: [
+                    { id: 'lite', label: 'Wanted Lite', costMultiplier: 40, guaranteedScatters: 2 },
+                    { id: 'std', label: 'Wanted Standard', costMultiplier: 60, guaranteedScatters: 3 },
+                    { id: 'super', label: 'Wanted Super', costMultiplier: 120, guaranteedScatters: 4 },
+                ],
+            },
+            darkWinOverlay: true,
+        },
+        symbols: [
+            symbol('badge', 'BADGE', `${wanted}/wanted-revelation-hero.png`, 5, 9),
+            symbol('watch', 'WATCH', `${wanted}/wanted-revelation-mid1.png`, 8, 4.4),
+            symbol('rope', 'ROPE', `${wanted}/wanted-revelation-mid2.png`, 12, 2.2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('wanted', 'WNTD', `${wanted}/wanted-revelation-bonus.png`, 8, 0, { type: 'mystery' }),
+            symbol('star', 'STAR', `${wanted}/wanted-revelation-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'gates-ascent',
+        title: 'Gates of Ascent',
+        benchmark: 'Gates of Heaven 1000',
+        skin: 'olympus',
+        accent: '#fbcd5b',
+        rtpTarget: 0.94,
+        volatility: 'High',
+        layout: { rows: 6, cols: 6, evaluation: 'pay-anywhere' },
+        backdrop: '/assets/games/backdrops/backdrop-stars.png',
+        featureText: 'Pay anywhere on a 6x6 grid. Land 3+ scatters for free spins with a persistent multiplier that grows on retriggers.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'gate', trigger: 4, awardFreeSpins: 8, pay: 1.6 },
+            anticipation: { scatterMin: 3 },
+            payAnywhereMin: 8,
+            persistentMultiplier: 1,
+            buyBonus: {
+                costMultiplier: 100,
+                guaranteedScatters: 4,
+                tiers: [
+                    { id: 'std', label: 'Ascent Buy', costMultiplier: 100, guaranteedScatters: 4 },
+                    { id: 'super', label: 'Olympus Buy', costMultiplier: 220, guaranteedScatters: 5, persistentMultiplier: 2 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('bolt', 'BOLT', `${olympus}/gates-ascent-hero.png`, 5, 8),
+            symbol('crown', 'CRWN', `${olympus}/gates-ascent-mid1.png`, 8, 4.4),
+            symbol('sandal', 'SAND', `${olympus}/gates-ascent-mid2.png`, 12, 2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('rank-j', 'J', `${classic}/slot-classic-cherry.png`, 22, 0.32),
+            symbol('gate', 'GATE', `${olympus}/gates-ascent-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'bass-bayou',
+        title: 'Bass Bayou Collect',
+        benchmark: 'Big Bass collect variant',
+        skin: 'bayou',
+        accent: '#9bd86b',
+        rtpTarget: 0.945,
+        volatility: 'Medium high',
+        layout: { rows: 3, cols: 5, evaluation: 'lines' },
+        backdrop: '/assets/games/backdrops/backdrop-felt-green.png',
+        featureText: 'Money symbols carry attached prizes. Free spins collect every money value via the angler.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'tag', trigger: 3, awardFreeSpins: 8, pay: 1.1 },
+            anticipation: { scatterMin: 2 },
+            buyBonus: {
+                costMultiplier: 80,
+                guaranteedScatters: 3,
+                tiers: [
+                    { id: 'std', label: 'Bayou Buy', costMultiplier: 80, guaranteedScatters: 3 },
+                    { id: 'super', label: 'Trophy Buy', costMultiplier: 160, guaranteedScatters: 4 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('bass', 'BASS', `${bayou}/bass-bayou-hero.png`, 5, 7.5),
+            symbol('rod', 'ROD', `${bayou}/bass-bayou-mid1.png`, 8, 4),
+            symbol('tackle', 'TKL', `${bayou}/bass-bayou-mid2.png`, 12, 2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('money', 'PRIZE', `${bayou}/bass-bayou-bonus.png`, 6, 0, { type: 'money', valueRange: [1, 8] }),
+            symbol('tag', 'BONUS', `${bayou}/bass-bayou-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'mummy-cascade',
+        title: 'Mummy Cascade',
+        benchmark: 'Flaming Mummy',
+        skin: 'mummy',
+        accent: '#f57c4a',
+        rtpTarget: 0.945,
+        volatility: 'High',
+        layout: { rows: 6, cols: 6, evaluation: 'cluster' },
+        backdrop: '/assets/games/backdrops/backdrop-parchment.png',
+        featureText: 'Cluster pays cascade with a growing multiplier ladder. Wins remove cells; new ones tumble in.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'flame', trigger: 4, awardFreeSpins: 10, pay: 1.4 },
+            anticipation: { scatterMin: 3 },
+            clusterMin: 5,
+            cascade: { tumbleMultiplierLadder: [1, 2, 3, 5, 10] },
+            buyBonus: {
+                costMultiplier: 90,
+                guaranteedScatters: 4,
+                tiers: [
+                    { id: 'std', label: 'Tomb Buy', costMultiplier: 90, guaranteedScatters: 4 },
+                    { id: 'super', label: 'Pharaoh Buy', costMultiplier: 200, guaranteedScatters: 5 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('mask', 'MASK', `${mummy}/mummy-cascade-hero.png`, 5, 7.5),
+            symbol('ankh', 'ANKH', `${mummy}/mummy-cascade-mid1.png`, 8, 4),
+            symbol('sun', 'SUN', `${mummy}/mummy-cascade-mid2.png`, 12, 2.2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('flame', 'FLAME', `${mummy}/mummy-cascade-bonus.png`, 5, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'phoenix-megaways',
+        title: 'Phoenix Megaways',
+        benchmark: 'Lucky Phoenix Megaways',
+        skin: 'phoenix',
+        accent: '#ff6b3a',
+        rtpTarget: 0.94,
+        volatility: 'Very high',
+        layout: { rows: 7, cols: 6, evaluation: 'megaways', columnRows: [4, 5, 6, 6, 5, 4] },
+        backdrop: '/assets/games/backdrops/backdrop-stars.png',
+        featureText: 'Megaways with variable rows per reel. Each cascade boosts the multiplier; phoenix wilds re-ignite.',
+        controls: { buyBonus: false, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'egg', trigger: 4, awardFreeSpins: 10, pay: 1.5 },
+            anticipation: { scatterMin: 3 },
+            cascade: { tumbleMultiplierLadder: [1, 2, 3, 5, 10] },
+            persistentMultiplier: 1,
+        },
+        symbols: [
+            symbol('phoenix', 'PHX', `${phoenix}/phoenix-megaways-hero.png`, 5, 9),
+            symbol('feather', 'FEA', `${phoenix}/phoenix-megaways-mid1.png`, 8, 4.5),
+            symbol('sun', 'SUN', `${phoenix}/phoenix-megaways-mid2.png`, 12, 2.4),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('rank-j', 'J', `${classic}/slot-classic-cherry.png`, 22, 0.32),
+            symbol('egg', 'EGG', `${phoenix}/phoenix-megaways-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'mansion-megaways',
+        title: 'Mansion Megaways',
+        benchmark: 'The Dog Mansion Megaways',
+        skin: 'mansion',
+        accent: '#a47cff',
+        rtpTarget: 0.945,
+        volatility: 'High',
+        layout: { rows: 7, cols: 6, evaluation: 'megaways', columnRows: [3, 5, 7, 7, 5, 3] },
+        backdrop: '/assets/games/backdrops/backdrop-stars.png',
+        featureText: 'Gothic megaways. Free spins keep a persistent multiplier that grows by +1 each scatter retrigger.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'candle', trigger: 4, awardFreeSpins: 12, pay: 1.6 },
+            anticipation: { scatterMin: 3 },
+            cascade: { tumbleMultiplierLadder: [1, 2, 3, 4, 6] },
+            persistentMultiplier: 1,
+            buyBonus: {
+                costMultiplier: 110,
+                guaranteedScatters: 4,
+                tiers: [
+                    { id: 'std', label: 'Mansion Buy', costMultiplier: 110, guaranteedScatters: 4 },
+                    { id: 'super', label: 'Crypt Buy', costMultiplier: 250, guaranteedScatters: 5, persistentMultiplier: 2 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('dog', 'DOG', `${mansion}/mansion-megaways-hero.png`, 5, 9),
+            symbol('key', 'KEY', `${mansion}/mansion-megaways-mid1.png`, 8, 4.5),
+            symbol('letter', 'LET', `${mansion}/mansion-megaways-mid2.png`, 12, 2.4),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('rank-j', 'J', `${classic}/slot-classic-cherry.png`, 22, 0.32),
+            symbol('candle', 'CNDL', `${mansion}/mansion-megaways-bonus.png`, 4, 0, { type: 'scatter' }),
         ],
     },
 ]

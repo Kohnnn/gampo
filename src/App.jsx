@@ -136,6 +136,12 @@ function App() {
                 <Route path="scarab-spin" element={lazied(<SlotsGame initialTemplateId="scarab-spin" />)} />
                 <Route path="bars" element={lazied(<SlotsGame initialTemplateId="bars" />)} />
                 <Route path="blue-samurai" element={lazied(<SlotsGame initialTemplateId="blue-samurai" />)} />
+                <Route path="wanted-revelation" element={lazied(<SlotsGame initialTemplateId="wanted-revelation" />)} />
+                <Route path="gates-ascent" element={lazied(<SlotsGame initialTemplateId="gates-ascent" />)} />
+                <Route path="bass-bayou" element={lazied(<SlotsGame initialTemplateId="bass-bayou" />)} />
+                <Route path="mummy-cascade" element={lazied(<SlotsGame initialTemplateId="mummy-cascade" />)} />
+                <Route path="phoenix-megaways" element={lazied(<SlotsGame initialTemplateId="phoenix-megaways" />)} />
+                <Route path="mansion-megaways" element={lazied(<SlotsGame initialTemplateId="mansion-megaways" />)} />
                 <Route path="*" element={<NotFoundPage />} />
             </Route>
         </Routes>
