@@ -1,85 +1,135 @@
 # Sportsbook
 
-`/sports` is GamPo's educational sportsbook. It uses **The Odds API** for live decimal odds and **TheSportsDB** for historical results, with aggressive caching and key rotation. All settlement is local and simulated against practice credits.
+`/sports` is Gampo's fake-credit sportsbook surface. It is a dense sportsbook-style simulator with an internal sport rail, central market workspace, right betslip rail on desktop, and mobile search/betslip overlays.
 
-## Data sources
+The implementation uses the Stake sportsbook audit pack only as layout and behavior reference. It does not copy Stake source, CSS, SVG paths, images, icons, team crests, CDN resources, or proprietary assets.
 
-### The Odds API (live odds)
+## Architecture
 
-- Endpoint base: `https://api.the-odds-api.com/v4`
-- Used endpoints:
-  - `GET /sports?apiKey=…` — list in-season sports (cached 24h)
-  - `GET /sports/upcoming/odds/?regions={region}&markets=h2h&oddsFormat=decimal&apiKey=…` — upcoming markets per region (cached 10 min)
-  - `GET /sports/{sportKey}/odds/?regions=us,uk&markets=h2h&oddsFormat=decimal&apiKey=…` — per-sport markets (cached 10 min)
-- Free-tier quota: 500 requests/month per key. We rotate three keys to multiply this.
+- Route wrapper: `src/pages/SportsPage.jsx`
+- Feature shell: `src/sportsbook/SportsbookShell.jsx`
+- Data and feed: `src/sportsbook/sportsbookData.js`, `src/sportsbook/sportsbookFeed.js`
+- Math and state: `src/sportsbook/sportsbookMath.js`, `src/sportsbook/sportsbookState.js`
+- Components: `src/sportsbook/components/*`
+- Styles: `src/styles/sportsbook.css`
 
-### TheSportsDB (historical / educational)
+The public route remains `/sports`. `SportsPage.jsx` is intentionally thin so sportsbook layout, data normalization, selection state, ticket placement, search, event detail, and mobile overlays stay inside the sportsbook feature folder.
 
-- Endpoint base: `https://www.thesportsdb.com/api/v1/json/3`
-- Used endpoints:
-  - `GET /eventsday.php?d=YYYY-MM-DD&s=Soccer` — events for a given day (cached 24h)
-  - `GET /lookupevent.php?id=…` — event detail (cached 24h)
-- No key required for the public v3 endpoints.
+## Data Sources
 
-## Service module
+Synthetic Gampo-owned fixtures are always available and drive the default UI states:
 
-`src/services/sportsApi.js` exposes:
+- sports, leagues, events, live clocks, scores, popularity, tags
+- winner, totals, spread/handicap, props, racing, and correct-score style market groups
+- selected, suspended, odds-up, odds-down, and boosted selection states
 
-- `fetchInSeasonSports()` — `{ data, cached, errors }`
-- `fetchUpcomingOdds(region)` — `{ data, cached, errors }`
-- `fetchOddsForSport(sportKey, { regions, markets })` — `{ data, cached, errors }`
-- `fetchEventsForDay(dateStr, sport)` — TheSportsDB historical
-- `fetchEventDetail(eventId)` — TheSportsDB lookup
-- `getQuotaSnapshot()` — last seen `x-requests-used` / `x-requests-remaining` per key
-- Helpers: `impliedFromDecimal`, `bestBookmakerPrice`, `fixtureFromOddsApi`
+Optional live feed support remains:
 
-## Key rotation
+- The Odds API via `src/services/sportsApi.js`
+- `fetchUpcomingOdds(region)`
+- `fetchInSeasonSports()`
+- `fixtureFromOddsApi(event)`
 
-The service maintains a small round-robin index in `localStorage` plus a per-key cooldown map.
+Free provider support is layered through a local Vite proxy:
 
-- Source order: `import.meta.env.VITE_ODDS_API_KEYS` (comma-separated) → falls back to a hardcoded list.
-- On HTTP 401/403 → cool down that key for 60 minutes and rotate.
-- On HTTP 429 → cool down that key for 30 minutes and rotate.
-- On other errors → just rotate (no cooldown).
-- If every key is in cooldown, the call returns `{ data: null, errors }` and the UI keeps showing whatever cached fixtures it has.
+- Proxy endpoint: `/api/sportsbook/free-feed`
+- Proxy implementation: `server/sportsbookProviderProxy.js`
+- Client normalization: `src/sportsbook/freeFeedAdapters.js`
+- Supported `.env.local` names: `SportsGameOdds_token`, `pandascore_token`, `odds-api_token`, `api-football_token`
+- Source roles:
+  - SportsGameOdds: preferred free primary odds feed for NBA, NFL, MLB, NHL, NCAAB, and NCAAF moneyline, spread, and total markets
+  - PandaScore: esports schedules and matchup context
+  - odds-api.io: free-tier sports/esports events and odds where available
+  - API-Football: soccer fixtures and match-winner odds where available; the proxy uses today's date and joins fixtures to odds because free plans can reject `next` and `ids` parameters
 
-## Caching
+These provider tokens are server-side only. Do not move them into `VITE_` variables. If the proxy is unavailable, the app falls back to The Odds API if configured and then to synthetic Gampo fixtures.
 
-All Odds API and TheSportsDB calls go through a `localStorage`-backed cache:
+Roadmap reference: keep expanding SportsGameOdds coverage first because its event/market model is the closest fit for Gampo's normalized sportsbook data. Next useful additions are alternate lines, player props, and soccer league filters when the active SportsGameOdds tier supports EPL/UEFA-style leagues.
 
-| Endpoint                         | TTL    |
-|----------------------------------|--------|
-| `/sports` (list)                 | 24h    |
-| Upcoming odds (per region)       | 10 min |
-| Per-sport odds                   | 10 min |
-| TheSportsDB events for a day     | 24h    |
-| TheSportsDB event detail         | 24h    |
+`sportsbookFeed.js` normalizes optional API events into the same event and market shape as synthetic events. If the feed fails, the sportsbook keeps rendering synthetic fixtures.
 
-Cache keys are derived from the URL + query string. The "Refresh odds" button forces a refetch but still respects key cooldowns.
+## Betting Flow
 
-## Quota chip
+All betting is practice-credit only.
 
-The header of `/sports` shows the **remaining quota** summed across all known keys, read from response headers (`x-requests-remaining`). It is updated after every successful request.
+- Default betslip mode is Singles.
+- Multi/parlay and 2-of-N system tickets are available from the betslip mode tabs.
+- Default odds policy is `Accept Only Higher Odds`.
+- Worse odds changes require manual acceptance before the `Place Practice Bet` button can submit.
+- Suspended selections block ticket placement.
+- Practice stake must be greater than zero and cannot exceed the current practice balance.
 
-## UI features
+Ticket settlement uses deterministic seeded simulation through `createRoundRng`, not direct `Math.random()`. Accepted odds are stored on the ticket so later odds movement does not rewrite settled or accepted tickets.
 
-- Region toggle (US / UK).
-- Sport tabs derived from `in-season sports` plus "All" and "Live".
-- F1 is included if `motorsport_f1_*` keys appear in the in-season list (the simulator additionally treats it as fantasy).
-- Per-fixture market grid with implied probability + fair-odds badge.
-- **Drift indicators**: when odds change between refreshes, market buttons flash green or red and show an arrow. Educational only; on a real book this would prompt strategy discussions.
-- **Bet builder**: the slip allows multiple legs from the same fixture. Parlay mode shows a yellow correlation warning explaining that real books often block these legs.
-- Singles / Parlay / System modes with combined odds, implied chance, model chance, and EV.
-- **Educational history**: pick a date → load past Soccer fixtures from TheSportsDB → compare scorelines to estimated fair odds.
+## Education Model
 
-## Compliance
+Education is contextual through the Odds Coach instead of a separate lesson page.
 
-- No real-money flow. Practice credits only.
-- No real-book branding embedded in the UI; bookmaker names come straight from the API response and are displayed as plain text.
-- Keys are read-only. The free Odds API tier is sufficient for personal/educational use.
+- Odds cells expose `Analyze odds`: decimal odds, break-even chance, no-vig fair chance when a full market exists, model edge, movement, status, and provider caveat.
+- Market groups expose `Analyze market`: market-type explanation, overround, vig, de-vig probability table, and notes about why all outcomes can look slightly overpriced.
+- Bet slip exposes `Analyze ticket`: singles stake split, multi/parlay multiplied odds, 2-of-N system combinations, estimated return versus profit, EV hint, same-game correlation warning, and odds-change policy.
+- Settled tickets expose `Review`: stake, returned practice credits, profit, deterministic leg rolls, accepted odds snapshot, and neutral decision-quality copy such as good decision / bad result or bad price / lucky result.
 
-## Risks and notes
+The coach uses three tiers:
 
-- **Client-side keys**: keys are exposed to anyone using the deployed app. For a public deploy, move to a tiny serverless proxy. Documented in `compliance.md`.
-- **API outages**: when the live feed fails, the sim still renders synthetic fixtures so the lab keeps working.
-- **Caching**: clearing browser storage wipes both the cache and the cooldown map; the next page load will re-fetch.
+- `Basics`: beginner-friendly break-even, status, payout, and market explanations.
+- `Analysis`: no-vig, vig, system combinations, and odds-change mechanics.
+- `Sharp Notes`: model-vs-price, source caveats, correlation, and accepted-price review.
+
+The analysis is for learning only. It must not claim profitable prediction or wagering advice.
+
+## UI Surfaces
+
+Desktop:
+
+- internal sport rail with Live Events, Starting Soon, All, My Bets, top sports, all sports/esports/racing groups
+- sportsbook home with promo strip, search trigger, section nav, top matches, outrights, top sports, and popular events
+- compact event rows with league/date headers, live score/clock, market labels, odds cells, and `+N` market affordance
+- event detail view with breadcrumbs, tabs, market filters, advanced stats, market accordions, and shared betslip selection
+- sticky right betslip with empty, selected, odds-changed, placing, accepted, and settled states
+
+Mobile:
+
+- single-column sportsbook home
+- horizontal promo strip
+- bottom nav for Browse, Casino, Bet Slip, Sports, and Chat
+- full-screen search overlay
+- full-height betslip bottom sheet
+
+## Compliance Limits
+
+- No deposits, withdrawals, crypto wallets, cash-value balance, account wagering, real order submission, KYC, or provider RGS.
+- CTA language uses fake-credit wording, e.g. `Place Practice Bet`.
+- Bookmaker/API data is optional display input; all settlement remains local simulation.
+
+## Verification
+
+Run:
+
+```powershell
+cd D:\gampo
+npm run build
+npm test
+```
+
+Focused sportsbook checks:
+
+```powershell
+cd D:\gampo
+npm test -- src/sportsbook/sportsbookEducation.test.js src/sportsbook/sportsbookMath.test.js src/sportsbook/sportsbookState.test.js src/utils/sportsApi.test.js
+```
+
+Browser-check `/sports` at:
+
+- `1440x900`: desktop home, selected betslip, event detail, odds changed, suspended odds, odds coach from odds cell, market, betslip, and settled ticket
+- `390x844`: mobile clean home, search overlay, betslip bottom sheet, coach drawer without overlap
+
+Acceptance points:
+
+- No horizontal overflow.
+- No text overlap.
+- Odds cells remain tappable and readable.
+- Odds Coach triggers do not resize odds cells or block selection.
+- Bet slip footer actions stay reachable.
+- Synthetic data renders even when external feed calls fail.
+- Free provider tokens are never exposed to browser code or documentation.

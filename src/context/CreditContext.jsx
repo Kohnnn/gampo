@@ -70,7 +70,13 @@ export function CreditProvider({ children }) {
 
     const showToast = useCallback((type, title, description, duration = 3000) => {
         const id = ++toastIdRef.current
-        setToasts(prev => [...prev, { id, type, title, description }])
+        // Wave 13: dedupe rapid-fire same-title toasts (e.g. autoplay spin spam)
+        // and cap the visible stack at 3 so the screen never fills with messages.
+        setToasts(prev => {
+            const sameKey = `${type}|${title}`
+            const filtered = prev.filter(t => `${t.type}|${t.title}` !== sameKey).slice(-2)
+            return [...filtered, { id, type, title, description }]
+        })
         window.setTimeout(() => {
             setToasts(prev => prev.filter(toast => toast.id !== id))
         }, duration)

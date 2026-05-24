@@ -1,6 +1,6 @@
 // Lightweight hotkey help modal. Toggles when the user presses '?'.
-// Designed to be mounted once at the GameShell title bar so every shell game
-// surfaces the same shortcut reference.
+// Wave 17: also accepts external control via `controlledOpen` + `onClose`
+// so the GameToolbar popover can open it.
 
 import { useEffect, useState } from 'react'
 import { Keyboard, X } from 'lucide-react'
@@ -16,8 +16,9 @@ const SHORTCUTS = [
     { key: '?', desc: 'Toggle this help overlay' },
 ]
 
-export default function HotkeyHelp() {
+export default function HotkeyHelp({ controlledOpen, onClose }) {
     const [open, setOpen] = useState(false)
+    const isOpen = controlledOpen !== undefined ? controlledOpen : open
 
     useEffect(() => {
         const onKey = (e) => {
@@ -26,31 +27,34 @@ export default function HotkeyHelp() {
             if (e.target?.isContentEditable) return
             if (e.key === '?' || (e.shiftKey && e.key === '/')) {
                 e.preventDefault()
-                setOpen(o => !o)
-            } else if (e.key === 'Escape' && open) {
-                setOpen(false)
+                if (controlledOpen !== undefined) {
+                    if (controlledOpen) onClose?.()
+                    else onClose?.() // controlled host should toggle externally
+                } else {
+                    setOpen(o => !o)
+                }
+            } else if (e.key === 'Escape' && isOpen) {
+                if (controlledOpen !== undefined) onClose?.()
+                else setOpen(false)
             }
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [open])
+    }, [isOpen, controlledOpen, onClose])
+
+    const dismiss = () => {
+        if (controlledOpen !== undefined) onClose?.()
+        else setOpen(false)
+    }
 
     return (
         <>
-            <button
-                className="gt-btn"
-                aria-label="Keyboard shortcuts"
-                title="Keyboard shortcuts (?)"
-                onClick={() => setOpen(true)}
-            >
-                <Keyboard size={14} />
-            </button>
-            {open && (
-                <div className="hotkey-backdrop" onClick={() => setOpen(false)}>
+            {isOpen && (
+                <div className="hotkey-backdrop" onClick={dismiss}>
                     <div className="hotkey-card" role="dialog" aria-label="Keyboard shortcuts" onClick={e => e.stopPropagation()}>
                         <header className="hotkey-head">
                             <h2><Keyboard size={16} /> Keyboard shortcuts</h2>
-                            <button className="hotkey-close" onClick={() => setOpen(false)} aria-label="Close shortcuts"><X size={14} /></button>
+                            <button className="hotkey-close" onClick={dismiss} aria-label="Close shortcuts"><X size={14} /></button>
                         </header>
                         <ul className="hotkey-list">
                             {SHORTCUTS.map(s => (

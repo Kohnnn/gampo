@@ -11,6 +11,13 @@ const bayou = '/assets/games/slots/bayou'
 const mummy = '/assets/games/slots/mummy'
 const phoenix = '/assets/games/slots/phoenix'
 const mansion = '/assets/games/slots/mansion'
+// Wave 8 themed packs
+const ronin = '/assets/games/slots/ronin'
+const iron = '/assets/games/slots/iron'
+const coop = '/assets/games/slots/coop'
+const spirit = '/assets/games/slots/spirit'
+const forge = '/assets/games/slots/forge'
+const gummy = '/assets/games/slots/gummy'
 
 function symbol(id, label, asset, weight, payout, extra = {}) {
     return { id, label, asset, weight, payout, ...extra }
@@ -483,6 +490,240 @@ export const SLOT_TEMPLATES = [
             symbol('candle', 'CNDL', `${mansion}/mansion-megaways-bonus.png`, 4, 0, { type: 'scatter' }),
         ],
     },
+
+    // ---- Wave 8 templates ----
+
+    {
+        id: 'ghostblade-strike',
+        title: 'Ghostblade Strike',
+        benchmark: 'Ghostblade',
+        skin: 'ronin',
+        accent: '#5fd1ff',
+        rtpTarget: 0.945,
+        volatility: 'High',
+        layout: { rows: 4, cols: 5, evaluation: 'lines' },
+        backdrop: '/assets/games/backdrops/backdrop-stars.png',
+        featureText: 'Stacked ronin wilds turn full reels wild. Three middle reels carry a 3x multiplier zone.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'amulet', trigger: 3, awardFreeSpins: 8, pay: 1.3 },
+            anticipation: { scatterMin: 2 },
+            stackedWildReel: { wildSymbolId: 'ghost', minStack: 3, lineBoost: 1.6 },
+            multiplierZones: { columns: [1, 2, 3], multiplier: 3 },
+            buyBonus: {
+                costMultiplier: 80,
+                guaranteedScatters: 3,
+                tiers: [
+                    { id: 'std', label: 'Spirit Buy', costMultiplier: 80, guaranteedScatters: 3 },
+                    { id: 'super', label: 'Ronin Buy', costMultiplier: 180, guaranteedScatters: 4, persistentMultiplier: 2 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('mask', 'MASK', `${ronin}/ghostblade-strike-hero.png`, 5, 8.5),
+            symbol('katana', 'KATA', `${ronin}/ghostblade-strike-mid1.png`, 8, 4.4),
+            symbol('blossom', 'BLSM', `${ronin}/ghostblade-strike-mid2.png`, 12, 2.2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('ghost', 'GHST', `${ronin}/ghostblade-strike-bonus.png`, 6, 0, { type: 'wild' }),
+            symbol('amulet', 'BONUS', `${ronin}/ghostblade-strike-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'iron-fist',
+        title: 'Iron Fist Demolition',
+        benchmark: 'Fist of Demolition',
+        skin: 'iron',
+        accent: '#ff7b3a',
+        rtpTarget: 0.94,
+        volatility: 'Very high',
+        layout: { rows: 4, cols: 5, evaluation: 'ways' },
+        backdrop: '/assets/games/backdrops/backdrop-parchment.png',
+        featureText: 'Hacksaw-style multiplier wheel feature gate. Trigger 3+ gongs to spin a 5x to 100x multiplier.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'gong', trigger: 3, awardFreeSpins: 6, pay: 1.4 },
+            anticipation: { scatterMin: 2 },
+            multiplierWheel: { values: [5, 10, 25, 50, 100], weights: [40, 30, 18, 9, 3] },
+            darkWinOverlay: true,
+            buyBonus: {
+                costMultiplier: 70,
+                guaranteedScatters: 3,
+                tiers: [
+                    { id: 'std', label: 'Bell Buy', costMultiplier: 70, guaranteedScatters: 3 },
+                    { id: 'super', label: 'Knockout Buy', costMultiplier: 180, guaranteedScatters: 4, persistentMultiplier: 3 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('fist', 'FIST', `${iron}/iron-fist-hero.png`, 5, 9),
+            symbol('belt', 'BELT', `${iron}/iron-fist-mid1.png`, 8, 4.4),
+            symbol('bell', 'BELL', `${iron}/iron-fist-mid2.png`, 12, 2.2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('gong', 'GONG', `${iron}/iron-fist-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'coop-cluck',
+        title: 'Coop Cluck Cluster',
+        benchmark: 'Motherclucker',
+        skin: 'coop',
+        accent: '#ffd166',
+        rtpTarget: 0.945,
+        volatility: 'Medium high',
+        layout: { rows: 6, cols: 6, evaluation: 'cluster' },
+        backdrop: '/assets/games/backdrops/backdrop-felt-green.png',
+        featureText: 'Cluster pays plus a flock-collect meter. Land 30 chicks to enter the bonus barn.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'basket', trigger: 4, awardFreeSpins: 8, pay: 1.2 },
+            anticipation: { scatterMin: 3 },
+            clusterMin: 5,
+            coinMeter: { target: 30, symbolId: 'egg', pay: 0.32 },
+            buyBonus: {
+                costMultiplier: 80,
+                guaranteedScatters: 4,
+                tiers: [
+                    { id: 'std', label: 'Coop Buy', costMultiplier: 80, guaranteedScatters: 4 },
+                    { id: 'super', label: 'Barn Buy', costMultiplier: 180, guaranteedScatters: 5 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('hen', 'HEN', `${coop}/coop-cluck-hero.png`, 5, 7),
+            symbol('egg-pay', 'EGG+', `${coop}/coop-cluck-mid1.png`, 8, 3.6),
+            symbol('barn', 'BARN', `${coop}/coop-cluck-mid2.png`, 12, 2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('egg', 'COIN', `${coop}/coop-cluck-mid1.png`, 9, 0.25, { type: 'coin' }),
+            symbol('basket', 'BONUS', `${coop}/coop-cluck-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'miko-spirit',
+        title: 'Miko Spirit Lanterns',
+        benchmark: 'MIKO',
+        skin: 'spirit',
+        accent: '#ff8db4',
+        rtpTarget: 0.945,
+        volatility: 'High',
+        layout: { rows: 5, cols: 5, evaluation: 'ways' },
+        backdrop: '/assets/games/backdrops/backdrop-stars.png',
+        featureText: 'Lantern collect respin. Each lantern locks as a sticky wild for the rest of the bonus.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'torii', trigger: 3, awardFreeSpins: 7, pay: 1.3 },
+            anticipation: { scatterMin: 2 },
+            stackedWildReel: { wildSymbolId: 'lantern', minStack: 3, lineBoost: 1.4, sticky: true },
+            stickyWild: true,
+            persistentMultiplier: 1,
+            buyBonus: {
+                costMultiplier: 70,
+                guaranteedScatters: 3,
+                tiers: [
+                    { id: 'std', label: 'Lantern Buy', costMultiplier: 70, guaranteedScatters: 3 },
+                    { id: 'super', label: 'Spirit Buy', costMultiplier: 160, guaranteedScatters: 4, persistentMultiplier: 2 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('miko', 'MIKO', `${spirit}/miko-spirit-hero.png`, 5, 8),
+            symbol('lantern-pay', 'LANT', `${spirit}/miko-spirit-mid1.png`, 8, 4.4),
+            symbol('fox', 'FOX', `${spirit}/miko-spirit-mid2.png`, 12, 2.2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('lantern', 'WILD', `${spirit}/miko-spirit-mid1.png`, 6, 0, { type: 'wild' }),
+            symbol('torii', 'BONUS', `${spirit}/miko-spirit-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'forge-anvil',
+        title: 'Forge of the Anvil',
+        benchmark: 'Waylanders Forge',
+        skin: 'forge',
+        accent: '#ffae44',
+        rtpTarget: 0.94,
+        volatility: 'High',
+        layout: { rows: 3, cols: 5, evaluation: 'lines' },
+        backdrop: '/assets/games/backdrops/backdrop-parchment.png',
+        featureText: 'Hold-and-respin coin board. Land 6+ coins to fill the anvil and trigger jackpot tiers.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'gem', trigger: 3, awardFreeSpins: 6, pay: 1.2 },
+            anticipation: { scatterMin: 2 },
+            holdAndRespin: {
+                triggerSymbolId: 'molten-coin',
+                triggerCount: 6,
+                respins: 3,
+                jackpots: [
+                    { name: 'Mini', multiplier: 8 },
+                    { name: 'Minor', multiplier: 25 },
+                    { name: 'Major', multiplier: 80 },
+                    { name: 'Grand', multiplier: 200 },
+                ],
+            },
+            buyBonus: {
+                costMultiplier: 90,
+                guaranteedScatters: 3,
+                tiers: [
+                    { id: 'std', label: 'Anvil Buy', costMultiplier: 90, guaranteedScatters: 3 },
+                    { id: 'super', label: 'Grand Buy', costMultiplier: 220, guaranteedScatters: 4, persistentMultiplier: 2 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('molten-coin', 'COIN', `${forge}/forge-anvil-hero.png`, 5, 7),
+            symbol('hammer', 'HMR', `${forge}/forge-anvil-mid1.png`, 8, 4),
+            symbol('anvil', 'ANV', `${forge}/forge-anvil-mid2.png`, 12, 2.2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('gem', 'BONUS', `${forge}/forge-anvil-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
+    {
+        id: 'gummy-drops',
+        title: 'Gummy Drops',
+        benchmark: 'Gummy Drop 1000 / Sweet Fiesta',
+        skin: 'gummy',
+        accent: '#ff66c4',
+        rtpTarget: 0.94,
+        volatility: 'Very high',
+        layout: { rows: 8, cols: 8, evaluation: 'cluster' },
+        backdrop: '/assets/games/backdrops/backdrop-neon-grid.png',
+        featureText: '8x8 cluster pays with a multiplier orb that grows with each cascade. Sweet, sticky, dangerous.',
+        controls: { buyBonus: true, turbo: true, auto: true },
+        features: {
+            scatter: { symbolId: 'lollipop', trigger: 5, awardFreeSpins: 12, pay: 1.5 },
+            anticipation: { scatterMin: 4 },
+            clusterMin: 6,
+            cascade: { tumbleMultiplierLadder: [1, 2, 4, 8, 16, 32] },
+            persistentMultiplier: 1,
+            buyBonus: {
+                costMultiplier: 100,
+                guaranteedScatters: 5,
+                tiers: [
+                    { id: 'std', label: 'Sweet Buy', costMultiplier: 100, guaranteedScatters: 5 },
+                    { id: 'super', label: 'Sugar Rush', costMultiplier: 250, guaranteedScatters: 6, persistentMultiplier: 2 },
+                ],
+            },
+        },
+        symbols: [
+            symbol('bear', 'BEAR', `${gummy}/gummy-drops-hero.png`, 5, 7),
+            symbol('heart', 'HRT', `${gummy}/gummy-drops-mid1.png`, 8, 3.8),
+            symbol('ring', 'RING', `${gummy}/gummy-drops-mid2.png`, 12, 2),
+            symbol('rank-a', 'A', `${classic}/slot-classic-7.png`, 18, 0.7),
+            symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
+            symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
+            symbol('rank-j', 'J', `${classic}/slot-classic-cherry.png`, 22, 0.32),
+            symbol('lollipop', 'BONUS', `${gummy}/gummy-drops-bonus.png`, 4, 0, { type: 'scatter' }),
+        ],
+    },
 ]
 
 export function getSlotTemplate(id) {
@@ -719,6 +960,129 @@ function evaluateBaseWins(cells, config) {
     return evaluateLines(cells, config)
 }
 
+// ---- multiplier-zone boost (Wave 9) ----
+// When the config declares `features.multiplierZones = { columns: number[], multiplier: number }`,
+// any winning line/way/megaways that crosses one of those columns gets its multiplier scaled.
+// For cluster/pay-anywhere we treat any winning index whose column matches as boost-eligible.
+
+function applyMultiplierZones(wins, config) {
+    const zone = config.features?.multiplierZones
+    if (!zone || !zone.columns?.length || !zone.multiplier) return { wins, zoneHits: 0 }
+    const cols = config.layout.cols
+    const evaluation = config.layout.evaluation
+    const colOf = (index) => {
+        if (evaluation === 'megaways') {
+            let cursor = 0
+            for (let c = 0; c < cols; c += 1) {
+                const colRows = getColumnRows(config, c)
+                if (index < cursor + colRows) return c
+                cursor += colRows
+            }
+            return -1
+        }
+        return index % cols
+    }
+    let zoneHits = 0
+    const out = wins.map(win => {
+        const indexes = win.indexes || []
+        const crosses = indexes.some(index => zone.columns.includes(colOf(index)))
+        if (!crosses) return win
+        zoneHits += 1
+        return {
+            ...win,
+            multiplier: round2(win.multiplier * zone.multiplier),
+            zoneBoost: zone.multiplier,
+        }
+    })
+    return { wins: out, zoneHits }
+}
+
+// ---- multiplier wheel resolve (Wave 9) ----
+// `features.multiplierWheel = { values: number[], weights: number[] }`. When 3+ scatters
+// trigger the feature, we resolve a wheel pick deterministically via the round-keyed roll.
+// The wheel award is added to the spin multiplier and surfaced as a feature event so the
+// UI can render a wheel cinematic.
+
+function resolveMultiplierWheel(config) {
+    const wheel = config.features?.multiplierWheel
+    if (!wheel || !Array.isArray(wheel.values) || !wheel.values.length) return null
+    const weights = Array.isArray(wheel.weights) && wheel.weights.length === wheel.values.length
+        ? wheel.weights
+        : wheel.values.map(() => 1)
+    const total = weights.reduce((sum, w) => sum + w, 0)
+    if (total <= 0) return null
+    const r = roll(config, 'wheel') * total
+    let cumulative = 0
+    for (let i = 0; i < wheel.values.length; i += 1) {
+        cumulative += weights[i]
+        if (r < cumulative) {
+            return { value: wheel.values[i], index: i }
+        }
+    }
+    return { value: wheel.values[wheel.values.length - 1], index: wheel.values.length - 1 }
+}
+
+// ---- hold-and-respin coin board resolve (Wave 9) ----
+// `features.holdAndRespin = { triggerSymbolId, triggerCount, respins, jackpots: [{ name, multiplier }] }`.
+// When triggerCount+ trigger symbols land we simulate a 3x4 coin board respin sequence
+// deterministically and return the awarded jackpot tier.
+
+function resolveHoldAndRespin(config, cells) {
+    const hr = config.features?.holdAndRespin
+    if (!hr) return null
+    const trigger = hr.triggerSymbolId
+    if (!trigger) return null
+    const triggers = cells.reduce((sum, item) => sum + (item.id === trigger ? 1 : 0), 0)
+    if (triggers < (hr.triggerCount || 6)) return null
+    // Simulate a 12-slot board; pre-fill with the triggers, then run `respins` rounds where
+    // each empty slot has a small chance to fill on each respin (deterministic per round).
+    const boardSize = 12
+    const filled = Math.min(boardSize, triggers)
+    let board = Array.from({ length: boardSize }, (_, idx) => idx < filled)
+    const respinLog = []
+    const respins = hr.respins || 3
+    let remaining = respins
+    for (let step = 0; step < respins; step += 1) {
+        let added = 0
+        const r = roll(config, `hold:step:${step}`)
+        // Each empty slot has ~r * 0.3 chance to fill, gated by filled count to avoid runaway.
+        board = board.map((slot, idx) => {
+            if (slot) return slot
+            const fillRoll = roll(config, `hold:fill:${step}:${idx}`)
+            if (fillRoll < 0.18 + r * 0.12) {
+                added += 1
+                return true
+            }
+            return slot
+        })
+        respinLog.push({ step: step + 1, added, totalFilled: board.filter(Boolean).length })
+        if (added > 0) remaining = respins // reset on fill (classic hold-and-respin)
+        else remaining -= 1
+        if (remaining <= 0) break
+    }
+    const finalFilled = board.filter(Boolean).length
+    const jackpots = Array.isArray(hr.jackpots) ? hr.jackpots : []
+    let award = null
+    if (finalFilled >= boardSize && jackpots.length) {
+        award = jackpots[jackpots.length - 1] // Grand
+    } else if (finalFilled >= boardSize - 2 && jackpots.length >= 3) {
+        award = jackpots[jackpots.length - 2] // Major
+    } else if (finalFilled >= filled + 3 && jackpots.length >= 2) {
+        award = jackpots[1] // Minor
+    } else if (jackpots.length) {
+        award = jackpots[0] // Mini
+    }
+    return {
+        triggers,
+        boardSize,
+        startFilled: filled,
+        finalFilled,
+        respins,
+        respinLog,
+        award,
+    }
+}
+
 // ---- money symbol resolve ----
 
 function resolveMoneyValues(cells, config) {
@@ -774,6 +1138,7 @@ function cascadeTumble(cells, config, baseWins, baseIndexes) {
 export function resolveSlotSpin(config, options = {}) {
     const bonusBuy = Boolean(options.bonusBuy)
     const buyTier = options.buyTier || null
+    const stickyWilds = Array.isArray(options.stickyWilds) ? options.stickyWilds : []
     const total = getCellCount(config)
     let cells = Array.from({ length: total }, (_, index) => pickSymbol(config, index, bonusBuy))
 
@@ -783,6 +1148,14 @@ export function resolveSlotSpin(config, options = {}) {
             ?? config.features?.buyBonus?.guaranteedScatters
             ?? 3
         cells = forceGuaranteedScatters(cells, config, guaranteed)
+    }
+
+    // Sticky wilds (Wave 9): force these cell indexes to be wild before mystery/evaluation.
+    if (stickyWilds.length) {
+        const wildSymbol = config.symbols.find(item => item.type === 'wild')
+        if (wildSymbol) {
+            cells = cells.map((item, index) => stickyWilds.includes(index) ? wildSymbol : item)
+        }
     }
 
     // Mystery reveal pre-evaluate
@@ -806,10 +1179,24 @@ export function resolveSlotSpin(config, options = {}) {
         cascadeSteps = cascadeResult.cascadeSteps
     }
 
+    // Multiplier zones (Wave 9): scale wins crossing zone columns.
+    const { wins: zonedWins, zoneHits } = applyMultiplierZones(wins, config)
+    wins = zonedWins
+
     let multiplier = wins.reduce((sum, item) => sum + item.multiplier, 0)
     const featureEvents = []
 
+    if (zoneHits > 0) {
+        featureEvents.push({
+            type: 'multiplier-zone',
+            label: `${config.features.multiplierZones.multiplier}x zone × ${zoneHits}`,
+            zoneHits,
+            multiplier: config.features.multiplierZones.multiplier,
+        })
+    }
+
     const scatter = config.features?.scatter
+    let triggeredFreeSpins = false
     if (scatter) {
         const scatterIndexes = cells
             .map((item, index) => item.id === scatter.symbolId ? index : -1)
@@ -821,6 +1208,7 @@ export function resolveSlotSpin(config, options = {}) {
                 : scatter.pay * 0.25 * scatterIndexes.length
         }
         if (scatterIndexes.length >= scatter.trigger) {
+            triggeredFreeSpins = true
             featureEvents.push({
                 type: 'free-spins',
                 label: `${scatter.awardFreeSpins} Free Spins`,
@@ -829,6 +1217,38 @@ export function resolveSlotSpin(config, options = {}) {
                 persistentMultiplier: buyTier?.persistentMultiplier || config.features?.persistentMultiplier || 0,
             })
         }
+    }
+
+    // Multiplier wheel (Wave 9): only when free spins triggered and config has the wheel.
+    let wheel = null
+    if (triggeredFreeSpins) {
+        wheel = resolveMultiplierWheel(config)
+        if (wheel) {
+            multiplier += wheel.value
+            featureEvents.push({
+                type: 'multiplier-wheel',
+                label: `Wheel awarded ${wheel.value}x`,
+                value: wheel.value,
+            })
+        }
+    }
+
+    // Hold-and-respin coin board (Wave 9): triggers when triggerCount+ COIN symbols land.
+    const holdAndRespin = resolveHoldAndRespin(config, cells)
+    if (holdAndRespin?.award) {
+        multiplier += holdAndRespin.award.multiplier
+        featureEvents.push({
+            type: 'hold-and-respin',
+            label: `${holdAndRespin.award.name} ${holdAndRespin.award.multiplier}x`,
+            award: holdAndRespin.award,
+            board: {
+                size: holdAndRespin.boardSize,
+                startFilled: holdAndRespin.startFilled,
+                finalFilled: holdAndRespin.finalFilled,
+                respins: holdAndRespin.respins,
+                log: holdAndRespin.respinLog,
+            },
+        })
     }
 
     const coinMeter = config.features?.coinMeter
@@ -864,6 +1284,11 @@ export function resolveSlotSpin(config, options = {}) {
         featureEvents.push({ type: 'wilds', label: 'Wild column pulse' })
     }
 
+    // New wild positions surfaced for sticky-wild lock tracking by the UI.
+    const wildIndexes = cells
+        .map((item, index) => item.type === 'wild' ? index : -1)
+        .filter(index => index >= 0)
+
     multiplier = round2(multiplier)
     return {
         cells,
@@ -876,6 +1301,11 @@ export function resolveSlotSpin(config, options = {}) {
         moneyTotal,
         mysteryReveal,
         cascadeSteps,
+        zoneHits,
+        wheel,
+        holdAndRespin,
+        wildIndexes,
+        triggeredFreeSpins,
     }
 }
 

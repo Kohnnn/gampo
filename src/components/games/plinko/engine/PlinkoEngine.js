@@ -4,7 +4,7 @@
 
 import { Ball, pad, unpad } from './Ball';
 import { BIN_PAYOUTS } from './constants';
-import { OUTCOMES } from './plinkoOutcomes';
+import { loadOutcomes, getCachedOutcomes } from './plinkoOutcomesLoader';
 
 const WIDTH = 760;
 const HEIGHT = 570;
@@ -52,11 +52,30 @@ class PlinkoEngine {
 
         this.animationId = null;
 
+        // Wave 9 lazy outcomes: only the active row count's table is loaded.
+        this.outcomesByRow = {};
+        this.outcomesReady = false;
+        this._kickOutcomesLoad(this.rowCount);
+
         // Handle high DPI displays (Retina/4K) for crisp rendering
         this._setupCanvasHDPI();
 
         // Build board
         this.placePinsAndWalls();
+    }
+
+    _kickOutcomesLoad(rowCount) {
+        const cached = getCachedOutcomes(rowCount);
+        if (cached) {
+            this.outcomesByRow[rowCount] = cached;
+            this.outcomesReady = true;
+            return;
+        }
+        loadOutcomes(rowCount).then(data => {
+            if (!data) return;
+            this.outcomesByRow[rowCount] = data;
+            this.outcomesReady = true;
+        }).catch(() => { /* swallow; engine falls back to center drop */ });
     }
 
     _setupCanvasHDPI() {
@@ -95,7 +114,7 @@ class PlinkoEngine {
      * Data loaded from plinkoOutcomes.js (generated offline by scripts/generatePlinkoOutcomes.cjs)
      */
     _getDropXForBin(binIndex) {
-        const rowOutcomes = OUTCOMES[this.rowCount];
+        const rowOutcomes = this.outcomesByRow[this.rowCount] || getCachedOutcomes(this.rowCount);
         if (!rowOutcomes) return pad(WIDTH / 2);
 
         const positions = rowOutcomes[binIndex];
@@ -384,6 +403,8 @@ class PlinkoEngine {
         }
         this.removeAllBalls();
         this.rowCount = newRowCount;
+        // Wave 9: lazy-load outcomes for the new row count.
+        this._kickOutcomesLoad(newRowCount);
         this.placePinsAndWalls();
     }
 

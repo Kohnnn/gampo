@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MessageCircle, Minus, X, Send, Trophy, BarChart3 } from 'lucide-react'
+import { MessageCircle, Minus, X, Send, Trophy, BarChart3, Award } from 'lucide-react'
 import { useSocial } from '../context/SocialContext'
 import { formatCredits } from '../utils/simulationMath'
 import StatsPanel from './StatsPanel'
+import ProgressPanel from './ProgressPanel'
 import './ChatDock.css'
 
 const STATE_KEY = 'gampo_chat_dock_state'
 const VALID = new Set(['open', 'minimized', 'closed'])
+const VALID_TABS = new Set(['chat', 'race', 'stats', 'progress'])
 
 function readInitialState() {
     try {
@@ -44,7 +46,7 @@ function ChatDock() {
     useEffect(() => {
         const onOpen = (e) => {
             const requested = e.detail?.tab
-            if (requested === 'chat' || requested === 'race' || requested === 'stats') setTab(requested)
+            if (requested && VALID_TABS.has(requested)) setTab(requested)
             setState('open')
         }
         document.addEventListener('gampo:open-chat', onOpen)
@@ -80,7 +82,8 @@ function ChatDock() {
     }
 
     const widthClass = useMemo(() => {
-        // Race + Stats widen the panel slightly (still corner-floating, not a gutter).
+        // Race + Stats + Progress widen the panel slightly (still corner-floating, not a gutter).
+        if (tab === 'progress') return 'w-progress'
         if (tab === 'stats') return 'w-stats'
         if (tab === 'race') return 'w-race'
         return 'w-chat'
@@ -138,6 +141,14 @@ function ChatDock() {
                     >
                         <BarChart3 size={14} /> Stats
                     </button>
+                    <button
+                        type="button"
+                        aria-pressed={tab === 'progress'}
+                        className={tab === 'progress' ? 'active' : ''}
+                        onClick={() => setTab('progress')}
+                    >
+                        <Award size={14} /> Progress
+                    </button>
                 </div>
                 <div className="chat-dock-controls">
                     <button className="chat-dock-min" onClick={() => setState('minimized')} aria-label="Minimize chat" title="Minimize">
@@ -194,6 +205,13 @@ function ChatDock() {
                 <>
                     <div className="chat-dock-banner">PnL across session, this game, and all-time.</div>
                     <StatsPanel />
+                </>
+            )}
+
+            {tab === 'progress' && (
+                <>
+                    <div className="chat-dock-banner">Achievements + missions. Local progress only.</div>
+                    <ProgressPanel />
                 </>
             )}
         </aside>

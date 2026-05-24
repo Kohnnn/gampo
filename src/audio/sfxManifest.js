@@ -147,6 +147,18 @@ export const sfxManifest = {
     },
     cases: {
         click: null,
+        // Wave 18: declared but silent until binaries land.
+        // open    -> latch click as the lid pops
+        // tick    -> per-tile tick while the carousel decelerates
+        // land    -> final stop thunk when the pointer locks
+        // rare    -> chime when a Covert/Extraordinary lands
+        // reveal  -> generic reveal sting on the result card
+        // win     -> profit > 0 sting
+        // lose    -> profit <= 0 sting
+        open: null,
+        tick: null,
+        land: null,
+        rare: null,
         reveal: null,
         win: null,
         lose: null,

@@ -592,6 +592,13 @@ body {
     align-items: center;
     gap: 6px;
     pointer-events: none;
+    max-width: min(420px, calc(100vw - 24px));
+    max-height: calc(100vh - 88px);
+    overflow: hidden;
+}
+
+.credit-toast-container > * + * {
+    margin-top: 0;
 }
 
 .credit-toast {
@@ -926,11 +933,17 @@ body {
 /* ===== Main Content ===== */
 .main-content {
     flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     background: var(--bg-primary);
     transition: padding-right 0.2s ease;
+}
+
+.main-content > * {
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 /* ChatDock floats in the bottom-right corner. Per QA v3 (2026-05-21) the

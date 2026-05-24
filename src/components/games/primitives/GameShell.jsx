@@ -27,7 +27,7 @@ export default function GameShell({
         ? titleBarExtras
         : (
             <>
-                <GameToolbar helpHref={helpHref} />
+                <GameToolbar helpHref={helpHref} definition={definition} />
                 <AudioToggle />
             </>
         )
