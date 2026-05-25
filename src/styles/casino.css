@@ -1065,3 +1065,39 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Wave 25: live missions + VIP styling */
+.mission-summary-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 8px 0 22px; }
+.mission-summary-card { padding: 14px; border-radius: 12px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.06); display: grid; gap: 4px; }
+.mission-summary-card small { color: var(--text-muted); font-size: 10px; font-weight: 950; letter-spacing: 0.1em; text-transform: uppercase; }
+.mission-summary-card strong { font-size: 22px; font-weight: 950; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.mission-summary-card span { color: var(--text-secondary); font-size: 11px; }
+.mission-summary-daily { border-left: 3px solid #78c4ff; }
+.mission-summary-weekly { border-left: 3px solid #ffd166; }
+.mission-summary-lifetime { border-left: 3px solid #ad7cff; }
+.mission-period-block { margin-bottom: 18px; }
+.mission-period-title { color: var(--text-secondary); font-size: 12px; font-weight: 950; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px; }
+.mission-card.is-complete { border-color: rgba(255, 209, 102, 0.45); background: rgba(255, 209, 102, 0.05); }
+.mission-card.is-claimed { opacity: 0.72; }
+.mission-card header { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.mission-card footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; }
+.mission-card footer small { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.mission-claimed-badge { color: #2af04a; font-size: 11px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
+.mission-progress-pct { color: var(--text-secondary); font-size: 11px; font-weight: 800; }
+.casino-action-row { display: inline-flex; gap: 6px; }
+.casino-action.primary { background: linear-gradient(180deg, #2ce26a, #00aa42); color: #fff; border: none; }
+.casino-action.danger { background: rgba(237, 66, 69, 0.18); color: #ff8b8d; border-color: rgba(237, 66, 69, 0.45); }
+.vip-headline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px; border-radius: 12px; background: rgba(0, 0, 0, 0.3); margin-bottom: 12px; }
+.vip-headline div { display: grid; gap: 4px; }
+.vip-headline small { color: var(--text-muted); font-size: 10px; font-weight: 950; letter-spacing: 0.1em; text-transform: uppercase; }
+.vip-headline strong { font-size: 20px; font-weight: 950; color: var(--text-primary); }
+.vip-headline em { color: var(--accent-yellow); font-style: normal; font-size: 11px; font-weight: 800; }
+.vip-progress-bar { height: 6px; background: rgba(255, 255, 255, 0.06); border-radius: 999px; overflow: hidden; margin-bottom: 18px; }
+.vip-progress-bar span { display: block; height: 100%; background: linear-gradient(90deg, #ffd166, #ad7cff); transition: width 220ms; }
+.vip-tier { padding: 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.28); display: grid; gap: 6px; }
+.vip-tier header { display: flex; justify-content: space-between; align-items: center; }
+.vip-tier h2 { margin: 0; font-size: 15px; }
+.vip-tier p { margin: 0; color: var(--text-secondary); font-size: 12px; }
+.vip-tier small { color: var(--text-muted); font-size: 11px; }
+.vip-tier.unlocked { border-color: rgba(120, 196, 255, 0.4); background: rgba(120, 196, 255, 0.06); }
+.vip-tier.current { border-color: rgba(255, 209, 102, 0.6); background: rgba(255, 209, 102, 0.08); box-shadow: 0 0 24px -8px rgba(255, 209, 102, 0.6); }

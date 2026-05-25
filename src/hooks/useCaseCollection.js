@@ -1,27 +1,33 @@
-// useCaseCollection — localStorage-backed drop history + owned-skin collection
-// for the CS-style cases game (Wave 18).
+// useCaseCollection — Wave 31 rewrite for the full CS2 pokedex catalog.
 //
-// Keys:
-//   gampo_cases_drops     — last N=200 drops, newest-first
-//   gampo_cases_collection — { [skinId]: { count, name, image, color, rarity, multiplier, lastSeen } }
+// Drops every collected skin into a discovered map keyed by `skinId+wear+stattrak`
+// so float/wear/StatTrak/souvenir variants count as separate "Pokedex" entries.
+// Every roll permanently adds to the collection (no cap, no pruning).
 //
-// API:
-//   const cases = useCaseCollection()
-//   cases.drops              -> array of recent drops (newest first)
-//   cases.collection         -> map of owned skins
-//   cases.summary            -> { totalDrops, uniqueSkins, bestMultiplier, bestSkin }
-//   cases.recordDrop(pick)   -> append a drop record + bump collection count
-//   cases.reset()            -> wipe both stores
+// Storage:
+//   gampo_cases_drops_v2     — last N=400 drops, newest-first
+//   gampo_cases_pokedex      — { [variantKey]: { count, name, image, rarity, color,
+//                                                wear, float, statTrak, souvenir,
+//                                                multiplier, firstSeen, lastSeen, skinId } }
+//
+// Variant key shape: `${skinId}::${wear}::${statTrak ? 'st' : 'reg'}::${souvenir ? 'sv' : 'std'}`.
+//
+// Pokedex entries also store a representative `multiplier` so the collection
+// summary can show best-multiplier-ever.
+//
+// Backwards compatibility: Wave 18 used `gampo_cases_drops` and
+// `gampo_cases_collection`. We keep them readable but ignore them; the new
+// keys carry the v2 dataset so older drops show as ‘legacy’ if migrated.
 
 import { useEffect, useState } from 'react'
 
-const DROPS_KEY = 'gampo_cases_drops'
-const COLLECTION_KEY = 'gampo_cases_collection'
-const DROPS_LIMIT = 200
+const DROPS_KEY = 'gampo_cases_drops_v2'
+const POKEDEX_KEY = 'gampo_cases_pokedex'
+const DROPS_LIMIT = 400
 
 const listeners = new Set()
 let drops = readDrops()
-let collection = readCollection()
+let pokedex = readPokedex()
 
 function readDrops() {
     try {
@@ -34,9 +40,9 @@ function readDrops() {
     }
 }
 
-function readCollection() {
+function readPokedex() {
     try {
-        const raw = localStorage.getItem(COLLECTION_KEY)
+        const raw = localStorage.getItem(POKEDEX_KEY)
         if (!raw) return {}
         const parsed = JSON.parse(raw)
         return parsed && typeof parsed === 'object' ? parsed : {}
@@ -53,9 +59,9 @@ function writeDrops() {
     } catch { /* quota / private mode */ }
 }
 
-function writeCollection() {
+function writePokedex() {
     try {
-        localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection))
+        localStorage.setItem(POKEDEX_KEY, JSON.stringify(pokedex))
     } catch { /* ignore */ }
 }
 
@@ -63,31 +69,47 @@ function notify() {
     listeners.forEach(fn => fn())
 }
 
+export function variantKey({ skinId, wear, statTrak, souvenir }) {
+    return `${skinId}::${wear || 'NA'}::${statTrak ? 'st' : 'reg'}::${souvenir ? 'sv' : 'std'}`
+}
+
 export function recordDrop(pick, ctx = {}) {
-    if (!pick || !pick.id) return
+    if (!pick || !pick.skinId) return
+    const key = variantKey(pick)
     const entry = {
-        id: pick.id,
+        key,
+        skinId: pick.skinId,
         name: pick.name,
         image: pick.image,
         color: pick.color,
         rarity: pick.rarity,
+        wear: pick.wear,
+        wearShort: pick.wearShort,
+        float: pick.float,
+        statTrak: !!pick.statTrak,
+        souvenir: !!pick.souvenir,
         multiplier: pick.multiplier,
         ts: Date.now(),
         caseId: ctx.caseId,
         caseName: ctx.caseName,
-        tier: ctx.tier,
     }
     drops = [entry, ...drops].slice(0, DROPS_LIMIT)
-    const key = pick.id
-    const prev = collection[key] || { count: 0 }
-    collection = {
-        ...collection,
+    const prev = pokedex[key] || { count: 0 }
+    pokedex = {
+        ...pokedex,
         [key]: {
-            id: pick.id,
+            key,
+            skinId: pick.skinId,
             name: pick.name,
             image: pick.image,
             color: pick.color,
             rarity: pick.rarity,
+            wear: pick.wear,
+            wearShort: pick.wearShort,
+            float: prev.count > 0 ? prev.float : pick.float,
+            bestFloat: prev.count > 0 ? Math.min(prev.bestFloat ?? prev.float, pick.float) : pick.float,
+            statTrak: !!pick.statTrak,
+            souvenir: !!pick.souvenir,
             multiplier: Math.max(prev.multiplier || 0, pick.multiplier || 0),
             count: (prev.count || 0) + 1,
             firstSeen: prev.firstSeen || Date.now(),
@@ -95,25 +117,25 @@ export function recordDrop(pick, ctx = {}) {
         },
     }
     writeDrops()
-    writeCollection()
+    writePokedex()
     notify()
 }
 
 export function resetCases() {
     drops = []
-    collection = {}
+    pokedex = {}
     try {
         localStorage.removeItem(DROPS_KEY)
-        localStorage.removeItem(COLLECTION_KEY)
+        localStorage.removeItem(POKEDEX_KEY)
     } catch { /* ignore */ }
     notify()
 }
 
-function summarise() {
-    const collectionList = Object.values(collection)
+function summarise(catalogTotal = 0) {
+    const list = Object.values(pokedex)
     let bestMultiplier = 0
     let bestSkin = null
-    for (const skin of collectionList) {
+    for (const skin of list) {
         if ((skin.multiplier || 0) > bestMultiplier) {
             bestMultiplier = skin.multiplier
             bestSkin = skin
@@ -121,13 +143,15 @@ function summarise() {
     }
     return {
         totalDrops: drops.length,
-        uniqueSkins: collectionList.length,
+        uniqueVariants: list.length,
+        catalogTotal,
+        completionPct: catalogTotal > 0 ? Math.min(100, Math.round((list.length / catalogTotal) * 100)) : 0,
         bestMultiplier,
         bestSkin,
     }
 }
 
-export function useCaseCollection() {
+export function useCaseCollection({ catalogTotal = 0 } = {}) {
     const [, force] = useState(0)
     useEffect(() => {
         const fn = () => force(n => n + 1)
@@ -136,8 +160,8 @@ export function useCaseCollection() {
     }, [])
     return {
         drops,
-        collection,
-        summary: summarise(),
+        pokedex,
+        summary: summarise(catalogTotal),
         recordDrop,
         reset: resetCases,
     }

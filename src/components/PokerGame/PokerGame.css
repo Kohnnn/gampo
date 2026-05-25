@@ -1428,3 +1428,9 @@
     cursor: pointer;
 }
 .ph-clear:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Wave 24: 1610x870 fit pass for poker. */
+@media (min-width: 1500px) and (max-height: 920px) {
+    .poker-table { padding: 10px; }
+    .poker-table-felt { padding: 10px; min-height: 420px; }
+}

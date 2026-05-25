@@ -102,6 +102,23 @@ function SportsbookShell() {
         if (settleTimer.current) window.clearTimeout(settleTimer.current)
     }, [])
 
+    // Wave 22: respond to `gampo:sports-navigate` events from the app
+    // sidebar (Casino/Sports adaptive). Detail mirrors the navigateSportsbook
+    // payload: { view, sportId?, group?, eventId? }.
+    useEffect(() => {
+        const onNav = (e) => {
+            const detail = e.detail || {}
+            setViewState({
+                view: detail.view || 'home',
+                sportId: detail.sportId || null,
+                eventId: detail.eventId || null,
+                group: detail.group || null,
+            })
+        }
+        document.addEventListener('gampo:sports-navigate', onNav)
+        return () => document.removeEventListener('gampo:sports-navigate', onNav)
+    }, [])
+
     const selectedIds = useMemo(() => new Set(selections.map(selection => selection.selectionId)), [selections])
     const leagueMap = useMemo(() => new Map(leagues.map(league => [league.id, league])), [leagues])
     const sportMap = useMemo(() => new Map(sports.map(sport => [sport.id, sport])), [sports])

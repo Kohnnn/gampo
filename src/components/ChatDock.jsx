@@ -22,7 +22,7 @@ function ChatDock() {
     const { messages, postMessage, race } = useSocial()
     const [state, setState] = useState(readInitialState)
     const [text, setText] = useState('')
-    const [tab, setTab] = useState('chat')
+    const [tab, setTab] = useState('stats')
     const [unread, setUnread] = useState(0)
     const lastSeenRef = useRef(messages.length)
     const scrollRef = useRef(null)
@@ -82,11 +82,9 @@ function ChatDock() {
     }
 
     const widthClass = useMemo(() => {
-        // Race + Stats + Progress widen the panel slightly (still corner-floating, not a gutter).
-        if (tab === 'progress') return 'w-progress'
-        if (tab === 'stats') return 'w-stats'
-        if (tab === 'race') return 'w-race'
-        return 'w-chat'
+        // Wave 21: dock locked to a single width across tabs so switching
+        // doesn't visibly reposition the panel.
+        return 'w-locked'
     }, [tab])
 
     if (state === 'closed') {
@@ -119,22 +117,6 @@ function ChatDock() {
                 <div className="chat-dock-tabs">
                     <button
                         type="button"
-                        aria-pressed={tab === 'chat'}
-                        className={tab === 'chat' ? 'active' : ''}
-                        onClick={() => setTab('chat')}
-                    >
-                        <MessageCircle size={14} /> Chat
-                    </button>
-                    <button
-                        type="button"
-                        aria-pressed={tab === 'race'}
-                        className={tab === 'race' ? 'active' : ''}
-                        onClick={() => setTab('race')}
-                    >
-                        <Trophy size={14} /> Race
-                    </button>
-                    <button
-                        type="button"
                         aria-pressed={tab === 'stats'}
                         className={tab === 'stats' ? 'active' : ''}
                         onClick={() => setTab('stats')}
@@ -148,6 +130,22 @@ function ChatDock() {
                         onClick={() => setTab('progress')}
                     >
                         <Award size={14} /> Progress
+                    </button>
+                    <button
+                        type="button"
+                        aria-pressed={tab === 'chat'}
+                        className={tab === 'chat' ? 'active' : ''}
+                        onClick={() => setTab('chat')}
+                    >
+                        <MessageCircle size={14} /> Chat
+                    </button>
+                    <button
+                        type="button"
+                        aria-pressed={tab === 'race'}
+                        className={tab === 'race' ? 'active' : ''}
+                        onClick={() => setTab('race')}
+                    >
+                        <Trophy size={14} /> Race
                     </button>
                 </div>
                 <div className="chat-dock-controls">

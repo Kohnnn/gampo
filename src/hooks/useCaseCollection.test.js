@@ -1,7 +1,7 @@
-// useCaseCollection tests — verify drop history limits + collection counts.
+// useCaseCollection tests — Wave 31 schema (skinId + wear + statTrak variants).
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { recordDrop, resetCases } from './useCaseCollection'
+import { recordDrop, resetCases, variantKey } from './useCaseCollection'
 
 beforeEach(() => {
     const store = new Map()
@@ -15,49 +15,81 @@ beforeEach(() => {
 })
 
 function readDrops() {
-    return JSON.parse(globalThis.localStorage.getItem('gampo_cases_drops') || '[]')
+    return JSON.parse(globalThis.localStorage.getItem('gampo_cases_drops_v2') || '[]')
 }
 
-function readCollection() {
-    return JSON.parse(globalThis.localStorage.getItem('gampo_cases_collection') || '{}')
+function readPokedex() {
+    return JSON.parse(globalThis.localStorage.getItem('gampo_cases_pokedex') || '{}')
 }
 
-describe('useCaseCollection', () => {
-    it('records a drop into history and bumps the collection count', () => {
-        recordDrop(
-            { id: 'sk1', name: 'Test Skin', image: '/img.png', color: '#fff', rarity: 'Covert', multiplier: 4.2 },
-            { caseId: 'case-a', caseName: 'Case A', tier: 'mid' },
-        )
+const baseSkin = {
+    skinId: 'sk1',
+    name: 'AK-47 | Test',
+    image: '/img.png',
+    color: '#fff',
+    rarity: 'Covert',
+    wear: 'Field-Tested',
+    wearShort: 'FT',
+    float: 0.22,
+    multiplier: 4.2,
+}
+
+describe('useCaseCollection v2', () => {
+    it('records a drop and bumps the pokedex variant count', () => {
+        recordDrop(baseSkin, { caseId: 'case-a', caseName: 'Case A' })
         const dropsAfter = readDrops()
         expect(dropsAfter.length).toBe(1)
-        expect(dropsAfter[0].id).toBe('sk1')
+        expect(dropsAfter[0].skinId).toBe('sk1')
         expect(dropsAfter[0].caseId).toBe('case-a')
 
-        const colAfter = readCollection()
-        expect(colAfter.sk1.count).toBe(1)
-        expect(colAfter.sk1.multiplier).toBe(4.2)
+        const pokedex = readPokedex()
+        const key = variantKey(baseSkin)
+        expect(pokedex[key].count).toBe(1)
+        expect(pokedex[key].multiplier).toBe(4.2)
     })
 
-    it('caps drop history to 200 entries', () => {
-        for (let i = 0; i < 250; i += 1) {
-            recordDrop({ id: `s${i}`, name: `n${i}`, multiplier: 1 }, { caseId: 'c1' })
+    it('treats StatTrak and souvenir as separate pokedex variants', () => {
+        recordDrop(baseSkin)
+        recordDrop({ ...baseSkin, statTrak: true })
+        recordDrop({ ...baseSkin, souvenir: true })
+        const pokedex = readPokedex()
+        expect(Object.keys(pokedex).length).toBe(3)
+    })
+
+    it('treats different wear conditions as separate variants', () => {
+        recordDrop(baseSkin)
+        recordDrop({ ...baseSkin, wear: 'Factory New', wearShort: 'FN', float: 0.03 })
+        const pokedex = readPokedex()
+        expect(Object.keys(pokedex).length).toBe(2)
+    })
+
+    it('caps drop history to 400 entries', () => {
+        for (let i = 0; i < 500; i += 1) {
+            recordDrop({ ...baseSkin, skinId: `s${i}` }, { caseId: 'c1' })
         }
-        expect(readDrops().length).toBe(200)
+        expect(readDrops().length).toBe(400)
     })
 
-    it('keeps best multiplier per skin', () => {
-        recordDrop({ id: 'k1', name: 'one', multiplier: 1.2 })
-        recordDrop({ id: 'k1', name: 'one', multiplier: 9.1 })
-        recordDrop({ id: 'k1', name: 'one', multiplier: 3.0 })
-        const col = readCollection()
-        expect(col.k1.count).toBe(3)
-        expect(col.k1.multiplier).toBe(9.1)
+    it('keeps best multiplier per variant', () => {
+        recordDrop({ ...baseSkin, multiplier: 1.2 })
+        recordDrop({ ...baseSkin, multiplier: 9.1 })
+        recordDrop({ ...baseSkin, multiplier: 3.0 })
+        const pokedex = readPokedex()
+        const key = variantKey(baseSkin)
+        expect(pokedex[key].count).toBe(3)
+        expect(pokedex[key].multiplier).toBe(9.1)
     })
 
-    it('reset clears history and collection', () => {
-        recordDrop({ id: 'x1', name: 'x', multiplier: 1 })
+    it('reset clears history and pokedex', () => {
+        recordDrop(baseSkin)
         resetCases()
         expect(readDrops().length).toBe(0)
-        expect(Object.keys(readCollection()).length).toBe(0)
+        expect(Object.keys(readPokedex()).length).toBe(0)
+    })
+
+    it('variantKey is stable for identical attributes', () => {
+        const a = variantKey({ skinId: 'x', wear: 'FN', statTrak: false, souvenir: false })
+        const b = variantKey({ skinId: 'x', wear: 'FN', statTrak: false, souvenir: false })
+        expect(a).toBe(b)
     })
 })

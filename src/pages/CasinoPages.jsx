@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, BookOpen, Crown, Gift, Radio, ShieldCheck, Target, Trophy } from 'lucide-react'
+import { Activity, Award, BookOpen, CheckCircle2, Crown, Gift, Lock, Radio, ShieldCheck, Target, Trophy } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { gameDefinitions } from '../data/gameDefinitions'
 import { liveStudioTables, missions, slotCatalog, sourceNotes, vipLevels } from '../data/casinoCatalog'
@@ -8,6 +8,9 @@ import { formatCredits, rolloverProgress } from '../utils/simulationMath'
 import { GameGrid } from './HomePage'
 import { useRaceData } from '../context/SocialContext'
 import { clearRecentRolls, getProvablyFair, getRecentRolls, maskSeed, rotateSeeds, setClientSeed } from '../utils/fairRng'
+import { useMissions } from '../hooks/useMissions'
+import { useProgress } from '../hooks/useProgress'
+import { MISSION_PERIODS, VIP_TIERS, vipTierFor } from '../data/missions'
 import '../styles/casino.css'
 
 export function OriginalsPage() {
@@ -62,51 +65,128 @@ export function LiveStudioPage() {
 }
 
 export function MissionsPage() {
+    const m = useMissions()
+    const { addWinnings } = useCredits()
+    const [confirmReset, setConfirmReset] = useState(false)
+
+    const grouped = useMemo(() => {
+        const map = { daily: [], weekly: [], lifetime: [] }
+        for (const mission of m.missions) {
+            if (map[mission.period]) map[mission.period].push(mission)
+        }
+        return map
+    }, [m.missions])
+
+    const onClaim = (mission) => {
+        const result = m.claim(mission.id)
+        if (result?.reward?.credits) {
+            addWinnings(result.reward.credits, `Mission: ${mission.name}`)
+        }
+    }
+
     return (
         <CasinoSection
             kicker="Practice goals"
             title="Missions"
-            text="Learning missions replace bonuses. They reward disciplined practice badges, not cash value."
+            text="Daily / weekly / lifetime missions reward exploration with practice credits. No real money."
             icon={<Target size={18} />}
+            action={confirmReset ? (
+                <span className="casino-action-row">
+                    <button className="casino-action danger" onClick={() => { m.reset(); setConfirmReset(false) }}>Confirm reset</button>
+                    <button className="casino-action" onClick={() => setConfirmReset(false)}>Cancel</button>
+                </span>
+            ) : (
+                <button className="casino-action" onClick={() => setConfirmReset(true)}>Reset progress</button>
+            )}
         >
-            <div className="mission-grid">
-                {missions.map(mission => (
-                    <article key={mission.id} className="mission-card">
-                        <span>{mission.reward}</span>
-                        <h2>{mission.title}</h2>
-                        <p>{mission.target}</p>
-                        <div className="casino-progress"><span style={{ width: `${mission.progress * 100}%` }} /></div>
-                    </article>
+            <div className="mission-summary-row">
+                {(['daily', 'weekly', 'lifetime']).map(period => (
+                    <div key={period} className={`mission-summary-card mission-summary-${period}`}>
+                        <small>{MISSION_PERIODS[period].label}</small>
+                        <strong>{m.summary[period].complete} / {m.summary[period].total}</strong>
+                        <span>{m.summary[period].claimed} claimed</span>
+                    </div>
                 ))}
             </div>
+
+            {(['daily', 'weekly', 'lifetime']).map(period => (
+                <div key={period} className="mission-period-block">
+                    <h3 className="mission-period-title">{MISSION_PERIODS[period].label} missions</h3>
+                    <div className="mission-grid">
+                        {grouped[period].map(mission => (
+                            <article key={mission.id} className={`mission-card period-${mission.period} ${mission.complete ? 'is-complete' : ''} ${mission.claimed ? 'is-claimed' : ''}`}>
+                                <header>
+                                    <span>+{mission.reward.credits} credits</span>
+                                    {mission.claimed ? <CheckCircle2 size={16} /> : null}
+                                </header>
+                                <h2>{mission.name}</h2>
+                                <p>{mission.detail}</p>
+                                <div className="casino-progress"><span style={{ width: `${mission.ratio * 100}%` }} /></div>
+                                <footer>
+                                    <small>{mission.value} / {mission.target}</small>
+                                    {mission.claimable ? (
+                                        <button className="casino-action primary" onClick={() => onClaim(mission)}>Claim</button>
+                                    ) : mission.claimed ? (
+                                        <span className="mission-claimed-badge">Claimed</span>
+                                    ) : (
+                                        <span className="mission-progress-pct">{Math.round(mission.ratio * 100)}%</span>
+                                    )}
+                                </footer>
+                            </article>
+                        ))}
+                    </div>
+                </div>
+            ))}
         </CasinoSection>
     )
 }
 
 export function VipPage() {
-    const { transactions } = useCredits()
-    const wagered = transactions.filter(item => item.type === 'bet').reduce((sum, item) => sum + Math.abs(item.amount || 0), 0)
+    const m = useMissions()
+    const wagered = m.stats.lifetime.wagered
+    const { current, next } = vipTierFor(wagered)
+    const progress = next ? Math.min(1, (wagered - current.wager) / Math.max(1, next.wager - current.wager)) : 1
 
     return (
         <CasinoSection
             kicker="Learning tiers"
             title="VIP Lab"
-            text="Progress tiers are based on simulated wagering volume and unlock analysis prompts only."
+            text="Tiers track simulated wager volume across all games. Perks are cosmetic — no real-world value."
             icon={<Crown size={18} />}
         >
-            <div className="vip-panel">
+            <div className="vip-headline">
                 <div>
-                    <span>Simulated volume</span>
+                    <small>Current tier</small>
+                    <strong>{current.label}</strong>
+                </div>
+                <div>
+                    <small>Lifetime wagered</small>
                     <strong>{formatCredits(wagered)}</strong>
                 </div>
-                {vipLevels.map(level => {
-                    const progress = rolloverProgress({ wagered, required: Math.max(1, level.threshold) })
+                {next ? (
+                    <div>
+                        <small>Next tier</small>
+                        <strong>{next.label}</strong>
+                        <em>{formatCredits(Math.max(0, next.wager - wagered))} to go</em>
+                    </div>
+                ) : (
+                    <div><small>Top tier reached</small><strong>{current.label}</strong></div>
+                )}
+            </div>
+
+            <div className="vip-progress-bar"><span style={{ width: `${progress * 100}%` }} /></div>
+
+            <div className="vip-panel">
+                {VIP_TIERS.map(tier => {
+                    const unlocked = wagered >= tier.wager
                     return (
-                        <article key={level.tier} className={wagered >= level.threshold ? 'unlocked' : ''}>
-                            <h2>{level.tier}</h2>
-                            <p>{level.perk}</p>
-                            <div className="casino-progress"><span style={{ width: `${progress * 100}%` }} /></div>
-                            <small>{formatCredits(level.threshold)} simulated volume</small>
+                        <article key={tier.id} className={`vip-tier vip-tier-${tier.id} ${unlocked ? 'unlocked' : ''} ${current.id === tier.id ? 'current' : ''}`}>
+                            <header>
+                                <h2>{tier.label}</h2>
+                                {unlocked ? <CheckCircle2 size={16} /> : <Lock size={14} />}
+                            </header>
+                            <p>{tier.perk}</p>
+                            <small>{formatCredits(tier.wager)} wagered</small>
                         </article>
                     )
                 })}

@@ -930,6 +930,38 @@ body {
     fill: currentColor;
 }
 
+/* Wave 23: pin button on game rows. Lives in `.nav-row` flex; revealed
+   on row hover and stays visible when pinned. */
+.nav-row {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+}
+.nav-row .nav-item { flex: 1; min-width: 0; }
+.nav-pin {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    width: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+.nav-row:hover .nav-pin { opacity: 1; }
+.nav-pin.is-pinned {
+    opacity: 1;
+    color: var(--accent-yellow, #ffcf5a);
+}
+.nav-pin:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+}
+.app-sidebar-hidden .nav-row .nav-pin { display: none; }
+
 /* ===== Main Content ===== */
 .main-content {
     flex: 1;

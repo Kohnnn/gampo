@@ -71,18 +71,23 @@ function solveBustTimeSec(bust) {
 const SIM_NAMES = ['Lyra', 'Reno', 'Kaia', 'Ozzy', 'Nia', 'Vex', 'Mika', 'Juno', 'Sable', 'Rune', 'Pixie', 'Quark', 'Tess', 'Echo', 'Wynn', 'Zev', 'Mira', 'Lev', 'Kit', 'Rhea']
 const SIM_COLORS = ['#ff7ab6', '#6db7ff', '#ffcf5a', '#9bf08a', '#c08bff', '#ff9457', '#5be0d4', '#41d6ff', '#ffe680', '#7bd389']
 
-// QA v4: bigger sim crowd (8–12 players) so the strip feels alive at the new
-// canvas size.
+// Wave 28: bigger sim crowd (10–16 players) with persona biases.
 function simulatePlayers(bust) {
-    const n = 8 + Math.floor(Math.random() * 5)
+    const n = 10 + Math.floor(Math.random() * 7)
     const out = []
     for (let i = 0; i < n; i++) {
-        // Long-tail target distribution biased toward 1.5×–4× with rare moonshots.
+        // Persona bias: roughly 30% cautious (low target), 50% mid, 15% gambler, 5% whale.
         const r = Math.random()
-        const target = r < 0.55 ? 1.3 + Math.random() * 1.6
-            : r < 0.85 ? 2.5 + Math.random() * 5
-            : 8 + Math.random() * 25
-        const bet = Math.round((1 + Math.random() * 49) * 100) / 100
+        let target
+        if (r < 0.3) target = 1.2 + Math.random() * 0.8           // cautious 1.2-2.0
+        else if (r < 0.8) target = 1.8 + Math.random() * 3.2     // mid 1.8-5.0
+        else if (r < 0.95) target = 4 + Math.random() * 12       // gambler 4-16
+        else target = 12 + Math.random() * 40                    // whale 12-52
+        // Bet sizes vary by persona too (rough proxy via target band)
+        const bet = r < 0.3 ? Math.round((1 + Math.random() * 9) * 100) / 100
+            : r < 0.8 ? Math.round((2 + Math.random() * 28) * 100) / 100
+            : r < 0.95 ? Math.round((10 + Math.random() * 60) * 100) / 100
+            : Math.round((50 + Math.random() * 250) * 100) / 100
         const cashed = bust >= target
         out.push({
             id: `${i}-${Math.random().toString(16).slice(2, 6)}`,

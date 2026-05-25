@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Flame, Gauge, Info, Play, RotateCcw, Sparkles, Square, Ticket, TrendingUp, X, Zap } from 'lucide-react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useBgm } from '../../../audio/useBgm'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import {
@@ -14,6 +15,8 @@ import {
     useGameSession,
 } from '../primitives'
 import EducationPanel from '../../EducationPanel'
+import WinPathOverlay from '../primitives/WinPathOverlay'
+import { getFeatureContract } from '../../../data/slotFeatureContracts'
 import {
     SLOT_TEMPLATES,
     getBuyTiers,
@@ -67,6 +70,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     const [templateId, setTemplateId] = useState(startId)
     const config = useMemo(() => getSlotTemplate(templateId), [templateId])
+    // Wave 29 + Wave 32: per-skin BGM. The actual `useBgm()` call is deferred
+    // until after `freeSpinSession` is declared so we can swap between
+    // `idle` and `bonus` loops when the bonus is live.
     const cellPositions = useMemo(() => getCellPositions(config), [config])
     const [betAmount, setBetAmount] = useState(5)
     const [grid, setGrid] = useState(() => makeInitialGrid(startTemplate))
@@ -109,6 +115,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [freeSpinSession, setFreeSpinSession] = useState(null) // { totalAwarded, played, totalWin, baseBet }
     const [bonusEndBanner, setBonusEndBanner] = useState(null) // { trigger, totalWin, played }
 
+    // Wave 32 follow-up: switch BGM track based on bonus state.
+    const bgmMode = (freeSpinSession || freeSpins > 0) ? 'bonus' : 'idle'
+    useBgm(config.skin, bgmMode)
+
     const timers = useRef([])
     const ticker = useRef(null)
     const stoppedColsRef = useRef(startTemplate.layout.cols)
@@ -118,6 +128,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const autoplayPendingRef = useRef(false)
     const stopsRef = useRef(advancedStops)
     const buyTierIdRef = useRef(null)
+    const reelFrameRef = useRef(null)
 
     useEffect(() => { stopsRef.current = advancedStops }, [advancedStops])
     useEffect(() => { buyTierIdRef.current = bonusBuyTierId }, [bonusBuyTierId])
@@ -574,21 +585,55 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <button type="button" className="slot-panel-info-toggle" onClick={() => setShowInfo(v => !v)}>
                             <Info size={14} /> Feature contract <ChevronDown size={14} className={showInfo ? 'rot' : ''} />
                         </button>
-                        {showInfo && (
-                            <>
-                                <p className="slot-panel-note">{config.featureText}</p>
-                                <div className="slot-tag-row">
-                                    <span>{paylineMode}</span>
-                                    <span>{config.volatility}</span>
-                                    {config.features?.scatter && <span>Scatter</span>}
-                                    {config.features?.coinMeter && <span>Coin collect</span>}
-                                    {config.features?.cascade && <span>Cascade</span>}
-                                    {config.features?.mysterySymbol && <span>Mystery</span>}
-                                    {config.features?.persistentMultiplier && <span>Persistent ×</span>}
-                                    {config.features?.holdAndRespin && <span>Hold &amp; respin</span>}
+                        {showInfo && (() => {
+                            const contract = getFeatureContract(config.id)
+                            return (
+                                <div className="slot-feature-contract">
+                                    <p className="slot-panel-note">{contract?.summary || config.featureText}</p>
+                                    <div className="slot-tag-row">
+                                        <span>{paylineMode}</span>
+                                        <span>{config.volatility}</span>
+                                        {config.features?.scatter && <span>Scatter</span>}
+                                        {config.features?.coinMeter && <span>Coin collect</span>}
+                                        {config.features?.cascade && <span>Cascade</span>}
+                                        {config.features?.mysterySymbol && <span>Mystery</span>}
+                                        {config.features?.persistentMultiplier && <span>Persistent ×</span>}
+                                        {config.features?.holdAndRespin && <span>Hold &amp; respin</span>}
+                                        {config.features?.multiplierWheel && <span>Wheel</span>}
+                                        {config.features?.stackedWildReel && <span>Stacked wilds</span>}
+                                    </div>
+                                    {contract?.mechanics && (
+                                        <div className="slot-contract-block">
+                                            <h4>Mechanics</h4>
+                                            <ul>
+                                                {contract.mechanics.map((m, i) => (
+                                                    <li key={i}>
+                                                        <strong>{m.name}.</strong> <span>{m.detail}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {contract?.bonusEntry && (
+                                        <div className="slot-contract-block">
+                                            <h4>Bonus entry</h4>
+                                            <p>{contract.bonusEntry}</p>
+                                            {contract.bonusFlow?.length > 0 && (
+                                                <ul className="slot-contract-flow">
+                                                    {contract.bonusFlow.map((b, i) => <li key={i}>{b}</li>)}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    )}
+                                    {contract?.volatility && (
+                                        <p className="slot-contract-note"><strong>Math:</strong> {contract.volatility}</p>
+                                    )}
+                                    {contract?.buyBonus && (
+                                        <p className="slot-contract-note"><strong>Bonus buy:</strong> {contract.buyBonus}</p>
+                                    )}
                                 </div>
-                            </>
-                        )}
+                            )
+                        })()}
                     </div>
                 </div>
             }
@@ -650,7 +695,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 </header>
 
                 <div className="slot-reel-wrap">
-                    <div className="slot-reel-frame-v2">
+                    <div className="slot-reel-frame-v2" ref={reelFrameRef}>
                         {config.layout.evaluation === 'megaways' ? (
                             <div className="slot-megaways-grid" style={{ gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))` }}>
                                 {Array.from({ length: config.layout.cols }).map((_, col) => {
@@ -704,6 +749,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     )
                                 })}
                             </div>
+                        )}
+                        {!running && lastResult?.wins?.length > 0 && (
+                            <WinPathOverlay
+                                wins={lastResult.wins}
+                                cellPositions={cellPositions}
+                                layout={config.layout}
+                                gridRef={reelFrameRef}
+                                accent={config.accent}
+                            />
                         )}
                     </div>
                 </div>

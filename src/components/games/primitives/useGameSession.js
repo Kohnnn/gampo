@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { recordPnl } from '../../../hooks/useGlobalPnl'
 import { recordRound as recordProgressRound } from '../../../hooks/useProgress'
+import { recordMissionRound } from '../../../hooks/useMissions'
 
 const HISTORY_LIMIT = 200
 const mirroredIds = new Set()
@@ -50,6 +51,13 @@ export default function useGameSession(gameId) {
                 // Wave 19: also feed the progression system. Achievements
                 // unlock and a toast surfaces from the same record path.
                 recordProgressRound({
+                    gameId,
+                    profit: entry.profit,
+                    betAmount: entry.betAmount,
+                    multiplier: entry.multiplier,
+                })
+                // Wave 25: also feed the missions/VIP system on every settled round.
+                recordMissionRound({
                     gameId,
                     profit: entry.profit,
                     betAmount: entry.betAmount,

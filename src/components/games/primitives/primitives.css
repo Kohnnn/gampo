@@ -202,6 +202,30 @@
     }
 }
 
+/* Wave 24: 1610×870 sweet spot — sidebar 280px, sportsbook chrome ~16px,
+   leaving the shell at 1314×870. The 3-col layout below should leave the
+   playfield at least 720px wide and 700px tall. Tighten paddings + fonts so
+   the playfield never needs to scroll for typical games. */
+@media (min-width: 1500px) and (max-height: 920px) {
+    .game-shell { padding: 10px; gap: 8px; }
+    .gs-titlebar {
+        padding: 7px 14px;
+    }
+    .gs-titlebar h1 { font-size: 17px; }
+    .gs-titlebar small { font-size: 10px; letter-spacing: 0.06em; }
+    .gs-balance strong { font-size: 16px; }
+    .gs-balance span { font-size: 10px; }
+    .gs-back { font-size: 10px; }
+    .gs-layout { gap: 8px; }
+    .gs-panel, .gs-aside { padding: 8px; }
+    .gs-playfield { padding: 10px; gap: 8px; }
+    .bp-panel { padding: 12px; gap: 10px; }
+    .bp-play { height: 48px; font-size: 14px; }
+    .bp-bet-input, .bp-bet-btn { height: 36px; }
+    .so-card { padding: 6px 8px; }
+    .so-card strong { font-size: 13px; }
+}
+
 @media (max-width: 1419px) {
     .gs-layout {
         grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
@@ -221,6 +245,17 @@
         max-height: none;
         overflow: visible;
     }
+}
+
+/* Wave 24: tablet tier (761–1024) — sidebar collapses under but the bet
+   panel still fits beside the playfield. Tighten panel width + paddings. */
+@media (min-width: 761px) and (max-width: 1024px) {
+    .gs-layout {
+        grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+    }
+    .gs-panel { padding: 10px; }
+    .gs-titlebar h1 { font-size: 16px; }
+    .gs-titlebar { padding: 8px 12px; }
 }
 
 @media (max-width: 760px) {
@@ -1294,6 +1329,17 @@ input:focus-visible,
     animation: gtPopoverIn 0.18s ease-out both;
 }
 
+/* Wave 21: portalled popover positioned via inline `top` / `left` so it
+   escapes the titlebar grid entirely. */
+.gt-popover.gt-popover-portal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: auto;
+    z-index: 220;
+    min-width: 230px;
+}
+
 @keyframes gtPopoverIn {
     from { opacity: 0; transform: translateY(-6px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1351,6 +1397,13 @@ input:focus-visible,
         bottom: 8px;
         max-height: 70vh;
         padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+    .gt-popover.gt-popover-portal {
+        right: 8px;
+        left: 8px;
+        bottom: 8px;
+        top: auto !important;
+        min-width: 0;
     }
 }
 
@@ -2180,3 +2233,27 @@ input:focus-visible,
 }
 
 /* === End Wave 5 polish === */
+
+/* Wave 29: volume mixer popover */
+.volmix-popover { padding: 12px; }
+.volmix-row {
+    display: grid;
+    grid-template-columns: 16px 60px 1fr 36px;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+}
+.volmix-row label { color: var(--text-secondary); font-size: 11px; font-weight: 800; }
+.volmix-row input[type='range'] {
+    width: 100%;
+    accent-color: var(--accent, #ffd166);
+    height: 4px;
+}
+.volmix-row em {
+    font-style: normal;
+    color: var(--text-primary);
+    font-size: 10px;
+    font-weight: 950;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
