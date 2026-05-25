@@ -24,58 +24,62 @@
 
 export const sfxManifest = {
     common: {
-        click: null,
-        reveal: null,
-        win: null,
-        lose: null,
-        cashout: null,
+        click: '/audio/common/click.wav',
+        reveal: '/audio/common/reveal.wav',
+        win: '/audio/common/win.wav',
+        lose: '/audio/common/lose.wav',
+        cashout: '/audio/common/cashout.wav',
+        // Wave 27: shared BGM-bus markers per family. Treated as roles so
+        // useSfx can preload them via the same path; in practice BGM uses
+        // a separate hook (`useBgm`) for looping playback.
+        bigwin: '/audio/common/bigwin.wav',
     },
     dice: {
-        click: null,
-        roll: null,
-        tick: null,
-        land: null,
-        win: null,
-        lose: null,
+        click: '/audio/common/click.wav',
+        roll: '/audio/dice/roll.wav',
+        tick: '/audio/cases/tick.wav',
+        land: '/audio/dice/land.wav',
+        win: '/audio/common/win.wav',
+        lose: '/audio/common/lose.wav',
     },
     mines: {
-        click: null,
-        reveal: null,
-        cashout: null,
-        win: null,
-        lose: null,
+        click: '/audio/common/click.wav',
+        reveal: '/audio/mines/reveal.wav',
+        cashout: '/audio/common/cashout.wav',
+        win: '/audio/common/win.wav',
+        lose: '/audio/common/lose.wav',
     },
     keno: {
-        click: null,
-        reveal: null,
-        win: null,
-        lose: null,
+        click: '/audio/common/click.wav',
+        reveal: '/audio/common/reveal.wav',
+        win: '/audio/common/win.wav',
+        lose: '/audio/common/lose.wav',
     },
     limbo: {
-        click: null,
-        tick: null,
-        win: null,
-        lose: null,
+        click: '/audio/common/click.wav',
+        tick: '/audio/cases/tick.wav',
+        win: '/audio/common/win.wav',
+        lose: '/audio/common/lose.wav',
     },
     crash: {
-        click: null,
-        tick: null,
-        cashout: null,
-        win: null,
-        lose: null,
+        click: '/audio/common/click.wav',
+        tick: '/audio/crash/tick.wav',
+        cashout: '/audio/crash/cashout.wav',
+        win: '/audio/common/win.wav',
+        lose: '/audio/common/lose.wav',
     },
     plinko: {
-        click: null,
-        peg: null,
-        bucket: null,
-        win: null,
-        lose: null,
+        click: '/audio/common/click.wav',
+        peg: '/audio/plinko/peg.wav',
+        bucket: '/audio/plinko/bucket.wav',
+        win: '/audio/common/win.wav',
+        lose: '/audio/common/lose.wav',
     },
     wheel: {
-        click: null,
-        tick: null,
-        win: null,
-        lose: null,
+        click: '/audio/common/click.wav',
+        tick: '/audio/cases/tick.wav',
+        win: '/audio/common/win.wav',
+        lose: '/audio/common/lose.wav',
     },
     blackjack: {
         click: null,
@@ -146,22 +150,34 @@ export const sfxManifest = {
         lose: null,
     },
     cases: {
-        click: null,
-        // Wave 18: declared but silent until binaries land.
-        // open    -> latch click as the lid pops
-        // tick    -> per-tile tick while the carousel decelerates
-        // land    -> final stop thunk when the pointer locks
-        // rare    -> chime when a Covert/Extraordinary lands
-        // reveal  -> generic reveal sting on the result card
-        // win     -> profit > 0 sting
-        // lose    -> profit <= 0 sting
-        open: null,
-        tick: null,
-        land: null,
-        rare: null,
-        reveal: null,
-        win: null,
-        lose: null,
+        click: '/audio/common/click.wav',
+        // Wave 18 + Wave 31: declared cases SFX, all wired to procedural binaries.
+        // open      -> latch click as the lid pops
+        // lid       -> heavy thud variant for crate slam
+        // tick      -> per-tile tick while the carousel decelerates
+        // multispin -> sting played when 3/5/10 rows kick off together
+        // land      -> final stop thunk when the pointer locks
+        // rare      -> chime when a Covert/Extraordinary lands
+        // knife     -> ★ knife/gloves drop fanfare
+        // gloves    -> alternative gloves sting
+        // stattrak  -> short bright stinger when StatTrak™ flag rolls
+        // souvenir  -> warm chord when a souvenir variant rolls
+        // reveal    -> generic reveal sting on the result card
+        // win       -> profit > 0 sting
+        // lose      -> profit <= 0 sting
+        open: '/audio/cases/open.wav',
+        lid: '/audio/cases/lid.wav',
+        tick: '/audio/cases/tick.wav',
+        multispin: '/audio/cases/multispin.wav',
+        land: '/audio/cases/land.wav',
+        rare: '/audio/cases/rare.wav',
+        knife: '/audio/cases/knife.wav',
+        gloves: '/audio/cases/gloves.wav',
+        stattrak: '/audio/cases/stattrak.wav',
+        souvenir: '/audio/cases/souvenir.wav',
+        reveal: '/audio/cases/reveal.wav',
+        win: '/audio/cases/win.wav',
+        lose: '/audio/cases/lose.wav',
     },
     drill: {
         click: null,
@@ -239,4 +255,26 @@ export function resolveSfx(slug, role) {
         return common[role] || null
     }
     return null
+}
+
+// Wave 27: per-template slot SFX roles. Declared silent; binaries arrive in
+// Wave 29. Each slot template emits these when the matching feature fires.
+export const slotSfxRoles = {
+    spinStart: 'Reels start',
+    reelStop: 'Per-reel stop',
+    reelTick: 'Reel deceleration tick',
+    settle: 'All reels settled',
+    winLine: 'A line/cluster win plays',
+    bigWin: 'Win threshold crossed',
+    scatter: 'Scatter hit',
+    bonusEnter: 'Bonus round enters',
+    bonusExit: 'Bonus round closes',
+    wheelLand: 'Multiplier wheel pointer lands',
+    holdFill: 'Hold-and-respin tile fills',
+    stickyLock: 'Sticky wild locks',
+    mysteryReveal: 'Mystery symbol revealed',
+    wantedSlam: 'Wanted-poster slam-in',
+    moneyCollect: 'Bayou angler money collect',
+    cascadeStep: 'Cascade tumble step',
+    anticipation: 'Pre-stop anticipation',
 }

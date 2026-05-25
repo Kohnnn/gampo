@@ -15,7 +15,7 @@
 // returns false but no errors are emitted.
 
 import { useCallback, useMemo, useRef } from 'react'
-import { getAudioCtx, getMasterGain, isMuted, unlockAudio, decode } from './audioContext'
+import { getAudioCtx, getMasterGain, getSfxGain, isMuted, unlockAudio, decode } from './audioContext'
 import { resolveSfx } from './sfxManifest'
 
 const bufferCache = new Map()
@@ -50,8 +50,8 @@ export function useSfx(slug) {
         if (isMuted()) return false
         await unlockAudio()
         const ctx = getAudioCtx()
-        const master = getMasterGain()
-        if (!ctx || !master) return false
+        const dest = getSfxGain() || getMasterGain()
+        if (!ctx || !dest) return false
         const buffer = await loadBuffer(url)
         if (!buffer) return false
         try {
@@ -60,7 +60,7 @@ export function useSfx(slug) {
             const gain = ctx.createGain()
             gain.gain.value = Number.isFinite(opts.volume) ? Math.max(0, Math.min(1, opts.volume)) : 1
             source.connect(gain)
-            gain.connect(master)
+            gain.connect(dest)
             source.start(0)
             return true
         } catch (e) {

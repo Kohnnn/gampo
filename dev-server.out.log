@@ -3,14 +3,99 @@
 > vite --host 0.0.0.0
 
 
-  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m1121[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m253[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.6:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.29.144.1:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.31.0.1:[1m5173[22m/[39m
 [2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
-[2m5:18:48 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
-[2m5:19:32 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
-[2m5:20:04 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx[22m
-[2m5:20:28 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/pages/CasinoPages.jsx, /src/components/StatsPanel.jsx, /src/components/games/crash/CrashGame.jsx, /src/components/games/dino/DinoGame.jsx, /src/components/games/slots/SlotsGame.jsx, /src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
-[2m5:22:04 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HomePage.jsx, /src/pages/CasinoPages.jsx[22m
+[2m3:20:55 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:20:55 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:21:29 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/primitives/GameToolbar.jsx[22m
+[2m3:21:42 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m3:21:52 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m3:22:00 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ChatDock.jsx[22m
+[2m3:22:09 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ChatDock.jsx[22m
+[2m3:22:16 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:22:16 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:22:22 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ChatDock.jsx[22m
+[2m3:22:33 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ChatDock.css[22m
+[2m3:22:39 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:22:39 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:23:20 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:23:21 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:23:27 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:23:27 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:23:44 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:23:44 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:24:59 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:24:59 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:25:19 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:25:19 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:25:48 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:25:48 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:25:49 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:25:52 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:27:04 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:27:04 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:27:25 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.jsx[22m
+[2m3:27:43 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/sportsbook/SportsbookShell.jsx[22m
+[2m3:27:49 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:27:49 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:28:01 am[22m [36m[1m[vite][22m[39m [32m.env.local changed, restarting server...[39m
+[2m3:28:01 am[22m [36m[1m[vite][22m[39m server restarted.
+[2m3:28:05 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m3:29:34 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m3:30:00 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m3:33:37 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx[22m
+[2m3:33:44 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx[22m
+[2m3:34:26 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CasinoPages.jsx[22m
+[2m3:34:53 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CasinoPages.jsx[22m
+[2m3:35:13 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/casino.css[22m
+[2m3:36:12 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m3:36:22 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m3:36:57 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m3:37:07 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m3:37:19 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m3:37:42 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m3:38:00 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/cases.css[22m
+[2m3:38:51 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
+[2m3:39:04 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
+[2m3:39:40 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m3:39:48 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m3:39:56 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m3:40:12 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m3:40:31 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/slots.css[22m
+[2m3:41:43 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/context/SocialContext.jsx[22m
+[2m3:41:43 am[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/context/SocialContext.jsx[22m Could not Fast Refresh ("useRaceData" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m3:41:43 am[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/context/SocialContext.jsx[22m
+[2m3:43:24 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx, /src/components/games/primitives/AudioToggle.jsx[22m
+[2m3:43:40 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
+[2m3:43:50 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
+[2m3:44:33 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/primitives/GameToolbar.jsx[22m
+[2m3:44:46 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/primitives/GameToolbar.jsx[22m
+[2m3:44:56 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m3:46:46 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
+[2m3:47:00 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
+[2m3:47:23 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m3:47:30 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m3:47:44 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m3:48:15 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m3:49:02 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
+[2m4:11:07 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m4:13:24 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m4:13:45 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/cases.css[22m
+[2m4:15:30 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx, /src/components/games/blackjack/BlackjackGame.jsx[22m
+[2m4:15:39 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m4:15:48 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/cases/CasesGame.jsx[22m
+[2m4:17:58 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m4:18:12 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m4:18:25 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/slots.css[22m
+[2m4:19:15 am[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/slots.css[22m
+[2m6:46:58 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m6:49:26 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m6:49:38 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m6:50:38 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m6:50:49 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m
+[2m6:51:06 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/games/slots/SlotsGame.jsx[22m

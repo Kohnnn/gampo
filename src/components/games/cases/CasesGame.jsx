@@ -1,21 +1,31 @@
-// Stake-style Cases (Wave 3 Batch 3C, polished in Wave 18).
+// CasesGame — Wave 31 rewrite.
 //
-// Wave 18 polish:
-//   - 3.5s carousel reveal with cubic-out deceleration + tick SFX every tile
-//     and a "land" thunk on the final stop.
-//   - Drop history persisted to localStorage via `useCaseCollection`.
-//   - Owned-skin collection grid with rarity counts + best multiplier.
-//   - Rare-drop chime + recent drop strip below the carousel.
-//   - Manifest still ships silent; missing audio paths are no-ops.
+// What changed:
+//   - Loads the playable case roster from `/data/cs-cases.json` (60 cases).
+//   - Loads the full pokedex catalog (~2,000 unique skins) on demand.
+//   - "Pokedex" view replaces the old collection grid: searchable, rarity-filtered,
+//     shows discovered/total per crate + a global completion bar. No selling.
+//   - Multi-row simultaneous open: pick 1 / 3 / 5 / 10 rows; every row spins
+//     independently with its own carousel, all settle within the 3.5s window.
+//   - Each drop rolls a wear condition + StatTrak / souvenir flag from the
+//     skin's wear range so float and StatTrak count as separate pokedex
+//     variants ("gotta gather them all").
+//   - Case grid replaces the old tier-chip + thin row layout. Tiers still
+//     filter the grid; expanded peek panel shows the full contains list.
+//   - SFX: open / tick / land / rare / reveal / win / lose all wired through
+//     the procedural 16-bit binaries from Wave 29.
+//   - Animations preserved: 3.5s cubic-out reel, anchor scale, rare burst.
 //
-// Skin imagery is loaded directly from the Steam community CDN URLs in
-// the source dataset. No proprietary Stake assets are copied.
+// Math note: opening N rows still uses one stake per row. Wear adjusts the
+// multiplier slightly so a Factory New 4× becomes 4.4× and a Battle-Scarred
+// 4× becomes 3.4× (cosmetic — keeps the math contract simple).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { useCaseCollection } from '../../../hooks/useCaseCollection'
+import { useCsCollection } from '../../../hooks/useCsCollection'
 import { recordCaseDrop as recordProgressCaseDrop } from '../../../hooks/useProgress'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
@@ -41,14 +51,39 @@ import EducationPanel from '../../EducationPanel'
 import './cases.css'
 
 const REVEAL_MS = 3500
-const TILE_PX = 100 // visual width of one carousel tile incl. gap
-const CAROUSEL_VISIBLE = 32 // tiles in the running track per case
-const PRIZE_INDEX = CAROUSEL_VISIBLE - 4 // where the resolved prize sits
-const TIER_COSTS = { low: 1, mid: 2.5, high: 6 } // multiplier of bet
-const TIER_LABEL = { low: 'Low', mid: 'Mid', high: 'High' }
-const RARE_TIERS = new Set(['Covert', 'Extraordinary'])
+const TILE_PX = 100
+const CAROUSEL_VISIBLE = 32
+const PRIZE_INDEX = CAROUSEL_VISIBLE - 4
+const ROW_OPTIONS = [1, 3, 5, 10]
+const RARE_TIERS = new Set(['Covert', 'Extraordinary', 'Contraband', '★'])
+const STATTRAK_CHANCE = 0.1
+const SOUVENIR_CHANCE = 0.06
 
-// Pick a weighted item using fairRng. Higher rarity tier = lower weight.
+const STANDARD_WEARS = [
+    { wear: 'Factory New',    short: 'FN', minFloat: 0.00, maxFloat: 0.07, weight: 12, mult: 1.10 },
+    { wear: 'Minimal Wear',   short: 'MW', minFloat: 0.07, maxFloat: 0.15, weight: 22, mult: 1.04 },
+    { wear: 'Field-Tested',   short: 'FT', minFloat: 0.15, maxFloat: 0.38, weight: 36, mult: 1.00 },
+    { wear: 'Well-Worn',      short: 'WW', minFloat: 0.38, maxFloat: 0.45, weight: 18, mult: 0.92 },
+    { wear: 'Battle-Scarred', short: 'BS', minFloat: 0.45, maxFloat: 1.00, weight: 12, mult: 0.85 },
+]
+
+function rollWear() {
+    const total = STANDARD_WEARS.reduce((s, w) => s + w.weight, 0)
+    let r = nextRoll('cases-wear').roll * total
+    for (const w of STANDARD_WEARS) {
+        r -= w.weight
+        if (r <= 0) return w
+    }
+    return STANDARD_WEARS[STANDARD_WEARS.length - 1]
+}
+
+function rollFloat(wear) {
+    if (!wear) return 0.18
+    const span = wear.maxFloat - wear.minFloat
+    const r = nextRoll('cases-float').roll
+    return Math.round((wear.minFloat + r * span) * 1000) / 1000
+}
+
 function rarityWeight(item) {
     if (item.isRare) return 0.4
     switch (item.rarity) {
@@ -56,7 +91,9 @@ function rarityWeight(item) {
         case 'Restricted': return 15.98
         case 'Classified': return 3.20
         case 'Covert': return 0.64
-        case 'Extraordinary': return 0.26
+        case 'Extraordinary':
+        case 'Contraband':
+        case '★': return 0.26
         default: return 12
     }
 }
@@ -83,7 +120,6 @@ function buildTrack(items, prizeIndex) {
     return track
 }
 
-// Cubic-out easing — deceleration matches CS:GO unboxing feel.
 function cubicOut(t) {
     return 1 - Math.pow(1 - t, 3)
 }
@@ -97,6 +133,12 @@ function formatRelative(ts) {
     return `${Math.round(diff / 86_400_000)}d`
 }
 
+function tierFromCase(c) {
+    return c.tier || 'mid'
+}
+
+const TIER_LABEL = { low: 'Low', mid: 'Mid', high: 'High' }
+
 export default function CasesGame() {
     const definition = findGameDefinition('cases') || { name: 'Cases', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
@@ -104,20 +146,26 @@ export default function CasesGame() {
     const sfx = useSfx('cases')
     const session = useGameSession('cases')
     const preloader = useOriginalsPreloader('cases')
-    const collection = useCaseCollection()
+    const csCatalog = useCsCollection()
+    const collection = useCaseCollection({ catalogTotal: csCatalog.catalog?.totalSkins || 0 })
 
     const [allCases, setAllCases] = useState(null)
     const [tier, setTier] = useState('low')
     const [caseId, setCaseId] = useState(null)
-    const [stack, setStack] = useState(1)
+    const [rows, setRows] = useState(1)
     const [running, setRunning] = useState(false)
     const [tracks, setTracks] = useState([]) // [[item, item, ...], ...]
     const [trackOffsets, setTrackOffsets] = useState([])
-    const [results, setResults] = useState([]) // resolved items list
+    const [results, setResults] = useState([]) // resolved drops list (with wear/statTrak)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
-    const [view, setView] = useState('open') // 'open' | 'history' | 'collection'
+    const [view, setView] = useState('open') // 'open' | 'history' | 'pokedex'
+    const [historyFilter, setHistoryFilter] = useState('')
+    const [pokedexFilter, setPokedexFilter] = useState('')
+    const [rarityFilter, setRarityFilter] = useState('all')
+    const [pokedexSort, setPokedexSort] = useState('multiplier')
+    const [caseGridSearch, setCaseGridSearch] = useState('')
     const tickRef = useRef({ ids: [], landId: null })
 
     useEffect(() => {
@@ -125,7 +173,7 @@ export default function CasesGame() {
         fetch('/data/cs-cases.json').then(r => r.json()).then(data => {
             if (cancelled) return
             setAllCases(data)
-            const first = data.find(c => c.tier === 'low')
+            const first = data.find(c => tierFromCase(c) === 'low') || data[0]
             if (first) setCaseId(first.id)
         }).catch(err => {
             // eslint-disable-next-line no-console
@@ -134,18 +182,21 @@ export default function CasesGame() {
         return () => { cancelled = true }
     }, [])
 
-    const tierCases = useMemo(() => (allCases || []).filter(c => c.tier === tier), [allCases, tier])
+    const tierCases = useMemo(() => {
+        const list = (allCases || []).filter(c => tierFromCase(c) === tier)
+        const q = caseGridSearch.trim().toLowerCase()
+        return q ? list.filter(c => c.name.toLowerCase().includes(q)) : list
+    }, [allCases, tier, caseGridSearch])
+
     const activeCase = useMemo(() => (allCases || []).find(c => c.id === caseId) || tierCases[0], [allCases, caseId, tierCases])
-    const tierCostMult = TIER_COSTS[tier]
 
     useEffect(() => {
-        if (activeCase && activeCase.tier !== tier) {
+        if (activeCase && tierFromCase(activeCase) !== tier) {
             const fresh = tierCases[0]
             if (fresh) setCaseId(fresh.id)
         }
     }, [tier, tierCases, activeCase])
 
-    // Cleanup any pending tick timers on unmount.
     useEffect(() => () => {
         tickRef.current.ids.forEach(id => window.clearTimeout(id))
         if (tickRef.current.landId) window.clearTimeout(tickRef.current.landId)
@@ -155,8 +206,6 @@ export default function CasesGame() {
     const machine = useRoundMachine({})
 
     const scheduleTickSfx = useCallback(() => {
-        // Schedule ~14 deceleration ticks across the reveal using cubic-out.
-        // Each tick volume softens as it slows.
         tickRef.current.ids.forEach(id => window.clearTimeout(id))
         const ids = []
         const TICKS = 14
@@ -179,7 +228,7 @@ export default function CasesGame() {
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (running) { resolve({ profit: 0 }); return }
         if (!activeCase) { showToast('error', 'Loading cases', 'Try again'); resolve({ profit: 0 }); return }
-        const stake = Math.max(1, Math.round(betAmount * tierCostMult * stack * 100) / 100)
+        const stake = Math.max(1, Math.round(betAmount * rows * 100) / 100)
         if (!placeBet(stake, 'Cases')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`)
             resolve({ profit: 0 })
@@ -191,67 +240,89 @@ export default function CasesGame() {
         setResults([])
         playSound('click')
         sfx.play('open', { volume: 0.7 })
+        if (rows >= 3) sfx.play('multispin', { volume: 0.55 })
         sfx.play('click')
         setView('open')
 
-        // Resolve prizes deterministically up front.
-        const picks = Array.from({ length: stack }, () => weightedPick(activeCase.items))
+        // Resolve drops up front. Each row picks a base skin, then rolls
+        // wear + StatTrak + souvenir for the variant.
+        const picks = Array.from({ length: rows }, () => {
+            const base = weightedPick(activeCase.items)
+            const wear = rollWear()
+            const float = rollFloat(wear)
+            const statTrak = nextRoll('cases-st').roll < STATTRAK_CHANCE
+            const souvenir = !statTrak && nextRoll('cases-sv').roll < SOUVENIR_CHANCE
+            const wearMult = wear?.mult || 1
+            const stMult = statTrak ? 1.6 : 1
+            const svMult = souvenir ? 1.3 : 1
+            const multiplier = Math.round(((base.multiplier || 1) * wearMult * stMult * svMult) * 100) / 100
+            return {
+                ...base,
+                skinId: base.id,
+                wear: wear?.wear,
+                wearShort: wear?.short,
+                float,
+                statTrak,
+                souvenir,
+                multiplier,
+            }
+        })
+
         const newTracks = picks.map(pick => {
-            const prizeIndex = activeCase.items.findIndex(it => it.id === pick.id && it.name === pick.name)
+            const prizeIndex = activeCase.items.findIndex(it => it.id === pick.skinId)
             return buildTrack(activeCase.items, Math.max(0, prizeIndex))
         })
         setTracks(newTracks)
         setTrackOffsets(newTracks.map(() => 0))
 
         machine.start([
-            { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { stake, stack, caseId: activeCase.id }, at: 0 },
+            { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { stake, rows, caseId: activeCase.id }, at: 0 },
             { index: 1, type: ROUND_EVENTS.INPUT_LOCK, payload: {}, at: 0 },
-            { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { stake, stack }, at: 0 },
+            { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { stake, rows }, at: 0 },
         ], { autoFinish: false })
 
-        // Animate by setting target offsets one frame later so the
-        // CSS transition runs.
         window.setTimeout(() => {
-            // The track translates negatively so the prize tile (PRIZE_INDEX)
-            // lands centered on the pointer. Add a small jitter so consecutive
-            // opens don't look identical.
-            const jitter = (nextRoll('cases').roll - 0.5) * 14 // -7..+7 px
-            const offset = -((PRIZE_INDEX) * TILE_PX - 50) + jitter
-            setTrackOffsets(newTracks.map(() => offset))
+            const offsets = newTracks.map(() => {
+                const jitter = (nextRoll('cases-jit').roll - 0.5) * 14
+                return -((PRIZE_INDEX) * TILE_PX - 50) + jitter
+            })
+            setTrackOffsets(offsets)
         }, 32)
 
         scheduleTickSfx()
 
-        // Settle after the carousel finishes.
         window.setTimeout(() => {
             const totalMultiplier = picks.reduce((s, p) => s + (p.multiplier || 0), 0)
-            const returnAmount = stake * (totalMultiplier / stack)
+            // payout = stake × (sum of per-row multipliers / rows)
+            const returnAmount = (stake / rows) * totalMultiplier
             const profit = returnAmount - stake
             if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')
             setResults(picks)
 
-            // Wave 18: persist drop history + bump owned-skin counts.
-            // Wave 19: also feed the progression system so cases-rare etc unlock.
             picks.forEach(pick => {
                 collection.recordDrop(pick, {
                     caseId: activeCase.id,
                     caseName: activeCase.name,
-                    tier: activeCase.tier,
                 })
                 recordProgressCaseDrop(pick)
             })
 
             const won = profit > 0
             const headlineMult = picks.reduce((m, p) => Math.max(m, p.multiplier || 0), 0)
-            const rare = picks.some(p => RARE_TIERS.has(p.rarity))
+            const rare = picks.some(p => RARE_TIERS.has(p.rarity) || p.statTrak)
             setToast({
                 kind: won ? 'win' : 'lose',
                 multiplier: won ? headlineMult : null,
                 amount: profit,
-                message: picks.map(p => p.name).join(', ').slice(0, 60),
+                message: picks.map(p => `${p.statTrak ? 'StatTrak™ ' : ''}${p.name}`).join(', ').slice(0, 80),
             })
             sfx.play('reveal', { volume: 0.9 })
             if (rare) sfx.play('rare', { volume: 1 })
+            // Wave 31: extra fanfare variants for special results.
+            const knifeOrGloves = picks.some(p => /knife|gloves|bayonet|karambit|huntsman|talon/i.test(p.name || ''))
+            if (knifeOrGloves) sfx.play('knife', { volume: 1 })
+            if (picks.some(p => p.statTrak)) sfx.play('stattrak', { volume: 0.85 })
+            if (picks.some(p => p.souvenir)) sfx.play('souvenir', { volume: 0.85 })
             if (won && headlineMult >= 12) {
                 playSound('bigwin')
                 setBigWin({ trigger: Date.now(), profit, multiplier: headlineMult })
@@ -261,15 +332,15 @@ export default function CasesGame() {
             sfx.play(won ? 'win' : 'lose')
             session.record({
                 id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-                label: `${activeCase.name} x${stack}`,
-                profit, betAmount: stake, multiplier: totalMultiplier / stack,
-                meta: { picks: picks.map(p => ({ id: p.id, rarity: p.rarity, multiplier: p.multiplier })) },
+                label: `${activeCase.name} x${rows}`,
+                profit, betAmount: stake, multiplier: totalMultiplier / rows,
+                meta: { picks: picks.map(p => ({ id: p.skinId, rarity: p.rarity, multiplier: p.multiplier, wear: p.wear, statTrak: p.statTrak })) },
             })
             machine.finish({
                 kind: won ? 'win' : 'lose',
                 profit,
-                multiplier: totalMultiplier / stack,
-                picks: picks.map(p => p.id),
+                multiplier: totalMultiplier / rows,
+                picks: picks.map(p => p.skinId),
             })
             showToast(won ? 'win' : 'loss', `${activeCase.name} ${won ? 'win' : 'miss'}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             setRunning(false)
@@ -280,9 +351,40 @@ export default function CasesGame() {
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
     const stageLoading = !preloader.ready || !allCases
 
-    const collectionList = useMemo(() => (
-        Object.values(collection.collection).sort((a, b) => (b.multiplier || 0) - (a.multiplier || 0))
-    ), [collection.collection])
+    const pokedexList = useMemo(() => Object.values(collection.pokedex), [collection.pokedex])
+
+    const filteredDrops = useMemo(() => {
+        const q = historyFilter.trim().toLowerCase()
+        return collection.drops.filter(d => {
+            if (rarityFilter !== 'all' && d.rarity !== rarityFilter) return false
+            if (q && !(d.name || '').toLowerCase().includes(q) && !(d.caseName || '').toLowerCase().includes(q)) return false
+            return true
+        })
+    }, [collection.drops, historyFilter, rarityFilter])
+
+    const filteredPokedex = useMemo(() => {
+        const q = pokedexFilter.trim().toLowerCase()
+        const list = pokedexList.filter(s => {
+            if (rarityFilter !== 'all' && s.rarity !== rarityFilter) return false
+            if (q && !(s.name || '').toLowerCase().includes(q)) return false
+            return true
+        })
+        switch (pokedexSort) {
+            case 'recent':     return [...list].sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))
+            case 'count':      return [...list].sort((a, b) => (b.count || 0) - (a.count || 0))
+            case 'name':       return [...list].sort((a, b) => a.name.localeCompare(b.name))
+            case 'wear':       return [...list].sort((a, b) => (a.float || 0) - (b.float || 0))
+            case 'multiplier':
+            default:           return [...list].sort((a, b) => (b.multiplier || 0) - (a.multiplier || 0))
+        }
+    }, [pokedexList, pokedexFilter, rarityFilter, pokedexSort])
+
+    const cases = allCases || []
+    const tierCounts = useMemo(() => {
+        const out = { low: 0, mid: 0, high: 0 }
+        for (const c of cases) out[tierFromCase(c)] = (out[tierFromCase(c)] || 0) + 1
+        return out
+    }, [cases])
 
     return (
         <GameShell
@@ -296,13 +398,13 @@ export default function CasesGame() {
                     balance={balance}
                     initialBet={5}
                     runningRound={running}
-                    actionLabel={activeCase ? `Open ${stack > 1 ? `x${stack}` : ''} (${formatCredits(activeCase ? Math.round((Number(lastBet || 5)) * tierCostMult * stack * 100) / 100 : 0)})` : 'Loading...'}
+                    actionLabel={activeCase ? `Open ${rows > 1 ? `×${rows}` : ''} (${formatCredits(activeCase ? Math.round((Number(lastBet || 5)) * rows * 100) / 100 : 0)})` : 'Loading...'}
                     onPlay={performPlay}
                     lastBet={lastBet}
                     disableAuto
                 >
                     <div className="bp-section">
-                        <label className="bp-label">Tier</label>
+                        <label className="bp-label">Tier ({tierCounts[tier] || 0} cases)</label>
                         <SegmentedModeTabs
                             options={[
                                 { value: 'low', label: 'Low' },
@@ -315,34 +417,35 @@ export default function CasesGame() {
                         />
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">Stack ({stack})</label>
+                        <label className="bp-label">Rows ({rows})</label>
                         <div className="bp-row">
-                            {[1, 2, 3, 4].map(n => (
-                                <button key={n} className={`bp-bet-btn ${stack === n ? 'active' : ''}`} disabled={running} onClick={() => setStack(n)}>{n}</button>
+                            {ROW_OPTIONS.map(n => (
+                                <button key={n} className={`bp-bet-btn ${rows === n ? 'active' : ''}`} disabled={running} onClick={() => setRows(n)}>{n}</button>
                             ))}
                         </div>
                     </div>
                     <div className="bp-bal-line">
-                        <span>Tier cost</span>
-                        <strong>×{tierCostMult.toFixed(1)}</strong>
-                    </div>
-                    <div className="bp-bal-line">
                         <span>Total stake</span>
-                        <strong>{formatCredits(Math.round(Number(lastBet || 5) * tierCostMult * stack * 100) / 100)}</strong>
+                        <strong>{formatCredits(Math.round(Number(lastBet || 5) * rows * 100) / 100)}</strong>
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">Collection</label>
+                        <label className="bp-label">Pokedex</label>
                         <div className="bp-row" style={{ flexWrap: 'wrap' }}>
                             <span className="cases-stat-pill">
                                 <small>Drops</small><strong>{collection.summary.totalDrops}</strong>
                             </span>
                             <span className="cases-stat-pill">
-                                <small>Skins</small><strong>{collection.summary.uniqueSkins}</strong>
+                                <small>Variants</small><strong>{collection.summary.uniqueVariants}</strong>
                             </span>
                             <span className="cases-stat-pill">
                                 <small>Best</small><strong>×{collection.summary.bestMultiplier.toFixed(2)}</strong>
                             </span>
                         </div>
+                        {csCatalog.loaded && (
+                            <div className="cases-pokedex-bar" title={`${collection.summary.uniqueVariants} discovered of ${csCatalog.catalog.totalSkins} skins`}>
+                                <span style={{ width: `${Math.min(100, collection.summary.uniqueVariants / Math.max(1, csCatalog.catalog.totalSkins) * 100)}%` }} />
+                            </div>
+                        )}
                     </div>
                 </BetPanel>
             }
@@ -353,7 +456,7 @@ export default function CasesGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={620} maxWidth={960} loading={stageLoading} className="cases-stage-frame">
+            <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
                 <div className="cases-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
 
@@ -362,8 +465,8 @@ export default function CasesGame() {
                         <button className={view === 'history' ? 'active' : ''} onClick={() => setView('history')} disabled={running}>
                             History {collection.drops.length > 0 && <em>{collection.drops.length}</em>}
                         </button>
-                        <button className={view === 'collection' ? 'active' : ''} onClick={() => setView('collection')} disabled={running}>
-                            Collection {collectionList.length > 0 && <em>{collectionList.length}</em>}
+                        <button className={view === 'pokedex' ? 'active' : ''} onClick={() => setView('pokedex')} disabled={running}>
+                            Pokedex {pokedexList.length > 0 && <em>{pokedexList.length}</em>}
                         </button>
                     </div>
 
@@ -372,59 +475,82 @@ export default function CasesGame() {
                             <div className="cases-tier-row">
                                 {(['low', 'mid', 'high']).map(t => (
                                     <button key={t} className={`cases-tier-chip ${tier === t ? 'active' : ''}`} disabled={running} onClick={() => setTier(t)}>
-                                        {TIER_LABEL[t]} · ×{TIER_COSTS[t].toFixed(1)}
+                                        {TIER_LABEL[t]} · {tierCounts[t] || 0}
                                     </button>
                                 ))}
+                                <input
+                                    type="search"
+                                    className="cases-search cases-grid-search"
+                                    placeholder="Filter cases..."
+                                    value={caseGridSearch}
+                                    onChange={e => setCaseGridSearch(e.target.value)}
+                                />
                             </div>
-                            <div className="cases-case-row">
+                            <div className="cases-case-grid">
                                 {tierCases.map(c => (
                                     <button
                                         key={c.id}
                                         className={`cases-case-card ${activeCase?.id === c.id ? 'active' : ''}`}
                                         disabled={running}
                                         onClick={() => setCaseId(c.id)}
+                                        title={`${c.name} · ${c.items.length} items · ${c.type || 'Case'}`}
                                     >
                                         <img src={c.image} alt={c.name} loading="lazy" />
                                         <span title={c.name}>{c.name}</span>
+                                        <em>{c.items.length} items</em>
                                     </button>
                                 ))}
                             </div>
-                            {tracks.map((track, ti) => (
-                                <div key={ti} className="cases-carousel-frame">
-                                    <div
-                                        className="cases-carousel-track"
-                                        style={{ transform: `translate(${trackOffsets[ti] || 0}px, -50%)` }}
-                                    >
-                                        {track.map((item, idx) => (
+                            {tracks.length > 0 && (
+                                <div className="cases-rows">
+                                    {tracks.map((track, ti) => (
+                                        <div key={ti} className="cases-carousel-frame">
                                             <div
-                                                key={`${ti}-${idx}-${item.id}`}
-                                                className={`cases-carousel-tile ${idx === PRIZE_INDEX && results.length > 0 ? 'is-prize' : ''}`}
-                                                style={{ borderColor: item.color }}
+                                                className="cases-carousel-track"
+                                                style={{ transform: `translate(${trackOffsets[ti] || 0}px, -50%)` }}
                                             >
-                                                <img src={item.image} alt={item.name} loading="lazy" />
-                                                <small>{item.name}</small>
+                                                {track.map((item, idx) => (
+                                                    <div
+                                                        key={`${ti}-${idx}-${item.id}`}
+                                                        className={`cases-carousel-tile ${idx === PRIZE_INDEX && results.length > 0 ? 'is-prize' : ''}`}
+                                                        style={{ borderColor: item.color }}
+                                                    >
+                                                        <img src={item.image} alt={item.name} loading="lazy" />
+                                                        <small>{item.name}</small>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
-                                    <span className="cases-carousel-pointer" />
+                                            <span className="cases-carousel-pointer" />
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
+                            )}
                             {results.length > 0 && (
                                 <div className="cases-result-row">
                                     {results.map((r, i) => (
-                                        <div key={i} className={`cases-result-card ${RARE_TIERS.has(r.rarity) ? 'rare' : ''}`} style={{ '--rarity': r.color }}>
+                                        <div key={i} className={`cases-result-card ${RARE_TIERS.has(r.rarity) ? 'rare' : ''} ${r.statTrak ? 'stattrak' : ''} ${r.souvenir ? 'souvenir' : ''}`} style={{ '--rarity': r.color }}>
                                             <img src={r.image} alt={r.name} />
-                                            <small>{r.name}</small>
-                                            <strong>×{r.multiplier.toFixed(2)}</strong>
+                                            <small>{r.statTrak && <em>StatTrak™ </em>}{r.souvenir && <em>Souvenir </em>}{r.name}</small>
+                                            <span className="cases-result-meta">
+                                                <em>{r.wearShort} · {r.float?.toFixed(3) ?? '—'}</em>
+                                                <strong>×{r.multiplier.toFixed(2)}</strong>
+                                            </span>
+                                            {RARE_TIERS.has(r.rarity) && (
+                                                <span className="cases-particles" aria-hidden>
+                                                    {Array.from({ length: 14 }).map((_, p) => (
+                                                        <i key={p} style={{ '--dx': `${(Math.cos(p * 0.448) * 80).toFixed(0)}px`, '--dy': `${(Math.sin(p * 0.448) * 80).toFixed(0)}px`, '--delay': `${p * 22}ms` }} />
+                                                    ))}
+                                                </span>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
                             )}
                             <div className="cases-stack-row">
-                                <MultiplierBadge label="Stack" value={stack} suffix="" size="sm" state={running ? 'active' : 'idle'} />
+                                <MultiplierBadge label="Rows" value={rows} suffix="" size="sm" state={running ? 'active' : 'idle'} />
                                 {activeCase && (
                                     <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-                                        {activeCase.items.length} skins · {activeCase.tier} tier
+                                        {activeCase.items.length} skins · {activeCase.type || 'Case'}
                                     </span>
                                 )}
                             </div>
@@ -435,20 +561,43 @@ export default function CasesGame() {
                         <div className="cases-history">
                             <header className="cases-history-head">
                                 <strong>Drop history</strong>
-                                <small>last {Math.min(collection.drops.length, 200)} drops</small>
+                                <small>last {Math.min(collection.drops.length, 400)} drops</small>
                                 {collection.drops.length > 0 && (
                                     <button className="cases-reset-btn" onClick={() => collection.reset()}>Reset</button>
                                 )}
                             </header>
-                            {collection.drops.length === 0 ? (
-                                <p className="cases-empty">No drops yet. Open a case to start a collection.</p>
+                            <div className="cases-filters">
+                                <input
+                                    type="search"
+                                    className="cases-search"
+                                    value={historyFilter}
+                                    onChange={e => setHistoryFilter(e.target.value)}
+                                    placeholder="Filter by skin name..."
+                                />
+                                <select className="cases-rarity-select" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
+                                    <option value="all">All rarities</option>
+                                    <option value="Mil-Spec Grade">Mil-Spec</option>
+                                    <option value="Restricted">Restricted</option>
+                                    <option value="Classified">Classified</option>
+                                    <option value="Covert">Covert</option>
+                                    <option value="Extraordinary">Extraordinary</option>
+                                    <option value="Contraband">Contraband</option>
+                                </select>
+                            </div>
+                            {filteredDrops.length === 0 ? (
+                                <p className="cases-empty">{collection.drops.length === 0 ? 'No drops yet. Open a case to start filling the pokedex.' : 'No drops match those filters.'}</p>
                             ) : (
                                 <ul className="cases-history-list">
-                                    {collection.drops.map((d, i) => (
-                                        <li key={`${d.id}-${d.ts}-${i}`} className={RARE_TIERS.has(d.rarity) ? 'rare' : ''} style={{ '--rarity': d.color }}>
+                                    {filteredDrops.map((d, i) => (
+                                        <li key={`${d.key}-${d.ts}-${i}`} className={RARE_TIERS.has(d.rarity) ? 'rare' : ''} style={{ '--rarity': d.color }}>
                                             <img src={d.image} alt={d.name} loading="lazy" />
-                                            <span className="cases-history-name">{d.name}</span>
+                                            <span className="cases-history-name">
+                                                {d.statTrak && <em className="cases-tag-st">ST™</em>}
+                                                {d.souvenir && <em className="cases-tag-sv">SV</em>}
+                                                {d.name}
+                                            </span>
                                             <span className="cases-history-rarity">{d.rarity || ''}</span>
+                                            <span className="cases-history-wear">{d.wearShort} · {d.float?.toFixed(3) ?? '—'}</span>
                                             <span className="cases-history-case">{d.caseName || ''}</span>
                                             <strong>×{(d.multiplier || 0).toFixed(2)}</strong>
                                             <em>{formatRelative(d.ts)}</em>
@@ -459,26 +608,59 @@ export default function CasesGame() {
                         </div>
                     )}
 
-                    {view === 'collection' && (
-                        <div className="cases-collection">
+                    {view === 'pokedex' && (
+                        <div className="cases-pokedex">
                             <header className="cases-history-head">
-                                <strong>Owned skins</strong>
-                                <small>{collectionList.length} unique</small>
+                                <strong>Pokedex</strong>
+                                <small>
+                                    {filteredPokedex.length} of {pokedexList.length} variants shown
+                                    {csCatalog.loaded && ` · ${collection.summary.uniqueVariants} unique discovered of ${csCatalog.catalog.totalSkins} skins (${collection.summary.completionPct}%)`}
+                                </small>
                             </header>
-                            {collectionList.length === 0 ? (
-                                <p className="cases-empty">Collection empty. Skins land here as you open cases.</p>
+                            <div className="cases-filters">
+                                <input
+                                    type="search"
+                                    className="cases-search"
+                                    value={pokedexFilter}
+                                    onChange={e => setPokedexFilter(e.target.value)}
+                                    placeholder="Search skins..."
+                                />
+                                <select className="cases-rarity-select" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
+                                    <option value="all">All rarities</option>
+                                    <option value="Mil-Spec Grade">Mil-Spec</option>
+                                    <option value="Restricted">Restricted</option>
+                                    <option value="Classified">Classified</option>
+                                    <option value="Covert">Covert</option>
+                                    <option value="Extraordinary">Extraordinary</option>
+                                    <option value="Contraband">Contraband</option>
+                                </select>
+                                <select className="cases-rarity-select" value={pokedexSort} onChange={e => setPokedexSort(e.target.value)}>
+                                    <option value="multiplier">Sort: Best multiplier</option>
+                                    <option value="recent">Sort: Recent</option>
+                                    <option value="count">Sort: Count</option>
+                                    <option value="wear">Sort: Lowest float</option>
+                                    <option value="name">Sort: Name</option>
+                                </select>
+                            </div>
+                            {filteredPokedex.length === 0 ? (
+                                <p className="cases-empty">{pokedexList.length === 0 ? 'Pokedex empty. Open cases to discover skins.' : 'No variants match those filters.'}</p>
                             ) : (
                                 <div className="cases-collection-grid">
-                                    {collectionList.map(skin => (
+                                    {filteredPokedex.map(skin => (
                                         <div
-                                            key={skin.id}
-                                            className={`cases-skin-card ${RARE_TIERS.has(skin.rarity) ? 'rare' : ''}`}
+                                            key={skin.key}
+                                            className={`cases-skin-card ${RARE_TIERS.has(skin.rarity) ? 'rare' : ''} ${skin.statTrak ? 'stattrak' : ''} ${skin.souvenir ? 'souvenir' : ''}`}
                                             style={{ '--rarity': skin.color }}
+                                            title={`${skin.name} · ${skin.wear} · float ${skin.float?.toFixed(3) ?? '—'}`}
                                         >
                                             <img src={skin.image} alt={skin.name} loading="lazy" />
-                                            <small>{skin.name}</small>
+                                            <small>
+                                                {skin.statTrak && <em className="cases-tag-st">ST™</em>}
+                                                {skin.souvenir && <em className="cases-tag-sv">SV</em>}
+                                                {skin.name}
+                                            </small>
                                             <span className="cases-skin-meta">
-                                                <em>{skin.rarity}</em>
+                                                <em>{skin.wearShort} · {skin.float?.toFixed(3) ?? '—'}</em>
                                                 <strong>×{(skin.multiplier || 0).toFixed(2)}</strong>
                                             </span>
                                             <i className="cases-skin-count">×{skin.count}</i>
@@ -489,7 +671,7 @@ export default function CasesGame() {
                         </div>
                     )}
 
-                    <ActionLockOverlay active={running} label="Unboxing..." />
+                    <ActionLockOverlay active={running} label={`Unboxing ${rows > 1 ? `${rows} rows` : ''}...`} />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>

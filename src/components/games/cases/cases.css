@@ -512,3 +512,210 @@
 .gampo-reduce-motion .cases-result-card.rare {
     animation: none !important;
 }
+
+/* Wave 24: 1610x870 fit pass for cases. */
+@media (min-width: 1500px) and (max-height: 920px) {
+    .cases-stage { padding: 12px; gap: 12px; }
+    .cases-carousel-frame { height: 100px; }
+    .cases-carousel-tile { height: 84px; width: 88px; flex: 0 0 88px; }
+    .cases-carousel-tile img { height: 50px; }
+    .cases-history-list { max-height: 360px; }
+    .cases-collection-grid { max-height: 380px; }
+}
+
+/* Wave 26: anchor scale, particles, filters, sell. */
+.cases-carousel-tile.is-prize {
+    transform: scale(1.18);
+    z-index: 2;
+    box-shadow: 0 0 30px -2px var(--rarity, rgba(255, 209, 102, 0.85));
+    transition: transform 280ms cubic-bezier(0.18, 0.95, 0.28, 1.1), box-shadow 280ms;
+}
+.cases-carousel-tile.is-prize ~ .cases-carousel-tile,
+.cases-carousel-frame:has(.is-prize) .cases-carousel-tile:not(.is-prize) {
+    opacity: 0.45;
+    transition: opacity 220ms;
+}
+.cases-particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.cases-particles i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--rarity, #ffd166), transparent 70%);
+    box-shadow: 0 0 12px var(--rarity, #ffd166);
+    animation: caseParticleBurst 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) var(--delay, 0ms) forwards;
+}
+@keyframes caseParticleBurst {
+    0% { transform: translate(0, 0) scale(1); opacity: 1; }
+    70% { opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+}
+.cases-result-card { position: relative; overflow: visible; }
+.cases-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+.cases-search,
+.cases-rarity-select {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    min-height: 32px;
+}
+.cases-search { flex: 1; min-width: 120px; }
+.cases-search:focus,
+.cases-rarity-select:focus {
+    outline: none;
+    border-color: var(--accent, #ffd166);
+}
+.cases-skin-card { position: relative; }
+.cases-sell-btn {
+    position: absolute;
+    bottom: 6px;
+    left: 6px;
+    appearance: none;
+    background: rgba(237, 66, 69, 0.18);
+    color: #ff8b8d;
+    border: 1px solid rgba(237, 66, 69, 0.35);
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 950;
+    padding: 2px 6px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s;
+}
+.cases-skin-card:hover .cases-sell-btn { opacity: 1; }
+.cases-sell-btn:hover { background: rgba(237, 66, 69, 0.32); color: #fff; }
+
+/* === Wave 31: Pokedex layout, case grid, multi-row, StatTrak / Souvenir === */
+.cases-tier-row {
+    grid-template-columns: repeat(3, auto) 1fr;
+}
+.cases-grid-search {
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.34);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 800;
+}
+.cases-grid-search:focus { outline: none; border-color: var(--accent, #ffd166); }
+.cases-case-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+}
+.cases-case-grid::-webkit-scrollbar { width: 6px; }
+.cases-case-grid::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 4px; }
+.cases-case-card em {
+    display: block;
+    margin-top: 2px;
+    font-style: normal;
+    font-size: 9px;
+    color: var(--text-muted, #6f7a8d);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.cases-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+}
+.cases-rows::-webkit-scrollbar { width: 6px; }
+.cases-rows::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 4px; }
+.cases-pokedex-bar {
+    margin-top: 8px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+}
+.cases-pokedex-bar span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #ffd166, #ad7cff);
+    transition: width 220ms;
+}
+.cases-result-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: 2px;
+    font-size: 9px;
+}
+.cases-result-meta em {
+    color: var(--text-muted, #6f7a8d);
+    font-style: normal;
+    font-weight: 800;
+}
+.cases-history-wear {
+    color: var(--text-muted, #6f7a8d);
+    font-size: 10px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.cases-history-list li {
+    grid-template-columns: 36px 1.4fr 0.8fr 0.7fr 1.2fr auto auto;
+}
+.cases-tag-st {
+    display: inline-block;
+    margin-right: 4px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-style: normal;
+    font-size: 8px;
+    font-weight: 950;
+    letter-spacing: 0.06em;
+    background: linear-gradient(180deg, #ffae44, #ff7b3a);
+    color: #1a0a02;
+}
+.cases-tag-sv {
+    display: inline-block;
+    margin-right: 4px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-style: normal;
+    font-size: 8px;
+    font-weight: 950;
+    letter-spacing: 0.06em;
+    background: linear-gradient(180deg, #ffe680, #b07a16);
+    color: #1a1602;
+}
+.cases-result-card.stattrak,
+.cases-skin-card.stattrak {
+    box-shadow: 0 0 22px -4px rgba(255, 174, 68, 0.7);
+    border-color: #ffae44;
+}
+.cases-result-card.souvenir,
+.cases-skin-card.souvenir {
+    box-shadow: 0 0 22px -4px rgba(255, 230, 128, 0.7);
+    border-color: #ffe680;
+}

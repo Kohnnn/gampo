@@ -1,6 +1,10 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useMemo, useState } from 'react'
+import { Pin, PinOff } from 'lucide-react'
+import { useSidebarPins } from '../hooks/useSidebarPins'
+import { sidebarPaths } from '../data/sidebarIcons'
 
+// ---- Casino sidebar data (unchanged from prior waves) ----
 const navSections = [
     {
         title: 'Casino',
@@ -31,7 +35,6 @@ const navSections = [
     },
 ]
 
-// Quick-action buttons that don't navigate; they dispatch global events.
 const sidebarActions = [
     {
         icon: 'chat', label: 'Open Chat',
@@ -47,11 +50,39 @@ const sidebarActions = [
     },
 ]
 
-// Wave 17 regroup: keep Gampo originals on top under "Featured" + "Originals",
-// then surface Slots / Tables / Cards / Arcade with the full catalog. Each
-// group's open-by-default state is set so Featured + Slots show by default.
+// ---- Sportsbook sidebar data (Wave 22) ----
+// Kept in sync with `SportsbookShell` view-state navigation events. The
+// sidebar emits `gampo:sports-navigate` so the shell can update its view
+// without a full route change. Falls back to /sports navigation if the
+// shell isn't listening (e.g. cold-load on /sports).
+const sportsViews = [
+    { id: 'home', icon: 'sports', label: 'Sportsbook Home', view: 'home' },
+    { id: 'live', icon: 'radio', label: 'Live Events', view: 'live' },
+    { id: 'starting', icon: 'clock', label: 'Starting Soon', view: 'starting' },
+    { id: 'all', icon: 'grid', label: 'All Events', view: 'all' },
+    { id: 'my-bets', icon: 'list', label: 'My Bets', view: 'my-bets' },
+]
+
+const sportsTopList = [
+    { id: 'soccer', icon: 'soccer', label: 'Soccer' },
+    { id: 'tennis', icon: 'tennis', label: 'Tennis' },
+    { id: 'cricket', icon: 'cricket', label: 'Cricket' },
+    { id: 'basketball', icon: 'basket', label: 'Basketball' },
+    { id: 'ice-hockey', icon: 'hockey', label: 'Ice Hockey' },
+    { id: 'baseball', icon: 'baseball', label: 'Baseball' },
+    { id: 'football', icon: 'football', label: 'Football' },
+    { id: 'horse-racing', icon: 'racing', label: 'Horse Racing' },
+]
+
+const sportsEsports = [
+    { id: 'cs2', icon: 'esports', label: 'CS2' },
+    { id: 'dota-2', icon: 'esports', label: 'Dota 2' },
+    { id: 'valorant', icon: 'esports', label: 'Valorant' },
+    { id: 'league-of-legends', icon: 'esports', label: 'League of Legends' },
+]
+
+// ---- Casino games (unchanged) ----
 const gameItems = [
-    // Featured (Gampo originals — always on top)
     { group: 'Featured', icon: 'poker', label: 'Live Poker', path: '/poker' },
     { group: 'Featured', icon: 'crash', label: 'Crash', path: '/crash' },
     { group: 'Featured', icon: 'plinko', label: 'Plinko', path: '/plinko' },
@@ -61,7 +92,6 @@ const gameItems = [
     { group: 'Featured', icon: 'keno', label: 'Keno', path: '/keno' },
     { group: 'Featured', icon: 'wheel', label: 'Wheel', path: '/wheel' },
 
-    // Originals (extended Gampo arcade originals)
     { group: 'Originals', icon: 'dino', label: 'Dino Run', path: '/dino' },
     { group: 'Originals', icon: 'tower', label: 'Tower', path: '/tower' },
     { group: 'Originals', icon: 'chickencross', label: 'Chicken Cross', path: '/chickencross' },
@@ -71,78 +101,58 @@ const gameItems = [
     { group: 'Originals', icon: 'color', label: 'Color Pick', path: '/color' },
     { group: 'Originals', icon: 'lottery', label: 'Lottery', path: '/lottery' },
 
-    // Slots (factory + 20 templates)
-    { group: 'Slots', icon: 'slots', label: 'Slot Factory', path: '/slots' },
-    { group: 'Slots', icon: 'slots', label: 'Vault Rush', path: '/slots' },
-    { group: 'Slots', icon: 'slots', label: 'River Catcher', path: '/slots' },
-    { group: 'Slots', icon: 'slots', label: 'Dust Rail Bounty', path: '/slots' },
-    { group: 'Slots', icon: 'slots', label: 'Storm Banner', path: '/slots' },
-    { group: 'Slots', icon: 'slots', label: 'Bassline Bonus', path: '/slots' },
-    { group: 'Slots', icon: 'slots', label: 'Scarab Spin', path: '/scarab-spin' },
-    { group: 'Slots', icon: 'slots', label: 'Bars', path: '/bars' },
-    { group: 'Slots', icon: 'slots', label: 'Blue Samurai', path: '/blue-samurai' },
-    { group: 'Slots', icon: 'slots', label: 'Wanted Revelation', path: '/wanted-revelation' },
-    { group: 'Slots', icon: 'slots', label: 'Gates of Ascent', path: '/gates-ascent' },
-    { group: 'Slots', icon: 'slots', label: 'Bass Bayou', path: '/bass-bayou' },
-    { group: 'Slots', icon: 'slots', label: 'Mummy Cascade', path: '/mummy-cascade' },
-    { group: 'Slots', icon: 'slots', label: 'Phoenix Megaways', path: '/phoenix-megaways' },
-    { group: 'Slots', icon: 'slots', label: 'Mansion Megaways', path: '/mansion-megaways' },
-    { group: 'Slots', icon: 'slots', label: 'Ghostblade Strike', path: '/ghostblade-strike' },
-    { group: 'Slots', icon: 'slots', label: 'Iron Fist', path: '/iron-fist' },
-    { group: 'Slots', icon: 'slots', label: 'Coop Cluck', path: '/coop-cluck' },
-    { group: 'Slots', icon: 'slots', label: 'Miko Spirit', path: '/miko-spirit' },
-    { group: 'Slots', icon: 'slots', label: 'Forge Anvil', path: '/forge-anvil' },
-    { group: 'Slots', icon: 'slots', label: 'Gummy Drops', path: '/gummy-drops' },
+    { group: 'Slots', icon: 'slots-vault', label: 'Slot Factory', path: '/slots' },
+    { group: 'Slots', icon: 'slots-vault', label: 'Vault Rush', path: '/slots' },
+    { group: 'Slots', icon: 'slots-river', label: 'River Catcher', path: '/slots' },
+    { group: 'Slots', icon: 'slots-west', label: 'Dust Rail Bounty', path: '/slots' },
+    { group: 'Slots', icon: 'slots-mythic', label: 'Storm Banner', path: '/slots' },
+    { group: 'Slots', icon: 'slots-rock', label: 'Bassline Bonus', path: '/slots' },
+    { group: 'Slots', icon: 'slots-scarab', label: 'Scarab Spin', path: '/scarab-spin' },
+    { group: 'Slots', icon: 'slots-bars', label: 'Bars', path: '/bars' },
+    { group: 'Slots', icon: 'slots-samurai', label: 'Blue Samurai', path: '/blue-samurai' },
+    { group: 'Slots', icon: 'slots-wanted', label: 'Wanted Revelation', path: '/wanted-revelation' },
+    { group: 'Slots', icon: 'slots-olympus', label: 'Gates of Ascent', path: '/gates-ascent' },
+    { group: 'Slots', icon: 'slots-bayou', label: 'Bass Bayou', path: '/bass-bayou' },
+    { group: 'Slots', icon: 'slots-mummy', label: 'Mummy Cascade', path: '/mummy-cascade' },
+    { group: 'Slots', icon: 'slots-phoenix', label: 'Phoenix Megaways', path: '/phoenix-megaways' },
+    { group: 'Slots', icon: 'slots-mansion', label: 'Mansion Megaways', path: '/mansion-megaways' },
+    { group: 'Slots', icon: 'slots-ronin', label: 'Ghostblade Strike', path: '/ghostblade-strike' },
+    { group: 'Slots', icon: 'slots-iron', label: 'Iron Fist', path: '/iron-fist' },
+    { group: 'Slots', icon: 'slots-coop', label: 'Coop Cluck', path: '/coop-cluck' },
+    { group: 'Slots', icon: 'slots-spirit', label: 'Miko Spirit', path: '/miko-spirit' },
+    { group: 'Slots', icon: 'slots-forge', label: 'Forge Anvil', path: '/forge-anvil' },
+    { group: 'Slots', icon: 'slots-gummy', label: 'Gummy Drops', path: '/gummy-drops' },
 
-    // Tables
     { group: 'Tables', icon: 'roulette', label: 'Roulette', path: '/roulette' },
     { group: 'Tables', icon: 'blackjack', label: 'Blackjack', path: '/blackjack' },
     { group: 'Tables', icon: 'baccarat', label: 'Baccarat', path: '/baccarat' },
     { group: 'Tables', icon: 'war', label: 'Casino War', path: '/war' },
     { group: 'Tables', icon: 'sicbo', label: 'Sic Bo', path: '/sicbo' },
 
-    // Cards
     { group: 'Cards', icon: 'videopoker', label: 'Video Poker', path: '/videopoker' },
     { group: 'Cards', icon: 'hilo', label: 'Hi-Lo Cards', path: '/hilo' },
 
-    // Arcade (newer originals + cases)
-    { group: 'Arcade', icon: 'slots', label: 'Cases', path: '/cases' },
-    { group: 'Arcade', icon: 'slots', label: 'Drill', path: '/drill' },
-    { group: 'Arcade', icon: 'slots', label: 'Packs', path: '/packs' },
-    { group: 'Arcade', icon: 'slots', label: 'Tome of Life', path: '/tomeoflife' },
-    { group: 'Arcade', icon: 'slots', label: 'Tarot', path: '/tarot' },
-    { group: 'Arcade', icon: 'slots', label: 'Flip', path: '/flip' },
-    { group: 'Arcade', icon: 'slots', label: 'Diamonds', path: '/diamonds' },
-    { group: 'Arcade', icon: 'slots', label: 'Darts', path: '/darts' },
-    { group: 'Arcade', icon: 'slots', label: 'Pump', path: '/pump' },
-    { group: 'Arcade', icon: 'slots', label: 'Slide', path: '/slide' },
-    { group: 'Arcade', icon: 'slots', label: 'Moles', path: '/moles' },
-    { group: 'Arcade', icon: 'slots', label: 'Snakes', path: '/snakes' },
-    { group: 'Arcade', icon: 'slots', label: 'Collections', path: '/collections' },
+    { group: 'Arcade', icon: 'arcade-cases', label: 'Cases', path: '/cases' },
+    { group: 'Arcade', icon: 'arcade-drill', label: 'Drill', path: '/drill' },
+    { group: 'Arcade', icon: 'arcade-packs', label: 'Packs', path: '/packs' },
+    { group: 'Arcade', icon: 'arcade-tome', label: 'Tome of Life', path: '/tomeoflife' },
+    { group: 'Arcade', icon: 'arcade-tarot', label: 'Tarot', path: '/tarot' },
+    { group: 'Arcade', icon: 'arcade-flip', label: 'Flip', path: '/flip' },
+    { group: 'Arcade', icon: 'arcade-diamonds', label: 'Diamonds', path: '/diamonds' },
+    { group: 'Arcade', icon: 'arcade-darts', label: 'Darts', path: '/darts' },
+    { group: 'Arcade', icon: 'arcade-pump', label: 'Pump', path: '/pump' },
+    { group: 'Arcade', icon: 'arcade-slide', label: 'Slide', path: '/slide' },
+    { group: 'Arcade', icon: 'arcade-moles', label: 'Moles', path: '/moles' },
+    { group: 'Arcade', icon: 'arcade-snakes', label: 'Snakes', path: '/snakes' },
+    { group: 'Arcade', icon: 'arcade-collection', label: 'Collections', path: '/collections' },
 ]
 
-// SVG glyphs (stroked outlines). 24x24 viewBox.
+// ---- SVG glyphs (24x24 viewBox). Wave 23 expansion: per-template slot
+// glyphs and unique arcade glyphs so icon-only collapse stays distinct. ----
 const icons = {
-    // sidebar nav
-    home:        <path d="M3 12 12 4l9 8v8a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-8z" />,
-    originals:   <path d="M12 2 14.5 8.5 21 9.27 16 13.97l1.5 6.78L12 17.27 6.5 20.75 8 13.97 3 9.27l6.5-.77L12 2z" />,
-    slotsLobby:  <path d="M3 6h18v12H3V6zm2 2v8h4V8H5zm6 0v8h2V8h-2zm4 0v8h4V8h-4z" />,
-    live:        <path d="M5 6h14v10H5V6zm-2 12h18v2H3v-2zm6-9 5 4-5 4V9z" />,
-    sports:      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4 3 2-1 4 3 2-3 2 1 4-3-2-3 2 1-4-3-2 3-2-1-4 3-2z" />,
-    gift:        <path d="M20 8h-3.18a3 3 0 0 0-4.82-3 3 3 0 0 0-4.82 3H4v4h2v9h12v-9h2V8zm-9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm2-2a1 1 0 1 1 2 0 1 1 0 0 1-2 0z" />,
-    mission:     <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3zm-1 14-4-4 1.5-1.5L11 13l4.5-4.5L17 10l-6 6z" />,
-    vip:         <path d="M5 16 3 6l5 3 4-7 4 7 5-3-2 10H5zm0 2h14v3H5v-3z" />,
-    academy:     <path d="M12 3 1 9l11 6 9-4.91V17h2V9L12 3zm-7 9.18v4l7 3.82 7-3.82v-4l-7 3.82-7-3.82z" />,
-    verify:      <path d="m9 16.2-3.5-3.5L4 14.2 9 19.2 20 8.2l-1.5-1.5L9 16.2z" />,
-    race:        <path d="M5 4v6h2V8h2v8H6v2h12v-2h-3V8h2v2h2V4H5zm6 4v8h2V8h-2z" />,
-    activity:    <path d="M3 12h4l2-7 4 14 2-7h6v2h-4l-3 9-4-14-1 5H3v-2z" />,
+    ...sidebarPaths,
 
-    // actions
-    chat:        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z" />,
-    pnl:         <path d="M3 17h4v4H3v-4zm6-6h4v10H9V11zm6-8h4v18h-4V3z" />,
-    progress:    <path d="M12 2 9.6 7.5 4 8.3l4.1 3.9L7 18l5-2.6L17 18l-1.1-5.8L20 8.3l-5.6-.8L12 2z" />,
-
-    // games
+    // games (legacy keys)
     crash:       <path d="M14 2h7v7l-3-3-5 5-3-3-7 7L2 13l9-9 3 3 0 -5z" />,
     plinko:      <path d="M12 3 4 17h16L12 3zm0 4 5.5 9.5h-11L12 7zm-4 4 4 7 4-7M9 12h2M13 12h2" />,
     dino:        <path d="M19 10V8h-2V6h-2V4h-3v2H9v3H6v3H3v3h3v3h3v-3h6v3h3v-3h3v-3h-3v-2zM12 8h2v2h-2V8z" />,
@@ -161,104 +171,294 @@ const icons = {
     tower:       <path d="M6 3h12v4H6V3zm-2 6h16v4H4V9zm-2 6h20v6H2v-6z" />,
     chickencross:<path d="M5 3v2h14V3H5zM3 7h18v2H3V7zm0 4h18v2H3v-2zm0 4h18v2H3v-2zm0 4h18v2H3v-2z" />,
     lottery:     <path d="M3 7c1 0 2-1 2-2h14c0 1 1 2 2 2v10c-1 0-2 1-2 2H5c0-1-1-2-2-2V7zm3 2v6h12V9H6zm2 1h2v4H8v-4z" />,
-    slots:       <path d="M3 5h18v14H3V5zm3 3v8h3V8H6zm6 0v8h3V8h-3zm6 0v8h0V8h0zM5 7h2v2H5V7zm6 0h2v2h-2V7zm6 0h2v2h-2V7z" />,
     coinflip:    <path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 3a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm-1 2v2H9v2h2v4h2v-4h2V8h-2V6h-2z" />,
     rps:         <path d="M6 6a2 2 0 0 1 2-2 2 2 0 0 1 2 2v6h0v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a1 1 0 0 1 1-1 1 1 0 0 1 1 1zM14 4l4 8-2 2 4 4-2 2-4-4-2 2-4-8 6-6z" />,
     guess:       <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 13h2v2h-2v-2zm0-9a3 3 0 0 1 3 3c0 2-3 2-3 5h-2c0-3 3-3 3-5a1 1 0 0 0-1-1 1 1 0 0 0-1 1H9a3 3 0 0 1 3-3z" />,
     hilo:        <path d="M5 4h6v8H5V4zm2 2v4h2V6H7zm6-2h6v8h-6V4zm2 2v4h2V6h-2zM5 14h6v8H5v-8zm2 2v4h2v-4H7zm6-2h6v8h-6v-8zm2 2v4h2v-4h-2z" />,
     poker:       <path d="M12 2a4 4 0 0 0-4 4c0 2 1 3 2 4-2 0-4 1-4 4 0 2 2 4 4 4 1 0 2 0 2-1l-1 5h2l-1-5c0 1 1 1 2 1 2 0 4-2 4-4 0-3-2-4-4-4 1-1 2-2 2-4a4 4 0 0 0-4-4z" />,
+
+    // Wave 23: per-skin slot glyphs (theme cues — vault, river, west, mythic, etc.)
+    'slots-vault':   <path d="M4 5h16v14H4V5zm2 2v10h12V7H6zm6 1a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm-1 4v0h2v0h-2zm-1 4 0 2 4 0 0-2-4 0z" />,
+    'slots-river':   <path d="M3 8c2 0 2 2 5 2s3-2 6-2 4 2 7 2v2c-3 0-4-2-7-2s-3 2-6 2-3-2-5-2V8zm0 6c2 0 2 2 5 2s3-2 6-2 4 2 7 2v2c-3 0-4-2-7-2s-3 2-6 2-3-2-5-2v-2z" />,
+    'slots-west':    <path d="M12 2 6 6v3l3 1v3l-2 6h10l-2-6v-3l3-1V6l-6-4zm-2 7v3h4V9h-4z" />,
+    'slots-mythic':  <path d="M12 2 9 9 2 9.3l5.5 4.4L5.5 21 12 17.5 18.5 21l-2-7.3L22 9.3 15 9 12 2zm0 4 1.8 4 4.2 0.4-3.3 2.7L16 16l-4-2-4 2 1.3-3 -3.3-2.7 4.2-0.4L12 6z" />,
+    'slots-rock':    <path d="M9 3v8a3 3 0 1 0 2 3V6h7V4l-9-1zm-3 11a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm12 2a3 3 0 1 0 0 4 3 3 0 0 0 0-4z" />,
+    'slots-scarab':  <path d="M12 2c-2 0-3 1-3 3v1H6L4 8l1 2h3v2H6l-2 2 2 3 4-2 2 4 2-4 4 2 2-3-2-2h-2v-2h3l1-2-2-2h-3V5c0-2-1-3-3-3z" />,
+    'slots-bars':    <path d="M4 4h4v16H4V4zm6 0h4v16h-4V4zm6 0h4v16h-4V4z" />,
+    'slots-samurai': <path d="m4 4 16 16-2 2-3-3-2 2-1-1 2-2L4 6V4zm12 0h4v4l-3 3-3-3 2-2-2-2 2 0z" />,
+    'slots-wanted':  <path d="M5 3h14v18H5V3zm2 3v3h10V6H7zm0 5v6h10v-6H7zm2 1h6v1H9v-1zm0 2h6v1H9v-1z" />,
+    'slots-olympus': <path d="M12 2 5 9h3v11h8V9h3l-7-7zm-2 9h4v9h-4v-9z" />,
+    'slots-bayou':   <path d="M3 14c4-4 8 0 14-3l4 3-3 2c-4 0-8 4-12 0-2-1-3-2-3-2zm9-2 1 1 1-1-1-1-1 1z" />,
+    'slots-mummy':   <path d="M8 3h8a2 2 0 0 1 2 2v3h-3v3h3v3h-3v3h3v2H6v-2h3v-3H6v-3h3V8H6V5a2 2 0 0 1 2-2zm1 5h6v0H9v0z" />,
+    'slots-phoenix': <path d="M12 2c2 3 4 5 4 8 0 2-2 4-4 4s-4-2-4-4c0-3 2-5 4-8zm0 12c-3 0-6 2-6 5l4-1 2 4 2-4 4 1c0-3-3-5-6-5z" />,
+    'slots-mansion': <path d="M3 21V11l9-7 9 7v10h-6v-7H9v7H3zm5-12 4-3 4 3v2H8V9z" />,
+    'slots-ronin':   <path d="M12 2 4 8l3 1-1 6h2l1-3 3 3 3-3 1 3h2l-1-6 3-1-8-6zm-2 14v3h4v-3h-4z" />,
+    'slots-iron':    <path d="M5 4h14v6H5V4zm0 8h14v8H5v-8zm2 2v4h10v-4H7zm2-7v3h6V7H9z" />,
+    'slots-coop':    <path d="M9 3a3 3 0 0 1 6 0v1l3 3-2 2v3h2v8H6v-8h2v-3L6 7l3-3V3zm2 1v1h2V4h-2z" />,
+    'slots-spirit':  <path d="M12 3a4 4 0 0 1 4 4v3h2v3l-2 1v3l-2-1-2 2-2-2-2 1v-3l-2-1V10h2V7a4 4 0 0 1 4-4zm-1 5v2h2V8h-2z" />,
+    'slots-forge':   <path d="M3 19h18v2H3v-2zm5-4 4-10h2l4 10h-2l-1-3h-4l-1 3H8zm3-5h2l-1-3-1 3z" />,
+    'slots-gummy':   <path d="M12 3c-4 0-7 2-7 5v8c0 3 3 5 7 5s7-2 7-5V8c0-3-3-5-7-5zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm-3 7a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm6 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" />,
+
+    // Wave 23: arcade glyphs
+    'arcade-cases':      <path d="M4 7l8-3 8 3v3l-8 3-8-3V7zm0 5 8 3 8-3v6l-8 3-8-3v-6z" />,
+    'arcade-drill':      <path d="M3 8h6v8H3V8zm6 1h4v6H9V9zm4 1h4v4h-4v-4zm4 1h3v2h-3v-2z" />,
+    'arcade-packs':      <path d="M4 8l8-4 8 4v8l-8 4-8-4V8zm8-2L6 9l6 3 6-3-6-3zm-7 4v6l6 3v-6L5 10zm14 0-6 3v6l6-3v-6z" />,
+    'arcade-tome':       <path d="M5 3h10a4 4 0 0 1 4 4v14H8a3 3 0 0 1-3-3V3zm0 16a1 1 0 0 0 1 1h11v-2H6a1 1 0 0 0-1 1zM7 5v11h10V5H7z" />,
+    'arcade-tarot':      <path d="M6 3h12v18H6V3zm2 2v14h8V5H8zm2 3 2 3 2-3-2-3-2 3zm0 4h4v4h-4v-4z" />,
+    'arcade-flip':       <path d="M12 2a10 10 0 1 0 7 17l-1.5-1.5A8 8 0 1 1 19 12c0 4-3 7-7 7v2a10 10 0 0 0 0-19zm-1 5h2v6h-2V7zm0 7h2v2h-2v-2z" />,
+    'arcade-diamonds':   <path d="M12 2 4 9l8 13 8-13-8-7zm0 4 5 4-5 8-5-8 5-4z" />,
+    'arcade-darts':      <path d="M12 2a10 10 0 1 0 10 10h-3a7 7 0 1 1-7-7V2zm0 4a6 6 0 1 0 6 6h-2a4 4 0 1 1-4-4V6zm0 3a3 3 0 1 0 3 3h-1a2 2 0 1 1-2-2V9zM18 4l4 4h-4V4z" />,
+    'arcade-pump':       <path d="M5 21h14v-3l-3-2v-2l3-1v-2l-3-2V8H8v1L5 11v2l3 1v2l-3 2v3zm5-9h4v3h-4v-3z" />,
+    'arcade-slide':      <path d="M3 13l9-9 4 4-9 9H3v-4zm12-8 4 4-2 2-4-4 2-2zm-9 12 14 0v3H6v-3z" />,
+    'arcade-moles':      <path d="M12 2a5 5 0 0 0-5 5v3l-3 5h4v3a4 4 0 0 0 8 0v-3h4l-3-5V7a5 5 0 0 0-5-5zm-2 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm4 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />,
+    'arcade-snakes':     <path d="M3 6c0-1 1-2 2-2h6a2 2 0 1 1 0 4H6a2 2 0 0 0 0 4h12a4 4 0 0 1 0 8h-6a2 2 0 1 1 0-4h6a2 2 0 0 0 0-4H6a4 4 0 0 1-3-6z" />,
+    'arcade-collection': <path d="M5 3h11l3 3v15H5V3zm2 2v14h10V8h-3V5H7zm2 5h6v2H9v-2zm0 4h6v2H9v-2z" />,
+
+    // generic slots fallback (unchanged)
+    slots:       <path d="M3 5h18v14H3V5zm3 3v8h3V8H6zm6 0v8h3V8h-3zm6 0v8h0V8h0zM5 7h2v2H5V7zm6 0h2v2h-2V7zm6 0h2v2h-2V7z" />,
 }
 
-function Sidebar({ isOpen, toggleSidebar }) {
-    const [gameSearch, setGameSearch] = useState('')
+function GameRow({ item, isPinned, onPinToggle }) {
+    return (
+        <div className="nav-row">
+            <NavLink
+                to={item.path}
+                title={item.label}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+                <span className="nav-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[item.icon] || icons.dice}</svg>
+                </span>
+                <span>{item.label}</span>
+            </NavLink>
+            <button
+                type="button"
+                className={`nav-pin ${isPinned ? 'is-pinned' : ''}`}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPinToggle(item.path) }}
+                title={isPinned ? 'Unpin from sidebar' : 'Pin to sidebar'}
+                aria-label={isPinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+            >
+                {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
+            </button>
+        </div>
+    )
+}
+
+function CasinoSidebar({ search, setSearch }) {
+    const { pins, isPinned: hookIsPinned, togglePin } = useSidebarPins()
     const groupedGames = useMemo(() => {
-        const q = gameSearch.trim().toLowerCase()
+        const q = search.trim().toLowerCase()
         const filtered = q ? gameItems.filter(item => item.label.toLowerCase().includes(q) || item.group.toLowerCase().includes(q)) : gameItems
         return filtered.reduce((acc, item) => {
             if (!acc[item.group]) acc[item.group] = []
             acc[item.group].push(item)
             return acc
         }, {})
-    }, [gameSearch])
+    }, [search])
+
+    const pinnedItems = useMemo(() => (
+        pins
+            .map(path => gameItems.find(g => g.path === path))
+            .filter(Boolean)
+    ), [pins])
+
     return (
-        <aside className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''}`}>
+        <>
+            {navSections.map(section => (
+                <div key={section.title} className="nav-section compact">
+                    <h3 className="nav-title">{section.title}</h3>
+                    {section.items.map((item) => (
+                        <NavLink
+                            key={item.path}
+                            to={item.path}
+                            title={item.label}
+                            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                        >
+                            <span className="nav-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[item.icon] || icons.home}</svg>
+                            </span>
+                            <span>{item.label}</span>
+                        </NavLink>
+                    ))}
+                </div>
+            ))}
+
+            <div className="nav-section compact">
+                <h3 className="nav-title">Utility</h3>
+                {sidebarActions.map((action) => (
+                    <button
+                        key={action.label}
+                        type="button"
+                        className="nav-item nav-item-action"
+                        title={action.label}
+                        onClick={action.onClick}
+                    >
+                        <span className="nav-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[action.icon] || icons.chat}</svg>
+                        </span>
+                        <span>{action.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="nav-section">
+                <h3 className="nav-title">Games</h3>
+                <label className="nav-game-search">
+                    <span>Search games</span>
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Crash, poker, cards..." />
+                </label>
+
+                {pinnedItems.length > 0 && !search.trim() && (
+                    <details className="nav-game-group" open>
+                        <summary>Pinned<b>{pinnedItems.length}</b></summary>
+                        {pinnedItems.map(item => (
+                            <GameRow
+                                key={`pinned-${item.path}-${item.label}`}
+                                item={item}
+                                isPinned
+                                onPinToggle={togglePin}
+                            />
+                        ))}
+                    </details>
+                )}
+
+                {Object.entries(groupedGames).map(([group, items]) => (
+                    <details key={group} className="nav-game-group" open={group === 'Featured' || group === 'Slots' || search.trim()}>
+                        <summary>{group}<b>{items.length}</b></summary>
+                        {items.map((item) => (
+                            <GameRow
+                                key={`${group}-${item.label}-${item.path}`}
+                                item={item}
+                                isPinned={hookIsPinned(item.path)}
+                                onPinToggle={togglePin}
+                            />
+                        ))}
+                    </details>
+                ))}
+            </div>
+        </>
+    )
+}
+
+function emitSportsNav(detail) {
+    document.dispatchEvent(new CustomEvent('gampo:sports-navigate', { detail }))
+}
+
+function SportsbookSidebar() {
+    return (
+        <>
+            <div className="nav-section compact">
+                <h3 className="nav-title">Sportsbook</h3>
+                {sportsViews.map(view => (
+                    <button
+                        key={view.id}
+                        type="button"
+                        className="nav-item nav-item-action"
+                        title={view.label}
+                        onClick={() => emitSportsNav({ view: view.view })}
+                    >
+                        <span className="nav-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[view.icon] || icons.sports}</svg>
+                        </span>
+                        <span>{view.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="nav-section compact">
+                <h3 className="nav-title">Top Sports</h3>
+                {sportsTopList.map(sport => (
+                    <button
+                        key={sport.id}
+                        type="button"
+                        className="nav-item nav-item-action"
+                        title={sport.label}
+                        onClick={() => emitSportsNav({ view: 'sport', sportId: sport.id })}
+                    >
+                        <span className="nav-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[sport.icon] || icons.sports}</svg>
+                        </span>
+                        <span>{sport.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="nav-section compact">
+                <h3 className="nav-title">Esports</h3>
+                {sportsEsports.map(sport => (
+                    <button
+                        key={sport.id}
+                        type="button"
+                        className="nav-item nav-item-action"
+                        title={sport.label}
+                        onClick={() => emitSportsNav({ view: 'sport', sportId: sport.id })}
+                    >
+                        <span className="nav-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[sport.icon] || icons.esports}</svg>
+                        </span>
+                        <span>{sport.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="nav-section compact">
+                <h3 className="nav-title">Account</h3>
+                <NavLink to="/race" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Race">
+                    <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons.race}</svg></span>
+                    <span>Race</span>
+                </NavLink>
+                <NavLink to="/activity" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} title="Activity">
+                    <span className="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons.activity}</svg></span>
+                    <span>Activity</span>
+                </NavLink>
+            </div>
+
+            <div className="nav-section compact">
+                <h3 className="nav-title">Utility</h3>
+                {sidebarActions.map((action) => (
+                    <button
+                        key={action.label}
+                        type="button"
+                        className="nav-item nav-item-action"
+                        title={action.label}
+                        onClick={action.onClick}
+                    >
+                        <span className="nav-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[action.icon] || icons.chat}</svg>
+                        </span>
+                        <span>{action.label}</span>
+                    </button>
+                ))}
+            </div>
+        </>
+    )
+}
+
+function Sidebar({ isOpen, toggleSidebar }) {
+    const [gameSearch, setGameSearch] = useState('')
+    const location = useLocation()
+    const isSportsRoute = location.pathname.startsWith('/sports')
+
+    return (
+        <aside className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''} ${isSportsRoute ? 'app-sidebar-sports' : 'app-sidebar-casino'}`}>
             <div className="sidebar-header">
                 <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"></path></svg>
                 </button>
                 <div className="sidebar-switcher">
-                    <NavLink to="/" className={({ isActive }) => `switch-btn ${isActive ? 'active' : ''}`}>
+                    <NavLink to="/" end className={({ isActive }) => `switch-btn ${isActive || (!isSportsRoute) ? 'active' : ''}`}>
                         Games
                     </NavLink>
-                    <NavLink to="/sports" className={({ isActive }) => `switch-btn ${isActive ? 'active' : ''}`}>
+                    <NavLink to="/sports" className={() => `switch-btn ${isSportsRoute ? 'active' : ''}`}>
                         Sports
                     </NavLink>
                 </div>
             </div>
 
             <nav className="sidebar-nav">
-                {navSections.map(section => (
-                    <div key={section.title} className="nav-section compact">
-                        <h3 className="nav-title">{section.title}</h3>
-                        {section.items.map((item) => (
-                            <NavLink
-                                key={item.path}
-                                to={item.path}
-                                title={item.label}
-                                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                            >
-                                <span className="nav-icon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[item.icon] || icons.home}</svg>
-                                </span>
-                                <span>{item.label}</span>
-                            </NavLink>
-                        ))}
-                    </div>
-                ))}
-
-                <div className="nav-section compact">
-                    <h3 className="nav-title">Utility</h3>
-                    {sidebarActions.map((action) => (
-                        <button
-                            key={action.label}
-                            type="button"
-                            className="nav-item nav-item-action"
-                            title={action.label}
-                            onClick={action.onClick}
-                        >
-                            <span className="nav-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[action.icon] || icons.chat}</svg>
-                            </span>
-                            <span>{action.label}</span>
-                        </button>
-                    ))}
-                </div>
-
-                <div className="nav-section">
-                    <h3 className="nav-title">Games</h3>
-                    <label className="nav-game-search">
-                        <span>Search games</span>
-                        <input value={gameSearch} onChange={e => setGameSearch(e.target.value)} placeholder="Crash, poker, cards..." />
-                    </label>
-                    {Object.entries(groupedGames).map(([group, items]) => (
-                        <details key={group} className="nav-game-group" open={group === 'Featured' || group === 'Slots' || gameSearch.trim()}>
-                            <summary>{group}<b>{items.length}</b></summary>
-                            {items.map((item) => (
-                                <NavLink
-                                    key={`${group}-${item.label}-${item.path}`}
-                                    to={item.path}
-                                    title={item.label}
-                                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                                >
-                                    <span className="nav-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[item.icon] || icons.dice}</svg>
-                                    </span>
-                                    <span>{item.label}</span>
-                                </NavLink>
-                            ))}
-                        </details>
-                    ))}
-                </div>
+                {isSportsRoute
+                    ? <SportsbookSidebar />
+                    : <CasinoSidebar search={gameSearch} setSearch={setGameSearch} />}
             </nav>
         </aside>
     )

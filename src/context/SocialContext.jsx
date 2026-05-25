@@ -3,11 +3,86 @@ import { useCredits } from './CreditContext'
 
 const SocialContext = createContext(null)
 
-const fakeChatters = [
-    'lucky_lemur', 'binary_bee', 'oddsmonkey', 'crash_capt', 'plinko_pat',
-    'mines_max', 'tower_tia', 'dice_doc', 'kenoking', 'baccarat_b',
-    'roulette_r', 'limbo_lia', 'wheel_wiz', 'chicken_chad', 'edge_eva',
+// Wave 28: deeper simulated player roster with personas. Each persona biases
+// the chat templates that user picks from + their race wager profile.
+const fakePlayers = [
+    { id: 'fake-1',  name: 'lucky_lemur',  persona: 'whale',     baseWagered: 24800 },
+    { id: 'fake-2',  name: 'binary_bee',   persona: 'analyst',   baseWagered: 12400 },
+    { id: 'fake-3',  name: 'oddsmonkey',   persona: 'analyst',   baseWagered: 10200 },
+    { id: 'fake-4',  name: 'crash_capt',   persona: 'gambler',   baseWagered: 8800 },
+    { id: 'fake-5',  name: 'plinko_pat',   persona: 'cautious',  baseWagered: 7600 },
+    { id: 'fake-6',  name: 'mines_max',    persona: 'gambler',   baseWagered: 6900 },
+    { id: 'fake-7',  name: 'tower_tia',    persona: 'streaker',  baseWagered: 5400 },
+    { id: 'fake-8',  name: 'dice_doc',     persona: 'analyst',   baseWagered: 4900 },
+    { id: 'fake-9',  name: 'kenoking',     persona: 'cautious',  baseWagered: 3800 },
+    { id: 'fake-10', name: 'wheel_wiz',    persona: 'gambler',   baseWagered: 3200 },
+    { id: 'fake-11', name: 'limbo_lia',    persona: 'whale',     baseWagered: 14600 },
+    { id: 'fake-12', name: 'baccarat_b',   persona: 'streaker',  baseWagered: 6100 },
+    { id: 'fake-13', name: 'roulette_r',   persona: 'gambler',   baseWagered: 4400 },
+    { id: 'fake-14', name: 'edge_eva',     persona: 'mod',       baseWagered: 8200 },
+    { id: 'fake-15', name: 'chicken_chad', persona: 'cautious',  baseWagered: 2700 },
+    { id: 'fake-16', name: 'flip_flo',     persona: 'streaker',  baseWagered: 3450 },
+    { id: 'fake-17', name: 'sicbo_sid',    persona: 'analyst',   baseWagered: 5800 },
+    { id: 'fake-18', name: 'rps_rex',      persona: 'gambler',   baseWagered: 2100 },
 ]
+
+const personaTemplates = {
+    whale: [
+        'just dropped 5k on mines lol',
+        'hit a 47x on dice fake credits but i felt that',
+        'auto plinko 100 balls running rn',
+        'thinking of buying the mansion super bonus',
+        'turbo spinning slot factory at max bet',
+    ],
+    analyst: [
+        'reminder this is fake credits with EV-shaped variance',
+        '99% RTP dice still has 1% house edge over time',
+        'plinko 16 rows = same EV as 8 rows, just lower hit rate',
+        'fair odds for 50% are 2.00, anything less = vig',
+        'limbo target 2x has ~49.5% hit at 99% RTP',
+        'cluster pays > line pays for low volatility chases',
+        'sample size matters: 100 rounds is barely a signal',
+    ],
+    gambler: [
+        'all in on red',
+        'thats it, switching to dice',
+        'just one more round',
+        'i can feel a multiplier coming',
+        'crash went 33x last round, i missed it',
+        'gonna chase it back',
+        'riding the streak',
+    ],
+    cautious: [
+        'half my bet now, building bankroll slowly',
+        'only autoplay 10 with stop on big win',
+        'taking a break, profit secured',
+        'keno 4 spots is the sweet spot for me',
+        'tower easy mode only',
+        'cashing at 1.5x every time',
+    ],
+    streaker: [
+        '4 in a row on flip!',
+        'this baccarat shoe is breaking my brain',
+        'tower run was clean lvl 7',
+        'just landed back to back wilds',
+        'free spin retrigger, lets go',
+    ],
+    mod: [
+        'reminder: GamPo Lab is fake credits, no real money',
+        'use the Stats tab to track your session',
+        'tilted? hit reset balance and walk away',
+        'check out the Risk Academy for EV explainers',
+    ],
+}
+
+const personaBaseTempo = {
+    whale: 4500,
+    analyst: 8500,
+    gambler: 5500,
+    cautious: 11000,
+    streaker: 7000,
+    mod: 22000,
+}
 
 const seedChat = [
     { user: 'edge_eva', text: 'Reminder: this is fake credits only, no cash value', flair: 'mod' },
@@ -22,23 +97,10 @@ const seedChat = [
     { user: 'wheel_wiz', text: 'High risk preset is brutal lol' },
 ]
 
-const fakeOpponents = [
-    { id: 'fake-1', name: 'lucky_lemur', baseWagered: 9100 },
-    { id: 'fake-2', name: 'binary_bee', baseWagered: 7800 },
-    { id: 'fake-3', name: 'oddsmonkey', baseWagered: 6450 },
-    { id: 'fake-4', name: 'crash_capt', baseWagered: 5800 },
-    { id: 'fake-5', name: 'plinko_pat', baseWagered: 5200 },
-    { id: 'fake-6', name: 'mines_max', baseWagered: 4400 },
-    { id: 'fake-7', name: 'tower_tia', baseWagered: 3900 },
-    { id: 'fake-8', name: 'dice_doc', baseWagered: 3100 },
-    { id: 'fake-9', name: 'kenoking', baseWagered: 2750 },
-    { id: 'fake-10', name: 'wheel_wiz', baseWagered: 1900 },
-]
-
 const racePrizes = [
     'Diamond badge', 'Gold badge', 'Silver badge', 'Bronze badge',
     'Top 10 badge', 'Top 10 badge', 'Top 10 badge', 'Top 10 badge', 'Top 10 badge', 'Top 10 badge',
-    'Top 20 badge',
+    'Top 20 badge', 'Top 20 badge',
 ]
 
 function pick(array) {
@@ -55,40 +117,56 @@ function makeMessage(user, text, type = 'chat') {
     }
 }
 
+function pickPersonaSpeaker() {
+    return pick(fakePlayers)
+}
+
+function tempoFor(persona) {
+    const base = personaBaseTempo[persona] || 7000
+    return base * (0.8 + Math.random() * 0.5) // ±20-30% jitter
+}
+
 export function SocialProvider({ children }) {
     const { transactions } = useCredits()
     const [messages, setMessages] = useState(() => seedChat.map(item => makeMessage(item.user, item.text, item.flair === 'mod' ? 'system' : 'chat')))
     const tickRef = useRef(0)
+    const nextChatTimer = useRef(null)
 
     useEffect(() => {
-        const id = window.setInterval(() => {
+        let cancelled = false
+        const schedule = () => {
+            if (cancelled) return
+            const speaker = pickPersonaSpeaker()
+            const templates = personaTemplates[speaker.persona] || personaTemplates.gambler
+            const text = pick(templates)
+            const type = speaker.persona === 'mod' ? 'system' : 'chat'
+            setMessages(prev => [...prev.slice(-60), makeMessage(speaker.name, text, type)])
             tickRef.current += 1
-            const user = pick(fakeChatters)
-            const text = pick([
-                'gg',
-                'nice hit',
-                'rough one',
-                'Plinko low risk for me today',
-                'crash went 12x last round',
-                'I keep picking lower on hilo lol',
-                'roulette red streak',
-                'mines 5 always',
-                'tower run was clean',
-                'wheel high preset is wild',
-                'remember EV is per round, not session',
-                'session bankroll only, fake credits',
-                'take a break if tilted',
-                'limbo target 2x is the sweet spot',
-            ])
-            setMessages(prev => [...prev.slice(-60), makeMessage(user, text)])
-        }, 6000)
-        return () => window.clearInterval(id)
+            const delay = tempoFor(speaker.persona)
+            nextChatTimer.current = window.setTimeout(schedule, delay)
+        }
+        nextChatTimer.current = window.setTimeout(schedule, 4500)
+        return () => {
+            cancelled = true
+            if (nextChatTimer.current) window.clearTimeout(nextChatTimer.current)
+        }
     }, [])
 
     const postMessage = useCallback((text) => {
         const trimmed = String(text || '').trim()
         if (!trimmed) return
         setMessages(prev => [...prev.slice(-80), makeMessage('you', trimmed, 'self')])
+        // Wave 28: ~30% chance a sim player reacts to your message after a beat.
+        if (Math.random() < 0.3) {
+            const reactor = pickPersonaSpeaker()
+            const reactions = [
+                'nice', 'rough', 'gg', 'lol same', 'try plinko low', 'cashout earlier',
+                'EV is the same', 'tilt-mode activated', 'one more',
+            ]
+            window.setTimeout(() => {
+                setMessages(prev => [...prev.slice(-80), makeMessage(reactor.name, pick(reactions))])
+            }, 1500 + Math.random() * 2500)
+        }
     }, [])
 
     const wagered = useMemo(() => (
@@ -96,22 +174,23 @@ export function SocialProvider({ children }) {
     ), [transactions])
 
     const race = useMemo(() => {
-        const drift = (tickRef.current * 7) % 100
-        const opponents = fakeOpponents.map((player, index) => ({
+        const drift = (tickRef.current * 13) % 100
+        const opponents = fakePlayers.map((player, index) => ({
             id: player.id,
             name: player.name,
-            wagered: Math.max(0, player.baseWagered + drift * (index % 3)),
+            persona: player.persona,
+            wagered: Math.max(0, player.baseWagered + drift * (index % 5) + (player.persona === 'whale' ? drift * 4 : 0)),
             isYou: false,
         }))
-        const you = { id: 'you', name: 'you', wagered: wagered, isYou: true }
+        const you = { id: 'you', name: 'you', wagered, isYou: true, persona: 'you' }
         const all = [...opponents, you].sort((a, b) => b.wagered - a.wagered)
-        return all.slice(0, 11).map((player, index) => ({
+        return all.slice(0, 12).map((player, index) => ({
             ...player,
             prize: racePrizes[index] || 'Practice badge',
         }))
-    }, [wagered])
+    }, [wagered, messages])
 
-    const value = { messages, postMessage, race }
+    const value = { messages, postMessage, race, players: fakePlayers }
 
     return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>
 }
