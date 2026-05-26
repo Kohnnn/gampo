@@ -57,7 +57,7 @@ export const PROMO_CARDS = [
         label: 'Promotion',
         title: 'Clay Court Slate',
         copy: 'Live tennis scenarios with simulated tiebreak swings.',
-        action: 'Bet & Watch',
+        action: 'Practice Slate',
         icon: Trophy,
     },
     {
@@ -65,7 +65,7 @@ export const PROMO_CARDS = [
         label: 'Boost',
         title: 'Race Day Boost',
         copy: 'Synthetic racing prices with suspended-runner states.',
-        action: 'Bet Now',
+        action: 'Practice Race',
         icon: Flame,
     },
 ]

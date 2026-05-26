@@ -3,7 +3,7 @@
 // Wave 2 retrofit: drives draw animation + result toast + sfx through the
 // round event machine. Math (kenoPayout) is unchanged.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -22,6 +22,10 @@ import {
     ResultToast,
     ActionLockOverlay,
     CoreStageFrame,
+    SimBetStrip,
+    makeInitialSimBetRows,
+    makeSimBetRow,
+    prependSimBetRow,
     ROUND_EVENTS,
     buildEvents,
     useRoundMachine,
@@ -50,6 +54,8 @@ export default function KenoGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [lastMultiplier, setLastMultiplier] = useState(null)
+    const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('keno', { count: 9, cap: 10 }))
+    const simSeqRef = useRef(0)
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return
@@ -135,6 +141,10 @@ export default function KenoGame() {
             }
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${hits}/${selected.length}`, profit, betAmount, multiplier })
             showToast(profit >= 0 ? 'win' : 'loss', `Keno ${hits} hits`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+            simSeqRef.current += 1
+            setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('keno', {
+                seed: `keno:${simSeqRef.current}:${selected.length}:${hits}:${multiplier}`,
+            }), 10))
             resolve({ profit })
         }, totalDuration)
     })
@@ -165,6 +175,7 @@ export default function KenoGame() {
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="keno-stage-frame">
                 <div className="keno-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <SimBetStrip rows={simFeed} title="Sim keno" />
                     <div className="keno-grid">
                         {Array.from({ length: 40 }, (_, i) => i + 1).map(n => {
                             const isSel = selected.includes(n)

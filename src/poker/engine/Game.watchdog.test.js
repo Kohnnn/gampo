@@ -37,4 +37,19 @@ describe('Game.advanceStreet — QA v4 watchdog', () => {
         const after = applyAction(state, { type: 'check' })
         expect(after.street).toBe('showdown')
     })
+
+    it('preserves per-seat poker persona metadata through initial state and deal', () => {
+        const players = [
+            seat('you', { isHuman: true }),
+            seat('bot-a', { persona: { pokerStyle: 'tight-passive', name: 'bot-a' }, pokerStyle: 'tight-passive' }),
+            seat('bot-b', { persona: { pokerStyle: 'loose-aggressive', name: 'bot-b' }, pokerStyle: 'loose-aggressive' }),
+        ]
+        const initial = createInitialState({ players, sb: 1, bb: 2, buttonIndex: 0 })
+        expect(initial.players[1].persona.pokerStyle).toBe('tight-passive')
+        expect(initial.players[2].pokerStyle).toBe('loose-aggressive')
+
+        const dealt = startHand(initial)
+        expect(dealt.players[1].persona.pokerStyle).toBe('tight-passive')
+        expect(dealt.players[2].pokerStyle).toBe('loose-aggressive')
+    })
 })

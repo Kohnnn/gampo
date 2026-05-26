@@ -98,6 +98,8 @@
     flex-wrap: wrap;
 }
 .cases-case-card {
+    position: relative;
+    overflow: hidden;
     width: 132px;
     padding: 6px;
     border-radius: 10px;
@@ -112,6 +114,43 @@
 .cases-case-card.active {
     border-color: var(--accent, #ffd166);
     box-shadow: 0 0 18px -8px rgba(255, 209, 102, 0.7);
+}
+.cases-case-card.is-lifting::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 10px;
+    height: 24px;
+    border-radius: 7px 7px 4px 4px;
+    background:
+        linear-gradient(180deg, rgba(255, 235, 160, 0.85), rgba(122, 74, 14, 0.86)),
+        linear-gradient(90deg, transparent 12%, rgba(0, 0, 0, 0.28) 12% 16%, transparent 16% 84%, rgba(0, 0, 0, 0.28) 84% 88%, transparent 88%);
+    border: 1px solid rgba(255, 209, 102, 0.6);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38), 0 0 18px rgba(255, 209, 102, 0.35);
+    z-index: 3;
+    transform-origin: 50% 100%;
+    animation: caseLidLift 260ms cubic-bezier(0.18, 0.9, 0.25, 1) both;
+}
+.cases-case-card.is-lifting::after {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 10px;
+    background: radial-gradient(circle at 50% 32%, rgba(255, 209, 102, 0.34), transparent 55%);
+    z-index: 2;
+    pointer-events: none;
+    animation: caseLidGlow 300ms ease-out both;
+}
+@keyframes caseLidLift {
+    0% { transform: translateY(0) rotateX(0deg) scale(1); opacity: 0.94; }
+    64% { transform: translateY(-18px) rotateX(42deg) scale(1.03); opacity: 1; }
+    100% { transform: translateY(-26px) rotateX(62deg) scale(1.02); opacity: 0; }
+}
+@keyframes caseLidGlow {
+    0% { opacity: 0; transform: scale(0.82); }
+    45% { opacity: 1; }
+    100% { opacity: 0; transform: scale(1.14); }
 }
 .cases-case-card img {
     width: 100%;
@@ -142,6 +181,31 @@
     border: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6);
 }
+.cases-carousel-frame::after {
+    content: '';
+    position: absolute;
+    top: -18%;
+    bottom: -18%;
+    left: -24%;
+    width: 90px;
+    transform: translateX(-120%) skewX(-16deg);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.46), rgba(255, 209, 102, 0.34), transparent);
+    filter: blur(1px);
+    opacity: 0;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    z-index: 4;
+}
+.case-phase-finale .cases-carousel-frame::after,
+.case-phase-zoom .cases-carousel-frame::after {
+    animation: caseLightSweep 1000ms cubic-bezier(0.16, 0.92, 0.28, 1) both;
+}
+@keyframes caseLightSweep {
+    0% { opacity: 0; transform: translateX(-120%) skewX(-16deg); }
+    16% { opacity: 0.85; }
+    80% { opacity: 0.55; }
+    100% { opacity: 0; transform: translateX(1450%) skewX(-16deg); }
+}
 
 .cases-carousel-track {
     position: absolute;
@@ -169,8 +233,17 @@
     padding: 4px;
     transition: box-shadow 200ms;
 }
+.cases-carousel-tile.is-target {
+    z-index: 3;
+    animation: casePrizeZoom 600ms cubic-bezier(0.16, 0.92, 0.28, 1) both;
+    box-shadow: 0 0 24px -5px var(--rarity, rgba(255, 209, 102, 0.75));
+}
 .cases-carousel-tile.is-prize {
     box-shadow: 0 0 22px -4px var(--rarity, rgba(255, 209, 102, 0.7));
+}
+@keyframes casePrizeZoom {
+    0% { transform: translateZ(0) scale(1.02); }
+    100% { transform: translateZ(0) scale(1.18); }
 }
 .cases-carousel-tile img {
     width: 100%;
@@ -582,6 +655,29 @@
     outline: none;
     border-color: var(--accent, #ffd166);
 }
+
+.cases-rarity-buttons {
+    display: none;
+}
+
+.cases-rarity-buttons button {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 10px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.cases-rarity-buttons button.active {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--accent, #ffd166), transparent 32%);
+    background: color-mix(in srgb, var(--accent, #ffd166), transparent 84%);
+}
 .cases-skin-card { position: relative; }
 .cases-sell-btn {
     position: absolute;
@@ -718,4 +814,158 @@
 .cases-skin-card.souvenir {
     box-shadow: 0 0 22px -4px rgba(255, 230, 128, 0.7);
     border-color: #ffe680;
+}
+
+@media (max-width: 480px) {
+    .cases-collection-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cases-filters {
+        gap: 6px;
+    }
+
+    .cases-filters .cases-rarity-select:first-of-type {
+        display: none;
+    }
+
+    .cases-rarity-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        width: 100%;
+    }
+}
+
+/* === Wave 35: CaseClicker-style feel pass === */
+.cases-skip-section {
+    gap: 6px;
+}
+.cases-skip-btn {
+    appearance: none;
+    width: 100%;
+    min-height: 34px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 209, 102, 0.32);
+    background: rgba(255, 209, 102, 0.12);
+    color: var(--accent, #ffd166);
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 140ms, border-color 140ms, color 140ms;
+}
+.cases-skip-btn:hover:not(:disabled) {
+    background: rgba(255, 209, 102, 0.2);
+    border-color: rgba(255, 209, 102, 0.68);
+    color: #fff;
+}
+.cases-skip-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.cases-prize-popover {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    z-index: 16;
+    animation: casePrizeOverlay 1800ms ease-out both;
+}
+.cases-prize-popover::before {
+    content: '';
+    position: absolute;
+    width: min(420px, 72%);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle, rgba(255, 234, 151, 0.26), rgba(255, 209, 102, 0.12) 32%, transparent 68%),
+        conic-gradient(from 0deg, transparent, rgba(255, 209, 102, 0.24), transparent 22%, rgba(255, 255, 255, 0.14), transparent 58%);
+    filter: blur(1px);
+    animation: casePrizeHalo 1800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.cases-prize-card {
+    position: relative;
+    width: min(260px, 72%);
+    padding: 18px 16px 16px;
+    border-radius: 14px;
+    border: 2px solid var(--rarity, #ffd166);
+    background:
+        radial-gradient(circle at 50% 0%, rgba(255, 209, 102, 0.24), transparent 58%),
+        rgba(8, 13, 21, 0.94);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.48), 0 0 36px -4px var(--rarity, #ffd166);
+    text-align: center;
+    transform-origin: 50% 55%;
+    animation: casePrizeCardPop 650ms cubic-bezier(0.18, 0.95, 0.28, 1.1) both;
+}
+.cases-prize-card img {
+    width: 100%;
+    height: 116px;
+    object-fit: contain;
+    filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.45));
+}
+.cases-prize-card span:not(.cases-particles) {
+    display: block;
+    margin-top: 8px;
+    color: var(--text-primary, #fff);
+    font-size: 13px;
+    font-weight: 950;
+    line-height: 1.18;
+}
+.cases-prize-card span em {
+    color: var(--accent, #ffd166);
+    font-style: normal;
+}
+.cases-prize-card strong {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 209, 102, 0.14);
+    color: var(--rarity, #ffd166);
+    font-size: 14px;
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+}
+@keyframes casePrizeOverlay {
+    0% { opacity: 0; }
+    12% { opacity: 1; }
+    82% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@keyframes casePrizeHalo {
+    0% { transform: scale(0.72) rotate(0deg); opacity: 0; }
+    24% { opacity: 1; }
+    100% { transform: scale(1.2) rotate(42deg); opacity: 0; }
+}
+@keyframes casePrizeCardPop {
+    0% { transform: translateY(24px) scale(0.74); opacity: 0; }
+    64% { transform: translateY(-3px) scale(1.04); opacity: 1; }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cases-case-card.is-lifting::before,
+    .cases-case-card.is-lifting::after,
+    .case-phase-finale .cases-carousel-frame::after,
+    .case-phase-zoom .cases-carousel-frame::after,
+    .cases-carousel-tile.is-target,
+    .cases-prize-popover,
+    .cases-prize-popover::before,
+    .cases-prize-card {
+        animation: none !important;
+    }
+}
+.gampo-reduce-motion .cases-case-card.is-lifting::before,
+.gampo-reduce-motion .cases-case-card.is-lifting::after,
+.gampo-reduce-motion .case-phase-finale .cases-carousel-frame::after,
+.gampo-reduce-motion .case-phase-zoom .cases-carousel-frame::after,
+.gampo-reduce-motion .cases-carousel-tile.is-target,
+.gampo-reduce-motion .cases-prize-popover,
+.gampo-reduce-motion .cases-prize-popover::before,
+.gampo-reduce-motion .cases-prize-card {
+    animation: none !important;
 }

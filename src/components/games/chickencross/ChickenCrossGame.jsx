@@ -51,6 +51,7 @@ export default function ChickenCrossGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const [laneFx, setLaneFx] = useState({ key: 0, from: 0, to: 0 })
     const { schedule, cancelAll } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
@@ -72,6 +73,7 @@ export default function ChickenCrossGame() {
         ], { autoFinish: false })
         setActiveBet(betAmount)
         setLane(0)
+        setLaneFx({ key: 0, from: 0, to: 0 })
         setSplat(false)
         setPhase('crossing')
         resolve({ profit: 0 })
@@ -85,7 +87,9 @@ export default function ChickenCrossGame() {
         if (safe) {
             playSound('flip')
             sfx.play('reveal')
-            setLane(prev => prev + 1)
+            const nextLane = lane + 1
+            setLane(nextLane)
+            setLaneFx(prev => ({ key: prev.key + 1, from: lane, to: nextLane }))
             return
         }
         playSound('explode')
@@ -163,17 +167,24 @@ export default function ChickenCrossGame() {
                 <div className="cc-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <div className="cc-road">
-                        {Array.from({ length: LANES + 1 }, (_, i) => (
-                            <div key={i} className={`cc-lane ${i === lane ? 'current' : ''} ${i < lane ? 'crossed' : ''} ${splat && i === lane ? 'splat' : ''}`}>
-                                {i === 0 && phase === 'idle' && (
-                                    <span className="cc-chicken idle" aria-hidden="true">{'\uD83D\uDC25'}</span>
-                                )}
-                                {i === lane && phase === 'crossing' && (
-                                    <span className={`cc-chicken ${splat ? 'splatted' : 'hopping'}`}>{splat ? '\uD83D\uDCA5' : '\uD83D\uDC25'}</span>
-                                )}
-                                <span className="cc-mult">{Math.pow(config.growth, i).toFixed(2)}×</span>
-                            </div>
-                        ))}
+                        {Array.from({ length: LANES + 1 }, (_, i) => {
+                            const isFadeFrom = laneFx.key > 0 && i === laneFx.from
+                            const isFadeTo = laneFx.key > 0 && i === laneFx.to
+                            return (
+                                <div
+                                    key={`${i}-${isFadeFrom || isFadeTo ? laneFx.key : 0}`}
+                                    className={`cc-lane ${i === lane ? 'current' : ''} ${i < lane ? 'crossed' : ''} ${splat && i === lane ? 'splat' : ''} ${isFadeFrom ? 'fade-out' : ''} ${isFadeTo ? 'fade-in' : ''}`}
+                                >
+                                    {i === 0 && phase === 'idle' && (
+                                        <span className="cc-chicken idle" aria-hidden="true">{'\uD83D\uDC25'}</span>
+                                    )}
+                                    {i === lane && phase === 'crossing' && (
+                                        <span className={`cc-chicken ${splat ? 'splatted' : 'hopping'}`}>{splat ? '\uD83D\uDCA5' : '\uD83D\uDC25'}</span>
+                                    )}
+                                    <span className="cc-mult">{Math.pow(config.growth, i).toFixed(2)}×</span>
+                                </div>
+                            )
+                        })}
                         {carKey > 0 && phase === 'crossing' && <span key={`car-${carKey}`} className="cc-car" />}
                     </div>
                     <div className="cc-action-btns">

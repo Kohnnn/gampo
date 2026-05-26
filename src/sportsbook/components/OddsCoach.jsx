@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Info, X } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, Info, X } from 'lucide-react'
 import { EDUCATION_SECTIONS } from '../sportsbookEducation'
 
 function toneClass(tone) {
@@ -8,12 +8,13 @@ function toneClass(tone) {
 
 function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
     const [open, setOpen] = useState(false)
-    const [tier, setTier] = useState('beginner')
-    const activeInsights = useMemo(() => (
-        (analysis?.insights || []).filter(insight => insight.tier === tier)
-    ), [analysis, tier])
 
     if (!analysis) return null
+
+    const sections = EDUCATION_SECTIONS.map(section => ({
+        ...section,
+        insights: (analysis.insights || []).filter(insight => insight.tier === section.tier),
+    })).filter(section => section.insights.length > 0)
 
     const openCoach = (event) => {
         event.preventDefault()
@@ -62,28 +63,25 @@ function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
                             </div>
                         ) : null}
 
-                        <div className="sb-coach-tabs">
-                            {EDUCATION_SECTIONS.map(section => (
-                                <button
-                                    key={section.tier}
-                                    type="button"
-                                    className={tier === section.tier ? 'is-active' : ''}
-                                    onClick={() => setTier(section.tier)}
-                                >
-                                    {section.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="sb-coach-insights">
-                            {activeInsights.map(item => (
-                                <article key={item.id} className={toneClass(item.tone)}>
-                                    <div>
-                                        <strong>{item.title}</strong>
-                                        {item.metricLabel ? <span>{item.metricLabel}: {item.metricValue}</span> : null}
+                        <div className="sb-coach-sections">
+                            {sections.map(section => (
+                                <details key={section.tier} className="sb-coach-section" open={section.tier === 'beginner' || undefined}>
+                                    <summary>
+                                        <span>{section.label}</span>
+                                        <ChevronDown size={15} />
+                                    </summary>
+                                    <div className="sb-coach-insights">
+                                        {section.insights.map(item => (
+                                            <article key={item.id} className={toneClass(item.tone)}>
+                                                <div>
+                                                    <strong>{item.title}</strong>
+                                                    {item.metricLabel ? <span>{item.metricLabel}: {item.metricValue}</span> : null}
+                                                </div>
+                                                <p>{item.body}</p>
+                                            </article>
+                                        ))}
                                     </div>
-                                    <p>{item.body}</p>
-                                </article>
+                                </details>
                             ))}
                         </div>
 
@@ -103,6 +101,29 @@ function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
                                         <span>{(row.impliedProbability * 100).toFixed(1)}%</span>
                                         <span>{(row.noVigProbability * 100).toFixed(1)}%</span>
                                         <span>{Number(row.fairOdds).toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {analysis.legRows?.length ? (
+                            <div className="sb-coach-leg-table">
+                                <div>
+                                    <span>Leg</span>
+                                    <span>Odds</span>
+                                    <span>Prob.</span>
+                                    <span>Roll</span>
+                                    <span>Result</span>
+                                    <span>Return role</span>
+                                </div>
+                                {analysis.legRows.map(row => (
+                                    <div key={`${row.label}-${row.roll}`}>
+                                        <strong>{row.label}</strong>
+                                        <span>{Number(row.acceptedOdds).toFixed(2)}</span>
+                                        <span>{(row.probability * 100).toFixed(1)}%</span>
+                                        <span>{Number(row.roll).toFixed(2)}</span>
+                                        <span className={row.result === 'won' ? 'sb-tone-positive' : 'sb-tone-danger'}>{row.result}</span>
+                                        <span>{row.returnRole}</span>
                                     </div>
                                 ))}
                             </div>

@@ -435,6 +435,16 @@
     box-shadow: 0 0 18px rgba(255, 207, 90, 0.34);
 }
 
+.slot-pill-fs.is-retriggering {
+    animation: slotFreeSpinPillCatch 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slotFreeSpinPillCatch {
+    0% { transform: scale(1); filter: brightness(1); }
+    42% { transform: scale(1.12); filter: brightness(1.25); }
+    100% { transform: scale(1); filter: brightness(1); }
+}
+
 .slot-pill-mult {
     border-color: color-mix(in srgb, var(--slot-accent), white 32%);
     box-shadow: 0 0 18px color-mix(in srgb, var(--slot-accent), transparent 60%);
@@ -1864,7 +1874,9 @@
         0 0 28px color-mix(in srgb, var(--slot-accent), transparent 55%);
     display: grid;
     place-items: center;
-    animation: slotWheelSpin 1.6s cubic-bezier(0.16, 0.92, 0.28, 1) both;
+    animation:
+        slotWheelSpin 1.25s cubic-bezier(0.16, 0.92, 0.28, 1) both,
+        slotWheelLandingWobble 0.35s cubic-bezier(0.2, 0.85, 0.25, 1) 1.25s both;
 }
 .slot-wheel-disc strong {
     position: relative;
@@ -1891,6 +1903,13 @@
     25% { opacity: 1; }
     100% { transform: rotate(1080deg) scale(1); opacity: 1; }
 }
+@keyframes slotWheelLandingWobble {
+    0% { transform: rotate(1080deg) scale(1); }
+    32% { transform: rotate(1094deg) scale(1.025); }
+    58% { transform: rotate(1072deg) scale(0.992); }
+    78% { transform: rotate(1086deg) scale(1.008); }
+    100% { transform: rotate(1080deg) scale(1); }
+}
 
 /* ---- Hold-and-respin board cell-by-cell fill (Wave 20) ----
    Stagger each filled tile with a pop-in so the board fills in front of the
@@ -1899,10 +1918,115 @@
 .slot-hold-slot.filled {
     animation: slotHoldFill 0.42s cubic-bezier(0.16, 0.92, 0.28, 1.1) both;
 }
+.slot-hold-slot.filled:not(.new-fill) {
+    animation: none;
+}
+.slot-hold-slot.filled.new-fill {
+    animation: slotHoldNewFill 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 @keyframes slotHoldFill {
     0% { transform: scale(0.4); opacity: 0; box-shadow: 0 0 0 transparent; }
     60% { transform: scale(1.1); opacity: 1; }
     100% { transform: scale(1); opacity: 1; }
+}
+@keyframes slotHoldNewFill {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 color-mix(in srgb, var(--slot-accent), transparent 100%);
+    }
+    52% {
+        transform: scale(1.18);
+        box-shadow:
+            0 0 0 6px color-mix(in srgb, var(--slot-accent), transparent 72%),
+            0 0 24px color-mix(in srgb, var(--slot-accent), transparent 34%);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--slot-accent), transparent 60%);
+    }
+}
+
+/* ---- Free-spin retrigger fly-ins + cascade traces (Wave 36) ---- */
+
+.slot-retrigger-flyers,
+.slot-cascade-trace-layer {
+    position: absolute;
+    inset: 12px;
+    z-index: 6;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.slot-retrigger-flyer {
+    position: absolute;
+    left: var(--from-x);
+    top: var(--from-y);
+    transform: translate(-50%, -50%) scale(0.72);
+    min-width: 34px;
+    height: 26px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 230, 128, 0.78);
+    background: linear-gradient(180deg, #fff0a6, #d89f28);
+    color: #1d1102;
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: 0.02em;
+    box-shadow: 0 0 22px rgba(255, 207, 90, 0.55);
+    animation: slotRetriggerFly 0.32s cubic-bezier(0.16, 1, 0.3, 1) var(--fly-delay) both;
+}
+
+@keyframes slotRetriggerFly {
+    0% {
+        opacity: 0;
+        left: var(--from-x);
+        top: var(--from-y);
+        transform: translate(-50%, -50%) scale(0.72);
+    }
+    18% {
+        opacity: 1;
+        left: var(--from-x);
+        top: var(--from-y);
+        transform: translate(-50%, -50%) scale(1.08);
+    }
+    100% {
+        opacity: 0;
+        left: var(--to-x);
+        top: var(--to-y);
+        transform: translate(-50%, -50%) scale(0.74);
+    }
+}
+
+.slot-cascade-trace-dot {
+    position: absolute;
+    left: var(--trace-x);
+    top: var(--trace-y);
+    width: 30px;
+    height: 42px;
+    transform: translate(-50%, -10%);
+    border-left: 2px dotted color-mix(in srgb, var(--slot-accent), white 28%);
+    opacity: 0;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--slot-accent), transparent 40%));
+    animation: slotCascadeTrace 0.52s ease-out var(--trace-delay) both;
+}
+
+.slot-cascade-trace-dot::after {
+    content: "";
+    position: absolute;
+    left: -5px;
+    bottom: -2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--slot-accent), white 20%);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--slot-accent), transparent 35%);
+}
+
+@keyframes slotCascadeTrace {
+    0% { opacity: 0; transform: translate(-50%, -24%) scaleY(0.4); }
+    26% { opacity: 0.95; }
+    100% { opacity: 0; transform: translate(-50%, 14%) scaleY(1); }
 }
 
 /* ---- Bayou money-collect ribbon (Wave 20) ---- */
@@ -2004,6 +2128,10 @@
     .slot-mystery-overlay.is-wanted-poster,
     .slot-wheel-disc,
     .slot-hold-slot.filled,
+    .slot-hold-slot.filled.new-fill,
+    .slot-retrigger-flyer,
+    .slot-cascade-trace-dot,
+    .slot-pill-fs.is-retriggering,
     .slot-collect-overlay,
     .slot-cascade-overlay {
         animation: none !important;
@@ -2013,6 +2141,10 @@
 .gampo-reduce-motion .slot-mystery-overlay.is-wanted-poster,
 .gampo-reduce-motion .slot-wheel-disc,
 .gampo-reduce-motion .slot-hold-slot.filled,
+.gampo-reduce-motion .slot-hold-slot.filled.new-fill,
+.gampo-reduce-motion .slot-retrigger-flyer,
+.gampo-reduce-motion .slot-cascade-trace-dot,
+.gampo-reduce-motion .slot-pill-fs.is-retriggering,
 .gampo-reduce-motion .slot-collect-overlay,
 .gampo-reduce-motion .slot-cascade-overlay {
     animation: none !important;
@@ -2159,4 +2291,79 @@
         color-mix(in srgb, var(--slot-accent), black 80%)) !important;
     border-color: color-mix(in srgb, var(--slot-accent), transparent 50%) !important;
     box-shadow: 0 4px 12px color-mix(in srgb, var(--slot-accent), transparent 70%) !important;
+}
+
+/* Wave 37: phone-safe bonus overlays after later cosmetic layers. */
+@media (max-width: 480px) {
+    .slot-wheel-overlay {
+        top: 44%;
+        max-width: calc(100% - 16px);
+        max-height: calc(100% - 16px);
+        padding: 10px 14px 9px;
+        gap: 2px;
+        border-radius: 12px;
+    }
+
+    .slot-wheel-overlay span,
+    .slot-wheel-overlay em {
+        font-size: 9px;
+        letter-spacing: 0.08em;
+    }
+
+    .slot-wheel-disc {
+        width: min(104px, 34vw);
+        height: min(104px, 34vw);
+        margin: 2px auto;
+    }
+
+    .slot-wheel-disc strong {
+        font-size: clamp(24px, 8vw, 34px);
+    }
+
+    .slot-wheel-pointer {
+        top: -8px;
+        border-left-width: 6px;
+        border-right-width: 6px;
+        border-top-width: 10px;
+    }
+
+    .slot-hold-overlay {
+        width: min(260px, calc(100% - 14px));
+        max-height: calc(100% - 14px);
+        padding: 8px 10px;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .slot-hold-overlay header {
+        margin-bottom: 6px;
+    }
+
+    .slot-hold-overlay header span {
+        font-size: 8px;
+        letter-spacing: 0.08em;
+    }
+
+    .slot-hold-overlay header strong {
+        font-size: 13px;
+    }
+
+    .slot-hold-overlay header em {
+        font-size: 14px;
+    }
+
+    .slot-hold-board {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 3px;
+        margin-bottom: 6px;
+    }
+
+    .slot-hold-slot {
+        border-radius: 6px;
+    }
+
+    .slot-hold-meta {
+        font-size: 9px;
+        gap: 5px;
+    }
 }

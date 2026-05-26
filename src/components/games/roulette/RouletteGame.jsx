@@ -231,7 +231,15 @@ export default function RouletteGame() {
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="rou-top-deck">
                     <div className="rou-wheel-area" ref={wheelAreaRef} style={{ '--ball-radius': ballRadius }}>
-                        <div className="rou-wheel" style={{ transform: `rotate(${wheelRotation}deg)`, transition: spinning ? 'transform 3.2s cubic-bezier(0.08, 0.72, 0.12, 1)' : 'none' }}>
+                        <div
+                            className={`rou-wheel ${spinning ? 'is-spinning' : 'is-idle'}`}
+                            style={spinning
+                                ? { transform: `rotate(${wheelRotation}deg)`, transition: 'transform 3.2s cubic-bezier(0.08, 0.72, 0.12, 1)' }
+                                : {
+                                    '--rou-idle-start': `${wheelRotation}deg`,
+                                    '--rou-idle-end': `${wheelRotation + 360}deg`,
+                                }}
+                        >
                             <img className="rou-wheel-texture" src="/images/generated/roulette-wheel-premium.png" alt="" />
                             <div className="rou-pocket-ring">
                                 {WHEEL_ORDER.map((n, i) => {

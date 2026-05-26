@@ -23,7 +23,7 @@ function shuffle(arr) {
     return out
 }
 
-// Player state: { id, name, stack, hole, status, putIn, lastAction, isHuman }
+// Player state: { id, name, stack, hole, status, putIn, lastAction, isHuman, persona }
 // status: active | folded | allin | sittingOut
 
 export const STREETS = ['preflop', 'flop', 'turn', 'river', 'showdown']
@@ -34,6 +34,8 @@ export function createInitialState({ players, sb = 1, bb = 2, ante = 0, buttonIn
             id: p.id, name: p.name, stack: p.stack, hole: [],
             status: p.stack > 0 ? 'active' : 'sittingOut',
             putIn: 0, lastAction: null, isHuman: !!p.isHuman, avatar: p.avatar || null,
+            persona: p.persona || p.pokerStyle || null,
+            pokerStyle: p.pokerStyle || p.persona?.pokerStyle || p.persona?.style || null,
         })),
         deck: [],
         community: [],

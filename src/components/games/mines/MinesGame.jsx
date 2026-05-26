@@ -7,7 +7,7 @@
 // Math is unchanged; events are emitted alongside the existing engine so a
 // future deterministic replay can read the round transcript.
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -27,6 +27,10 @@ import {
     ResultToast,
     ActionLockOverlay,
     CoreStageFrame,
+    SimBetStrip,
+    makeInitialSimBetRows,
+    makeSimBetRow,
+    prependSimBetRow,
     ROUND_EVENTS,
     useRoundMachine,
 } from '../primitives'
@@ -37,7 +41,6 @@ import './mines.css'
 
 const GRID = 25
 const HOUSE_EDGE = 0.01
-const SIM_NAMES = ['Wynn', 'Mira', 'Lev', 'Kaia', 'Reno', 'Vex', 'Juno']
 
 // Multiplier after k safe picks given m bombs (no edge); we apply (1 - edge) at output.
 function multiplierFor(picks, bombs) {
@@ -78,7 +81,8 @@ export default function MinesGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
-    const [simFeed, setSimFeed] = useState(() => SIM_NAMES.map((name, i) => ({ id: `${name}-${i}`, name, picks: i + 1, mult: multiplierFor(i + 1, 3), cashed: i % 4 !== 0 })))
+    const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('mines', { bombs: 3, count: 9, cap: 10 }))
+    const simSeqRef = useRef(0)
     const { schedule, cancelAll } = useCancellableTimeouts()
 
     // Imperative round machine. Mines emits events as the player interacts
@@ -113,18 +117,14 @@ export default function MinesGame() {
         resolve({ profit: 0 })
     })
 
-    const pushSimResult = () => {
-        const simBombs = [1, 3, 5, 10][Math.floor(Math.random() * 4)]
-        const picks = 1 + Math.floor(Math.random() * Math.min(8, GRID - simBombs))
-        const cashed = Math.random() > 0.24
-        setSimFeed(prev => [{
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-            name: SIM_NAMES[Math.floor(Math.random() * SIM_NAMES.length)],
-            picks,
-            mult: cashed ? multiplierFor(picks, simBombs) : 0,
-            cashed,
-        }, ...prev].slice(0, 7))
-    }
+    const pushSimResult = useCallback((context = {}) => {
+        simSeqRef.current += 1
+        const row = makeSimBetRow('mines', {
+            bombs: context.bombs ?? bombs,
+            seed: `mines:${simSeqRef.current}:${context.outcome || phase}`,
+        })
+        setSimFeed(prev => prependSimBetRow(prev, row, 10))
+    }, [bombs, phase])
 
     const reveal = (idx) => {
         if (!inRound || revealed.includes(idx) || !bombSet) return
@@ -143,7 +143,7 @@ export default function MinesGame() {
             showToast('loss', 'Mines bust', `-${formatCredits(stake)}`)
             setToast({ kind: 'lose', amount: -stake, message: 'Mines bust' })
             machine.finish({ won: false, profit: -stake, picks: next.length, hit: idx })
-            pushSimResult()
+            pushSimResult({ bombs, outcome: 'bust' })
             setPhase('busted')
             schedule(() => setPhase('idle'), 1100)
             return
@@ -181,7 +181,7 @@ export default function MinesGame() {
         showToast('win', 'Mines cashed out', `+${formatCredits(profit)}`)
         setToast({ kind: 'cashout', amount: profit, multiplier: m, message: 'Mines cashed out' })
         machine.finish({ won: true, profit, multiplier: m, picks: list.length })
-        pushSimResult()
+        pushSimResult({ bombs, outcome: 'cashout' })
         setPhase('cashed')
         schedule(() => setPhase('idle'), 1100)
     }, [revealed, inRound, bombs, stake, addWinnings, playSound, sfx, session, showToast, machine, schedule])
@@ -237,15 +237,7 @@ export default function MinesGame() {
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="mines-stage-frame">
                 <div className={`mines-stage phase-${phase}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="mines-live-rail">
-                        {simFeed.map(p => (
-                            <span key={p.id} className={p.cashed ? 'cashed' : 'busted'}>
-                                <em>{p.name}</em>
-                                <strong>{p.cashed ? `${p.mult.toFixed(2)}×` : 'BOOM'}</strong>
-                                <small>{p.picks} picks</small>
-                            </span>
-                        ))}
-                    </div>
+                    <SimBetStrip rows={simFeed} title="Sim mines" />
                     <div className="mines-multiplier-row">
                         <MultiplierBadge label="Current" value={currentMult} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="sm" />
                         <MultiplierBadge label="Next pick" value={nextMult} size="sm" />

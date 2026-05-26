@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -17,6 +17,10 @@ import {
     ResultToast,
     ActionLockOverlay,
     CoreStageFrame,
+    SimBetStrip,
+    makeInitialSimBetRows,
+    makeSimBetRow,
+    prependSimBetRow,
     ROUND_EVENTS,
     buildEvents,
     useRoundMachine,
@@ -56,6 +60,8 @@ export default function WheelGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('wheel', { count: 9, cap: 10 }))
+    const simSeqRef = useRef(0)
     const segments = wheelPresets[risk]
 
     const handleEvent = useCallback((ev) => {
@@ -146,6 +152,10 @@ export default function WheelGame() {
             }
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${multiplier}×`, profit, betAmount, multiplier, meta: { risk } })
             showToast(profit >= 0 ? 'win' : 'loss', `Wheel ${multiplier}×`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+            simSeqRef.current += 1
+            setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('wheel', {
+                seed: `wheel:${simSeqRef.current}:${risk}:${idx}:${multiplier}`,
+            }), 10))
             resolve({ profit })
         }, SPIN_DURATION_MS + 260)
     })
@@ -194,6 +204,7 @@ export default function WheelGame() {
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="wheel-stage-frame">
                 <div className={`wheel-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <SimBetStrip rows={simFeed} title="Sim wheel" />
                     <div className="wheel-pointer" />
                     <div className={`wheel-disc ${spinning ? 'spinning' : ''}`} style={{ transform: `rotate(${rotation}deg)` }}>
                         {segments.map((segment, i) => (

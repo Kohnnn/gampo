@@ -57,6 +57,14 @@
     transform: translateY(-4px);
 }
 
+.cc-lane.fade-in {
+    animation: ccLaneFadeIn 0.22s ease-out both;
+}
+
+.cc-lane.fade-out {
+    animation: ccLaneFadeOut 0.22s ease-out both;
+}
+
 .cc-lane.splat {
     background: linear-gradient(180deg, rgba(237, 66, 69, 0.4), rgba(150, 30, 30, 0.3));
     border-color: rgba(237, 66, 69, 0.7);
@@ -73,6 +81,16 @@
     0% { transform: scale(1); }
     50% { transform: scale(1.6); }
     100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+@keyframes ccLaneFadeIn {
+    0% { opacity: 0.62; transform: translateY(6px) scale(0.98); filter: brightness(0.75); }
+    100% { opacity: 1; transform: translateY(-4px) scale(1); filter: brightness(1); }
+}
+
+@keyframes ccLaneFadeOut {
+    0% { opacity: 1; filter: brightness(1.25); }
+    100% { opacity: 0.88; filter: brightness(1); }
 }
 
 .cc-mult {
@@ -138,3 +156,22 @@
 
 .cc-action-btns button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+@media (prefers-reduced-motion: reduce) {
+    .cc-chicken.idle,
+    .cc-chicken.hopping,
+    .cc-chicken.splatted,
+    .cc-car,
+    .cc-lane.fade-in,
+    .cc-lane.fade-out {
+        animation: none;
+    }
+}
+
+.gampo-reduce-motion .cc-chicken.idle,
+.gampo-reduce-motion .cc-chicken.hopping,
+.gampo-reduce-motion .cc-chicken.splatted,
+.gampo-reduce-motion .cc-car,
+.gampo-reduce-motion .cc-lane.fade-in,
+.gampo-reduce-motion .cc-lane.fade-out {
+    animation: none;
+}

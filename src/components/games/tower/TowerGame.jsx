@@ -51,6 +51,7 @@ export default function TowerGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const [ladderPulseKey, setLadderPulseKey] = useState(0)
     const { schedule, cancelAll } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
@@ -72,6 +73,7 @@ export default function TowerGame() {
         ], { autoFinish: false })
         setActiveBet(betAmount)
         setLevel(0)
+        setLadderPulseKey(0)
         setFellAt(null)
         setPhase('climbing')
         // Resolves when player cashes out or falls.
@@ -87,6 +89,7 @@ export default function TowerGame() {
             playSound('flip')
             sfx.play('reveal')
             setLevel(prev => prev + 1)
+            setLadderPulseKey(key => key + 1)
             return
         }
         playSound('explode')
@@ -185,7 +188,11 @@ export default function TowerGame() {
                             const isLit = index < level
                             const isFallen = fellAt !== null && index === fellAt
                             return (
-                                <span key={index} className={`tower-tile ${isLit ? 'lit' : ''} ${isCurrent ? 'current' : ''} ${isFallen ? 'fallen' : ''}`}>
+                                <span
+                                    key={`${index}-${ladderPulseKey}`}
+                                    className={`tower-tile ${isLit ? 'lit ladder-reveal' : ''} ${isCurrent ? 'current' : ''} ${isFallen ? 'fallen' : ''}`}
+                                    style={{ '--tower-reveal-delay': `${index * 60}ms` }}
+                                >
                                     {tileLevel}
                                 </span>
                             )
