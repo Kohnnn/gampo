@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -91,6 +91,19 @@ export default function VideoPokerGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [lastMultiplier, setLastMultiplier] = useState(0)
+    const [holdPulseIndex, setHoldPulseIndex] = useState(null)
+    const holdPulseTimer = useRef(null)
+
+    useEffect(() => () => {
+        if (holdPulseTimer.current) window.clearTimeout(holdPulseTimer.current)
+    }, [])
+
+    const toggleHold = useCallback((index) => {
+        setHeld(prev => prev.includes(index) ? prev.filter(x => x !== index) : [...prev, index])
+        if (holdPulseTimer.current) window.clearTimeout(holdPulseTimer.current)
+        setHoldPulseIndex(index)
+        holdPulseTimer.current = window.setTimeout(() => setHoldPulseIndex(null), 220)
+    }, [])
 
     const machine = useRoundMachine({})
 
@@ -108,6 +121,7 @@ export default function VideoPokerGame() {
         ], { autoFinish: false })
         setCards(buildShuffledDeck().slice(0, 5))
         setHeld([])
+        setHoldPulseIndex(null)
         setActiveBet(betAmount)
         setPhase('draw')
         setOutcomeKey(null)
@@ -204,10 +218,10 @@ export default function VideoPokerGame() {
                         {(cards.length ? cards : Array.from({ length: 5 }, () => null)).map((card, i) => (
                             <button
                                 key={`${dealKey}-${i}`}
-                                className={`vp-card-slot ${held.includes(i) ? 'held' : ''}`}
+                                className={`vp-card-slot ${held.includes(i) ? 'held' : ''} ${holdPulseIndex === i ? 'hold-pulse' : ''}`}
                                 disabled={!card || phase !== 'draw'}
                                 style={{ animationDelay: `${i * 90}ms` }}
-                                onClick={() => setHeld(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i])}
+                                onClick={() => toggleHold(i)}
                             >
                                 {card
                                     ? <CardFace rank={card.rank} suit={card.suit} dealing size="lg" />

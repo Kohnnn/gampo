@@ -15,21 +15,21 @@ const SNG_HAND_LIMIT = 60
 const LEVEL_HANDS = 6
 const BOT_THINK_MS = 1100
 const BOT_PERSONAS = [
-    { name: 'lucky_lemur', avatar: 1, aggression: 0.52, chat: ['glgl', 'small pot poker', 'river saved me'] },
-    { name: 'binary_bee', avatar: 2, aggression: 0.38, chat: ['range says call', 'too many bluffs?', 'checking back'] },
-    { name: 'oddsmonkey', avatar: 3, aggression: 0.68, chat: ['pot odds say yes', 'thin value?', 'priced in'] },
-    { name: 'crash_capt', avatar: 4, aggression: 0.82, chat: ['pressure spot', 'big sizing', 'no fear'] },
-    { name: 'plinko_pat', avatar: 5, aggression: 0.47, chat: ['bouncy flop', 'one time', 'variance lol'] },
-    { name: 'turn_barrel', avatar: 1, aggression: 0.74, chat: ['barrel card', 'polar now', 'turn is mine'] },
-    { name: 'nit_nova', avatar: 2, aggression: 0.29, chat: ['not defending that', 'discipline', 'folding range'] },
-    { name: 'river_raccoon', avatar: 3, aggression: 0.58, chat: ['river spot', 'show me', 'thin call'] },
-    { name: 'solver_sam', avatar: 4, aggression: 0.61, chat: ['mixed node', 'spr matters', 'balanced enough'] },
-    { name: 'bubble_ace', avatar: 5, aggression: 0.43, chat: ['survive first', 'ladder brain', 'no punt'] },
-    { name: 'value_vix', avatar: 1, aggression: 0.55, chat: ['thin value!', 'snap call', 'two-pair good'] },
-    { name: 'donk_dora', avatar: 2, aggression: 0.65, chat: ['donk lead', 'no time to waste', 'shove it'] },
-    { name: 'mtt_max', avatar: 3, aggression: 0.7, chat: ['final-table mode', 'icm pressure', 'short stack ammo'] },
-    { name: 'straddle_sue', avatar: 4, aggression: 0.78, chat: ['straddle pot', 'open jam', 'level it up'] },
-    { name: 'fish_finn', avatar: 5, aggression: 0.34, chat: ['call call call', 'I had a draw', 'nh'] },
+    { name: 'lucky_lemur', avatar: 1, aggression: 0.52, pokerStyle: 'whale', chat: ['glgl', 'small pot poker', 'river saved me'] },
+    { name: 'binary_bee', avatar: 2, aggression: 0.38, pokerStyle: 'analyst', chat: ['range says call', 'too many bluffs?', 'checking back'] },
+    { name: 'oddsmonkey', avatar: 3, aggression: 0.68, pokerStyle: 'analyst', chat: ['pot odds say yes', 'thin value?', 'priced in'] },
+    { name: 'crash_capt', avatar: 4, aggression: 0.82, pokerStyle: 'loose-aggressive', chat: ['pressure spot', 'big sizing', 'no fear'] },
+    { name: 'plinko_pat', avatar: 5, aggression: 0.47, pokerStyle: 'cautious', chat: ['bouncy flop', 'one time', 'variance lol'] },
+    { name: 'turn_barrel', avatar: 1, aggression: 0.74, pokerStyle: 'loose-aggressive', chat: ['barrel card', 'polar now', 'turn is mine'] },
+    { name: 'nit_nova', avatar: 2, aggression: 0.29, pokerStyle: 'tight-passive', chat: ['not defending that', 'discipline', 'folding range'] },
+    { name: 'river_raccoon', avatar: 3, aggression: 0.58, pokerStyle: 'analyst', chat: ['river spot', 'show me', 'thin call'] },
+    { name: 'solver_sam', avatar: 4, aggression: 0.61, pokerStyle: 'analyst', chat: ['mixed node', 'spr matters', 'balanced enough'] },
+    { name: 'bubble_ace', avatar: 5, aggression: 0.43, pokerStyle: 'cautious', chat: ['survive first', 'ladder brain', 'no punt'] },
+    { name: 'value_vix', avatar: 1, aggression: 0.55, pokerStyle: 'analyst', chat: ['thin value!', 'snap call', 'two-pair good'] },
+    { name: 'donk_dora', avatar: 2, aggression: 0.65, pokerStyle: 'whale', chat: ['donk lead', 'no time to waste', 'shove it'] },
+    { name: 'mtt_max', avatar: 3, aggression: 0.7, pokerStyle: 'loose-aggressive', chat: ['final-table mode', 'icm pressure', 'short stack ammo'] },
+    { name: 'straddle_sue', avatar: 4, aggression: 0.78, pokerStyle: 'loose-aggressive', chat: ['straddle pot', 'open jam', 'level it up'] },
+    { name: 'fish_finn', avatar: 5, aggression: 0.34, pokerStyle: 'whale', chat: ['call call call', 'I had a draw', 'nh'] },
 ]
 const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => `/assets/games/poker/poker-avatar-${i}.png`)
 
@@ -127,6 +127,7 @@ export default function PokerGame() {
     const [rebuyPrompt, setRebuyPrompt] = useState(false)
     const [chipMotions, setChipMotions] = useState([]) // [{ id, seat, amount, ts }]
     const [thinkProgress, setThinkProgress] = useState(0) // 0..1 for current bot
+    const [postflopChart, setPostflopChart] = useState(null)
     const stepTimer = useRef(null)
     const lastRecordedShowdown = useRef(null)
     const heroStartStackRef = useRef(0)
@@ -137,7 +138,11 @@ export default function PokerGame() {
     const thinkStartRef = useRef(0)
 
     useEffect(() => {
-        preloadGto()
+        let active = true
+        preloadGto().then(([, postflop]) => {
+            if (active) setPostflopChart(postflop)
+        })
+        return () => { active = false }
     }, [])
 
     useEffect(() => {
@@ -196,7 +201,7 @@ export default function PokerGame() {
         const personas = samplePersonas()
         const seats = [
             { id: 'you', name: 'you', stack: buyIn, isHuman: true },
-            ...personas.map(p => ({ id: p.id, name: p.name, stack: buyIn, avatar: p.avatar, persona: p })),
+            ...personas.map(p => ({ id: p.id, name: p.name, stack: buyIn, avatar: p.avatar, persona: p, pokerStyle: p.pokerStyle })),
         ]
         const init = createInitialState({ players: seats, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante, buttonIndex: 4 })
         initialBuyInRef.current = buyIn
@@ -250,6 +255,8 @@ export default function PokerGame() {
                 seatIndex: state.toAct,
                 aggression: Math.min(0.96, persona.aggression + blindPressure + anteFactor),
                 difficulty: persona.difficulty || 'intermediate',
+                persona: persona.pokerStyle || persona,
+                postflopChart,
             })
             setState(prev => applyAction(prev, decision))
             setThinkProgress(0)
@@ -282,7 +289,7 @@ export default function PokerGame() {
             if (thinkRafRef.current) window.cancelAnimationFrame(thinkRafRef.current)
             setThinkProgress(0)
         }
-    }, [state, playSound])
+    }, [state, playSound, postflopChart])
 
     const acts = state ? legalActions(state) : []
     const human = state ? state.players.find(p => p.isHuman) : null
@@ -334,6 +341,7 @@ export default function PokerGame() {
             seat.stack = buyAmount
             seat.avatar = fresh.avatar
             seat.persona = fresh
+            seat.pokerStyle = fresh.pokerStyle
             seat.status = 'active'
             seat.putIn = 0
             seat.lastAction = null

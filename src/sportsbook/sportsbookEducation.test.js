@@ -76,9 +76,19 @@ describe('sportsbookEducation', () => {
 
         expect(formatPercent(0.5)).toBe('50.0%')
         expect(analysis.metrics.find(metric => metric.label === 'Break-even')?.value).toBe('50.0%')
+        expect(analysis.metrics.find(metric => metric.label === 'Fair odds')?.value).toBe('1.85')
+        expect(analysis.metrics.find(metric => metric.label === 'Model edge')?.value).toBe('4.0%')
         expect(analysis.metrics.find(metric => metric.label === 'Move')?.value).toBe('Up 0.10')
+        expect(analysis.insights.find(insight => insight.id === 'selection-movement')?.body).toContain('moved up')
         expect(analysis.insights.some(insight => insight.tier === 'beginner')).toBe(true)
         expect(analysis.insights.some(insight => insight.title.includes('Source caveat'))).toBe(true)
+    })
+
+    it('explains odds-down movement as a shorter price', () => {
+        const analysis = analyzeSelection(marketGroup.selections[1], marketGroup)
+
+        expect(analysis.metrics.find(metric => metric.label === 'Move')?.value).toBe('Down 0.15')
+        expect(analysis.insights.find(insight => insight.id === 'selection-movement')?.body).toContain('Shorter decimal odds')
     })
 
     it('explains market overround, vig, and de-vig probabilities', () => {
@@ -109,9 +119,12 @@ describe('sportsbookEducation', () => {
         })
 
         expect(singles.insights.find(insight => insight.id === 'ticket-mode')?.body).toContain('Singles split')
+        expect(singles.metrics.find(metric => metric.label === 'Stake/leg')?.value).toBe('GC 10.00')
         expect(multi.insights.find(insight => insight.id === 'ticket-break-even')?.metricValue).toBe('26.3%')
         expect(multi.insights.some(insight => insight.id === 'ticket-same-game')).toBe(true)
         expect(system.insights.find(insight => insight.id === 'ticket-mode')?.body).toContain('2-of-N system')
+        expect(system.metrics.find(metric => metric.label === '2-leg combos')?.value).toBe('3')
+        expect(system.insights.find(insight => insight.id === 'ticket-system-combos')?.body).toContain('3 two-leg combos')
     })
 
     it('summarizes settled ticket rolls and decision quality', () => {
@@ -125,6 +138,10 @@ describe('sportsbookEducation', () => {
             payout: 0,
             profit: -20,
             quote,
+            selections: [
+                { selectionId: 'home', label: 'Harbor United', acceptedOdds: 2, currentOdds: 2.2 },
+                { selectionId: 'over', label: 'Over 2.5', acceptedOdds: 1.9, currentOdds: 1.84 },
+            ],
             legs: [
                 {
                     label: 'Harbor United',
@@ -142,7 +159,19 @@ describe('sportsbookEducation', () => {
         })
 
         expect(analysis.metrics.find(metric => metric.label === 'Profit')?.value).toBe('GC -20.00')
+        expect(analysis.legRows).toHaveLength(2)
+        expect(analysis.legRows?.[0]).toMatchObject({
+            label: 'Harbor United',
+            acceptedOdds: 2,
+            probability: 0.54,
+            result: 'won',
+            returnRole: 'won leg, ticket blocked',
+        })
         expect(analysis.insights.find(insight => insight.id === 'settlement-rolls')?.body).toContain('roll 0.32')
+        expect(analysis.insights.find(insight => insight.id === 'settlement-rolls')?.body).toContain('accepted 2.00')
+        expect(analysis.insights.find(insight => insight.id === 'settlement-rolls')?.body).toContain('return role')
         expect(analysis.insights.find(insight => insight.id === 'settlement-accepted-price')?.body).toContain('Accepted odds')
+        expect(analysis.insights.find(insight => insight.id === 'settlement-price-movement')?.body).toContain('accepted 2.00')
+        expect(analysis.insights.find(insight => insight.id === 'settlement-price-movement')?.body).toContain('later price moved higher')
     })
 })

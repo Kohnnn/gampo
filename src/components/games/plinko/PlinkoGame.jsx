@@ -24,6 +24,10 @@ import {
     ResultToast,
     ActionLockOverlay,
     CoreStageFrame,
+    SimBetStrip,
+    makeInitialSimBetRows,
+    makeSimBetRow,
+    prependSimBetRow,
     ROUND_EVENTS,
     useRoundMachine,
 } from '../primitives'
@@ -47,7 +51,6 @@ function loadEngine() {
 const HOUSE_EDGE = 0.01
 const ROW_OPTIONS = [8, 10, 12, 14, 16]
 const RISK_OPTIONS = ['low', 'medium', 'high']
-const SIM_NAMES = ['Reno', 'Kira', 'Vex', 'Nia', 'Ozzy', 'Mika', 'Rune', 'Tess']
 
 const BALL_TYPES = {
     normal:   { id: 'normal',   name: 'Basic',    color: '#ff4d4f', image: '/images/coins/coin_original.svg', cost: 1,  bonus: 1  },
@@ -81,6 +84,7 @@ export default function PlinkoGame() {
     // Map of ballId -> settle fn so concurrent drops resolve their own promise.
     const settleByIdRef = useRef(new Map())
     const lastBigWinAtRef = useRef(0)
+    const simSeqRef = useRef(0)
 
     const [risk, setRisk] = useState('medium')
     const [rows, setRows] = useState(12)
@@ -93,23 +97,12 @@ export default function PlinkoGame() {
     const [binColors, setBinColors] = useState(null)
     const [engineReady, setEngineReady] = useState(false)
     const [toast, setToast] = useState(null)
-    const [simFeed, setSimFeed] = useState(() => SIM_NAMES.map((name, i) => ({ id: `${name}-${i}`, name, mult: [0.4, 0.7, 1.1, 2, 5][i % 5], bet: 1 + i })))
+    const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('plinko', { count: 9, cap: 10 }))
 
     // Wave 2 lightweight machine. Emits round-start on each drop and
     // round-result on each ball settlement; sim feed and physics flow
     // unchanged.
     const machine = useRoundMachine({})
-
-    useEffect(() => {
-        const id = window.setInterval(() => {
-            setSimFeed(prev => {
-                const name = SIM_NAMES[Math.floor(Math.random() * SIM_NAMES.length)]
-                const mult = [0.2, 0.4, 0.7, 1.1, 1.5, 2, 5, 9, 16][Math.floor(Math.random() * 9)]
-                return [{ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, name, mult, bet: [1, 2, 5, 10, 25][Math.floor(Math.random() * 5)] }, ...prev].slice(0, 8)
-            })
-        }, 1500)
-        return () => window.clearInterval(id)
-    }, [])
 
     useEffect(() => {
         if (!canvasRef.current) return
@@ -249,6 +242,10 @@ export default function PlinkoGame() {
                 message: `Plinko bin ${bi}`,
             })
             showToast(profit >= 0 ? 'win' : 'loss', `Plinko ${mult.toFixed(2)}×`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+            simSeqRef.current += 1
+            setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('plinko', {
+                seed: `plinko:${simSeqRef.current}:${rows}:${risk}:${bi}:${mult}`,
+            }), 10))
             setActiveDrops(n => Math.max(0, n - 1))
             if (mode !== 'auto') resolve({ profit })
         })
@@ -345,14 +342,8 @@ export default function PlinkoGame() {
             <CoreStageFrame minHeight={580} maxWidth={920} loading={!preloader.ready || !engineReady} className="plinko-stage-frame">
                 <div className="plinko-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <SimBetStrip rows={simFeed} title="Sim drops" />
                     <div className="plinko-canvas-wrap">
-                        <div className="plinko-live-rail">
-                            {simFeed.map(p => (
-                                <span key={p.id} className={p.mult >= 2 ? 'hot' : p.mult < 1 ? 'cold' : ''}>
-                                    <em>{p.name}</em><strong>{p.mult.toFixed(1)}×</strong>
-                                </span>
-                            ))}
-                        </div>
                         <canvas ref={canvasRef} className="plinko-canvas" />
                         {payouts && binColors && (
                             <div className="plinko-bins" style={{ '--bins': payouts.length }}>

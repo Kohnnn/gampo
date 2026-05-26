@@ -68,11 +68,11 @@ Education is contextual through the Odds Coach instead of a separate lesson page
 - Odds cells expose `Analyze odds`: decimal odds, break-even chance, no-vig fair chance when a full market exists, model edge, movement, status, and provider caveat.
 - Market groups expose `Analyze market`: market-type explanation, overround, vig, de-vig probability table, and notes about why all outcomes can look slightly overpriced.
 - Bet slip exposes `Analyze ticket`: singles stake split, multi/parlay multiplied odds, 2-of-N system combinations, estimated return versus profit, EV hint, same-game correlation warning, and odds-change policy.
-- Settled tickets expose `Review`: stake, returned practice credits, profit, deterministic leg rolls, accepted odds snapshot, and neutral decision-quality copy such as good decision / bad result or bad price / lucky result.
+- Settled tickets expose `Review`: stake, returned practice credits, profit, leg probability, deterministic roll, accepted odds snapshot, return role, and neutral decision-quality copy such as good decision / bad result or bad price / lucky result.
 
-The coach uses three tiers:
+The coach uses compact sections. `Basics` opens first by default, while `Analysis` and `Sharp Notes` stay expandable so education remains secondary to the sportsbook surface.
 
-- `Basics`: beginner-friendly break-even, status, payout, and market explanations.
+- `Basics`: beginner-friendly break-even, status, estimated return, and market explanations.
 - `Analysis`: no-vig, vig, system combinations, and odds-change mechanics.
 - `Sharp Notes`: model-vs-price, source caveats, correlation, and accepted-price review.
 

@@ -16,6 +16,15 @@ export { default as ResultToast } from './ResultToast'
 export { default as ActionLockOverlay } from './ActionLockOverlay'
 export { default as CoreStageFrame } from './CoreStageFrame'
 export { default as AudioToggle } from './AudioToggle'
+export { default as SimBetStrip } from './SimBetStrip'
+export {
+    makeSimBetRow,
+    makeInitialSimBetRows,
+    prependSimBetRow,
+    clampSimRows,
+    estimateMinesMultiplier,
+    personaSimProfile,
+} from './simBetRows'
 export {
     ROUND_STATES,
     ROUND_EVENTS,

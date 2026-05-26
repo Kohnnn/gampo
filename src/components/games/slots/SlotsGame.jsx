@@ -27,6 +27,12 @@ import {
     randomVisualSymbol,
     resolveSlotSpin,
 } from './slotFactory'
+import {
+    SLOT_RETRIGGER_FLY_MS,
+    buildCascadeTraceCells,
+    buildHoldTileStates,
+    buildRetriggerFlyers,
+} from './slotsMotion'
 import './slots.css'
 
 const FEATURE_LABELS = {
@@ -111,6 +117,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [stickyWilds, setStickyWilds] = useState([])
     const [wheelReveal, setWheelReveal] = useState(null)
     const [holdReveal, setHoldReveal] = useState(null)
+    const [retriggerFlyers, setRetriggerFlyers] = useState([])
     // Wave 10: free-spin session tracking
     const [freeSpinSession, setFreeSpinSession] = useState(null) // { totalAwarded, played, totalWin, baseBet }
     const [bonusEndBanner, setBonusEndBanner] = useState(null) // { trigger, totalWin, played }
@@ -192,6 +199,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setStickyWilds([])
         setWheelReveal(null)
         setHoldReveal(null)
+        setRetriggerFlyers([])
         setFreeSpinSession(null)
         setBonusEndBanner(null)
     }, [clearTimers, config, setStoppedColumnState])
@@ -221,17 +229,19 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setSpinPhase(result.multiplier > 0 ? 'win' : 'settled')
         setAnticipating(false)
         setMysteryReveal(result.mysteryReveal || null)
+        setRetriggerFlyers([])
 
         // Wave 9: surface wheel + hold cinematic state
+        const revealTrigger = Date.now()
         const wheelEvent = result.featureEvents.find(item => item.type === 'multiplier-wheel')
         if (wheelEvent) {
-            setWheelReveal({ trigger: Date.now(), value: wheelEvent.value })
+            setWheelReveal({ trigger: revealTrigger, value: wheelEvent.value })
         } else {
             setWheelReveal(null)
         }
         const holdEvent = result.featureEvents.find(item => item.type === 'hold-and-respin')
         if (holdEvent) {
-            setHoldReveal({ trigger: Date.now(), award: holdEvent.award, board: holdEvent.board })
+            setHoldReveal({ trigger: revealTrigger, award: holdEvent.award, board: holdEvent.board })
         } else {
             setHoldReveal(null)
         }
@@ -266,6 +276,19 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
         const freeSpinEvent = result.featureEvents.find(item => item.type === 'free-spins')
         if (freeSpinEvent?.freeSpins) {
+            if (freeSpinSession && freeSpinEvent.indexes?.length) {
+                const flyers = buildRetriggerFlyers({
+                    indexes: freeSpinEvent.indexes,
+                    cellPositions,
+                    layout: config.layout,
+                    amount: freeSpinEvent.freeSpins,
+                    trigger: revealTrigger,
+                })
+                setRetriggerFlyers(flyers)
+                timers.current.push(window.setTimeout(() => {
+                    setRetriggerFlyers([])
+                }, SLOT_RETRIGGER_FLY_MS + 260))
+            }
             setFreeSpins(value => value + freeSpinEvent.freeSpins)
             setFreeSpinSession(prev => {
                 if (prev) {
@@ -324,7 +347,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`,
         )
         resolve({ profit, multiplier: result.multiplier, featureEvents: result.featureEvents })
-    }, [addWinnings, clearTimers, config, playSound, session, showToast])
+    }, [addWinnings, cellPositions, clearTimers, config, freeSpinSession, playSound, session, showToast])
 
     const performSpin = useCallback(({ source = 'manual', bet = betAmount, free = canUseFreeSpin, tierId = null } = {}) => (
         new Promise(resolve => {
@@ -377,6 +400,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setLastResult(null)
             setStoppedColumnState(0)
             setMysteryReveal(null)
+            setRetriggerFlyers([])
             setAnticipating(false)
             playSound('tick')
 
@@ -489,6 +513,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     const cascadeSteps = lastResult?.cascadeSteps || 0
     const moneyTotal = lastResult?.moneyTotal || 0
+    const holdTiles = useMemo(() => holdReveal ? buildHoldTileStates(holdReveal.board) : [], [holdReveal])
+    const cascadeTraceCells = useMemo(() => {
+        if (!lastResult?.cascadeSteps || running) return []
+        return buildCascadeTraceCells({
+            indexes: lastResult.winningIndexes || [],
+            cellPositions,
+            layout: config.layout,
+        })
+    }, [cellPositions, config.layout, lastResult, running])
     const cover = `/images/covers/generated/${config.id}.png`
 
     return (
@@ -663,7 +696,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                     <div className="slot-stage-pills">
                         {freeSpins > 0 && (
-                            <div className="slot-pill slot-pill-fs">
+                            <div className={`slot-pill slot-pill-fs ${retriggerFlyers.length ? 'is-retriggering' : ''}`}>
                                 <Ticket size={14} />
                                 <strong>{freeSpins}</strong>
                                 <small>free spins</small>
@@ -748,6 +781,40 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                         </div>
                                     )
                                 })}
+                            </div>
+                        )}
+                        {cascadeTraceCells.length > 0 && (
+                            <div className="slot-cascade-trace-layer" aria-hidden>
+                                {cascadeTraceCells.map(cell => (
+                                    <span
+                                        key={cell.id}
+                                        className="slot-cascade-trace-dot"
+                                        style={{
+                                            '--trace-x': `${cell.x}%`,
+                                            '--trace-y': `${cell.y}%`,
+                                            '--trace-delay': `${cell.delayMs}ms`,
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                        {retriggerFlyers.length > 0 && (
+                            <div className="slot-retrigger-flyers" aria-hidden>
+                                {retriggerFlyers.map(flyer => (
+                                    <span
+                                        key={flyer.id}
+                                        className="slot-retrigger-flyer"
+                                        style={{
+                                            '--from-x': `${flyer.fromX}%`,
+                                            '--from-y': `${flyer.fromY}%`,
+                                            '--to-x': `${flyer.toX}%`,
+                                            '--to-y': `${flyer.toY}%`,
+                                            '--fly-delay': `${flyer.delayMs}ms`,
+                                        }}
+                                    >
+                                        +{flyer.amount}
+                                    </span>
+                                ))}
                             </div>
                         )}
                         {!running && lastResult?.wins?.length > 0 && (
@@ -872,11 +939,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             <em>{holdReveal.award.multiplier}×</em>
                         </header>
                         <div className="slot-hold-board">
-                            {Array.from({ length: holdReveal.board.size }).map((_, idx) => (
+                            {holdTiles.map(tile => (
                                 <div
-                                    key={idx}
-                                    className={`slot-hold-slot ${idx < holdReveal.board.finalFilled ? 'filled' : ''}`}
-                                    style={{ animationDelay: `${idx * 60}ms` }}
+                                    key={tile.index}
+                                    className={`slot-hold-slot ${tile.filled ? 'filled' : ''} ${tile.fresh ? 'new-fill' : ''}`}
+                                    style={{ animationDelay: `${tile.delayMs}ms` }}
                                 />
                             ))}
                         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -18,6 +18,10 @@ import {
     ResultToast,
     ActionLockOverlay,
     CoreStageFrame,
+    SimBetStrip,
+    makeInitialSimBetRows,
+    makeSimBetRow,
+    prependSimBetRow,
     ROUND_EVENTS,
     buildEvents,
     useRoundMachine,
@@ -53,6 +57,8 @@ export default function DiceGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('dice', { count: 9, cap: 10 }))
+    const simSeqRef = useRef(0)
     const payout = dicePayout(winChance / 100)
 
     const handleEvent = useCallback((ev) => {
@@ -154,6 +160,10 @@ export default function DiceGame() {
         // even if the user navigates away during the animation.
         session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: roll.toFixed(2), profit, betAmount, multiplier: won ? payout : 0, meta: { winChance, rollMode } })
         showToast(won ? 'win' : 'loss', won ? 'Dice hit' : 'Dice miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+        simSeqRef.current += 1
+        setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('dice', {
+            seed: `dice:${simSeqRef.current}:${roll.toFixed(2)}:${winChance}:${rollMode}`,
+        }), 10))
 
         // Resolve to the BetPanel autoplay loop after the animation budget.
         setTimeout(() => resolve({ profit }), DICE_ROLL_DURATION_MS + 260)
@@ -209,6 +219,7 @@ export default function DiceGame() {
             <CoreStageFrame minHeight={460} maxWidth={920} loading={!preloader.ready} className="dice-stage-frame">
                 <div className={`dice-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <SimBetStrip rows={simFeed} title="Sim dice" />
                     <div className="dice-pips" aria-label="Last 4 rolls">
                         {Array.from({ length: 4 }, (_, i) => {
                             const item = session.history[i]

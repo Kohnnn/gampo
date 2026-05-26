@@ -5,7 +5,7 @@ const SocialContext = createContext(null)
 
 // Wave 28: deeper simulated player roster with personas. Each persona biases
 // the chat templates that user picks from + their race wager profile.
-const fakePlayers = [
+export const fakePlayers = [
     { id: 'fake-1',  name: 'lucky_lemur',  persona: 'whale',     baseWagered: 24800 },
     { id: 'fake-2',  name: 'binary_bee',   persona: 'analyst',   baseWagered: 12400 },
     { id: 'fake-3',  name: 'oddsmonkey',   persona: 'analyst',   baseWagered: 10200 },
@@ -26,7 +26,7 @@ const fakePlayers = [
     { id: 'fake-18', name: 'rps_rex',      persona: 'gambler',   baseWagered: 2100 },
 ]
 
-const personaTemplates = {
+export const personaTemplates = {
     whale: [
         'just dropped 5k on mines lol',
         'hit a 47x on dice fake credits but i felt that',

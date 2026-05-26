@@ -117,35 +117,43 @@ function ChatDock() {
                 <div className="chat-dock-tabs">
                     <button
                         type="button"
+                        aria-label="Stats"
                         aria-pressed={tab === 'stats'}
                         className={tab === 'stats' ? 'active' : ''}
                         onClick={() => setTab('stats')}
                     >
-                        <BarChart3 size={14} /> Stats
+                        <BarChart3 size={14} />
+                        <span className="chat-dock-tab-label">Stats</span>
                     </button>
                     <button
                         type="button"
+                        aria-label="Progress"
                         aria-pressed={tab === 'progress'}
                         className={tab === 'progress' ? 'active' : ''}
                         onClick={() => setTab('progress')}
                     >
-                        <Award size={14} /> Progress
+                        <Award size={14} />
+                        <span className="chat-dock-tab-label">Progress</span>
                     </button>
                     <button
                         type="button"
+                        aria-label="Chat"
                         aria-pressed={tab === 'chat'}
                         className={tab === 'chat' ? 'active' : ''}
                         onClick={() => setTab('chat')}
                     >
-                        <MessageCircle size={14} /> Chat
+                        <MessageCircle size={14} />
+                        <span className="chat-dock-tab-label">Chat</span>
                     </button>
                     <button
                         type="button"
+                        aria-label="Race"
                         aria-pressed={tab === 'race'}
                         className={tab === 'race' ? 'active' : ''}
                         onClick={() => setTab('race')}
                     >
-                        <Trophy size={14} /> Race
+                        <Trophy size={14} />
+                        <span className="chat-dock-tab-label">Race</span>
                     </button>
                 </div>
                 <div className="chat-dock-controls">

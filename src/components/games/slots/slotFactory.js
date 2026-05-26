@@ -1103,6 +1103,9 @@ function resolveHoldAndRespin(config, cells) {
     const boardSize = 12
     const filled = Math.min(boardSize, triggers)
     let board = Array.from({ length: boardSize }, (_, idx) => idx < filled)
+    const startFilledIndexes = board
+        .map((slot, index) => slot ? index : -1)
+        .filter(index => index >= 0)
     const respinLog = []
     const respins = hr.respins || 3
     let remaining = respins
@@ -1125,6 +1128,10 @@ function resolveHoldAndRespin(config, cells) {
         if (remaining <= 0) break
     }
     const finalFilled = board.filter(Boolean).length
+    const filledIndexes = board
+        .map((slot, index) => slot ? index : -1)
+        .filter(index => index >= 0)
+    const newFillIndexes = filledIndexes.filter(index => !startFilledIndexes.includes(index))
     const jackpots = Array.isArray(hr.jackpots) ? hr.jackpots : []
     let award = null
     if (finalFilled >= boardSize && jackpots.length) {
@@ -1140,7 +1147,10 @@ function resolveHoldAndRespin(config, cells) {
         triggers,
         boardSize,
         startFilled: filled,
+        startFilledIndexes,
         finalFilled,
+        filledIndexes,
+        newFillIndexes,
         respins,
         respinLog,
         award,
@@ -1308,7 +1318,10 @@ export function resolveSlotSpin(config, options = {}) {
             board: {
                 size: holdAndRespin.boardSize,
                 startFilled: holdAndRespin.startFilled,
+                startFilledIndexes: holdAndRespin.startFilledIndexes,
                 finalFilled: holdAndRespin.finalFilled,
+                filledIndexes: holdAndRespin.filledIndexes,
+                newFillIndexes: holdAndRespin.newFillIndexes,
                 respins: holdAndRespin.respins,
                 log: holdAndRespin.respinLog,
             },

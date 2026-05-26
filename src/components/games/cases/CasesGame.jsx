@@ -48,16 +48,33 @@ import {
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
+import {
+    CASE_LID_LIFT_MS,
+    CASE_LIGHT_SWEEP_LEAD_MS,
+    CASE_PRIZE_INDEX,
+    CASE_PRIZE_ZOOM_LEAD_MS,
+    CASE_REVEAL_MS,
+    CASE_SETTLE_PAD_MS,
+    casePhaseLabel,
+    finalPrizeOffset,
+    pickCelebrationDrop,
+} from './casesAnimation'
 import './cases.css'
 
-const REVEAL_MS = 3500
-const TILE_PX = 100
 const CAROUSEL_VISIBLE = 32
-const PRIZE_INDEX = CAROUSEL_VISIBLE - 4
 const ROW_OPTIONS = [1, 3, 5, 10]
 const RARE_TIERS = new Set(['Covert', 'Extraordinary', 'Contraband', '★'])
 const STATTRAK_CHANCE = 0.1
 const SOUVENIR_CHANCE = 0.06
+const RARITY_FILTERS = [
+    { value: 'all', label: 'All', selectLabel: 'All rarities' },
+    { value: 'Mil-Spec Grade', label: 'Mil-Spec', selectLabel: 'Mil-Spec' },
+    { value: 'Restricted', label: 'Restricted', selectLabel: 'Restricted' },
+    { value: 'Classified', label: 'Classified', selectLabel: 'Classified' },
+    { value: 'Covert', label: 'Covert', selectLabel: 'Covert' },
+    { value: 'Extraordinary', label: 'Extraordinary', selectLabel: 'Extraordinary' },
+    { value: 'Contraband', label: 'Contraband', selectLabel: 'Contraband' },
+]
 
 const STANDARD_WEARS = [
     { wear: 'Factory New',    short: 'FN', minFloat: 0.00, maxFloat: 0.07, weight: 12, mult: 1.10 },
@@ -116,7 +133,7 @@ function buildTrack(items, prizeIndex) {
         const idx = Math.floor(nextRoll('cases').roll * items.length)
         track.push(items[idx])
     }
-    track[PRIZE_INDEX] = items[prizeIndex]
+    track[CASE_PRIZE_INDEX] = items[prizeIndex]
     return track
 }
 
@@ -157,6 +174,8 @@ export default function CasesGame() {
     const [tracks, setTracks] = useState([]) // [[item, item, ...], ...]
     const [trackOffsets, setTrackOffsets] = useState([])
     const [results, setResults] = useState([]) // resolved drops list (with wear/statTrak)
+    const [casePhase, setCasePhase] = useState('idle') // idle | lid | spinning | finale | zoom | settling
+    const [celebrationDrop, setCelebrationDrop] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
@@ -167,6 +186,9 @@ export default function CasesGame() {
     const [pokedexSort, setPokedexSort] = useState('multiplier')
     const [caseGridSearch, setCaseGridSearch] = useState('')
     const tickRef = useRef({ ids: [], landId: null })
+    const revealTimersRef = useRef([])
+    const pendingRoundRef = useRef(null)
+    const celebrationTimerRef = useRef(null)
 
     useEffect(() => {
         let cancelled = false
@@ -197,13 +219,26 @@ export default function CasesGame() {
         }
     }, [tier, tierCases, activeCase])
 
-    useEffect(() => () => {
+    const machine = useRoundMachine({})
+
+    const clearRevealTimers = useCallback(() => {
+        revealTimersRef.current.forEach(id => window.clearTimeout(id))
+        revealTimersRef.current = []
         tickRef.current.ids.forEach(id => window.clearTimeout(id))
         if (tickRef.current.landId) window.clearTimeout(tickRef.current.landId)
         tickRef.current = { ids: [], landId: null }
     }, [])
 
-    const machine = useRoundMachine({})
+    const queueRevealTimer = useCallback((fn, ms) => {
+        const id = window.setTimeout(fn, ms)
+        revealTimersRef.current.push(id)
+        return id
+    }, [])
+
+    useEffect(() => () => {
+        clearRevealTimers()
+        if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
+    }, [clearRevealTimers])
 
     const scheduleTickSfx = useCallback(() => {
         tickRef.current.ids.forEach(id => window.clearTimeout(id))
@@ -211,7 +246,7 @@ export default function CasesGame() {
         const TICKS = 14
         for (let i = 0; i < TICKS; i += 1) {
             const t = i / (TICKS - 1)
-            const at = Math.round(cubicOut(t) * REVEAL_MS)
+            const at = Math.round(cubicOut(t) * CASE_REVEAL_MS)
             const vol = Math.max(0.18, 0.6 * (1 - t * 0.65))
             const id = window.setTimeout(() => {
                 sfx.play('tick', { volume: vol })
@@ -222,8 +257,89 @@ export default function CasesGame() {
         if (tickRef.current.landId) window.clearTimeout(tickRef.current.landId)
         tickRef.current.landId = window.setTimeout(() => {
             sfx.play('land', { volume: 0.85 })
-        }, REVEAL_MS - 40)
+        }, CASE_REVEAL_MS - 40)
     }, [sfx])
+
+    const finishPendingRound = useCallback(({ skipped = false } = {}) => {
+        const pending = pendingRoundRef.current
+        if (!pending || pending.settled) return
+        pending.settled = true
+        clearRevealTimers()
+
+        const { caseData, picks, resolve, stake, tracks: pendingTracks, offsets: pendingOffsets, rows: roundRows } = pending
+        setTracks(pendingTracks)
+        setTrackOffsets(pendingOffsets)
+        setCasePhase('settling')
+
+        const totalMultiplier = picks.reduce((s, p) => s + (p.multiplier || 0), 0)
+        // payout = stake x (sum of per-row multipliers / rows)
+        const returnAmount = (stake / roundRows) * totalMultiplier
+        const profit = returnAmount - stake
+        if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')
+        setResults(picks)
+
+        picks.forEach(pick => {
+            collection.recordDrop(pick, {
+                caseId: caseData.id,
+                caseName: caseData.name,
+            })
+            recordProgressCaseDrop(pick)
+        })
+
+        const won = profit > 0
+        const headlineMult = picks.reduce((m, p) => Math.max(m, p.multiplier || 0), 0)
+        const rare = picks.some(p => RARE_TIERS.has(p.rarity) || p.statTrak)
+        const celebrate = pickCelebrationDrop(picks)
+        setCelebrationDrop(celebrate)
+        if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
+        if (celebrate) {
+            celebrationTimerRef.current = window.setTimeout(() => setCelebrationDrop(null), 2600)
+        }
+        setToast({
+            kind: won ? 'win' : 'lose',
+            multiplier: won ? headlineMult : null,
+            amount: profit,
+            message: picks.map(p => `${p.statTrak ? 'StatTrak™ ' : ''}${p.name}`).join(', ').slice(0, 80),
+        })
+        if (skipped) sfx.play('land', { volume: 0.72 })
+        sfx.play('reveal', { volume: 0.9 })
+        if (rare) sfx.play('rare', { volume: 1 })
+        // Wave 31: extra fanfare variants for special results.
+        const knifeOrGloves = picks.some(p => /knife|gloves|bayonet|karambit|huntsman|talon/i.test(p.name || ''))
+        if (knifeOrGloves) sfx.play('knife', { volume: 1 })
+        if (picks.some(p => p.statTrak)) sfx.play('stattrak', { volume: 0.85 })
+        if (picks.some(p => p.souvenir)) sfx.play('souvenir', { volume: 0.85 })
+        if (won && headlineMult >= 12) {
+            playSound('bigwin')
+            setBigWin({ trigger: Date.now(), profit, multiplier: headlineMult })
+        } else {
+            playSound(won ? 'win' : 'loss')
+        }
+        sfx.play(won ? 'win' : 'lose')
+        session.record({
+            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            label: `${caseData.name} x${roundRows}`,
+            profit, betAmount: stake, multiplier: totalMultiplier / roundRows,
+            meta: { picks: picks.map(p => ({ id: p.skinId, rarity: p.rarity, multiplier: p.multiplier, wear: p.wear, statTrak: p.statTrak })) },
+        })
+        machine.finish({
+            kind: won ? 'win' : 'lose',
+            profit,
+            multiplier: totalMultiplier / roundRows,
+            picks: picks.map(p => p.skinId),
+            skipped,
+        })
+        showToast(won ? 'win' : 'loss', `${caseData.name} ${won ? 'win' : 'miss'}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+        setRunning(false)
+        setCasePhase('idle')
+        pendingRoundRef.current = null
+        resolve({ profit })
+    }, [addWinnings, clearRevealTimers, collection, machine, playSound, session, showToast, sfx])
+
+    const skipCaseAnimation = useCallback(() => {
+        if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+        finishPendingRound({ skipped: true })
+    }, [finishPendingRound])
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (running) { resolve({ profit: 0 }); return }
@@ -234,13 +350,19 @@ export default function CasesGame() {
             resolve({ profit: 0 })
             return
         }
+        clearRevealTimers()
+        if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
         setLastBet(betAmount)
         setToast(null)
+        setCelebrationDrop(null)
         setRunning(true)
         setResults([])
+        setTracks([])
+        setTrackOffsets([])
+        setCasePhase('lid')
         playSound('click')
-        sfx.play('open', { volume: 0.7 })
-        if (rows >= 3) sfx.play('multispin', { volume: 0.55 })
+        sfx.play('open', { volume: 0.65 })
+        sfx.play('lid', { volume: 0.78 })
         sfx.play('click')
         setView('open')
 
@@ -272,8 +394,20 @@ export default function CasesGame() {
             const prizeIndex = activeCase.items.findIndex(it => it.id === pick.skinId)
             return buildTrack(activeCase.items, Math.max(0, prizeIndex))
         })
-        setTracks(newTracks)
-        setTrackOffsets(newTracks.map(() => 0))
+        const finalOffsets = newTracks.map(() => {
+            const jitter = (nextRoll('cases-jit').roll - 0.5) * 14
+            return finalPrizeOffset(jitter)
+        })
+        pendingRoundRef.current = {
+            caseData: activeCase,
+            offsets: finalOffsets,
+            picks,
+            resolve,
+            rows,
+            settled: false,
+            stake,
+            tracks: newTracks,
+        }
 
         machine.start([
             { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { stake, rows, caseId: activeCase.id }, at: 0 },
@@ -281,71 +415,32 @@ export default function CasesGame() {
             { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { stake, rows }, at: 0 },
         ], { autoFinish: false })
 
-        window.setTimeout(() => {
-            const offsets = newTracks.map(() => {
-                const jitter = (nextRoll('cases-jit').roll - 0.5) * 14
-                return -((PRIZE_INDEX) * TILE_PX - 50) + jitter
-            })
-            setTrackOffsets(offsets)
-        }, 32)
+        queueRevealTimer(() => {
+            if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+            setCasePhase('spinning')
+            setTracks(newTracks)
+            setTrackOffsets(newTracks.map(() => 0))
+            sfx.play('multispin', { volume: rows >= 3 ? 0.62 : 0.36 })
+            queueRevealTimer(() => {
+                if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+                setTrackOffsets(finalOffsets)
+            }, 32)
+            scheduleTickSfx()
+        }, CASE_LID_LIFT_MS)
 
-        scheduleTickSfx()
+        queueRevealTimer(() => {
+            if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+            setCasePhase('finale')
+        }, CASE_LID_LIFT_MS + CASE_REVEAL_MS - CASE_LIGHT_SWEEP_LEAD_MS)
 
-        window.setTimeout(() => {
-            const totalMultiplier = picks.reduce((s, p) => s + (p.multiplier || 0), 0)
-            // payout = stake × (sum of per-row multipliers / rows)
-            const returnAmount = (stake / rows) * totalMultiplier
-            const profit = returnAmount - stake
-            if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')
-            setResults(picks)
+        queueRevealTimer(() => {
+            if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+            setCasePhase('zoom')
+        }, CASE_LID_LIFT_MS + CASE_REVEAL_MS - CASE_PRIZE_ZOOM_LEAD_MS)
 
-            picks.forEach(pick => {
-                collection.recordDrop(pick, {
-                    caseId: activeCase.id,
-                    caseName: activeCase.name,
-                })
-                recordProgressCaseDrop(pick)
-            })
-
-            const won = profit > 0
-            const headlineMult = picks.reduce((m, p) => Math.max(m, p.multiplier || 0), 0)
-            const rare = picks.some(p => RARE_TIERS.has(p.rarity) || p.statTrak)
-            setToast({
-                kind: won ? 'win' : 'lose',
-                multiplier: won ? headlineMult : null,
-                amount: profit,
-                message: picks.map(p => `${p.statTrak ? 'StatTrak™ ' : ''}${p.name}`).join(', ').slice(0, 80),
-            })
-            sfx.play('reveal', { volume: 0.9 })
-            if (rare) sfx.play('rare', { volume: 1 })
-            // Wave 31: extra fanfare variants for special results.
-            const knifeOrGloves = picks.some(p => /knife|gloves|bayonet|karambit|huntsman|talon/i.test(p.name || ''))
-            if (knifeOrGloves) sfx.play('knife', { volume: 1 })
-            if (picks.some(p => p.statTrak)) sfx.play('stattrak', { volume: 0.85 })
-            if (picks.some(p => p.souvenir)) sfx.play('souvenir', { volume: 0.85 })
-            if (won && headlineMult >= 12) {
-                playSound('bigwin')
-                setBigWin({ trigger: Date.now(), profit, multiplier: headlineMult })
-            } else {
-                playSound(won ? 'win' : 'loss')
-            }
-            sfx.play(won ? 'win' : 'lose')
-            session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-                label: `${activeCase.name} x${rows}`,
-                profit, betAmount: stake, multiplier: totalMultiplier / rows,
-                meta: { picks: picks.map(p => ({ id: p.skinId, rarity: p.rarity, multiplier: p.multiplier, wear: p.wear, statTrak: p.statTrak })) },
-            })
-            machine.finish({
-                kind: won ? 'win' : 'lose',
-                profit,
-                multiplier: totalMultiplier / rows,
-                picks: picks.map(p => p.skinId),
-            })
-            showToast(won ? 'win' : 'loss', `${activeCase.name} ${won ? 'win' : 'miss'}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
-            setRunning(false)
-            resolve({ profit })
-        }, REVEAL_MS + 60)
+        queueRevealTimer(() => {
+            finishPendingRound()
+        }, CASE_LID_LIFT_MS + CASE_REVEAL_MS + CASE_SETTLE_PAD_MS)
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
@@ -385,6 +480,29 @@ export default function CasesGame() {
         for (const c of cases) out[tierFromCase(c)] = (out[tierFromCase(c)] || 0) + 1
         return out
     }, [cases])
+
+    const renderRarityFilter = () => (
+        <>
+            <select className="cases-rarity-select" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
+                {RARITY_FILTERS.map(option => (
+                    <option key={option.value} value={option.value}>{option.selectLabel}</option>
+                ))}
+            </select>
+            <div className="cases-rarity-buttons" role="group" aria-label="Rarity filter">
+                {RARITY_FILTERS.map(option => (
+                    <button
+                        key={option.value}
+                        type="button"
+                        className={rarityFilter === option.value ? 'active' : ''}
+                        aria-pressed={rarityFilter === option.value}
+                        onClick={() => setRarityFilter(option.value)}
+                    >
+                        {option.label}
+                    </button>
+                ))}
+            </div>
+        </>
+    )
 
     return (
         <GameShell
@@ -428,6 +546,18 @@ export default function CasesGame() {
                         <span>Total stake</span>
                         <strong>{formatCredits(Math.round(Number(lastBet || 5) * rows * 100) / 100)}</strong>
                     </div>
+                    <div className="bp-section cases-skip-section">
+                        <label className="bp-label">Animation</label>
+                        <button
+                            className="cases-skip-btn"
+                            disabled={!running || !pendingRoundRef.current}
+                            onClick={skipCaseAnimation}
+                            type="button"
+                        >
+                            Skip animation
+                        </button>
+                        <p className="bp-hint">Instantly settles the same practice round and keeps the drop record.</p>
+                    </div>
                     <div className="bp-section">
                         <label className="bp-label">Pokedex</label>
                         <div className="bp-row" style={{ flexWrap: 'wrap' }}>
@@ -457,7 +587,7 @@ export default function CasesGame() {
             }
         >
             <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
-                <div className="cases-stage">
+                <div className={`cases-stage case-phase-${casePhase}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
 
                     <div className="cases-view-tabs">
@@ -490,7 +620,7 @@ export default function CasesGame() {
                                 {tierCases.map(c => (
                                     <button
                                         key={c.id}
-                                        className={`cases-case-card ${activeCase?.id === c.id ? 'active' : ''}`}
+                                        className={`cases-case-card ${activeCase?.id === c.id ? 'active' : ''} ${casePhase === 'lid' && activeCase?.id === c.id ? 'is-lifting' : ''}`}
                                         disabled={running}
                                         onClick={() => setCaseId(c.id)}
                                         title={`${c.name} · ${c.items.length} items · ${c.type || 'Case'}`}
@@ -512,8 +642,8 @@ export default function CasesGame() {
                                                 {track.map((item, idx) => (
                                                     <div
                                                         key={`${ti}-${idx}-${item.id}`}
-                                                        className={`cases-carousel-tile ${idx === PRIZE_INDEX && results.length > 0 ? 'is-prize' : ''}`}
-                                                        style={{ borderColor: item.color }}
+                                                        className={`cases-carousel-tile ${idx === CASE_PRIZE_INDEX && (casePhase === 'zoom' || results.length > 0) ? 'is-target' : ''} ${idx === CASE_PRIZE_INDEX && results.length > 0 ? 'is-prize' : ''}`}
+                                                        style={{ borderColor: item.color, '--rarity': item.color }}
                                                     >
                                                         <img src={item.image} alt={item.name} loading="lazy" />
                                                         <small>{item.name}</small>
@@ -554,6 +684,24 @@ export default function CasesGame() {
                                     </span>
                                 )}
                             </div>
+                            {celebrationDrop && (
+                                <div className="cases-prize-popover" style={{ '--rarity': celebrationDrop.color }} role="status" aria-label="Rare drop">
+                                    <div className="cases-prize-card">
+                                        <img src={celebrationDrop.image} alt={celebrationDrop.name} />
+                                        <span>
+                                            {celebrationDrop.statTrak && <em>StatTrak™ </em>}
+                                            {celebrationDrop.souvenir && <em>Souvenir </em>}
+                                            {celebrationDrop.name}
+                                        </span>
+                                        <strong>×{(celebrationDrop.multiplier || 0).toFixed(2)}</strong>
+                                        <span className="cases-particles" aria-hidden>
+                                            {Array.from({ length: 18 }).map((_, p) => (
+                                                <i key={p} style={{ '--dx': `${(Math.cos(p * 0.349) * 92).toFixed(0)}px`, '--dy': `${(Math.sin(p * 0.349) * 92).toFixed(0)}px`, '--delay': `${p * 18}ms` }} />
+                                            ))}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -574,15 +722,7 @@ export default function CasesGame() {
                                     onChange={e => setHistoryFilter(e.target.value)}
                                     placeholder="Filter by skin name..."
                                 />
-                                <select className="cases-rarity-select" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
-                                    <option value="all">All rarities</option>
-                                    <option value="Mil-Spec Grade">Mil-Spec</option>
-                                    <option value="Restricted">Restricted</option>
-                                    <option value="Classified">Classified</option>
-                                    <option value="Covert">Covert</option>
-                                    <option value="Extraordinary">Extraordinary</option>
-                                    <option value="Contraband">Contraband</option>
-                                </select>
+                                {renderRarityFilter()}
                             </div>
                             {filteredDrops.length === 0 ? (
                                 <p className="cases-empty">{collection.drops.length === 0 ? 'No drops yet. Open a case to start filling the pokedex.' : 'No drops match those filters.'}</p>
@@ -625,15 +765,7 @@ export default function CasesGame() {
                                     onChange={e => setPokedexFilter(e.target.value)}
                                     placeholder="Search skins..."
                                 />
-                                <select className="cases-rarity-select" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
-                                    <option value="all">All rarities</option>
-                                    <option value="Mil-Spec Grade">Mil-Spec</option>
-                                    <option value="Restricted">Restricted</option>
-                                    <option value="Classified">Classified</option>
-                                    <option value="Covert">Covert</option>
-                                    <option value="Extraordinary">Extraordinary</option>
-                                    <option value="Contraband">Contraband</option>
-                                </select>
+                                {renderRarityFilter()}
                                 <select className="cases-rarity-select" value={pokedexSort} onChange={e => setPokedexSort(e.target.value)}>
                                     <option value="multiplier">Sort: Best multiplier</option>
                                     <option value="recent">Sort: Recent</option>
@@ -671,7 +803,7 @@ export default function CasesGame() {
                         </div>
                     )}
 
-                    <ActionLockOverlay active={running} label={`Unboxing ${rows > 1 ? `${rows} rows` : ''}...`} />
+                    <ActionLockOverlay active={running} label={casePhaseLabel(casePhase, rows)} />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>

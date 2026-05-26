@@ -62,6 +62,15 @@
     overflow: hidden;
 }
 
+.rou-wheel.is-idle {
+    animation: rouWheelIdle 18s linear infinite;
+}
+
+@keyframes rouWheelIdle {
+    from { transform: rotate(var(--rou-idle-start, 0deg)); }
+    to { transform: rotate(var(--rou-idle-end, 360deg)); }
+}
+
 .rou-pocket-ring {
     position: absolute;
     inset: 0;
@@ -248,9 +257,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .rou-num-pop.idle span { animation: none; }
+    .rou-num-pop.idle span,
+    .rou-wheel.is-idle { animation: none; }
 }
-.gampo-reduce-motion .rou-num-pop.idle span { animation: none; }
+.gampo-reduce-motion .rou-num-pop.idle span,
+.gampo-reduce-motion .rou-wheel.is-idle { animation: none; }
 
 .rou-history {
     display: flex;

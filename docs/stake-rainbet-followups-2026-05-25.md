@@ -143,3 +143,10 @@ the generated WAVs.
 - `cs-prices.json` doesn't yet carry actual market prices (just metadata)
   because the current price source returned 401. The schema is in place
   under `map[name].steamAnalyst = { price, avg7, avg30, soldLast24h, … }`.
+
+2026-05-25 — Wave 33 shipped shared sim-player strips for Mines, Dice, Plinko, Limbo, Wheel, and Keno with persona-biased deterministic row helpers.
+2026-05-25 — Wave 34 shipped persona-aware poker bot decisions with seeded distribution tests, low-SPR equity sampling, GTO texture anchoring, and per-seat style wiring.
+2026-05-26 — Wave 35 shipped CS case lid-lift, staged reveal phases, deterministic skip settlement, Restricted+ prize celebration helpers, and desktop/mobile browser smoke.
+2026-05-26 — Wave 36 shipped slot wheel landing wobble, hold new-fill pulses, retrigger fly-in helpers, cascade trace helpers, and desktop/mobile browser smoke.
+2026-05-26 — Wave 37 shipped phone-safe slot bonus overlays, icon-only narrow ChatDock tabs, two-column mobile Pokedex, compact rarity buttons, and bottom-right phone tools popover.
+2026-05-26 — Wave 38 shipped roulette idle wheel motion, blackjack chip slide and phone actions, lottery settle wobble, tower ladder reveal, Chicken Cross lane cross-fade, and Video Poker hold pulse.

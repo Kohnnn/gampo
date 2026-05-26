@@ -255,3 +255,55 @@ Fourth audit (`docs/evaluationreport.md` v4) plus three user concerns — Plinko
 - `src/components/ChatDock.jsx` — chat placeholder copy.
 - `progress.md` — this section.
 
+## Stake/Rainbet Wave 33 Gap 1 (2026-05-25)
+
+- Added shared sim-player row generation in `src/components/games/primitives/simBetRows.js`, reusing the Social roster/personas and deterministic `createRoundRng` seeds.
+- Added `<SimBetStrip />` and wired it into Mines, Dice, Plinko, Limbo, Wheel, and Keno so each settled user round prepends one capped social row.
+- Added `simBetRows.test.js` coverage for persona stake/target bias and 8-12 row capping.
+- Verification: `npm test -- --run` is green at 127 tests across 27 files; `npm run build` is clean in 14.87s with the existing empty-chunk / large Plinko row warnings. Browser smoke checked `/dice` desktop with one played round, persona-varied `/dice` rows after the final bias adjustment, all six strip routes for initial rows, and `/mines` at 390x844.
+
+## Stake/Rainbet Wave 34 Gap 2 (2026-05-25)
+
+- Upgraded `src/poker/bots/HeuristicBot.js` with persona profiles for tight-passive, loose-aggressive, whale, cautious, and analyst bot styles.
+- Added deterministic bot RNG hooks, per-persona VPIP/PFR/c-bet/fold-to-3-bet/river-bluff biasing, and low-SPR postflop equity sampling at 250 rollouts.
+- Added a soft postflop GTO anchor that consumes already-loaded `/data/poker/postflop.json` texture frequencies without letting the bot fetch chart data directly.
+- Preserved `persona` / `pokerStyle` metadata in `Game.js`, assigned styles in `PokerGame.jsx`, and passed the loaded postflop chart into bot decisions.
+- Added `HeuristicBot.test.js` coverage for deterministic action distributions, river bluff bands, sample-count selection, and GTO anchoring; extended `Game.watchdog.test.js` for persona metadata.
+- Verification: focused poker tests are green at 14 tests across 3 files; `npm test -- --run` is green at 133 tests across 28 files; `npm run build` is clean in 9.37s with the existing empty-chunk / large row warnings. Browser smoke checked `/poker` at 1440x900 through a seated practice table and populated GTO panel.
+
+## Stake/Rainbet Wave 35 Gap 3 (2026-05-26)
+
+- Added `src/components/games/cases/casesAnimation.js` to centralize reveal timings, target prize offset math, phase labels, and celebration-drop selection.
+- Refactored `CasesGame.jsx` around explicit lid/spinning/finale/zoom/settling phases with one guarded settlement path for both natural reveals and skipped reveals.
+- Added a desktop/mobile-safe `Skip animation` control that immediately settles the same pending practice round while preserving drop, balance, session, PnL, and history records.
+- Added CSS-only lid lift, reel light sweep, target prize zoom, center prize popover, and reduced-motion fallbacks in `cases.css`.
+- Added `casesAnimation.test.js` coverage for offset math, phase labels, Restricted+ celebration thresholds, and strongest-drop selection.
+- Verification: focused cases tests are green at 11 tests across 2 files; `npm test -- --run` is green at 137 tests across 29 files; `npm run build` is clean in 9.12s with the existing empty-chunk / large row warnings. Browser smoke checked `/cases` at 1440x900 for lid phase, natural settle, skipped settle, and clean console, plus `/cases` at 390x844 for no horizontal overflow.
+
+## Stake/Rainbet Wave 36 Gap 4 (2026-05-26)
+
+- Added `src/components/games/slots/slotsMotion.js` to centralize slot bonus motion timings and pure helpers for hold tile freshness, cell centers, retrigger flyers, and cascade traces.
+- Extended `slotFactory.js` hold-and-respin feature events with `startFilledIndexes`, `filledIndexes`, and `newFillIndexes` so the UI can pulse only newly landed hold tiles.
+- Wired `SlotsGame.jsx` to render transient retrigger flyers from scatter cells, cascade trace dots over winning cells, and shared hold tile state from the helper layer.
+- Added CSS-only wheel landing wobble, hold new-fill pulse, retrigger fly-in chips, cascade trace dots, and reduced-motion fallbacks in `slots.css`.
+- Added `slotsMotion.test.js` coverage for helper state, uniform/megaways cell centers, retrigger coordinates, cascade capping, and exported timing constants.
+- Verification: focused slot tests are green at 17 tests across 2 files; `npm test -- --run` is green at 143 tests across 30 files; `npm run build` is clean in 13.93s with the existing empty-chunk / large row warnings. Browser smoke checked `/slots` at 1440x900 for Iron Fist wheel/free-spin bonus motion and `/slots` at 390x844 for no horizontal overflow.
+
+## Stake/Rainbet Wave 37 Gap 5 (2026-05-26)
+
+- Added phone-safe slot bonus overlay sizing in `slots.css`, including smaller wheel disc padding and a five-column hold board so wheel/hold overlays stay inside the reel frame at 375px.
+- Updated `ChatDock.jsx` and `ChatDock.css` so dock tabs keep the Stats / Progress / Chat / Race order but hide labels when the mobile dock width drops below 360px.
+- Added reusable cases rarity filter options plus a mobile rarity button group, while keeping the native select behavior on larger screens.
+- Forced the cases Pokedex collection grid to two columns at 480px and kept the Pokedex sort select visible beside the compact rarity controls.
+- Added a small-phone GameToolbar portal override so the tools menu remains portalled but anchors to the viewport bottom-right instead of clipping from the trigger.
+- Verification: `npm test -- --run` is green at 143 tests across 30 files; `npm run build` is clean in 12.59s with the existing empty-chunk / large row warnings. Browser smoke checked `/slots` at 375x667 for overlay and tools-popover metrics, `/cases` at 480x844 for two-column Pokedex + rarity buttons, and `/cases` at 320x667 for icon-only ChatDock tabs.
+
+## Stake/Rainbet Wave 38 Gap 6 (2026-05-26)
+
+- Added Roulette idle wheel motion with spinning/idle classes and a reduced-motion fallback.
+- Added Blackjack chip-slide feedback when a hand is dealt, plus phone-sized Hit / Stand primary actions.
+- Added Lottery post-draw settling wobble and broader reduced-motion coverage.
+- Added Tower staggered ladder reveal pulses after safe climbs.
+- Added Chicken Cross lane fade-out/fade-in motion after safe crossings.
+- Added Video Poker hold-toggle pulse motion for held and unheld cards.
+- Verification: `npm test -- --run` is green at 143 tests across 30 files; `npm run build` is clean in 8.22s with the existing empty-chunk / large row warnings. Browser smoke checked `/roulette`, `/blackjack` desktop/mobile, `/lottery`, `/tower`, `/chickencross`, and `/videopoker`, including the new motion selectors and no horizontal overflow.

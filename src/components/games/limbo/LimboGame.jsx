@@ -3,7 +3,7 @@
 // Wave 2 retrofit: drives multiplier ramp + result toast + sfx through the
 // round event machine. Math (limboWinChance, target multiplier) unchanged.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -22,6 +22,10 @@ import {
     ResultToast,
     ActionLockOverlay,
     CoreStageFrame,
+    SimBetStrip,
+    makeInitialSimBetRows,
+    makeSimBetRow,
+    prependSimBetRow,
     ROUND_EVENTS,
     buildEvents,
     useRoundMachine,
@@ -50,6 +54,8 @@ export default function LimboGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('limbo', { count: 9, cap: 10 }))
+    const simSeqRef = useRef(0)
     const chance = limboWinChance(target)
 
     const handleEvent = useCallback((ev) => {
@@ -143,6 +149,10 @@ export default function LimboGame() {
         }
         session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${multiplier.toFixed(2)}×`, profit, betAmount, multiplier: won ? target : 0, meta: { target } })
         showToast(won ? 'win' : 'loss', won ? 'Target cleared' : 'Below target', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+        simSeqRef.current += 1
+        setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('limbo', {
+            seed: `limbo:${simSeqRef.current}:${target}:${multiplier.toFixed(2)}`,
+        }), 10))
 
         setTimeout(() => resolve({ profit }), RAMP_DURATION_MS + 260)
     })
@@ -191,6 +201,7 @@ export default function LimboGame() {
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="limbo-stage-frame">
                 <div className={`limbo-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <SimBetStrip rows={simFeed} title="Sim limbo" />
                     <div className="limbo-stars-bg" />
                     <div className="limbo-rocket-row">
                         <div className="limbo-gauge">

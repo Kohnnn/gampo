@@ -93,6 +93,14 @@
     box-shadow: 0 20px 32px rgba(0, 231, 1, 0.4);
 }
 
+.vp-card-slot.hold-pulse {
+    animation: vpHoldPulse 0.2s ease-out both;
+}
+
+.vp-card-slot.held.hold-pulse {
+    animation-name: vpHoldPulseHeld;
+}
+
 .vp-card.placeholder {
     background: rgba(255, 255, 255, 0.04);
     border: 2px dashed rgba(255, 255, 255, 0.18);
@@ -117,3 +125,24 @@
     letter-spacing: 0.04em;
 }
 
+@keyframes vpHoldPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+
+@keyframes vpHoldPulseHeld {
+    0%, 100% { transform: translateY(-16px) scale(1); }
+    50% { transform: translateY(-16px) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vp-paytable-row.won,
+    .vp-card-slot.hold-pulse {
+        animation: none;
+    }
+}
+
+.gampo-reduce-motion .vp-paytable-row.won,
+.gampo-reduce-motion .vp-card-slot.hold-pulse {
+    animation: none;
+}

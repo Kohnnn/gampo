@@ -5,7 +5,7 @@
 // Extracted from the legacy SimulatorGame.jsx (Blackjack section) and reshaped
 // to use GameShell + BetPanel + StatsOverlay + HistoryDrawer.
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -123,6 +123,18 @@ export default function BlackjackGame() {
     const [studyResults, setStudyResults] = useState(null)
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const [chipSlide, setChipSlide] = useState(null)
+    const chipSlideTimer = useRef(null)
+
+    useEffect(() => () => {
+        if (chipSlideTimer.current) window.clearTimeout(chipSlideTimer.current)
+    }, [])
+
+    const triggerChipSlide = useCallback((amount) => {
+        if (chipSlideTimer.current) window.clearTimeout(chipSlideTimer.current)
+        setChipSlide({ key: Date.now(), amount })
+        chipSlideTimer.current = window.setTimeout(() => setChipSlide(null), 560)
+    }, [])
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return
@@ -220,6 +232,7 @@ export default function BlackjackGame() {
         setPlayer(initialPlayer)
         setDealer(initialDealer)
         setActiveBet(betAmount)
+        triggerChipSlide(betAmount)
         setPhase('playing')
         setInsurance(0)
         setInsuranceOffered(initialDealer[0]?.rank === 'A')
@@ -424,6 +437,11 @@ export default function BlackjackGame() {
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="bj-stage-frame">
                 <div className="bj-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    {chipSlide ? (
+                        <span key={chipSlide.key} className="bj-chip-slide" aria-hidden="true">
+                            {formatCredits(chipSlide.amount)}
+                        </span>
+                    ) : null}
                     <Hand
                         label={`Dealer ${dealer.length && phase !== 'playing' ? scoreBlackjackHand(dealer) : phase === 'playing' && dealer[0] ? `(${dealerUpValue(dealer[0])})` : '--'}`}
                         cards={dealer}
@@ -436,8 +454,8 @@ export default function BlackjackGame() {
                         emptyHint={phase === 'idle' ? 'Pick decks · S17/H17 · then Deal' : null}
                     />
                     <div className="bj-actions">
-                        <button disabled={phase !== 'playing'} onClick={hit}>Hit</button>
-                        <button disabled={phase !== 'playing'} onClick={stand}>Stand</button>
+                        <button className="bj-primary-action" disabled={phase !== 'playing'} onClick={hit}>Hit</button>
+                        <button className="bj-primary-action" disabled={phase !== 'playing'} onClick={stand}>Stand</button>
                         <button disabled={phase !== 'playing' || player.length !== 2} onClick={doubleDown}>Double</button>
                         <button disabled={phase !== 'playing' || player.length !== 2} onClick={surrender}>Surrender</button>
                     </div>

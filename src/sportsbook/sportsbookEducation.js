@@ -44,6 +44,7 @@ import {
  * @property {'settlement'} type
  * @property {string} title
  * @property {Array<{label:string,value:string,tone?:string}>} metrics
+ * @property {Array<{label:string,acceptedOdds:number,probability:number,roll:number,result:string,returnRole:string}>} [legRows]
  * @property {EducationInsight[]} insights
  */
 
@@ -69,6 +70,11 @@ function gc(value) {
     const numeric = Number(value)
     if (!Number.isFinite(numeric)) return 'GC 0.00'
     return `GC ${numeric.toFixed(2)}`
+}
+
+function finiteNumber(value, fallback = 0) {
+    const numeric = Number(value)
+    return Number.isFinite(numeric) ? numeric : fallback
 }
 
 function insight(id, tier, title, body, metricLabel = '', metricValue = '', tone = 'neutral') {
@@ -101,6 +107,21 @@ function movement(selection) {
     return { direction: 'flat', diff: 0, label: 'Stable' }
 }
 
+function movementLesson(move, selection) {
+    const current = decimal(selection?.decimalOdds ?? selection?.currentOdds)
+    const previous = decimal(selection?.previousOdds ?? selection?.acceptedOdds)
+    if (move.direction === 'up') {
+        return `The price moved up from ${previous} to ${current}. Higher decimal odds pay more for the same stake, but they also imply the outcome is less likely than before.`
+    }
+    if (move.direction === 'down') {
+        return `The price moved down from ${previous} to ${current}. Shorter decimal odds pay less for the same stake and usually mean the market is pricing this outcome as more likely.`
+    }
+    if (move.label === 'No tracked move') {
+        return 'No previous price is available for this cell, so there is no line-movement lesson yet.'
+    }
+    return `The current price is close to the previous price at ${current}. Treat this as a stable line before checking break-even chance.`
+}
+
 function marketLesson(label = '') {
     const text = String(label).toLowerCase()
     if (text.includes('1x2') || text.includes('winner') || text.includes('moneyline') || text.includes('fixed win')) {
@@ -121,7 +142,71 @@ function marketLesson(label = '') {
     if (text.includes('place') || text.includes('top 3')) {
         return 'Place-style racing markets can pay on a finishing range instead of only first place, so prices are usually shorter.'
     }
+    if (text.includes('outright')) {
+        return 'Outrights settle on a future winner across a field. Long prices can stay open for a long time, so movement and liquidity matter more than one isolated price.'
+    }
     return 'This market converts an event opinion into prices. Start by reading break-even chance, then compare it with a fair estimate.'
+}
+
+function settlementMovementReview(ticket) {
+    const moved = (ticket?.selections || []).filter(selection => (
+        Number.isFinite(Number(selection.currentOdds))
+        && Number.isFinite(Number(selection.acceptedOdds))
+        && Math.abs(Number(selection.currentOdds) - Number(selection.acceptedOdds)) > 0.015
+    ))
+    if (moved.length === 0) {
+        return 'No post-acceptance line movement snapshot is available for this settled ticket. The accepted odds still remain locked for review.'
+    }
+    return moved.map(selection => {
+        const accepted = Number(selection.acceptedOdds)
+        const current = Number(selection.currentOdds)
+        const direction = current > accepted
+            ? 'later price moved higher, so the accepted price was lower than the later snapshot'
+            : 'accepted a price before it shortened'
+        return `${selection.label}: accepted ${decimal(accepted)}, later ${decimal(current)} (${direction})`
+    }).join('; ')
+}
+
+function settlementLegRows(ticket) {
+    const legs = ticket?.legs || []
+    const selections = ticket?.selections || []
+    const stake = finiteNumber(ticket?.stake)
+    const mode = ticket?.mode || ticket?.quote?.mode || BET_MODES.SINGLES
+    const allLegsWon = legs.length > 0 && legs.every(leg => leg.won)
+    const totalPayout = finiteNumber(ticket?.payout ?? ticket?.estimatedPayout)
+    const stakePerLeg = mode === BET_MODES.SINGLES && legs.length ? stake / legs.length : 0
+    const systemComboCount = mode === BET_MODES.SYSTEM_2 && legs.length >= 2 ? (legs.length * (legs.length - 1)) / 2 : 0
+
+    return legs.map((leg, index) => {
+        const selection = selections.find(item => item.selectionId === leg.selectionId)
+            || selections.find(item => item.label === leg.label)
+            || {}
+        const acceptedOdds = finiteNumber(leg.odds ?? selection.acceptedOdds ?? selection.currentOdds)
+        const probability = finiteNumber(leg.trueProbability ?? selection.trueProbability)
+        const roll = finiteNumber(leg.roll)
+        let returnRole = 'GC 0.00'
+
+        if (mode === BET_MODES.SINGLES) {
+            returnRole = gc(leg.won ? stakePerLeg * acceptedOdds : 0)
+        } else if (mode === BET_MODES.MULTI) {
+            returnRole = allLegsWon ? `all-leg ticket ${gc(totalPayout)}` : (leg.won ? 'won leg, ticket blocked' : 'blocked ticket')
+        } else if (mode === BET_MODES.SYSTEM_2) {
+            const paidCombos = legs.filter((other, otherIndex) => otherIndex !== index && leg.won && other.won).length
+            returnRole = `${paidCombos}/${Math.max(0, legs.length - 1)} paid combos`
+            if (systemComboCount > 0 && paidCombos > 0) {
+                returnRole += `, stake base ${gc(stake / systemComboCount)}`
+            }
+        }
+
+        return {
+            label: leg.label || selection.label || `Leg ${index + 1}`,
+            acceptedOdds,
+            probability,
+            roll,
+            result: leg.won ? 'won' : 'lost',
+            returnRole,
+        }
+    })
 }
 
 function marketNoVigRows(group) {
@@ -155,6 +240,7 @@ export function analyzeSelection(selection, marketGroup = null) {
         metrics: [
             { label: 'Break-even', value: formatPercent(breakEven) },
             { label: 'No-vig fair', value: noVigProbability ? formatPercent(noVigProbability) : 'n/a' },
+            { label: 'Fair odds', value: fairOdds ? decimal(fairOdds) : 'n/a' },
             { label: 'Model edge', value: formatPercent(edge), tone: edge > 0 ? 'positive' : edge < 0 ? 'danger' : 'neutral' },
             { label: 'Move', value: move.label, tone: move.direction === 'up' ? 'positive' : move.direction === 'down' ? 'warning' : 'neutral' },
         ],
@@ -177,6 +263,15 @@ export function analyzeSelection(selection, marketGroup = null) {
                 'Status',
                 disabled ? 'Blocked' : selection?.status || 'available',
                 disabled ? 'danger' : 'neutral',
+            ),
+            insight(
+                'selection-movement',
+                'beginner',
+                'Odds movement',
+                movementLesson(move, selection),
+                'Move',
+                move.label,
+                move.direction === 'up' ? 'positive' : move.direction === 'down' ? 'warning' : 'neutral',
             ),
             insight(
                 'selection-no-vig',
@@ -257,11 +352,19 @@ export function analyzeMarketGroup(group) {
 export function analyzeTicket({ selections = [], stake = 0, mode = BET_MODES.SINGLES, quote = null } = {}) {
     const ticketQuote = quote || quoteTicket({ selections, stake, mode })
     const count = selections.length
-    const sameGame = selections.some((selection, index) => selections.findIndex(other => other.eventId === selection.eventId) !== index)
+    const sameGame = selections.some((selection, index) => (
+        selection.eventId && selections.findIndex(other => other.eventId === selection.eventId) !== index
+    ))
     const totalOdds = Number(ticketQuote.totalOdds) || 0
-    const breakEven = mode === BET_MODES.SINGLES ? 0 : impliedProbability(totalOdds)
+    const breakEven = mode === BET_MODES.SINGLES ? 0 : Number(ticketQuote.impliedChance) || impliedProbability(totalOdds)
     const modelChance = Number(ticketQuote.modelChance) || 0
     const profitIfMax = Math.max(0, Number(ticketQuote.estimatedPayout || 0) - Number(stake || 0))
+    const stakeUnitLabel = mode === BET_MODES.SYSTEM_2 ? 'Stake/combo' : mode === BET_MODES.SINGLES ? 'Stake/leg' : 'Stake'
+    const stakeUnitValue = mode === BET_MODES.SYSTEM_2
+        ? gc(ticketQuote.stakePerCombo)
+        : mode === BET_MODES.SINGLES
+            ? gc(ticketQuote.stakePerLeg)
+            : gc(stake)
 
     const modeBody = mode === BET_MODES.SINGLES
         ? 'Singles split the stake across selections. Each leg can return independently, so one loss does not automatically sink every other leg.'
@@ -275,11 +378,23 @@ export function analyzeTicket({ selections = [], stake = 0, mode = BET_MODES.SIN
         metrics: [
             { label: 'Selections', value: String(count) },
             { label: 'Stake', value: gc(stake) },
+            { label: stakeUnitLabel, value: stakeUnitValue },
+            ...(mode === BET_MODES.SYSTEM_2 ? [{ label: '2-leg combos', value: String(ticketQuote.combinations || 0) }] : []),
             { label: 'Est. return', value: gc(ticketQuote.estimatedPayout) },
             { label: 'EV hint', value: gc(ticketQuote.expectedValue), tone: ticketQuote.expectedValue >= 0 ? 'positive' : 'danger' },
         ],
         insights: [
             insight('ticket-mode', 'beginner', 'How this ticket pays', modeBody),
+            ...(mode === BET_MODES.SINGLES ? [
+                insight(
+                    'ticket-singles-split',
+                    'beginner',
+                    'Stake is split per single',
+                    `Your ${gc(stake)} stake is split into ${count || 0} independent singles at about ${gc(ticketQuote.stakePerLeg)} per leg.`,
+                    'Per leg',
+                    gc(ticketQuote.stakePerLeg),
+                ),
+            ] : []),
             insight(
                 'ticket-payout',
                 'beginner',
@@ -298,6 +413,16 @@ export function analyzeTicket({ selections = [], stake = 0, mode = BET_MODES.SIN
                 'Break-even',
                 mode === BET_MODES.SINGLES ? 'per leg' : formatPercent(breakEven),
             ),
+            ...(mode === BET_MODES.SYSTEM_2 ? [
+                insight(
+                    'ticket-system-combos',
+                    'intermediate',
+                    '2-of-N combo math',
+                    `This system creates ${ticketQuote.combinations || 0} two-leg combos at about ${gc(ticketQuote.stakePerCombo)} each. A partial result can still return practice credits, but only combos where both legs win contribute.`,
+                    'Combos',
+                    String(ticketQuote.combinations || 0),
+                ),
+            ] : []),
             insight(
                 'ticket-model',
                 'advanced',
@@ -332,11 +457,12 @@ export function analyzeTicket({ selections = [], stake = 0, mode = BET_MODES.SIN
 
 export function analyzeSettlement(ticket) {
     const legs = ticket?.legs || []
-    const stake = Number(ticket?.stake) || 0
-    const payout = Number(ticket?.payout ?? ticket?.estimatedPayout ?? 0) || 0
-    const profit = Number(ticket?.profit) || roundCurrency(payout - stake)
+    const legRows = settlementLegRows(ticket)
+    const stake = finiteNumber(ticket?.stake)
+    const payout = finiteNumber(ticket?.payout ?? ticket?.estimatedPayout)
+    const profit = Number.isFinite(Number(ticket?.profit)) ? Number(ticket.profit) : roundCurrency(payout - stake)
     const quote = ticket?.quote || quoteTicket(ticket || {})
-    const expectedValue = Number(quote?.expectedValue) || 0
+    const expectedValue = finiteNumber(quote?.expectedValue)
     const resultTone = profit >= 0 ? 'positive' : expectedValue >= 0 ? 'warning' : 'danger'
     const resultCopy = expectedValue >= 0 && profit < 0
         ? 'This is a good-decision / bad-result sample: the quoted EV was not negative, but variance still won this round.'
@@ -355,17 +481,18 @@ export function analyzeSettlement(ticket) {
             { label: 'Profit', value: `${profit >= 0 ? '+' : ''}${gc(profit)}`, tone: profit >= 0 ? 'positive' : 'danger' },
             { label: 'Pre-settle EV', value: gc(expectedValue), tone: expectedValue >= 0 ? 'positive' : 'danger' },
         ],
+        legRows,
         insights: [
             insight('settlement-result', 'beginner', 'Result versus decision quality', resultCopy, 'Outcome', ticket?.result || ticket?.status || 'settled', resultTone),
             insight(
                 'settlement-rolls',
                 'intermediate',
-                'Deterministic leg rolls',
-                legs.length
-                    ? legs.map(leg => `${leg.label}: roll ${decimal(leg.roll)} vs ${formatPercent(leg.trueProbability)} (${leg.won ? 'won' : 'lost'})`).join('; ')
+                'Leg probability, roll, and return role',
+                legRows.length
+                    ? legRows.map(row => `${row.label}: accepted ${decimal(row.acceptedOdds)}, roll ${decimal(row.roll)} vs ${formatPercent(row.probability)} (${row.result}), return role ${row.returnRole}`).join('; ')
                     : 'This ticket does not include leg-level settlement data yet.',
                 'Legs',
-                String(legs.length),
+                String(legRows.length),
             ),
             insight(
                 'settlement-accepted-price',
@@ -374,6 +501,14 @@ export function analyzeSettlement(ticket) {
                 'Accepted odds are stored on the ticket, so later line movement does not rewrite the settled lesson.',
                 'Snapshot',
                 'locked',
+            ),
+            insight(
+                'settlement-price-movement',
+                'advanced',
+                'Price movement review',
+                settlementMovementReview(ticket),
+                'Movement',
+                'review',
             ),
         ],
     }

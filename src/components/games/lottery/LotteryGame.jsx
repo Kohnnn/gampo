@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
@@ -24,6 +24,12 @@ export default function LotteryGame() {
     const [lastWon, setLastWon] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [settling, setSettling] = useState(false)
+    const settleTimer = useRef(null)
+
+    useEffect(() => () => {
+        if (settleTimer.current) window.clearTimeout(settleTimer.current)
+    }, [])
 
     const toggle = (n) => {
         if (drawing) return
@@ -47,6 +53,9 @@ export default function LotteryGame() {
             setLastWon(returnAmount > 0)
             setBurstKey(k => k + 1)
             setDrawing(false)
+            setSettling(true)
+            if (settleTimer.current) window.clearTimeout(settleTimer.current)
+            settleTimer.current = window.setTimeout(() => setSettling(false), 220)
             if (multiplier >= 8) {
                 playSound('bigwin')
                 setBigWin({ trigger: Date.now(), profit, multiplier })
@@ -77,7 +86,7 @@ export default function LotteryGame() {
         >
             <div className="lottery-stage">
                 <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                <div className={`lot-tumbler ${drawing ? 'shaking' : ''}`}>
+                <div className={`lot-tumbler ${drawing ? 'shaking' : ''} ${settling ? 'settling' : ''}`}>
                     {/* Idle: rotating drum with ghost balls so the panel is never empty. */}
                     {drawAnim.length === 0 && !drawing && (
                         <div className="lot-drum" aria-hidden="true">

@@ -29,6 +29,10 @@
 }
 
 .lot-tumbler.shaking { animation: lotShake 0.4s ease-in-out infinite; }
+.lot-tumbler.settling {
+    animation: lotSettleWobble 0.2s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+    transform-origin: 50% 70%;
+}
 
 .lot-drum {
     position: relative;
@@ -86,6 +90,13 @@
     0%, 100% { transform: translateX(0) rotate(0); }
     25% { transform: translateX(-3px) rotate(-1deg); }
     75% { transform: translateX(3px) rotate(1deg); }
+}
+
+@keyframes lotSettleWobble {
+    0% { transform: translateX(0) rotate(0deg) scale(1); }
+    35% { transform: translateX(-2px) rotate(-2.4deg) scale(1.012); }
+    70% { transform: translateX(1px) rotate(1.2deg) scale(0.998); }
+    100% { transform: translateX(0) rotate(0deg) scale(1); }
 }
 
 .lot-ball {
@@ -165,3 +176,22 @@
     100% { transform: scale(1); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .lot-tumbler.shaking,
+    .lot-tumbler.settling,
+    .lot-drum,
+    .lot-tumbler-hint,
+    .lot-ball,
+    .lot-grid button.hit {
+        animation: none;
+    }
+}
+
+.gampo-reduce-motion .lot-tumbler.shaking,
+.gampo-reduce-motion .lot-tumbler.settling,
+.gampo-reduce-motion .lot-drum,
+.gampo-reduce-motion .lot-tumbler-hint,
+.gampo-reduce-motion .lot-ball,
+.gampo-reduce-motion .lot-grid button.hit {
+    animation: none;
+}
