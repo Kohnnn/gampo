@@ -38,6 +38,7 @@ import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreload
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './mines.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const GRID = 25
 const HOUSE_EDGE = 0.01
@@ -65,6 +66,7 @@ function placeBombs(bombs) {
 }
 
 export default function MinesGame() {
+    useGameBgm('mines', 'idle')
     const definition = findGameDefinition('mines') || { name: 'Mines', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

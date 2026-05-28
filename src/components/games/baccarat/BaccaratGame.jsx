@@ -26,6 +26,7 @@ import { buildBigEyeBoy, buildBigRoad, buildCockroachPig, buildSmallRoad } from 
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './baccarat.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 const SUITS = ['S', 'H', 'D', 'C']
@@ -86,6 +87,7 @@ function suitColor(s) { return (s === 'H' || s === 'D') ? 'red' : 'black' }
 function suitGlyph(s) { return s === 'H' ? '\u2665' : s === 'D' ? '\u2666' : s === 'S' ? '\u2660' : '\u2663' }
 
 export default function BaccaratGame() {
+    useGameBgm('baccarat', 'idle')
     const definition = findGameDefinition('baccarat')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

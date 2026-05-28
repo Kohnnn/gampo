@@ -12,8 +12,10 @@ import SicBoDie from './SicBoDie'
 import EducationPanel from '../../EducationPanel'
 import './SicBoDie.css'
 import './sicbo.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 export default function SicBoGame() {
+    useGameBgm('sicbo', 'idle')
     const definition = findGameDefinition('sicbo')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

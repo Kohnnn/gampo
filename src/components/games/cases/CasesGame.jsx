@@ -60,6 +60,7 @@ import {
     pickCelebrationDrop,
 } from './casesAnimation'
 import './cases.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const CAROUSEL_VISIBLE = 32
 const ROW_OPTIONS = [1, 3, 5, 10]
@@ -157,6 +158,7 @@ function tierFromCase(c) {
 const TIER_LABEL = { low: 'Low', mid: 'Mid', high: 'High' }
 
 export default function CasesGame() {
+    useGameBgm('cases', 'idle')
     const definition = findGameDefinition('cases') || { name: 'Cases', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

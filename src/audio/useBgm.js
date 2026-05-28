@@ -2,12 +2,14 @@
 //
 // Plays a single looping audio source through the BGM gain bus. Switching
 // templates fades the current loop out and the next one in. Manifest is
-// keyed by skin family in `bgmManifest`. When the entry is null, the hook
-// is a no-op (Wave 27 ships silent BGM until binaries land).
+// keyed by skin family in `bgmManifest` (slot mode) or game id in
+// `gameBgmManifest` (Wave 35: casino-game mode). When the entry is null,
+// the hook is a no-op.
 
 import { useEffect, useRef } from 'react'
 import { getAudioCtx, getBgmGain, isMuted, unlockAudio, decode } from './audioContext'
 import { resolveBgm } from './bgmManifest'
+import { resolveGameBgm } from './gameBgmManifest'
 
 const bufferCache = new Map()
 
@@ -31,7 +33,7 @@ async function loadBuffer(url) {
     return promise
 }
 
-export function useBgm(skinFamily, mode = 'idle') {
+function useBgmInner(url) {
     const sourceRef = useRef(null)
     const fadeRef = useRef(null)
 
@@ -39,7 +41,6 @@ export function useBgm(skinFamily, mode = 'idle') {
         let cancelled = false
 
         async function start() {
-            const url = resolveBgm(skinFamily, mode)
             if (!url) return
             if (isMuted()) return
             await unlockAudio()
@@ -100,5 +101,15 @@ export function useBgm(skinFamily, mode = 'idle') {
                 fadeRef.current = null
             }
         }
-    }, [skinFamily, mode])
+    }, [url])
+}
+
+// Wave 29: slot skin BGM. `skinFamily` keys into `bgmManifest`.
+export function useBgm(skinFamily, mode = 'idle') {
+    useBgmInner(resolveBgm(skinFamily, mode))
+}
+
+// Wave 35: per-game BGM. `gameId` keys into `gameBgmManifest`.
+export function useGameBgm(gameId, mode = 'idle') {
+    useBgmInner(resolveGameBgm(gameId, mode))
 }

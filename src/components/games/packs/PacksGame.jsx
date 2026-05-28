@@ -35,6 +35,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './packs.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const REVEAL_STAGGER_MS = 220
 const PACK_REVEAL_DELAY_MS = 320
@@ -92,6 +93,7 @@ function weightedPick(pool) {
 }
 
 export default function PacksGame() {
+    useGameBgm('packs', 'idle')
     const definition = findGameDefinition('packs') || { name: 'Packs', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

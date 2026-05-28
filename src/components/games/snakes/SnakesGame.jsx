@@ -33,6 +33,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './snakes.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const COLS = 3
 const ROWS = 8
@@ -64,6 +65,7 @@ function multiplierFor(safeRungs, snakesPerRow) {
 }
 
 export default function SnakesGame() {
+    useGameBgm('snakes', 'idle')
     const definition = findGameDefinition('snakes') || { name: 'Snakes', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

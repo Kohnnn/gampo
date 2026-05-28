@@ -31,6 +31,7 @@ import { createRoundRng } from '../../../utils/roundRng'
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './dice.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 // Wave 1 pilot game. Drives all UI motion from the deterministic round
 // event machine. Pre-existing synth audio (`useAudio`) stays in place;
@@ -41,6 +42,7 @@ import './dice.css'
 const DICE_ROLL_DURATION_MS = 720
 
 export default function DiceGame() {
+    useGameBgm('dice', 'idle')
     const definition = findGameDefinition('dice')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

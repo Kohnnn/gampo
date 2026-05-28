@@ -31,6 +31,7 @@ import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreload
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './blackjack.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 const SUITS = ['S', 'H', 'D', 'C']
@@ -102,6 +103,7 @@ function suitGlyph(s) {
 function suitColor(s) { return (s === 'H' || s === 'D') ? 'red' : 'black' }
 
 export default function BlackjackGame() {
+    useGameBgm('blackjack', 'idle')
     const definition = findGameDefinition('blackjack') || { name: 'Blackjack', category: 'Tables' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

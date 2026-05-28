@@ -31,6 +31,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './diamonds.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const REVEAL_MS = 600
 
@@ -70,6 +71,7 @@ function pickGem() {
 }
 
 export default function DiamondsGame() {
+    useGameBgm('diamonds', 'idle')
     const definition = findGameDefinition('diamonds') || { name: 'Diamonds', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

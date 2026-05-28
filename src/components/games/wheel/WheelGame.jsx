@@ -29,6 +29,7 @@ import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreload
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './wheel.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 // Wave 2 retrofit. Spin animation timing stays at 2.2s; events emit at
 // the matching wallclock so sfx + toast stay in sync with the visible
@@ -44,6 +45,7 @@ const wheelPresets = {
 }
 
 export default function WheelGame() {
+    useGameBgm('wheel', 'idle')
     const definition = findGameDefinition('wheel')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

@@ -30,11 +30,13 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './slide.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const TRAVEL_MS = 720
 const HOUSE_EDGE = 0.04
 
 export default function SlideGame() {
+    useGameBgm('slide', 'idle')
     const definition = findGameDefinition('slide') || { name: 'Slide', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

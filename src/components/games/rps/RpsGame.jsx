@@ -8,6 +8,7 @@ import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, 
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './rps.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const OPTIONS = [
     { id: 'rock', label: 'Rock', img: '/assets/games/rps/rps-rock.png', emoji: '🪨', beats: 'scissors' },
@@ -16,6 +17,7 @@ const OPTIONS = [
 ]
 
 export default function RpsGame() {
+    useGameBgm('rps', 'idle')
     const definition = findGameDefinition('rps')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

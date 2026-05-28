@@ -30,6 +30,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './pump.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const STEP_RAMP = 1.18
 const STEP_BUST_CHANCE = 0.12
@@ -37,6 +38,7 @@ const MAX_PUMPS = 10
 const BASE_SIZE = 128
 
 export default function PumpGame() {
+    useGameBgm('pump', 'idle')
     const definition = findGameDefinition('pump') || { name: 'Pump', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

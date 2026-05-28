@@ -36,6 +36,7 @@ import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import CrashChart from './CrashChart'
 import './crash.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const HOUSE_EDGE = 0.01
 const TARGET_PRESETS = [1.25, 1.5, 2, 3, 5, 10, 25, 50, 100]
@@ -100,6 +101,7 @@ function simulatePlayers(bust) {
 }
 
 export default function CrashGame() {
+    useGameBgm('crash', 'idle')
     const definition = findGameDefinition('crash') || { name: 'Crash', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

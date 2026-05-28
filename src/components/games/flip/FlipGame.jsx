@@ -30,12 +30,14 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './flip.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const FLIP_DURATION_MS = 760
 const PAYOUT = 1.96 // ~2% house edge per Stake-style fair-coin product
 const HOUSE_EDGE = 1 - PAYOUT / 2
 
 export default function FlipGame() {
+    useGameBgm('flip', 'idle')
     const definition = findGameDefinition('flip') || { name: 'Flip', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
