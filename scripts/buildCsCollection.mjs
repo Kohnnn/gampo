@@ -211,10 +211,46 @@ async function main() {
     console.log(`Wrote ${collectionPath} (${(cstat.size / 1024 / 1024).toFixed(2)} MB)`)
 
     // Build a small "playable cases" subset for the carousel game so the
-    // hot path stays fast. Keep up to 24 cases biased toward Cases /
-    // Stickers Capsules / Souvenir packages, capped at 18 items each so
+    // hot path stays fast. Keep up to 60 cases, capped at 18 items each so
     // the wheel reads cleanly.
+    //
+    // Wave 41: tier is now driven by **highest rarity present** in the
+    // case's contains list (not by max multiplier). The CS2 rarity ladder
+    // maps cleanly to four playable tiers:
+    //
+    //   classified    = Mil-Spec / Restricted / Industrial Grade
+    //   covert        = Classified
+    //   exceedingly   = Covert
+    //   contraband    = Extraordinary / Contraband / ★ knife-grade
+    //
+    // This replaces the prior `low / mid / high` model that the user
+    // asked to retire.
     const PLAYABLE_TYPES = new Set(['Case', 'Souvenir Package', 'Sticker Capsule', 'Container', 'Patch Pack', 'Music Kit Box'])
+    function rarityRank(name) {
+        switch (name) {
+            case 'Consumer Grade': return 1
+            case 'Industrial Grade': return 2
+            case 'Mil-Spec Grade': return 3
+            case 'Restricted': return 4
+            case 'Classified': return 5
+            case 'Covert': return 6
+            case 'Contraband': return 7
+            case 'Extraordinary': return 7
+            case '★': return 7
+            default: return 3
+        }
+    }
+    function tierForCase(c) {
+        let rank = 0
+        for (const it of c.items) {
+            const r = rarityRank(it.rarity)
+            if (r > rank) rank = r
+        }
+        if (rank >= 7) return 'contraband'
+        if (rank >= 6) return 'exceedingly'
+        if (rank >= 5) return 'covert'
+        return 'classified'
+    }
     const playable = crates
         .filter(c => PLAYABLE_TYPES.has(c.type))
         .slice(0, 60)
@@ -228,23 +264,20 @@ async function main() {
                 multiplier: it.multiplier,
                 isRare: it.isRare,
             }))
-            const tier = items.some(it => it.multiplier >= 30) ? 'high'
-                : items.some(it => it.multiplier >= 8) ? 'mid'
-                : 'low'
             return {
                 id: c.id,
                 name: c.name,
                 image: c.image,
                 description: c.description,
-                tier,
+                tier: tierForCase({ items }),
                 type: c.type,
                 items,
             }
         })
         .filter(c => c.items.length > 0)
         .sort((a, b) => {
-            const ta = { low: 0, mid: 1, high: 2 }[a.tier]
-            const tb = { low: 0, mid: 1, high: 2 }[b.tier]
+            const ta = { classified: 0, covert: 1, exceedingly: 2, contraband: 3 }[a.tier] ?? 0
+            const tb = { classified: 0, covert: 1, exceedingly: 2, contraband: 3 }[b.tier] ?? 0
             return ta - tb || a.name.localeCompare(b.name)
         })
 
@@ -252,6 +285,68 @@ async function main() {
     await fs.writeFile(casesPath, JSON.stringify(playable))
     const stat2 = await fs.stat(casesPath)
     console.log(`Wrote ${casesPath} (${(stat2.size / 1024).toFixed(1)} KB) — ${playable.length} playable cases`)
+
+    // Wave 41: cs2cap.com baseline ingestion. Pulls rarity + image metadata
+    // for every CS2 item via /v1/items (the same source we already use for
+    // skins.json), then enriches with price data from /v1/prices when the
+    // user flagged `--prices`. The output is a USD-keyed rarity tier we
+    // use to drive the new "collection" model in CasesGame instead of
+    // the old low/mid/high tier.
+    const cs2capKey = process.env.cs2cap_token
+    if (cs2capKey) {
+        console.log('Fetching cs2cap.com /v1/items baseline...')
+        try {
+            const all = []
+            let offset = 0
+            const pageSize = 100
+            // Cap at 8000 items (80 pages) to avoid burning quota — covers
+            // the entire CS2 weapon-skin catalog comfortably.
+            while (offset < 8000) {
+                const url = `https://api.cs2c.app/v1/items?limit=${pageSize}&offset=${offset}`
+                const res = await fetch(url, {
+                    headers: { Authorization: `Bearer ${cs2capKey}` },
+                })
+                if (!res.ok) {
+                    console.warn(`  cs2cap items page ${offset}: HTTP ${res.status}`)
+                    break
+                }
+                const data = await res.json()
+                const page = Array.isArray(data?.items) ? data.items : []
+                if (page.length === 0) break
+                all.push(...page)
+                if (offset === 0 || (offset / pageSize) % 10 === 0) {
+                    console.log(`  cs2cap items page offset=${offset} got ${page.length}`)
+                }
+                if (page.length < pageSize) break
+                offset += pageSize
+            }
+            console.log(`  cs2cap total items: ${all.length}`)
+            // Build the rarity index: market_hash_name -> { rarity, color, type, ... }.
+            const rarityMap = {}
+            for (const item of all) {
+                const key = item.market_hash_name
+                if (!key) continue
+                rarityMap[key] = {
+                    rarityName: item.rarity_name || null,
+                    rarityColor: item.rarity_color ? `#${item.rarity_color}` : null,
+                    itemType: item.item_type || null,
+                    weaponType: item.weapon_type || null,
+                    minFloat: item.min_float ?? null,
+                    maxFloat: item.max_float ?? null,
+                    statTrak: !!item.is_stattrak,
+                    souvenir: !!item.is_souvenir,
+                    cdnIcon: item.image_url || null,
+                    phase: item.phase || null,
+                }
+            }
+            const cs2capPath = path.join(ROOT, 'public', 'data', 'cs2cap-rarity.json')
+            await fs.writeFile(cs2capPath, JSON.stringify(rarityMap))
+            const stat = await fs.stat(cs2capPath)
+            console.log(`Wrote ${cs2capPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB) — ${Object.keys(rarityMap).length} cs2cap entries`)
+        } catch (err) {
+            console.warn('  cs2cap failed:', err.message)
+        }
+    }
 
     // Optional price enrichment.
     if (args.has('--prices')) {

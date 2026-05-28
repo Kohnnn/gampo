@@ -969,3 +969,44 @@
 .gampo-reduce-motion .cases-prize-card {
     animation: none !important;
 }
+
+/* === Wave 41: locked-collection silhouettes + show-locked toggle === */
+.cases-locked-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary, #b1bad3);
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    user-select: none;
+}
+.cases-locked-toggle input { accent-color: var(--accent, #ffd166); }
+
+.cases-skin-card.cases-skin-locked {
+    position: relative;
+    filter: grayscale(0.85) brightness(0.55);
+    opacity: 0.78;
+    border-style: dashed;
+}
+.cases-skin-card.cases-skin-locked img {
+    filter: brightness(0.7);
+}
+.cases-skin-card.cases-skin-locked .cases-locked-name {
+    color: var(--text-muted, #828b9c);
+    font-style: italic;
+}
+.cases-skin-card.cases-skin-locked:hover {
+    filter: grayscale(0.6) brightness(0.7);
+    opacity: 0.92;
+}
+.cases-skin-locked-icon {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 14px;
+    line-height: 1;
+    pointer-events: none;
+    opacity: 0.95;
+    text-shadow: 0 0 6px rgba(0, 0, 0, 0.85);
+}

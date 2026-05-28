@@ -152,10 +152,20 @@ function formatRelative(ts) {
 }
 
 function tierFromCase(c) {
-    return c.tier || 'mid'
+    return c.tier || 'classified'
 }
 
-const TIER_LABEL = { low: 'Low', mid: 'Mid', high: 'High' }
+const TIER_LABEL = {
+    classified: 'Classified',
+    covert: 'Covert',
+    exceedingly: 'Exceedingly Rare',
+    contraband: 'Contraband',
+    // Legacy fallbacks so any in-flight stored data still renders.
+    low: 'Classified',
+    mid: 'Covert',
+    high: 'Contraband',
+}
+const TIER_ORDER = ['classified', 'covert', 'exceedingly', 'contraband']
 
 export default function CasesGame() {
     useGameBgm('cases', 'idle')
@@ -169,7 +179,7 @@ export default function CasesGame() {
     const collection = useCaseCollection({ catalogTotal: csCatalog.catalog?.totalSkins || 0 })
 
     const [allCases, setAllCases] = useState(null)
-    const [tier, setTier] = useState('low')
+    const [tier, setTier] = useState('classified')
     const [caseId, setCaseId] = useState(null)
     const [rows, setRows] = useState(1)
     const [running, setRunning] = useState(false)
@@ -182,6 +192,8 @@ export default function CasesGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [view, setView] = useState('open') // 'open' | 'history' | 'pokedex'
+    // Wave 41: filter to also show locked silhouettes from the full catalog.
+    const [showLocked, setShowLocked] = useState(true)
     const [historyFilter, setHistoryFilter] = useState('')
     const [pokedexFilter, setPokedexFilter] = useState('')
     const [rarityFilter, setRarityFilter] = useState('all')
@@ -197,7 +209,7 @@ export default function CasesGame() {
         fetch('/data/cs-cases.json').then(r => r.json()).then(data => {
             if (cancelled) return
             setAllCases(data)
-            const first = data.find(c => tierFromCase(c) === 'low') || data[0]
+            const first = data.find(c => tierFromCase(c) === 'classified') || data[0]
             if (first) setCaseId(first.id)
         }).catch(err => {
             // eslint-disable-next-line no-console
@@ -476,9 +488,36 @@ export default function CasesGame() {
         }
     }, [pokedexList, pokedexFilter, rarityFilter, pokedexSort])
 
+    // Wave 41: locked silhouettes from the full CS2 catalog. Skins not yet
+    // discovered show with greyscale + a lock icon; opening the matching
+    // case can reveal them.
+    const lockedSkins = useMemo(() => {
+        if (!showLocked || !csCatalog.loaded) return []
+        const discovered = new Set(pokedexList.map(s => s.skinId))
+        const q = pokedexFilter.trim().toLowerCase()
+        const list = []
+        for (const skin of Object.values(csCatalog.catalog.skins || {})) {
+            if (discovered.has(skin.id)) continue
+            if (rarityFilter !== 'all' && skin.rarity?.name !== rarityFilter) continue
+            if (q && !(skin.name || '').toLowerCase().includes(q)) continue
+            list.push({
+                key: `locked::${skin.id}`,
+                skinId: skin.id,
+                name: skin.name,
+                image: skin.image,
+                color: skin.rarity?.color || '#777',
+                rarity: skin.rarity?.name || 'Unknown',
+                locked: true,
+                multiplier: skin.rarity?.multiplier || 0,
+            })
+        }
+        // Cap to 240 locked rows so the grid stays performant.
+        return list.slice(0, 240)
+    }, [showLocked, csCatalog.loaded, csCatalog.catalog, pokedexList, rarityFilter, pokedexFilter])
+
     const cases = allCases || []
     const tierCounts = useMemo(() => {
-        const out = { low: 0, mid: 0, high: 0 }
+        const out = Object.fromEntries(TIER_ORDER.map(t => [t, 0]))
         for (const c of cases) out[tierFromCase(c)] = (out[tierFromCase(c)] || 0) + 1
         return out
     }, [cases])
@@ -526,11 +565,7 @@ export default function CasesGame() {
                     <div className="bp-section">
                         <label className="bp-label">Tier ({tierCounts[tier] || 0} cases)</label>
                         <SegmentedModeTabs
-                            options={[
-                                { value: 'low', label: 'Low' },
-                                { value: 'mid', label: 'Mid' },
-                                { value: 'high', label: 'High' },
-                            ]}
+                            options={TIER_ORDER.map(t => ({ value: t, label: TIER_LABEL[t] }))}
                             value={tier}
                             onChange={t => !running && setTier(t)}
                             size="sm"
@@ -561,7 +596,7 @@ export default function CasesGame() {
                         <p className="bp-hint">Instantly settles the same practice round and keeps the drop record.</p>
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">Pokedex</label>
+                        <label className="bp-label">Collection</label>
                         <div className="bp-row" style={{ flexWrap: 'wrap' }}>
                             <span className="cases-stat-pill">
                                 <small>Drops</small><strong>{collection.summary.totalDrops}</strong>
@@ -598,14 +633,14 @@ export default function CasesGame() {
                             History {collection.drops.length > 0 && <em>{collection.drops.length}</em>}
                         </button>
                         <button className={view === 'pokedex' ? 'active' : ''} onClick={() => setView('pokedex')} disabled={running}>
-                            Pokedex {pokedexList.length > 0 && <em>{pokedexList.length}</em>}
+                            Collection {pokedexList.length > 0 && <em>{pokedexList.length}</em>}
                         </button>
                     </div>
 
                     {view === 'open' && (
                         <>
                             <div className="cases-tier-row">
-                                {(['low', 'mid', 'high']).map(t => (
+                                {TIER_ORDER.map(t => (
                                     <button key={t} className={`cases-tier-chip ${tier === t ? 'active' : ''}`} disabled={running} onClick={() => setTier(t)}>
                                         {TIER_LABEL[t]} · {tierCounts[t] || 0}
                                     </button>
@@ -727,7 +762,7 @@ export default function CasesGame() {
                                 {renderRarityFilter()}
                             </div>
                             {filteredDrops.length === 0 ? (
-                                <p className="cases-empty">{collection.drops.length === 0 ? 'No drops yet. Open a case to start filling the pokedex.' : 'No drops match those filters.'}</p>
+                                <p className="cases-empty">{collection.drops.length === 0 ? 'No drops yet. Open a case to start filling the collection.' : 'No drops match those filters.'}</p>
                             ) : (
                                 <ul className="cases-history-list">
                                     {filteredDrops.map((d, i) => (
@@ -753,7 +788,7 @@ export default function CasesGame() {
                     {view === 'pokedex' && (
                         <div className="cases-pokedex">
                             <header className="cases-history-head">
-                                <strong>Pokedex</strong>
+                                <strong>Collection</strong>
                                 <small>
                                     {filteredPokedex.length} of {pokedexList.length} variants shown
                                     {csCatalog.loaded && ` · ${collection.summary.uniqueVariants} unique discovered of ${csCatalog.catalog.totalSkins} skins (${collection.summary.completionPct}%)`}
@@ -775,9 +810,17 @@ export default function CasesGame() {
                                     <option value="wear">Sort: Lowest float</option>
                                     <option value="name">Sort: Name</option>
                                 </select>
+                                <label className="cases-locked-toggle">
+                                    <input
+                                        type="checkbox"
+                                        checked={showLocked}
+                                        onChange={e => setShowLocked(e.target.checked)}
+                                    />
+                                    <span>Show locked</span>
+                                </label>
                             </div>
-                            {filteredPokedex.length === 0 ? (
-                                <p className="cases-empty">{pokedexList.length === 0 ? 'Pokedex empty. Open cases to discover skins.' : 'No variants match those filters.'}</p>
+                            {filteredPokedex.length === 0 && lockedSkins.length === 0 ? (
+                                <p className="cases-empty">{pokedexList.length === 0 ? 'Collection empty. Open cases to discover skins.' : 'No variants match those filters.'}</p>
                             ) : (
                                 <div className="cases-collection-grid">
                                     {filteredPokedex.map(skin => (
@@ -798,6 +841,23 @@ export default function CasesGame() {
                                                 <strong>×{(skin.multiplier || 0).toFixed(2)}</strong>
                                             </span>
                                             <i className="cases-skin-count">×{skin.count}</i>
+                                        </div>
+                                    ))}
+                                    {showLocked && lockedSkins.map(skin => (
+                                        <div
+                                            key={skin.key}
+                                            className="cases-skin-card cases-skin-locked"
+                                            style={{ '--rarity': skin.color }}
+                                            title={`${skin.name} · locked · ${skin.rarity}`}
+                                            aria-label={`Locked skin ${skin.name}`}
+                                        >
+                                            <img src={skin.image} alt={skin.name} loading="lazy" />
+                                            <small className="cases-locked-name">{skin.name}</small>
+                                            <span className="cases-skin-meta">
+                                                <em>{skin.rarity}</em>
+                                                <strong>locked</strong>
+                                            </span>
+                                            <i className="cases-skin-locked-icon" aria-hidden>🔒</i>
                                         </div>
                                     ))}
                                 </div>
