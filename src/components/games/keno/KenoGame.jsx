@@ -34,11 +34,13 @@ import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreload
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './keno.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const DRAW_INTERVAL_MS = 220
 const DRAW_DELAY_MS = 200
 
 export default function KenoGame() {
+    useGameBgm('keno', 'idle')
     const definition = findGameDefinition('keno')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

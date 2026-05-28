@@ -33,6 +33,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './tomeoflife.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const REVEAL_DELAY_MS = 380
 const PAGE_COUNT = 3
@@ -59,6 +60,7 @@ function pickSymbol() {
 }
 
 export default function TomeOfLifeGame() {
+    useGameBgm('tomeoflife', 'idle')
     const definition = findGameDefinition('tomeoflife') || { name: 'Tome of Life', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

@@ -34,11 +34,13 @@ import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreload
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './limbo.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const RAMP_DURATION_MS = 720
 const RAMP_TICKS = 8
 
 export default function LimboGame() {
+    useGameBgm('limbo', 'idle')
     const definition = findGameDefinition('limbo')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

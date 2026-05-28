@@ -26,6 +26,7 @@ import { Particles } from '../../fx'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './war.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 const SUITS = ['S', 'H', 'D', 'C']
@@ -46,6 +47,7 @@ function buildShuffledShoe() {
 }
 
 export default function CasinoWarGame() {
+    useGameBgm('war', 'idle')
     const definition = findGameDefinition('war')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

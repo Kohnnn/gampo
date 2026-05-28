@@ -31,6 +31,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './tarot.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const REVEAL_DELAY_MS = 360
 const REVEAL_STAGGER_MS = 240
@@ -86,6 +87,7 @@ function contributionFor(card, pickedSuit) {
 }
 
 export default function TarotGame() {
+    useGameBgm('tarot', 'idle')
     const definition = findGameDefinition('tarot') || { name: 'Tarot', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

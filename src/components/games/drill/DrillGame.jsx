@@ -42,6 +42,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './drill.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 // 8-layer shaft. Multipliers are baked at design time so the layer
 // labels and rewards are stable. Bust chance climbs roughly linearly,
@@ -59,6 +60,7 @@ const LAYERS = [
 ]
 
 export default function DrillGame() {
+    useGameBgm('drill', 'idle')
     const definition = findGameDefinition('drill') || { name: 'Drill', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

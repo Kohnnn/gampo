@@ -25,6 +25,7 @@ import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreload
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './tower.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const PRESETS = {
     easy: { safe: 0.85, growth: 1.18, label: 'Easy' },
@@ -35,6 +36,7 @@ const PRESETS = {
 const HEIGHT = 8
 
 export default function TowerGame() {
+    useGameBgm('tower', 'idle')
     const definition = findGameDefinition('tower')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

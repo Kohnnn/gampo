@@ -8,10 +8,12 @@ import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, 
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './lottery.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const TABLE = [0, 0, 1, 8, 120, 5000]
 
 export default function LotteryGame() {
+    useGameBgm('lottery', 'idle')
     const definition = findGameDefinition('lottery')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

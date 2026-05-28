@@ -8,6 +8,7 @@ import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, 
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './color.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const COLORS = [
     { id: 'red', label: 'Red', color: '#e23d4f' },
@@ -17,6 +18,7 @@ const COLORS = [
 ]
 
 export default function ColorGame() {
+    useGameBgm('color', 'idle')
     const definition = findGameDefinition('color')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

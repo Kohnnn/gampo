@@ -8,11 +8,13 @@ import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, 
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './coinflip.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const HEAD = '/assets/games/coin/coin-heads.png'
 const TAIL = '/assets/games/coin/coin-tails.png'
 
 export default function CoinFlipGame() {
+    useGameBgm('coinflip', 'idle')
     const definition = findGameDefinition('coinflip')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

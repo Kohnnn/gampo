@@ -18,6 +18,7 @@ import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import DinoEngine from './engine/DinoEngine'
 import './dino.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const PRESETS = {
     easy:    { safe: 0.86, growth: 1.18, label: 'Easy',    speed: 240 },
@@ -27,6 +28,7 @@ const PRESETS = {
 }
 
 export default function DinoGame() {
+    useGameBgm('dino', 'idle')
     const definition = findGameDefinition('dino') || { name: 'Dino', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

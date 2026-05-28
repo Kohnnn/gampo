@@ -28,6 +28,7 @@ import '../../ui/card-face.css'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './hilo.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 // Wave 2 retrofit. Hilo now uses the shared CardFace primitive and the
 // round event machine. Stake guide section 7: deal 220-320ms travel,
@@ -43,6 +44,7 @@ function pickSuit(rng) {
 }
 
 export default function HiloGame() {
+    useGameBgm('hilo', 'idle')
     const definition = findGameDefinition('hilo')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

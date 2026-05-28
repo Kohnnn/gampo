@@ -33,6 +33,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './moles.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const GRID = 9
 const REVEAL_MS = 580
@@ -64,6 +65,7 @@ function placeMoles(count) {
 }
 
 export default function MolesGame() {
+    useGameBgm('moles', 'idle')
     const definition = findGameDefinition('moles') || { name: 'Moles', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

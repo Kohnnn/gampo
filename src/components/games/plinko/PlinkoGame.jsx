@@ -34,6 +34,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './plinko.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 // Engine and outcomes table are imported lazily so the ~16MB outcomes module
 // is split into its own chunk (only loaded on /plinko).
@@ -72,6 +73,7 @@ function expectedReturn(payouts) {
 }
 
 export default function PlinkoGame() {
+    useGameBgm('plinko', 'idle')
     const definition = findGameDefinition('plinko') || { name: 'Plinko', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

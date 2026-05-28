@@ -8,6 +8,7 @@ import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, 
 import { BOARD_NUMBERS, WHEEL_ORDER, colorOf, makeBet } from './layout'
 import EducationPanel from '../../EducationPanel'
 import './roulette.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const CHIP_VALUES = [1, 5, 25, 100, 500]
 const SIM_NAMES = ['Kira', 'Reno', 'Mika', 'Jules', 'Vex', 'Nia', 'Sable', 'Ozzy', 'Tess', 'Rune']
@@ -40,6 +41,7 @@ function bestBetForCell(numbers, amount, type, params) {
 }
 
 export default function RouletteGame() {
+    useGameBgm('roulette', 'idle')
     const definition = findGameDefinition('roulette')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

@@ -25,6 +25,7 @@ import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreload
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './chickencross.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const PRESETS = {
     easy: { safe: 0.85, growth: 1.18, label: 'Easy' },
@@ -34,6 +35,7 @@ const PRESETS = {
 const LANES = 12
 
 export default function ChickenCrossGame() {
+    useGameBgm('chickencross', 'idle')
     const definition = findGameDefinition('chickencross')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

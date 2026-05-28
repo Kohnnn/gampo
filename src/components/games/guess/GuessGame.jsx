@@ -8,8 +8,10 @@ import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, 
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './guess.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 export default function GuessGame() {
+    useGameBgm('guess', 'idle')
     const definition = findGameDefinition('guess')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

@@ -31,6 +31,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import './darts.css'
+import { useGameBgm } from '../../../audio/useBgm'
 
 const THROW_MS = 720
 const SECTOR_COUNT = 12
@@ -57,6 +58,7 @@ function sampleHit({ sector }) {
 }
 
 export default function DartsGame() {
+    useGameBgm('darts', 'idle')
     const definition = findGameDefinition('darts') || { name: 'Darts', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()

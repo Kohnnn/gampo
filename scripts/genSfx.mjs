@@ -17,6 +17,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { renderForSkin, SKIN_ARCHETYPE, renderForGame, GAME_ARCHETYPE } from './bgmEngine.mjs'
 
 const SR = 44100
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -327,204 +328,31 @@ function bgmLoop({ durMs = 8000, melody, bass, type = 'square', tempoBpm = 92 })
     return out
 }
 
-const BGM = {
-    // Common skin families with simple tritone-friendly motifs.
-    'bgm/classic/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 96,
-        melody: [523, 0, 659, 0, 784, 0, 659, 0, 523, 587, 659, 587, 523, 0, 392, 0],
-        bass:   [262, 196, 220, 247],
-    }),
-    'bgm/mythic/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 88,
-        melody: [440, 0, 523, 0, 659, 0, 523, 0, 440, 0, 392, 0, 349, 392, 440, 0],
-        bass:   [220, 175, 196, 220],
-    }),
-    'bgm/cyber/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 110,
-        melody: [659, 0, 784, 0, 659, 0, 587, 0, 523, 587, 659, 784, 880, 0, 784, 0],
-        bass:   [262, 294, 330, 294],
-    }),
-    'bgm/wanted/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 84,
-        melody: [330, 0, 440, 0, 392, 0, 330, 0, 294, 330, 392, 440, 392, 0, 330, 0],
-        bass:   [165, 220, 196, 165],
-    }),
-    'bgm/olympus/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 78,
-        melody: [392, 0, 523, 0, 587, 659, 587, 523, 440, 0, 392, 0, 330, 0, 392, 0],
-        bass:   [196, 220, 247, 220],
-    }),
-    'bgm/bayou/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 100,
-        melody: [392, 440, 494, 523, 494, 440, 392, 0, 392, 440, 494, 523, 587, 523, 494, 0],
-        bass:   [196, 220, 247, 220],
-    }),
-    'bgm/mummy/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 80,
-        melody: [330, 392, 440, 392, 330, 0, 277, 330, 370, 415, 392, 0, 330, 0, 277, 0],
-        bass:   [165, 220, 185, 165],
-    }),
-    'bgm/phoenix/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 104,
-        melody: [523, 587, 659, 784, 880, 784, 659, 523, 587, 659, 784, 880, 1046, 880, 784, 0],
-        bass:   [262, 330, 392, 262],
-    }),
-    'bgm/mansion/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 76,
-        melody: [277, 330, 370, 415, 370, 330, 277, 0, 247, 277, 330, 370, 415, 370, 330, 0],
-        bass:   [138, 175, 185, 165],
-    }),
-    'bgm/ronin/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 90,
-        melody: [440, 523, 587, 659, 587, 523, 440, 0, 392, 440, 523, 587, 659, 587, 523, 0],
-        bass:   [220, 247, 196, 220],
-    }),
-    'bgm/iron/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 110,
-        melody: [220, 277, 330, 277, 220, 0, 196, 220, 277, 330, 392, 330, 277, 0, 220, 0],
-        bass:   [110, 165, 220, 165],
-    }),
-    'bgm/coop/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 108,
-        melody: [523, 587, 659, 784, 659, 587, 523, 0, 587, 659, 784, 880, 784, 659, 587, 0],
-        bass:   [262, 294, 330, 262],
-    }),
-    'bgm/spirit/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 84,
-        melody: [392, 440, 494, 523, 494, 440, 392, 0, 330, 392, 440, 494, 523, 494, 440, 0],
-        bass:   [196, 220, 247, 196],
-    }),
-    'bgm/forge/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 96,
-        melody: [330, 392, 440, 494, 440, 392, 330, 0, 277, 330, 392, 440, 494, 440, 392, 0],
-        bass:   [165, 196, 220, 247],
-    }),
-    'bgm/gummy/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 120,
-        melody: [659, 784, 880, 988, 880, 784, 659, 0, 587, 659, 784, 880, 988, 880, 784, 0],
-        bass:   [330, 392, 440, 330],
-    }),
-    'bgm/bank/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 92,
-        melody: [523, 0, 659, 0, 784, 0, 659, 0, 523, 587, 659, 587, 523, 0, 392, 0],
-        bass:   [262, 196, 220, 247],
-    }),
-    'bgm/catcher/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 96,
-        melody: [392, 440, 523, 440, 392, 0, 349, 392, 440, 523, 587, 523, 440, 0, 392, 0],
-        bass:   [196, 247, 220, 196],
-    }),
-    'bgm/western/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 86,
-        melody: [330, 392, 440, 392, 330, 0, 277, 330, 392, 440, 494, 440, 392, 0, 330, 0],
-        bass:   [165, 220, 247, 196],
-    }),
-    'bgm/rock/idle.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 132,
-        melody: [330, 0, 440, 0, 523, 0, 440, 0, 330, 0, 440, 0, 587, 0, 523, 0],
-        bass:   [165, 220, 247, 220],
-    }),
-}
+// Wave 34: themed BGM via the bgmEngine archetype renderer.
+// Each entry below renders one mode (idle | bonus) for one skin family.
+// The renderer ships marimba / brass / saw-pad / 8-bit / synth voices so
+// loops sound theme-specific instead of all chiptune.
 
-// Wave 32 follow-up: bonus loops. Higher tempo, brighter motifs so the
-// bonus mode reads "feature is live". Same skin families as idle.
-const BGM_BONUS = {
-    'bgm/classic/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 124,
-        melody: [659, 784, 880, 988, 880, 784, 659, 587, 659, 784, 988, 1175, 988, 784, 659, 0],
-        bass:   [330, 392, 440, 330],
-    }),
-    'bgm/mythic/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 116,
-        melody: [523, 659, 784, 880, 784, 659, 523, 0, 587, 659, 784, 988, 880, 784, 659, 0],
-        bass:   [262, 330, 392, 262],
-    }),
-    'bgm/cyber/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 138,
-        melody: [659, 988, 1175, 1318, 1175, 988, 784, 659, 988, 1175, 1318, 1568, 1318, 1175, 988, 0],
-        bass:   [262, 392, 523, 392],
-    }),
-    'bgm/wanted/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 110,
-        melody: [330, 392, 440, 523, 587, 523, 440, 392, 330, 440, 523, 659, 587, 523, 440, 0],
-        bass:   [165, 220, 196, 165],
-    }),
-    'bgm/olympus/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 100,
-        melody: [523, 659, 784, 880, 784, 659, 523, 0, 587, 784, 880, 1046, 880, 784, 659, 0],
-        bass:   [262, 392, 330, 262],
-    }),
-    'bgm/bayou/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 124,
-        melody: [392, 494, 587, 659, 587, 494, 392, 0, 440, 523, 659, 784, 659, 523, 440, 0],
-        bass:   [196, 247, 294, 247],
-    }),
-    'bgm/mummy/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 104,
-        melody: [330, 415, 466, 523, 466, 415, 330, 0, 277, 330, 392, 466, 523, 466, 415, 0],
-        bass:   [165, 220, 196, 165],
-    }),
-    'bgm/phoenix/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 132,
-        melody: [659, 784, 988, 1175, 988, 784, 659, 0, 784, 988, 1175, 1318, 1568, 1318, 988, 0],
-        bass:   [330, 440, 523, 330],
-    }),
-    'bgm/mansion/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 96,
-        melody: [277, 330, 392, 466, 415, 392, 330, 0, 247, 330, 392, 466, 523, 466, 392, 0],
-        bass:   [165, 220, 196, 165],
-    }),
-    'bgm/ronin/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 116,
-        melody: [440, 587, 659, 784, 880, 784, 659, 587, 440, 659, 784, 988, 880, 784, 659, 0],
-        bass:   [220, 294, 330, 220],
-    }),
-    'bgm/iron/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 140,
-        melody: [220, 277, 330, 415, 466, 415, 330, 277, 220, 330, 392, 466, 523, 466, 392, 0],
-        bass:   [110, 165, 220, 165],
-    }),
-    'bgm/coop/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 132,
-        melody: [659, 784, 880, 988, 880, 784, 659, 0, 784, 880, 988, 1175, 988, 880, 784, 0],
-        bass:   [330, 440, 392, 330],
-    }),
-    'bgm/spirit/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 108,
-        melody: [440, 523, 587, 659, 784, 659, 587, 0, 440, 523, 659, 784, 880, 784, 659, 0],
-        bass:   [220, 294, 330, 220],
-    }),
-    'bgm/forge/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 120,
-        melody: [330, 392, 466, 523, 587, 523, 466, 0, 392, 466, 523, 659, 587, 523, 466, 0],
-        bass:   [165, 220, 247, 220],
-    }),
-    'bgm/gummy/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 144,
-        melody: [784, 880, 988, 1175, 988, 880, 784, 0, 988, 1175, 1318, 1568, 1318, 1175, 988, 0],
-        bass:   [392, 440, 523, 392],
-    }),
-    'bgm/bank/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 116,
-        melody: [659, 784, 880, 988, 880, 784, 659, 0, 587, 659, 784, 880, 988, 880, 784, 0],
-        bass:   [330, 392, 440, 330],
-    }),
-    'bgm/catcher/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 122,
-        melody: [392, 523, 587, 659, 784, 659, 587, 0, 440, 523, 659, 784, 880, 784, 659, 0],
-        bass:   [196, 262, 330, 220],
-    }),
-    'bgm/western/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 108,
-        melody: [330, 440, 494, 523, 587, 523, 494, 0, 277, 330, 392, 466, 523, 466, 415, 0],
-        bass:   [165, 220, 247, 196],
-    }),
-    'bgm/rock/bonus.wav': () => bgmLoop({
-        durMs: 8000, tempoBpm: 156,
-        melody: [330, 440, 587, 659, 784, 659, 587, 440, 330, 440, 587, 784, 988, 784, 587, 0],
-        bass:   [165, 220, 247, 220],
-    }),
-}
+const BGM_FAMILIES = Object.keys(SKIN_ARCHETYPE)
+
+const BGM = Object.fromEntries(
+    BGM_FAMILIES.map(skin => [`bgm/${skin}/idle.wav`, () => renderForSkin(skin, 'idle', 8000)])
+)
+
+const BGM_BONUS = Object.fromEntries(
+    BGM_FAMILIES.map(skin => [`bgm/${skin}/bonus.wav`, () => renderForSkin(skin, 'bonus', 8000)])
+)
+
+// Wave 35: per-game BGM keyed by route id. Renders both idle + tense
+// modes; tense plays during high-stakes moments (cashout climb, etc.)
+// when the game opts in to swap modes.
+const GAME_KEYS = Object.keys(GAME_ARCHETYPE)
+const BGM_GAMES = Object.fromEntries(
+    GAME_KEYS.map(g => [`bgm/games/${g}/idle.wav`, () => renderForGame(g, 'idle', 8000)])
+)
+const BGM_GAMES_BONUS = Object.fromEntries(
+    GAME_KEYS.map(g => [`bgm/games/${g}/bonus.wav`, () => renderForGame(g, 'bonus', 8000)])
+)
 
 // ---- main ----
 
@@ -553,6 +381,12 @@ async function main() {
             tasks.push(writeOne(rel, gen()))
         }
         for (const [rel, gen] of Object.entries(BGM_BONUS)) {
+            tasks.push(writeOne(rel, gen()))
+        }
+        for (const [rel, gen] of Object.entries(BGM_GAMES)) {
+            tasks.push(writeOne(rel, gen()))
+        }
+        for (const [rel, gen] of Object.entries(BGM_GAMES_BONUS)) {
             tasks.push(writeOne(rel, gen()))
         }
     }
