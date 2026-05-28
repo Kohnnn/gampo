@@ -204,6 +204,50 @@ export const ARCHETYPES = {
 
 // ---- render ----
 
+// Wave 42: convolution-style soft reverb tail. Convolves the rendered
+// buffer with a short noise impulse-response so loops feel like they
+// have a room behind them instead of arcade-dry chiptune.
+function softReverb(buf, mix = 0.18, tailMs = 220) {
+    const tail = Math.floor(SR * (tailMs / 1000))
+    const ir = new Float32Array(tail)
+    let energy = 0
+    for (let i = 0; i < tail; i += 1) {
+        const decay = Math.exp(-i / tail * 4)
+        ir[i] = (Math.random() * 2 - 1) * decay
+        energy += ir[i] * ir[i]
+    }
+    // Normalise IR.
+    const norm = energy > 0 ? 1 / Math.sqrt(energy) : 0
+    for (let i = 0; i < tail; i += 1) ir[i] *= norm
+    // Sparse convolution — only every 4th IR sample to keep it cheap.
+    const out = new Float32Array(buf.length)
+    const stride = 4
+    for (let i = 0; i < buf.length; i += 1) {
+        let sum = buf[i]
+        for (let k = stride; k < tail && k < i; k += stride) {
+            sum += buf[i - k] * ir[k] * mix
+        }
+        out[i] = sum
+    }
+    return out
+}
+
+// Major and minor chord intervals (root, third, fifth) in semitones.
+function chordIntervals(quality) {
+    if (quality === 'maj') return [0, 4, 7]
+    if (quality === 'min') return [0, 3, 7]
+    if (quality === 'sus2') return [0, 2, 7]
+    if (quality === 'sus4') return [0, 5, 7]
+    if (quality === 'maj7') return [0, 4, 7, 11]
+    if (quality === 'min7') return [0, 3, 7, 10]
+    if (quality === 'dom7') return [0, 4, 7, 10]
+    return [0, 4, 7]
+}
+
+function transposeFreq(f, semitones) {
+    return f * Math.pow(2, semitones / 12)
+}
+
 function renderTrack(archetypeName, mode = 'idle', durMs = 8000) {
     const arch = ARCHETYPES[archetypeName]
     if (!arch) throw new Error(`unknown archetype ${archetypeName}`)
@@ -221,6 +265,11 @@ function renderTrack(archetypeName, mode = 'idle', durMs = 8000) {
     const drumPattern = arch.drumPattern || '0000000000000000'
     const kickPattern = arch.kickPattern || '0000000000000000'
     const snarePattern = arch.snarePattern || '0000000000000000'
+    // Wave 42: chord progression derived from the bass line. Default to a
+    // major-pad chord on each bass beat unless arch.chordQualities was
+    // specified.
+    const chordQualities = arch.chordQualities
+        || (arch.melodyVoice.toString().includes('detunedSaws') ? ['min', 'maj', 'maj', 'min'] : ['maj', 'maj', 'min', 'maj'])
 
     for (let i = 0; i < totalSamples; i += 1) {
         const t = i / SR
@@ -245,6 +294,28 @@ function renderTrack(archetypeName, mode = 'idle', durMs = 8000) {
         const bassPhase = (eighthIdx % 2 === 0) ? eighthPhase : 1 + eighthPhase
         const bassPhaseN = bassPhase / 2
         if (bassF) v += arch.bassVoice(t, bassF, bassPhaseN)
+
+        // Wave 42: layered chord pad on every bass beat. Played 1 octave
+        // above bass for body without muddying the low end. ~0.18 amplitude.
+        if (bassF) {
+            const quality = chordQualities[beatIdx % chordQualities.length]
+            const intervals = chordIntervals(quality)
+            const padPhase = (eighthIdx % 4) / 4 + eighthPhase / 4
+            for (const semi of intervals) {
+                const f = transposeFreq(bassF * 2, semi)
+                v += osc(t, f, 'triangle') * padEnv(padPhase) * 0.06
+            }
+        }
+
+        // Wave 42: arpeggio sparkle layer — uses melody chord intervals at
+        // 16th-note rate over the bass note for a "Stake-style" sparkle.
+        if (mode === 'bonus' && bassF) {
+            const sixteenthIdx = Math.floor(phaseInLoop * arch.beatsPerLoop * 2)
+            const intervals = chordIntervals(chordQualities[beatIdx % chordQualities.length])
+            const semi = intervals[sixteenthIdx % intervals.length]
+            const f = transposeFreq(bassF * 4, semi)
+            v += osc(t, f, 'sine') * Math.exp(-eighthPhase * 9) * 0.12
+        }
 
         // hat / shaker
         if (drumPattern[eighthIdx] === '1') {
@@ -271,7 +342,19 @@ function renderTrack(archetypeName, mode = 'idle', durMs = 8000) {
         buf[totalSamples - 1 - i] *= k
     }
 
-    return buf
+    // Wave 42: soft reverb tail + headroom limiter so the richer mix
+    // doesn't clip after layering pad + arpeggio.
+    const reverbed = softReverb(buf, mode === 'bonus' ? 0.22 : 0.16, 240)
+    let peak = 0
+    for (let i = 0; i < reverbed.length; i += 1) {
+        const a = Math.abs(reverbed[i])
+        if (a > peak) peak = a
+    }
+    if (peak > 0.94) {
+        const k = 0.94 / peak
+        for (let i = 0; i < reverbed.length; i += 1) reverbed[i] *= k
+    }
+    return reverbed
 }
 
 // ---- skin → archetype map ----

@@ -155,7 +155,9 @@ function decodePng(buf) {
 
 // ---- background detection + alpha stripping ----
 
-// Sample the dominant background color from the outer 4 % rim.
+// Sample the dominant background color from the outer 4 % rim using
+// a 2-cluster k-means so noisy/textured corners still resolve a useful
+// background centroid.
 function sampleBackground(img) {
     const { width, height, rgba } = img
     const samples = []
@@ -179,17 +181,53 @@ function sampleBackground(img) {
         for (let y = rim; y < height - rim; y += 4) pushPx(x, y)
     }
     if (samples.length === 0) return null
-    // Coarse k=1 mean (background is usually uniform on these atlases).
-    let r = 0, g = 0, b = 0
-    for (const [sr, sg, sb] of samples) { r += sr; g += sg; b += sb }
-    r = Math.round(r / samples.length)
-    g = Math.round(g / samples.length)
-    b = Math.round(b / samples.length)
-    // Variance check — if rim is high-variance the AI used a textured backdrop;
-    // we skip strip in that case.
+
+    // 2-means cluster on the rim samples. Initialise with darkest +
+    // brightest sample so we separate background plate from any glyph
+    // edge that bleeds into the rim.
+    let darkSeed = samples[0]
+    let lightSeed = samples[0]
+    let darkLum = 999
+    let lightLum = -1
+    for (const [sr, sg, sb] of samples) {
+        const lum = 0.30 * sr + 0.59 * sg + 0.11 * sb
+        if (lum < darkLum) { darkLum = lum; darkSeed = [sr, sg, sb] }
+        if (lum > lightLum) { lightLum = lum; lightSeed = [sr, sg, sb] }
+    }
+    let c0 = darkSeed.slice()
+    let c1 = lightSeed.slice()
+    for (let iter = 0; iter < 6; iter += 1) {
+        const a = [0, 0, 0, 0]
+        const b = [0, 0, 0, 0]
+        for (const [sr, sg, sb] of samples) {
+            const da = (sr - c0[0]) ** 2 + (sg - c0[1]) ** 2 + (sb - c0[2]) ** 2
+            const db = (sr - c1[0]) ** 2 + (sg - c1[1]) ** 2 + (sb - c1[2]) ** 2
+            const tgt = da <= db ? a : b
+            tgt[0] += sr; tgt[1] += sg; tgt[2] += sb; tgt[3] += 1
+        }
+        if (a[3] > 0) c0 = [a[0] / a[3], a[1] / a[3], a[2] / a[3]]
+        if (b[3] > 0) c1 = [b[0] / b[3], b[1] / b[3], b[2] / b[3]]
+    }
+    // Pick the centroid that contains the LARGER share of rim pixels.
+    let aCount = 0, bCount = 0
+    for (const [sr, sg, sb] of samples) {
+        const da = (sr - c0[0]) ** 2 + (sg - c0[1]) ** 2 + (sb - c0[2]) ** 2
+        const db = (sr - c1[0]) ** 2 + (sg - c1[1]) ** 2 + (sb - c1[2]) ** 2
+        if (da <= db) aCount += 1
+        else bCount += 1
+    }
+    const dominant = aCount >= bCount ? c0 : c1
+    const r = Math.round(dominant[0])
+    const g = Math.round(dominant[1])
+    const b = Math.round(dominant[2])
+
+    // Variance from the dominant centroid only (not from the mean).
     let varSum = 0
     for (const [sr, sg, sb] of samples) {
-        varSum += (sr - r) ** 2 + (sg - g) ** 2 + (sb - b) ** 2
+        const da = (sr - c0[0]) ** 2 + (sg - c0[1]) ** 2 + (sb - c0[2]) ** 2
+        const db = (sr - c1[0]) ** 2 + (sg - c1[1]) ** 2 + (sb - c1[2]) ** 2
+        const dist = Math.min(da, db)
+        varSum += dist
     }
     const variance = varSum / samples.length
     return { r, g, b, variance }
@@ -336,15 +374,19 @@ async function main() {
         const img = decodePng(orig)
         const bg = sampleBackground(img)
         if (!bg) { processed += 1; continue }
-        // Variance > 1200 means edges are textured → skip strip (gummy/phoenix);
-        // those atlases get no transparency post-processing.
-        if (bg.variance > 1200) {
+        // Wave 39: bumped variance ceiling to 9000 (was 1200) — k-means now
+        // resolves a centroid even on noisy backgrounds. Anything above
+        // 9000 means the rim itself is multi-toned and stripping would
+        // mash the artwork.
+        if (bg.variance > 9000) {
             skippedTextured += 1
             // eslint-disable-next-line no-console
             console.log(`  skip textured ${file} variance=${bg.variance.toFixed(0)}`)
             continue
         }
-        const stripped = stripBackground(img, bg, 30)
+        // Adaptive threshold: noisier backgrounds need a wider tolerance.
+        const threshold = Math.min(60, Math.max(28, Math.round(Math.sqrt(bg.variance) * 0.55)))
+        const stripped = stripBackground(img, bg, threshold)
         // If we stripped < 5 % we probably got a non-uniform background; abort.
         if (!stripped.ratio || stripped.ratio < 0.05) {
             // eslint-disable-next-line no-console
@@ -357,7 +399,7 @@ async function main() {
         await safeWrite(fp, out)
         processed += 1
         // eslint-disable-next-line no-console
-        console.log(`  ok ${file} ${img.width}x${img.height} → ${final.width}x${final.height} (stripped ${(stripped.ratio * 100).toFixed(0)}%)`)
+        console.log(`  ok ${file} ${img.width}x${img.height} → ${final.width}x${final.height} (stripped ${(stripped.ratio * 100).toFixed(0)}% th=${threshold})`)
     }
     // eslint-disable-next-line no-console
     console.log(`[stripSlotRankBg] processed=${processed} skippedTextured=${skippedTextured}`)
