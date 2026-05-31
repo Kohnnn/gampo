@@ -268,10 +268,44 @@
 .bac-road-cell.player { border-color: #1475e1; }
 .bac-road-cell.tie { background: #ffcf5a; border-color: #b07a16; }
 
+.bac-road-cell.has-tie {
+    position: relative;
+}
+
+.bac-road-cell.has-tie::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -2px;
+    width: 2px;
+    height: 20px;
+    border-radius: 999px;
+    background: #14a050;
+    transform: translateX(-50%) rotate(45deg);
+    box-shadow: 0 0 4px rgba(20, 160, 80, 0.65);
+}
+
+.bac-road-cell.latest {
+    position: relative;
+    box-shadow: 0 0 0 2px rgba(20, 160, 80, 0.45), 0 0 12px rgba(20, 160, 80, 0.48);
+    animation: bacLatestPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes bacLatestPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+}
+
 .bac-road-cell.dot-banker { background: #9f252a; }
 .bac-road-cell.dot-player { background: #1475e1; }
 .bac-road-cell.dot-red { background: #ed4245; }
 .bac-road-cell.dot-blue { background: #1475e1; }
+
+@media (prefers-reduced-motion: reduce) {
+    .bac-road-cell.latest { animation: none; }
+}
+
+.gampo-reduce-motion .bac-road-cell.latest { animation: none; }
 
 @media (max-width: 860px) {
     .bac-bets {

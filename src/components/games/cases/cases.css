@@ -1052,7 +1052,7 @@
     display: none;
 }
 .cases-stage.has-result .cases-rows {
-    display: none;
+    max-height: 250px;
 }
 .cases-stage.has-result .cases-result-row {
     min-height: 136px;
@@ -1200,6 +1200,49 @@
 .cases-result-profit.pos { color: var(--accent-green, #00e701); }
 .cases-result-profit.neg { color: var(--accent-red, #ed4245); }
 
+.cases-results-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cases-round-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.cases-round-summary span {
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(0, 0, 0, 0.34);
+}
+
+.cases-round-summary small {
+    display: block;
+    color: var(--text-muted, #6f7a8d);
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.cases-round-summary strong {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-primary, #fff);
+    font-size: 14px;
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cases-round-summary .pos strong { color: var(--accent-green, #00e701); }
+.cases-round-summary .neg strong { color: var(--accent-red, #ed4245); }
+
 .cases-collection-summary {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1291,6 +1334,65 @@
 }
 
 @media (max-width: 480px) {
+    .game-shell:has(.cases-stage-frame) .gs-panel {
+        order: 1;
+    }
+
+    .game-shell:has(.cases-stage-frame) .gs-playfield {
+        order: 2;
+    }
+
+    .game-shell:has(.cases-stage-frame) .gs-aside {
+        order: 3;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-panel {
+        gap: 7px;
+        padding: 10px;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-panel > * {
+        order: 4;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-panel > .bp-section:first-of-type {
+        order: 1;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-play[data-game-action="case-open"] {
+        order: 2;
+        position: static;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-panel > .bp-section:nth-of-type(2) {
+        order: 3;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-tabs,
+    .game-shell:has(.cases-stage-frame) .cases-collection-panel {
+        display: none;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-hint {
+        display: none;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-section {
+        gap: 6px;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-bet-input,
+    .game-shell:has(.cases-stage-frame) .bp-bet-btn {
+        height: 34px;
+    }
+
+    .game-shell:has(.cases-stage-frame) .bp-play {
+        min-height: 46px;
+        height: 46px;
+        flex-basis: 46px;
+        margin-top: 2px;
+    }
+
     .cases-room-summary {
         grid-template-columns: 1fr;
     }
@@ -1348,6 +1450,10 @@
         height: 28px;
     }
     .cases-collection-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cases-round-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 

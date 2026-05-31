@@ -67,42 +67,41 @@
     position: relative;
     width: 100%;
     aspect-ratio: 9 / 14;
-    min-height: 212px;
-    border-radius: 14px;
-    border: 1px solid color-mix(in srgb, var(--rarity, #b478ff), transparent 25%);
+    min-height: 238px;
+    border-radius: 12px;
+    border: 2px solid color-mix(in srgb, var(--rarity, #b478ff), transparent 18%);
     color: #fff;
-    background: rgba(0, 0, 0, 0.22);
+    background:
+        radial-gradient(circle at 50% 12%, color-mix(in srgb, var(--rarity, #b478ff), transparent 76%), transparent 42%),
+        rgba(0, 0, 0, 0.38);
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.42);
     overflow: hidden;
-    transition: transform 220ms cubic-bezier(0.18, 0.89, 0.32, 1.15), box-shadow 220ms;
-    animation: tarotDeal 0.34s ease both;
+    transition: transform 260ms cubic-bezier(0.18, 0.89, 0.32, 1.15), box-shadow 260ms;
+    animation: tarotFlip 0.42s cubic-bezier(0.18, 0.89, 0.32, 1.1) both;
 }
 
-.tarot-card svg {
+.tarot-card img {
     display: block;
     width: 100%;
     height: 100%;
+    object-fit: cover;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    filter: saturate(1.04) contrast(1.04);
 }
 
-.tarot-card-back-face svg rect {
-    fill: #25133e;
-    stroke: rgba(180, 120, 255, 0.66);
-    stroke-width: 3;
+.tarot-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 18%, transparent 76%, rgba(0, 0, 0, 0.22)),
+        radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.1), transparent 38%);
 }
 
-.tarot-card-back-face svg path,
-.tarot-card-back-face svg circle {
-    fill: none;
-    stroke: rgba(255, 255, 255, 0.22);
-    stroke-width: 4;
-}
-
-.tarot-card-back-face svg text {
-    fill: rgba(255, 255, 255, 0.72);
-    font-size: 28px;
-    font-weight: 950;
-    text-anchor: middle;
-    font-family: ui-serif, Georgia, serif;
+.tarot-card-back-face {
+    border-color: rgba(180, 120, 255, 0.56);
 }
 
 .tarot-card-position {
@@ -139,43 +138,50 @@
     transform: translateY(-3px);
 }
 
-.tarot-svg-index,
-.tarot-svg-suit,
-.tarot-svg-name,
-.tarot-svg-keywords,
-.tarot-svg-mult {
-    fill: #fff;
-    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-    text-anchor: middle;
+.tarot-card-title,
+.tarot-card-corner,
+.tarot-card-suit,
+.tarot-card-mult {
+    position: absolute;
+    z-index: 2;
+    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.88);
+}
+
+.tarot-card-title {
+    left: 10px;
+    right: 10px;
+    bottom: 34px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 950;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.tarot-card-corner,
+.tarot-card-suit {
+    top: 10px;
+    font-size: 12px;
     font-weight: 950;
 }
 
-.tarot-svg-index {
-    text-anchor: start;
-    font-size: 15px;
-    fill: rgba(255, 255, 255, 0.78);
-}
+.tarot-card-corner { left: 12px; color: rgba(255, 255, 255, 0.82); }
+.tarot-card-suit { right: 12px; }
 
-.tarot-svg-suit {
-    text-anchor: end;
-    font-size: 16px;
-    fill: rgba(255, 255, 255, 0.82);
-}
-
-.tarot-svg-name {
-    font-size: 12px;
-}
-
-.tarot-svg-keywords {
-    font-size: 8px;
-    letter-spacing: 0.05em;
-    fill: rgba(255, 255, 255, 0.58);
-    text-transform: uppercase;
-}
-
-.tarot-svg-mult {
-    font-size: 18px;
-    fill: var(--rarity, #b478ff);
+.tarot-card-mult {
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    min-width: 58px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.62);
+    color: var(--rarity, #b478ff);
+    font-size: 13px;
+    font-weight: 950;
+    text-align: center;
+    border: 1px solid color-mix(in srgb, var(--rarity, #b478ff), transparent 36%);
 }
 
 .tarot-card-readout {
@@ -208,9 +214,10 @@
     color: var(--rarity, #b478ff);
 }
 
-@keyframes tarotDeal {
-    from { opacity: 0; transform: translateY(16px) rotate(-2deg) scale(0.96); }
-    to { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+@keyframes tarotFlip {
+    0% { opacity: 0; transform: rotateY(84deg) translateY(16px) scale(0.96); }
+    62% { opacity: 1; transform: rotateY(-8deg) translateY(0) scale(1.02); }
+    100% { opacity: 1; transform: rotateY(0deg) translateY(0) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {

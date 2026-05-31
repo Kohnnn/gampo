@@ -3,9 +3,11 @@ import {
     CASE_PRIZE_INDEX,
     CASE_TILE_PX,
     casePhaseLabel,
+    claimCaseSettlement,
     finalPrizeOffset,
     pickCelebrationDrop,
     shouldCelebrateDrop,
+    summarizeCaseSettlement,
 } from './casesAnimation'
 
 describe('cases animation helpers', () => {
@@ -34,5 +36,27 @@ describe('cases animation helpers', () => {
             { name: 'Gold', rarity: 'Covert', multiplier: 8.8 },
         ])
         expect(drop.name).toBe('Gold')
+    })
+
+    it.each([1, 5, 10])('summarizes %i-row case settlement with every result', rows => {
+        const picks = Array.from({ length: rows }, (_, index) => ({
+            name: `Drop ${index + 1}`,
+            valueGc: 1.5 + index,
+        }))
+        const summary = summarizeCaseSettlement({ picks, stake: rows * 2, rows })
+
+        expect(summary.rows).toBe(rows)
+        expect(summary.resultCount).toBe(rows)
+        expect(summary.perRow).toHaveLength(rows)
+        expect(summary.totalReturn).toBe(picks.reduce((sum, pick) => sum + pick.valueGc, 0))
+        expect(summary.profit).toBe(summary.totalReturn - rows * 2)
+    })
+
+    it('claims case settlement exactly once for normal and skipped paths', () => {
+        const pending = { settled: false }
+
+        expect(claimCaseSettlement(pending)).toBe(true)
+        expect(claimCaseSettlement(pending)).toBe(false)
+        expect(claimCaseSettlement(null)).toBe(false)
     })
 })

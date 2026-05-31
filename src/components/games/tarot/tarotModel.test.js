@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { contributionFor, DECK, drawSpread, expectedMultiplierForSuit } from './tarotModel'
+import { contributionFor, DECK, drawSpread, expectedMultiplierForSuit, TAROT_BACK_IMAGE, tarotCardImage } from './tarotModel'
 
 describe('tarot model', () => {
     it('draws a three-card spread without replacement', () => {
@@ -17,5 +17,14 @@ describe('tarot model', () => {
     it('boosts matching card contribution over a non-matching pick', () => {
         const sun = DECK.find(card => card.id === 'sun')
         expect(contributionFor(sun, 'wands')).toBeGreaterThan(contributionFor(sun, 'cups'))
+    })
+
+    it('maps all 22 Major Arcana and the back to monochrome PNG assets', () => {
+        expect(DECK).toHaveLength(22)
+        expect(TAROT_BACK_IMAGE).toBe('/assets/tarot/monochrome/back.png')
+        DECK.forEach((card, index) => {
+            expect(card.assetIndex).toBe(index)
+            expect(tarotCardImage(card)).toBe(`/assets/tarot/monochrome/${String(index).padStart(2, '0')}.png`)
+        })
     })
 })

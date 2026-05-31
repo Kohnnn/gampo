@@ -323,3 +323,13 @@ Fourth audit (`docs/evaluationreport.md` v4) plus three user concerns — Plinko
 - Rebuilt Tarot around a 22-card generated deck model with deterministic no-replacement spread draws, normalized 96% RTP per suit, generated SVG card fronts/backs, and clearer suit EV/top-card guidance.
 - Added `tarotModel.test.js` coverage for no-replacement draws, suit EV normalization, and matching-suit contribution boosts.
 - Verification: `npm test -- --run` is green at 178 tests across 41 files; `npm run build` passes with the existing empty `phaser`/`matter` chunks and large `rows-*` chunk warnings. Browser smoke `round3-card-tables-verified` checked `/poker`, `/roulette`, `/baccarat`, `/blackjack`, and `/tarot` at 375x667, 480x800, 1024x768, and 1610x870 with no horizontal overflow, no console errors, no broken images, and key actions visible.
+
+## Card Games Fix + Tarot Asset Pass (2026-05-31)
+
+- Hardened Cases with a stable `case-open` CTA selector, phone-first CTA ordering, exactly-once settlement guard, 1/5/10-row settlement summaries, and readable landed reels/results after skip or natural settle.
+- Added Roulette coverage mapping from `makeBet(...)` so straight, outside, column/dozen, and racetrack bets mark every covered board cell, with distinct straight chips, advanced coverage badges, spin phases, ball drop motion, pocket glow, and reduced-motion fallbacks.
+- Reworked Blackjack into multi-hand state with Split, split-aces auto-stand, max four hands, double-after-split except split aces, original-hand surrender, and settlement rules for original natural blackjack vs split 21.
+- Updated Baccarat roads to tail-window the newest Big Road/derived-road outcomes, pulse latest cells, and render ties attached to the current road cell.
+- Replaced generated Tarot SVG cards with the supplied monochrome Major Arcana PNG pack under `public/assets/tarot/monochrome`, keeping the 22-card 96% RTP model and pixel-art card presentation.
+- Added targeted tests for Cases settlement summaries/guard, Roulette coverage, Blackjack split rules, Baccarat road tail/latest/tie behavior, and Tarot asset path mapping.
+- Verification: `npm test -- --run` is green at 193 tests across 44 files; `npm run build` passes with the existing empty `phaser`/`matter` chunks and large `rows-*` chunk warnings. Browser smoke `cardfix-after-final` checked `/cases`, `/roulette`, `/blackjack`, `/baccarat`, and `/tarot` at 375x667, 480x800, 1024x768, and 1610x870 with no horizontal overflow, no console errors, no broken images, and key actions visible. Interaction checks covered 5-row Cases skip, Roulette straight+advanced spin, repeated Baccarat road latest markers, Tarot PNG reveal, and Blackjack deal UI with Split visible.

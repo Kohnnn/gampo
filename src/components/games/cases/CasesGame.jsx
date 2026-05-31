@@ -55,8 +55,10 @@ import {
     CASE_REVEAL_MS,
     CASE_SETTLE_PAD_MS,
     casePhaseLabel,
+    claimCaseSettlement,
     finalPrizeOffset,
     pickCelebrationDrop,
+    summarizeCaseSettlement,
 } from './casesAnimation'
 import {
     CASE_CATEGORIES,
@@ -182,6 +184,7 @@ export default function CasesGame() {
     const [results, setResults] = useState([]) // resolved drops list (with wear/statTrak)
     const [casePhase, setCasePhase] = useState('idle') // idle | lid | spinning | finale | zoom | settling
     const [celebrationDrop, setCelebrationDrop] = useState(null)
+    const [settlementSummary, setSettlementSummary] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
@@ -284,8 +287,7 @@ export default function CasesGame() {
 
     const finishPendingRound = useCallback(({ skipped = false } = {}) => {
         const pending = pendingRoundRef.current
-        if (!pending || pending.settled) return
-        pending.settled = true
+        if (!claimCaseSettlement(pending)) return
         clearRevealTimers()
 
         const { caseData, picks, resolve, stake, tracks: pendingTracks, offsets: pendingOffsets, rows: roundRows } = pending
@@ -293,12 +295,13 @@ export default function CasesGame() {
         setTrackOffsets(pendingOffsets)
         setCasePhase('settling')
 
-        const totalValueGc = roundGc(picks.reduce((s, p) => s + (p.valueGc || 0), 0), 0)
-        const returnAmount = totalValueGc
-        const profit = roundSignedGc(returnAmount - stake, 0)
+        const settlement = summarizeCaseSettlement({ picks, stake, rows: roundRows })
+        const returnAmount = settlement.totalReturn
+        const profit = roundSignedGc(settlement.profit, 0)
         const averageMultiplier = stake > 0 ? returnAmount / stake : 0
         if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')
         setResults(picks)
+        setSettlementSummary(settlement)
 
         picks.forEach(pick => {
             collection.recordDrop(pick, {
@@ -379,6 +382,7 @@ export default function CasesGame() {
         setLastBet(unitPrice)
         setToast(null)
         setCelebrationDrop(null)
+        setSettlementSummary(null)
         setRunning(true)
         setResults([])
         setTracks([])
@@ -616,6 +620,50 @@ export default function CasesGame() {
                     onPlay={performPlay}
                     lastBet={lastBet}
                     disableAuto
+                    playButtonProps={{
+                        'data-game-action': 'case-open',
+                        'data-testid': 'case-open-cta',
+                        'aria-label': activeCase ? `Open ${rows} ${rows === 1 ? 'case row' : 'case rows'} for ${formatCredits(totalStake)}` : 'Open case loading',
+                    }}
+                    afterPlayChildren={
+                        <>
+                            <div className="bp-section cases-skip-section">
+                                <label className="bp-label">Animation</label>
+                                <button
+                                    className="cases-skip-btn"
+                                    disabled={!running || !pendingRoundRef.current}
+                                    onClick={skipCaseAnimation}
+                                    type="button"
+                                    aria-label="Skip case opening animation"
+                                >
+                                    Skip animation
+                                </button>
+                                <p className="bp-hint">Instantly settles the same practice round and keeps the drop record.</p>
+                            </div>
+                            <div className="bp-section cases-collection-panel">
+                                <label className="bp-label">Collection</label>
+                                <div className="bp-row" style={{ flexWrap: 'wrap' }}>
+                                    <span className="cases-stat-pill">
+                                        <small>Drops</small><strong>{collection.summary.totalDrops}</strong>
+                                    </span>
+                                    <span className="cases-stat-pill">
+                                        <small>Variants</small><strong>{collection.summary.uniqueVariants}</strong>
+                                    </span>
+                                    <span className="cases-stat-pill">
+                                        <small>Best</small><strong>×{collection.summary.bestMultiplier.toFixed(2)}</strong>
+                                    </span>
+                                    <span className="cases-stat-pill">
+                                        <small>Value</small><strong>{formatCredits(collection.summary.totalValueGc || 0)}</strong>
+                                    </span>
+                                </div>
+                                {csCatalog.loaded && (
+                                    <div className="cases-pokedex-bar" title={`${collection.summary.uniqueVariants} discovered of ${csCatalog.catalog.totalSkins} skins`}>
+                                        <span style={{ width: `${Math.min(100, collection.summary.uniqueVariants / Math.max(1, csCatalog.catalog.totalSkins) * 100)}%` }} />
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    }
                 >
                     <div className="bp-section">
                         <span className="bp-label" id="cases-category-label">Case type ({categoryCounts[category] || 0} cases)</span>
@@ -643,41 +691,6 @@ export default function CasesGame() {
                     <div className="bp-bal-line">
                         <span>Total stake</span>
                         <strong>{formatCredits(totalStake)}</strong>
-                    </div>
-                    <div className="bp-section cases-skip-section">
-                        <label className="bp-label">Animation</label>
-                        <button
-                            className="cases-skip-btn"
-                            disabled={!running || !pendingRoundRef.current}
-                            onClick={skipCaseAnimation}
-                            type="button"
-                            aria-label="Skip case opening animation"
-                        >
-                            Skip animation
-                        </button>
-                        <p className="bp-hint">Instantly settles the same practice round and keeps the drop record.</p>
-                    </div>
-                    <div className="bp-section">
-                        <label className="bp-label">Collection</label>
-                        <div className="bp-row" style={{ flexWrap: 'wrap' }}>
-                            <span className="cases-stat-pill">
-                                <small>Drops</small><strong>{collection.summary.totalDrops}</strong>
-                            </span>
-                            <span className="cases-stat-pill">
-                                <small>Variants</small><strong>{collection.summary.uniqueVariants}</strong>
-                            </span>
-                            <span className="cases-stat-pill">
-                                <small>Best</small><strong>×{collection.summary.bestMultiplier.toFixed(2)}</strong>
-                            </span>
-                            <span className="cases-stat-pill">
-                                <small>Value</small><strong>{formatCredits(collection.summary.totalValueGc || 0)}</strong>
-                            </span>
-                        </div>
-                        {csCatalog.loaded && (
-                            <div className="cases-pokedex-bar" title={`${collection.summary.uniqueVariants} discovered of ${csCatalog.catalog.totalSkins} skins`}>
-                                <span style={{ width: `${Math.min(100, collection.summary.uniqueVariants / Math.max(1, csCatalog.catalog.totalSkins) * 100)}%` }} />
-                            </div>
-                        )}
                     </div>
                 </BetPanel>
             }
@@ -860,32 +873,54 @@ export default function CasesGame() {
                                 </div>
                             )}
                             {results.length > 0 && (
-                                <div className="cases-result-row">
-                                    {results.map((r, i) => (
-                                        <div key={i} className={`cases-result-card ${RARE_TIERS.has(r.rarity) ? 'rare' : ''} ${r.statTrak ? 'stattrak' : ''} ${r.souvenir ? 'souvenir' : ''}`} style={{ '--rarity': r.color }}>
-                                            <img src={r.image} alt={r.name} />
-                                            <div className="cases-result-badges">
-                                                {r.statTrak && <b className="stattrak">StatTrak™</b>}
-                                                {r.souvenir && <b className="souvenir">Souvenir</b>}
-                                                {r.rarity && <b>{r.rarity}</b>}
-                                            </div>
-                                            <small>{r.name}</small>
-                                            <span className="cases-result-meta">
-                                                <em>{r.wearShort} · {r.float?.toFixed(3) ?? '—'}</em>
-                                                <strong>{formatCredits(r.valueGc || 0)}</strong>
+                                <div className="cases-results-panel" aria-live="polite">
+                                    {settlementSummary && (
+                                        <div className="cases-round-summary">
+                                            <span>
+                                                <small>Rows</small>
+                                                <strong>{settlementSummary.resultCount}/{settlementSummary.rows}</strong>
                                             </span>
-                                            <span className={`cases-result-profit ${(r.profitGc || 0) >= 0 ? 'pos' : 'neg'}`}>
-                                                {(r.profitGc || 0) >= 0 ? '+' : ''}{formatCredits(r.profitGc || 0)}
+                                            <span>
+                                                <small>Total stake</small>
+                                                <strong>{formatCredits(settlementSummary.stake)}</strong>
                                             </span>
-                                            {RARE_TIERS.has(r.rarity) && (
-                                                <span className="cases-particles" aria-hidden>
-                                                    {Array.from({ length: 14 }).map((_, p) => (
-                                                        <i key={p} style={{ '--dx': `${(Math.cos(p * 0.448) * 80).toFixed(0)}px`, '--dy': `${(Math.sin(p * 0.448) * 80).toFixed(0)}px`, '--delay': `${p * 22}ms` }} />
-                                                    ))}
-                                                </span>
-                                            )}
+                                            <span>
+                                                <small>Total return</small>
+                                                <strong>{formatCredits(settlementSummary.totalReturn)}</strong>
+                                            </span>
+                                            <span className={settlementSummary.profit >= 0 ? 'pos' : 'neg'}>
+                                                <small>P/L</small>
+                                                <strong>{settlementSummary.profit >= 0 ? '+' : ''}{formatCredits(settlementSummary.profit)}</strong>
+                                            </span>
                                         </div>
-                                    ))}
+                                    )}
+                                    <div className="cases-result-row">
+                                        {results.map((r, i) => (
+                                            <div key={i} className={`cases-result-card ${RARE_TIERS.has(r.rarity) ? 'rare' : ''} ${r.statTrak ? 'stattrak' : ''} ${r.souvenir ? 'souvenir' : ''}`} style={{ '--rarity': r.color }}>
+                                                <img src={r.image} alt={r.name} />
+                                                <div className="cases-result-badges">
+                                                    {r.statTrak && <b className="stattrak">StatTrak™</b>}
+                                                    {r.souvenir && <b className="souvenir">Souvenir</b>}
+                                                    {r.rarity && <b>{r.rarity}</b>}
+                                                </div>
+                                                <small>{r.name}</small>
+                                                <span className="cases-result-meta">
+                                                    <em>{r.wearShort} · {r.float?.toFixed(3) ?? '—'}</em>
+                                                    <strong>{formatCredits(r.valueGc || 0)}</strong>
+                                                </span>
+                                                <span className={`cases-result-profit ${(r.profitGc || 0) >= 0 ? 'pos' : 'neg'}`}>
+                                                    {(r.profitGc || 0) >= 0 ? '+' : ''}{formatCredits(r.profitGc || 0)}
+                                                </span>
+                                                {RARE_TIERS.has(r.rarity) && (
+                                                    <span className="cases-particles" aria-hidden>
+                                                        {Array.from({ length: 14 }).map((_, p) => (
+                                                            <i key={p} style={{ '--dx': `${(Math.cos(p * 0.448) * 80).toFixed(0)}px`, '--dy': `${(Math.sin(p * 0.448) * 80).toFixed(0)}px`, '--delay': `${p * 22}ms` }} />
+                                                        ))}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                             <div className="cases-stack-row">
