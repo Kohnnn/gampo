@@ -9,7 +9,8 @@ describe('cases CSS polish', () => {
     })
 
     it('keeps the case reel deceleration paced for a full reveal', () => {
-        expect(css).toContain('transition: transform 5200ms cubic-bezier')
+        expect(css).toContain('--case-spin-ms')
+        expect(css).toContain('transition: transform var(--case-spin-ms, 5200ms) cubic-bezier')
         expect(css).toContain('animation: casePrizeZoom 760ms')
     })
 })

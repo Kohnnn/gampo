@@ -487,7 +487,7 @@ export const gameDefinitions = [
         hitFrequency: 'Suit dependent',
         image: '/images/covers/generated/baccarat.png',
         accent: '#b478ff',
-        lesson: 'Pick a suit before the spread; cards matching the suit pay 3x their base. Three matches build the long-tail payout.',
+        lesson: 'Pick a suit before the 78-card spread; matching Minor Arcana use a 2.5x raw omen bonus while Major Arcana create the long-tail swings.',
     },
     {
         id: 'scarab-spin',

@@ -5,7 +5,8 @@ export const CASE_TILE_PX = 100
 export const CASE_PRIZE_INDEX = 28
 export const CASE_LIGHT_SWEEP_LEAD_MS = 1500
 export const CASE_PRIZE_ZOOM_LEAD_MS = 760
-export const CASE_OPEN_PHASES = ['lid', 'spinning', 'finale', 'zoom', 'settling']
+export const CASE_OPEN_PHASES = ['idle', 'arming', 'lid', 'spin', 'slowdown', 'land', 'reveal', 'settled']
+export const CASE_VISIBLE_PHASES = ['arming', 'lid', 'spin', 'slowdown', 'land', 'reveal']
 
 export const CASE_CELEBRATION_RARITIES = new Set([
     'Restricted',
@@ -22,10 +23,24 @@ export function finalPrizeOffset(jitter = 0, prizeIndex = CASE_PRIZE_INDEX, tile
 
 export function casePhaseLabel(phase, rows = 1) {
     const rowText = rows > 1 ? `${rows} rows` : 'case'
+    if (phase === 'arming') return 'Preparing drop...'
     if (phase === 'lid') return 'Lifting lid...'
-    if (phase === 'finale' || phase === 'zoom') return 'Locking prize...'
-    if (phase === 'settling') return 'Settling drop...'
+    if (phase === 'spin') return `Rolling ${rowText}...`
+    if (phase === 'slowdown') return 'Slowing reel...'
+    if (phase === 'land') return 'Pointer locked...'
+    if (phase === 'reveal') return 'Revealing result...'
+    if (phase === 'settled') return 'Drop recorded'
     return `Unboxing ${rowText}...`
+}
+
+export function casePhaseIndex(phase) {
+    return CASE_OPEN_PHASES.indexOf(phase)
+}
+
+export function hasReachedCasePhase(current, target) {
+    const currentIndex = casePhaseIndex(current)
+    const targetIndex = casePhaseIndex(target)
+    return currentIndex >= 0 && targetIndex >= 0 && currentIndex >= targetIndex
 }
 
 export function claimCaseSettlement(pendingRound) {

@@ -82,28 +82,36 @@ export const sfxManifest = {
         lose: '/audio/common/lose.wav',
     },
     blackjack: {
-        click: null,
-        reveal: null,
-        win: null,
-        lose: null,
+        click: '/audio/kenney/casino/chip-lay-1.ogg',
+        chip: '/audio/kenney/casino/chips-stack-1.ogg',
+        deal: '/audio/kenney/casino/card-slide-1.ogg',
+        reveal: '/audio/kenney/casino/card-place-1.ogg',
+        shuffle: '/audio/kenney/casino/card-shuffle.ogg',
+        win: '/audio/kenney/jingles/jingles_HIT03.ogg',
+        lose: '/audio/common/lose.wav',
     },
     hilo: {
-        click: null,
-        flip: null,
-        win: null,
-        lose: null,
+        click: '/audio/kenney/casino/chip-lay-1.ogg',
+        flip: '/audio/kenney/casino/card-place-1.ogg',
+        reveal: '/audio/kenney/casino/card-slide-1.ogg',
+        win: '/audio/kenney/jingles/jingles_NES05.ogg',
+        lose: '/audio/common/lose.wav',
     },
     baccarat: {
-        click: null,
-        reveal: null,
-        win: null,
-        lose: null,
+        click: '/audio/kenney/casino/chip-lay-1.ogg',
+        chip: '/audio/kenney/casino/chips-collide-1.ogg',
+        deal: '/audio/kenney/casino/card-slide-1.ogg',
+        reveal: '/audio/kenney/casino/card-place-1.ogg',
+        win: '/audio/kenney/jingles/jingles_HIT03.ogg',
+        lose: '/audio/common/lose.wav',
     },
     videopoker: {
-        click: null,
-        reveal: null,
-        win: null,
-        lose: null,
+        click: '/audio/kenney/casino/chip-lay-1.ogg',
+        deal: '/audio/kenney/casino/card-slide-1.ogg',
+        reveal: '/audio/kenney/casino/card-place-1.ogg',
+        shuffle: '/audio/kenney/casino/card-shuffle.ogg',
+        win: '/audio/kenney/jingles/jingles_NES05.ogg',
+        lose: '/audio/common/lose.wav',
     },
     flip: {
         click: null,
@@ -150,7 +158,7 @@ export const sfxManifest = {
         lose: null,
     },
     cases: {
-        click: '/audio/common/click.wav',
+        click: '/audio/kenney/casino/chip-lay-1.ogg',
         // Wave 18 + Wave 31: declared cases SFX, all wired to procedural binaries.
         // open      -> latch click as the lid pops
         // lid       -> heavy thud variant for crate slam
@@ -165,7 +173,7 @@ export const sfxManifest = {
         // reveal    -> generic reveal sting on the result card
         // win       -> profit > 0 sting
         // lose      -> profit <= 0 sting
-        open: '/audio/cases/open.wav',
+        open: '/audio/kenney/casino/cards-pack-open-1.ogg',
         lid: '/audio/cases/lid.wav',
         tick: '/audio/cases/tick.wav',
         multispin: '/audio/cases/multispin.wav',
@@ -225,10 +233,13 @@ export const sfxManifest = {
         lose: null,
     },
     tarot: {
-        click: null,
-        reveal: null,
-        win: null,
-        lose: null,
+        click: '/audio/kenney/casino/chip-lay-1.ogg',
+        deal: '/audio/kenney/casino/card-shuffle.ogg',
+        reveal: '/audio/kenney/casino/card-place-1.ogg',
+        major: '/audio/kenney/jingles/jingles_STEEL07.ogg',
+        bonus: '/audio/kenney/jingles/jingles_PIZZI12.ogg',
+        win: '/audio/kenney/jingles/jingles_NES05.ogg',
+        lose: '/audio/common/lose.wav',
     },
     'scarab-spin': {
         click: null,
@@ -249,10 +260,11 @@ export const sfxManifest = {
         lose: null,
     },
     war: {
-        click: null,
-        reveal: null,
-        win: null,
-        lose: null,
+        click: '/audio/kenney/casino/chip-lay-1.ogg',
+        deal: '/audio/kenney/casino/card-slide-1.ogg',
+        reveal: '/audio/kenney/casino/card-place-1.ogg',
+        win: '/audio/kenney/jingles/jingles_HIT03.ogg',
+        lose: '/audio/common/lose.wav',
     },
     chickencross: {
         click: null,
@@ -267,6 +279,15 @@ export const sfxManifest = {
         cashout: null,
         win: null,
         lose: null,
+    },
+    roulette: {
+        click: '/audio/kenney/casino/chip-lay-1.ogg',
+        chip: '/audio/kenney/casino/chips-stack-1.ogg',
+        spin: '/audio/cases/multispin.wav',
+        tick: '/audio/cases/tick.wav',
+        land: '/audio/cases/land.wav',
+        win: '/audio/kenney/jingles/jingles_HIT03.ogg',
+        lose: '/audio/common/lose.wav',
     },
 }
 
