@@ -5,6 +5,45 @@
     gap: 14px;
     color: var(--text-primary);
     overflow: hidden;
+    padding: 4px;
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 90% 0%, rgba(138, 206, 255, 0.12), transparent 42%),
+        linear-gradient(180deg, rgba(4, 18, 28, 0.28), rgba(4, 12, 18, 0.48));
+}
+
+.bj-table-status {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.bj-table-status div {
+    min-width: 0;
+    padding: 9px 11px;
+    border-radius: 11px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bj-table-status span {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--text-muted);
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.bj-table-status strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 950;
+    white-space: nowrap;
 }
 
 .bj-chip-slide {
@@ -155,6 +194,13 @@
 }
 .bj-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.bj-actions button.recommended:not(:disabled) {
+    border-color: rgba(138, 206, 255, 0.95);
+    background: linear-gradient(180deg, rgba(138, 206, 255, 0.28), rgba(20, 117, 225, 0.18));
+    box-shadow: 0 0 22px rgba(138, 206, 255, 0.24);
+    color: #d9f0ff;
+}
+
 .bj-insurance {
     display: flex;
     align-items: center;
@@ -191,6 +237,7 @@
 .gampo-reduce-motion .bj-chip-slide { animation: none; }
 
 @media (max-width: 720px) {
+    .bj-table-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .bj-card { width: 48px; height: 68px; }
     .bj-actions { grid-template-columns: repeat(2, 1fr); }
 }

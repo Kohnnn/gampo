@@ -48,6 +48,15 @@ function cashGameLevel() {
 function suitGlyph(s) { return s === 'h' ? '\u2665' : s === 'd' ? '\u2666' : s === 's' ? '\u2660' : '\u2663' }
 function suitClass(s) { return (s === 'h' || s === 'd') ? 'red' : 'black' }
 function rankPretty(r) { return r === 'T' ? '10' : r }
+function cardCode(card) {
+    if (!card) return ''
+    return `${rankPretty(card[0])}${suitGlyph(card[1])}`
+}
+function prettyStreet(street) {
+    if (!street) return 'Waiting'
+    if (street === 'showdown') return 'Showdown'
+    return street.charAt(0).toUpperCase() + street.slice(1)
+}
 
 const DIFFICULTY_TUNING = { beginner: -0.18, intermediate: -0.06, advanced: 0.06 }
 
@@ -473,6 +482,17 @@ export default function PokerGame() {
     const profitInSession = state && human && initialBuyInRef.current
         ? (human.stack || 0) - initialBuyInRef.current
         : 0
+    const actor = state?.toAct >= 0 ? state.players[state.toAct] : null
+    const facingAmount = state && human ? Math.max(0, (state.currentBet || 0) - (human.putIn || 0)) : 0
+    const potOdds = facingAmount > 0 ? facingAmount / Math.max(1, state.pot + facingAmount) : 0
+    const heroCards = human?.hole?.length ? human.hole.map(cardCode).join(' ') : '—'
+    const tableStateLabel = state?.street === 'showdown'
+        ? 'Showdown'
+        : isHumanTurn
+            ? 'Your action'
+            : actor
+                ? `${actor.name} thinking`
+                : 'Dealing'
 
     return (
         <div className="poker-page">
@@ -590,6 +610,28 @@ export default function PokerGame() {
 
                     <div className="poker-layout">
                         <div className="poker-table">
+                            <div className="pk-table-status" aria-label="Live poker table status">
+                                <div>
+                                    <span>Street</span>
+                                    <strong>{prettyStreet(state.street)}</strong>
+                                </div>
+                                <div>
+                                    <span>To act</span>
+                                    <strong>{tableStateLabel}</strong>
+                                </div>
+                                <div>
+                                    <span>Your hand</span>
+                                    <strong>{heroCards}</strong>
+                                </div>
+                                <div>
+                                    <span>Facing</span>
+                                    <strong>{facingAmount > 0 ? formatCredits(facingAmount) : 'No bet'}</strong>
+                                </div>
+                                <div>
+                                    <span>Pot odds</span>
+                                    <strong>{facingAmount > 0 ? `${(potOdds * 100).toFixed(0)}%` : '—'}</strong>
+                                </div>
+                            </div>
                             <div className="poker-table-felt">
                                 <div className="pk-pot">Pot {formatCredits(state.pot)}</div>
                                 <div className="pk-board">
@@ -656,6 +698,10 @@ export default function PokerGame() {
                                     </>
                                 ) : (
                                     <>
+                                        <div className={`pk-action-status ${isHumanTurn ? 'is-live' : ''}`}>
+                                            <span>{isHumanTurn ? 'Decision ready' : 'Waiting'}</span>
+                                            <strong>{isHumanTurn ? 'Choose fold, call/check, or size a raise.' : tableStateLabel}</strong>
+                                        </div>
                                         {acts.map(a => {
                                             if (a.type === 'fold') return <button key={a.type} className="pk-act fold" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'fold' })}>Fold</button>
                                             if (a.type === 'check') return <button key={a.type} className="pk-act check" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'check' })}>Check</button>
@@ -690,6 +736,14 @@ export default function PokerGame() {
                             </div>
                             {tab === 'gto' && (
                                 <div className="poker-sidebar-body">
+                                    <div className="poker-guide-card">
+                                        <span>Table brief</span>
+                                        <p>Practice-credit 6-max no-limit Hold'em. Use the GTO panel as a study reference, then compare the recommendation with pot odds, stack depth, and opponent style.</p>
+                                        <div>
+                                            <strong>Cashout</strong>
+                                            <em>Returns your stack; mid-hand cashout folds live cards.</em>
+                                        </div>
+                                    </div>
                                     <GtoPanel state={state} />
                                 </div>
                             )}

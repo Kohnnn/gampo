@@ -2,9 +2,99 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 14px;
     align-items: center;
     transition: box-shadow 0.4s ease;
+    padding: 6px;
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 22% 0%, rgba(246, 200, 95, 0.12), transparent 44%),
+        linear-gradient(180deg, rgba(5, 22, 22, 0.34), rgba(4, 12, 18, 0.56));
+}
+
+.bac-round-status {
+    width: min(820px, 100%);
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.bac-round-status div {
+    min-width: 0;
+    padding: 9px 11px;
+    border-radius: 11px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bac-round-status span {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--text-muted);
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.bac-round-status strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 950;
+    white-space: nowrap;
+}
+
+.bac-round-status.player div { border-color: rgba(20, 117, 225, 0.28); }
+.bac-round-status.banker div { border-color: rgba(201, 50, 55, 0.28); }
+.bac-round-status.tie div { border-color: rgba(20, 160, 80, 0.3); }
+
+.bac-ticket-strip {
+    width: min(820px, 100%);
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    overflow-x: auto;
+    padding: 7px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.24);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    scrollbar-width: thin;
+}
+
+.bac-ticket-strip > span:first-child:last-child {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 850;
+    padding: 0 5px;
+}
+
+.bac-ticket-chip {
+    min-width: max-content;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bac-ticket-chip b {
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+}
+
+.bac-ticket-chip em {
+    color: #ffe680;
+    font-style: normal;
+    font-size: 10px;
+    font-weight: 900;
 }
 
 .bac-table {
@@ -23,6 +113,14 @@
     padding: 18px 14px;
     text-align: center;
     box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.bac-side.winner {
+    border-color: #ffe680;
+    box-shadow:
+        inset 0 4px 12px rgba(0, 0, 0, 0.48),
+        0 0 0 2px rgba(255, 230, 128, 0.28),
+        0 0 28px rgba(255, 207, 90, 0.28);
 }
 
 .bac-side h3 {
@@ -97,7 +195,7 @@
 
 .bac-bets {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 8px;
     width: 100%;
     max-width: 820px;
@@ -134,8 +232,8 @@
 }
 
 .bac-road-card {
-    background: #fff;
-    border: 1px solid #ddd;
+    background: linear-gradient(180deg, rgba(236, 244, 255, 0.96), rgba(214, 226, 238, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.22);
     border-radius: 8px;
     padding: 8px;
     overflow-x: auto;
@@ -175,3 +273,88 @@
 .bac-road-cell.dot-red { background: #ed4245; }
 .bac-road-cell.dot-blue { background: #1475e1; }
 
+@media (max-width: 860px) {
+    .bac-bets {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 760px) {
+    .bac-round-status,
+    .bac-table,
+    .bac-roads {
+        grid-template-columns: 1fr;
+    }
+
+    .bac-bets {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .bac-side {
+        padding: 14px 10px;
+    }
+}
+
+@media (max-width: 460px) {
+    .bac-bets {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 400px) {
+    .gs-layout:has(.bac-stage-frame) {
+        overflow: visible;
+    }
+
+    .gs-layout:has(.bac-stage-frame) > .gs-panel {
+        order: 1;
+        flex: 0 0 auto;
+        overflow: visible;
+    }
+
+    .gs-layout:has(.bac-stage-frame) > .gs-playfield {
+        order: 2;
+    }
+
+    .gs-layout:has(.bac-stage-frame) .bp-panel {
+        height: auto;
+        overflow: visible;
+    }
+
+    .bac-stage-frame.core-stage {
+        min-height: 260px !important;
+    }
+
+    .bac-stage {
+        max-height: 242px;
+        overflow-y: auto;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .bac-round-status {
+        grid-template-columns: 1fr;
+    }
+
+    .bac-ticket-strip,
+    .bac-roads {
+        display: none;
+    }
+
+    .bac-table {
+        gap: 8px;
+    }
+
+    .bac-side {
+        padding: 10px 8px;
+    }
+
+    .bac-side .bac-score {
+        font-size: 30px;
+        margin-bottom: 8px;
+    }
+
+    .bac-bets {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

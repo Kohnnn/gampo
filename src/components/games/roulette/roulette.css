@@ -18,11 +18,50 @@
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.rou-state-card {
+    width: min(960px, 100%);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+}
+
+.rou-state-card div {
+    min-width: 0;
+    padding: 9px 11px;
+    border-radius: 11px;
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid rgba(255, 255, 255, 0.065);
+}
+
+.rou-state-card span {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--text-muted);
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.rou-state-card strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 950;
+    white-space: nowrap;
+}
+
+.rou-state-card.red div { border-color: rgba(201, 50, 55, 0.25); }
+.rou-state-card.black div { border-color: rgba(255, 255, 255, 0.12); }
+.rou-state-card.green div { border-color: rgba(20, 160, 80, 0.35); }
+
 .rou-top-deck {
     width: 100%;
-    max-width: 960px;
+    max-width: 1040px;
     display: grid;
-    grid-template-columns: minmax(270px, 360px) minmax(190px, 0.8fr) minmax(190px, 0.8fr);
+    grid-template-columns: minmax(250px, 340px) minmax(220px, 1fr) minmax(210px, 0.85fr);
     gap: 12px;
     align-items: stretch;
 }
@@ -40,7 +79,7 @@
 
 .rou-wheel-area {
     position: relative;
-    width: min(360px, 78vw);
+    width: min(340px, 78vw);
     aspect-ratio: 1;
     display: grid;
     place-items: center;
@@ -307,6 +346,88 @@
     overflow: auto;
 }
 
+.rou-ticket-strip {
+    width: min(960px, 100%);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: stretch;
+    padding: 9px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(6, 18, 18, 0.74), rgba(6, 14, 19, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.065);
+}
+
+.rou-ticket-head {
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    min-width: 96px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.28);
+}
+
+.rou-ticket-head span {
+    color: var(--text-muted);
+    font-size: 9px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.rou-ticket-head strong {
+    color: #ffe680;
+    font-size: 13px;
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+}
+
+.rou-ticket-list {
+    min-width: 0;
+    display: flex;
+    gap: 7px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.rou-ticket-empty,
+.rou-ticket-chip {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9px;
+    padding: 7px 10px;
+    white-space: nowrap;
+}
+
+.rou-ticket-empty {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 850;
+}
+
+.rou-ticket-chip {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(109, 183, 255, 0.24);
+}
+
+.rou-ticket-chip b {
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 950;
+}
+
+.rou-ticket-chip em {
+    color: #9ecbff;
+    font-style: normal;
+    font-size: 10px;
+    font-weight: 900;
+}
+
 .rou-player-feed li {
     display: grid;
     grid-template-columns: 0.9fr 0.9fr 0.7fr;
@@ -348,7 +469,7 @@
 
 .rou-board {
     width: 100%;
-    max-width: 780px;
+    max-width: 840px;
     background:
         url('/images/generated/roulette-felt-rainbet.png') center/cover,
         linear-gradient(180deg, #075f36, #023f22);
@@ -452,7 +573,7 @@
 
 .rou-advanced {
     width: 100%;
-    max-width: 760px;
+    max-width: 840px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -572,6 +693,102 @@
 @media (max-width: 860px) {
     .rou-top-deck { grid-template-columns: 1fr; justify-items: center; }
     .rou-live-panel { width: 100%; }
+}
+
+@media (max-width: 720px) {
+    .rou-state-card,
+    .rou-ticket-strip {
+        grid-template-columns: 1fr;
+    }
+    .rou-board {
+        grid-template-columns: 34px repeat(13, minmax(0, 1fr));
+        padding: 6px;
+    }
+    .rou-extra-row,
+    .rou-racetrack {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .roulette-stage {
+        max-height: 190px;
+        overflow-y: auto;
+        align-items: stretch;
+    }
+
+    .rou-top-deck {
+        grid-template-columns: 1fr;
+    }
+
+    .rou-wheel-area {
+        width: min(220px, 70vw);
+        justify-self: center;
+    }
+
+    .rou-feed-col {
+        display: none;
+    }
+
+    .rou-ticket-strip {
+        display: none;
+    }
+}
+
+@media (max-width: 400px) {
+    .gs-layout:has(.roulette-stage) {
+        overflow: visible;
+    }
+
+    .gs-layout:has(.roulette-stage) > .gs-panel {
+        order: 1;
+        flex: 0 0 auto;
+        overflow: visible;
+    }
+
+    .gs-layout:has(.roulette-stage) > .gs-playfield {
+        order: 2;
+    }
+
+    .gs-layout:has(.roulette-stage) .bp-panel {
+        height: auto;
+        overflow: visible;
+        padding: 10px;
+        gap: 7px;
+    }
+
+    .gs-layout:has(.roulette-stage) .bp-section {
+        padding-top: 2px;
+        padding-bottom: 2px;
+        gap: 6px;
+    }
+
+    .gs-layout:has(.roulette-stage) .bp-bal-line,
+    .gs-layout:has(.roulette-stage) .rou-empty-hint {
+        display: none;
+    }
+
+    .gs-layout:has(.roulette-stage) .rou-controls {
+        gap: 6px;
+    }
+
+    .gs-layout:has(.roulette-stage) .rou-chip {
+        width: 40px;
+        height: 40px;
+        border-width: 2px;
+        font-size: 12px;
+    }
+
+    .gs-layout:has(.roulette-stage) .rou-clear,
+    .gs-layout:has(.roulette-stage) .rou-undo {
+        height: 40px;
+    }
+
+    .gs-layout:has(.roulette-stage) .bp-play {
+        height: 48px;
+        min-height: 48px;
+        flex-basis: 48px;
+    }
 }
 
 .rou-clear,

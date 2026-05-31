@@ -85,6 +85,18 @@ function drawBaccaratHand() {
 
 function suitColor(s) { return (s === 'H' || s === 'D') ? 'red' : 'black' }
 function suitGlyph(s) { return s === 'H' ? '\u2665' : s === 'D' ? '\u2666' : s === 'S' ? '\u2660' : '\u2663' }
+function betLabel(key) {
+    switch (key) {
+        case 'banker': return 'Banker'
+        case 'player': return 'Player'
+        case 'tie': return 'Tie'
+        case 'pair_p': return 'Player Pair'
+        case 'pair_b': return 'Banker Pair'
+        case 'big': return 'Big'
+        case 'small': return 'Small'
+        default: return key
+    }
+}
 
 export default function BaccaratGame() {
     useGameBgm('baccarat', 'idle')
@@ -215,6 +227,10 @@ export default function BaccaratGame() {
     const smallRoad = useMemo(() => buildSmallRoad(bigRoad), [bigRoad])
     const cockroachPig = useMemo(() => buildCockroachPig(bigRoad), [bigRoad])
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
+    const playerScore = hand ? handTotal(hand.player) : null
+    const bankerScore = hand ? handTotal(hand.banker) : null
+    const winner = hand ? (playerScore === bankerScore ? 'tie' : playerScore > bankerScore ? 'player' : 'banker') : null
+    const selectedBets = Object.entries(bets).filter(([, amount]) => amount > 0)
 
     return (
         <GameShell
@@ -262,19 +278,43 @@ export default function BaccaratGame() {
                     <div className="bac-meta">
                         <MultiplierBadge label="Stake" value={totalStake} suffix="" size="sm" state={running ? 'active' : 'idle'} />
                     </div>
+                    <div className={`bac-round-status ${winner || 'idle'}`}>
+                        <div>
+                            <span>Round</span>
+                            <strong>{running ? 'Dealing' : winner ? `${betLabel(winner)} wins` : 'Open'}</strong>
+                        </div>
+                        <div>
+                            <span>Score</span>
+                            <strong>{hand ? `${playerScore} - ${bankerScore}` : '—'}</strong>
+                        </div>
+                        <div>
+                            <span>Ticket</span>
+                            <strong>{selectedBets.length ? `${formatCredits(totalStake)} / ${selectedBets.length} bet${selectedBets.length === 1 ? '' : 's'}` : 'No chips'}</strong>
+                        </div>
+                    </div>
+                    <div className="bac-ticket-strip">
+                        {selectedBets.length === 0 ? (
+                            <span>Tap Banker, Player, Tie, pairs, Big, or Small before dealing.</span>
+                        ) : selectedBets.map(([key, amount]) => (
+                            <span key={key} className={`bac-ticket-chip ${key}`}>
+                                <b>{betLabel(key)}</b>
+                                <em>{formatCredits(amount)}</em>
+                            </span>
+                        ))}
+                    </div>
                     <div className="bac-table">
-                        <div className="bac-side">
+                        <div className={`bac-side ${winner === 'player' ? 'winner' : ''}`}>
                             <h3>Player</h3>
-                            <div className="bac-score">{hand ? handTotal(hand.player) : '--'}</div>
+                            <div className="bac-score">{playerScore ?? '--'}</div>
                             <div className="bac-cards">
                                 {(hand?.player || [{}, {}]).map((c, i) => c.rank ? (
                                     <CardFace key={i} rank={c.rank} suit={c.suit} dealing size="md" />
                                 ) : <CardBack key={i} size="md" />)}
                             </div>
                         </div>
-                        <div className="bac-side">
+                        <div className={`bac-side ${winner === 'banker' ? 'winner' : ''}`}>
                             <h3>Banker</h3>
-                            <div className="bac-score">{hand ? handTotal(hand.banker) : '--'}</div>
+                            <div className="bac-score">{bankerScore ?? '--'}</div>
                             <div className="bac-cards">
                                 {(hand?.banker || [{}, {}]).map((c, i) => c.rank ? (
                                     <CardFace key={i} rank={c.rank} suit={c.suit} dealing size="md" />
@@ -291,6 +331,7 @@ export default function BaccaratGame() {
                             { key: 'pair_p', label: 'Player Pair 12×', cls: 'player' },
                             { key: 'pair_b', label: 'Banker Pair 12×', cls: 'banker' },
                             { key: 'big', label: 'Big 1.54×', cls: 'tie' },
+                            { key: 'small', label: 'Small 2.5×', cls: 'tie' },
                         ].map(b => (
                             <div key={b.key} className={`bac-bet-cell ${b.cls} ${bets[b.key] ? 'has-bet' : ''}`} onClick={() => addBet(b.key)}>
                                 {b.label}{bets[b.key] ? ` · ${formatCredits(bets[b.key])}` : ''}

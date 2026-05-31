@@ -40,6 +40,23 @@ function bestBetForCell(numbers, amount, type, params) {
     return { id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, type, params, amount }
 }
 
+function betLabel(type, params = {}) {
+    if (type === 'straight') return `Number ${params.n}`
+    if (type === 'dozen1') return '1st 12'
+    if (type === 'dozen2') return '2nd 12'
+    if (type === 'dozen3') return '3rd 12'
+    if (type === 'col1') return 'Column 1'
+    if (type === 'col2') return 'Column 2'
+    if (type === 'col3') return 'Column 3'
+    if (type === 'low') return '1-18'
+    if (type === 'high') return '19-36'
+    if (type === 'zeroNeighbours') return 'Zero Neighbours'
+    if (type === 'tier') return 'Tier'
+    if (type === 'voisins') return 'Voisins'
+    if (type === 'orphelins') return 'Orphelins'
+    return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
 export default function RouletteGame() {
     useGameBgm('roulette', 'idle')
     const definition = findGameDefinition('roulette')
@@ -186,6 +203,25 @@ export default function RouletteGame() {
         .reduce((s, b) => s + b.amount, 0)
 
     const cellBet = (n) => betTotal('straight', { n })
+    const groupedBets = useMemo(() => {
+        const map = new Map()
+        for (const bet of bets) {
+            const key = `${bet.type}:${JSON.stringify(bet.params || {})}`
+            const current = map.get(key) || {
+                label: betLabel(bet.type, bet.params),
+                amount: 0,
+                count: 0,
+                payout: makeBet(bet.type, bet.params).payout,
+            }
+            current.amount += bet.amount
+            current.count += 1
+            map.set(key, current)
+        }
+        return [...map.values()].sort((a, b) => b.amount - a.amount).slice(0, 6)
+    }, [bets])
+    const resultText = result === null
+        ? (bettingMs > 0 ? 'Bets closing' : 'Ready')
+        : `${result} ${colorOf(result)}`
 
     return (
         <GameShell
@@ -236,6 +272,20 @@ export default function RouletteGame() {
         >
             <div className={`roulette-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
+                <div className={`rou-state-card ${meta?.color || 'idle'}`}>
+                    <div>
+                        <span>Wheel state</span>
+                        <strong>{spinning ? 'Spinning' : resultText}</strong>
+                    </div>
+                    <div>
+                        <span>Ticket</span>
+                        <strong>{bets.length ? `${formatCredits(totalStake)} on ${bets.length} leg${bets.length === 1 ? '' : 's'}` : 'No active chips'}</strong>
+                    </div>
+                    <div>
+                        <span>Last result</span>
+                        <strong>{result === null ? '—' : `${result} ${colorOf(result)}`}</strong>
+                    </div>
+                </div>
                 <div className="rou-top-deck">
                     <div className="rou-wheel-area" ref={wheelAreaRef} style={{ '--ball-radius': ballRadius }}>
                         <div
@@ -293,6 +343,23 @@ export default function RouletteGame() {
                     </div>
                 </div>
 
+                <div className="rou-ticket-strip" aria-label="Current roulette bet slip">
+                    <div className="rou-ticket-head">
+                        <span>Bet slip</span>
+                        <strong>{formatCredits(totalStake)}</strong>
+                    </div>
+                    <div className="rou-ticket-list">
+                        {groupedBets.length === 0 ? (
+                            <span className="rou-ticket-empty">Tap a number, outside group, or racetrack sector.</span>
+                        ) : groupedBets.map(item => (
+                            <span key={item.label} className="rou-ticket-chip">
+                                <b>{item.label}</b>
+                                <em>{formatCredits(item.amount)} · {item.payout.toFixed(2)}x</em>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
                 <div className="rou-board" aria-label="Roulette betting table">
                     <div className={`rou-cell zero ${result === 0 ? 'winner' : ''}`} data-bet={cellBet(0) || ''}
                         onClick={() => addBet('straight', { n: 0 })}
@@ -312,7 +379,7 @@ export default function RouletteGame() {
                     </div>
                 </div>
 
-                <details className="rou-advanced">
+                <details className="rou-advanced" open>
                     <summary>Advanced bets</summary>
                     <div className="rou-extra-row">
                         {[
