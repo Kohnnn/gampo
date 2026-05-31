@@ -175,3 +175,42 @@
 .gampo-reduce-motion .cc-lane.fade-out {
     animation: none;
 }
+
+@media (max-width: 640px) {
+    .cc-stage {
+        gap: 10px;
+        padding: 12px 6px;
+    }
+
+    .cc-road {
+        gap: 4px;
+        padding: 10px 4px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+    }
+
+    .cc-lane {
+        flex: 0 0 42px;
+        height: 136px;
+        padding: 8px 2px;
+        scroll-snap-align: center;
+    }
+
+    .cc-chicken {
+        font-size: 34px;
+    }
+
+    .cc-mult {
+        max-width: 112px;
+        font-size: 10px;
+        line-height: 1;
+        white-space: nowrap;
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+    }
+
+    .cc-action-btns button {
+        height: 44px;
+        font-size: 12px;
+    }
+}

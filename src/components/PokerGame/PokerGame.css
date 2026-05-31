@@ -1,5 +1,9 @@
 .poker-page {
-    min-height: 100%;
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: 24px;
     padding: 16px;
     background: radial-gradient(circle at 20% 0%, rgba(255, 207, 90, 0.06), transparent 50%), var(--bg-primary);
 }
@@ -435,9 +439,12 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
     gap: 14px;
+    align-items: start;
+    padding-bottom: 24px;
 }
 
 .poker-table {
+    min-width: 0;
     background: linear-gradient(180deg, rgba(15, 33, 46, 0.92), rgba(20, 39, 51, 0.92));
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -448,7 +455,8 @@
 
 .poker-table-felt {
     position: relative;
-    aspect-ratio: 16 / 10;
+    height: clamp(430px, 54vh, 620px);
+    min-height: 430px;
     background:
         radial-gradient(ellipse at center, rgba(0, 100, 50, 0.4), transparent 70%),
         url('/assets/games/poker/poker-felt.png') center/cover no-repeat,
@@ -850,7 +858,7 @@
 @media (max-width: 1100px) {
     .poker-layout { grid-template-columns: 1fr; }
     .poker-chat { max-height: none; }
-    .poker-sidebar { max-height: none; }
+    .poker-sidebar { position: static; max-height: none; }
 }
 
 /* Wave 15: tablet and mobile responsive scaling */
@@ -890,6 +898,8 @@
 
     .poker-table { padding: 10px; }
     .poker-table-felt {
+        height: auto;
+        min-height: 520px;
         aspect-ratio: 4 / 5;
         border-width: 8px;
         border-radius: 140px / 220px;
@@ -926,6 +936,8 @@
     .pk-info-cashout,
     .pk-info-topup { grid-column: span 2; }
     .poker-table-felt {
+        height: auto;
+        min-height: 460px;
         aspect-ratio: 3 / 4;
     }
     .pk-card { width: 30px; height: 44px; padding: 3px; font-size: 10px; }
@@ -939,6 +951,8 @@
 /* === Tabbed sidebar === */
 
 .poker-sidebar {
+    position: sticky;
+    top: 12px;
     background: linear-gradient(180deg, rgba(15, 33, 46, 0.92), rgba(20, 39, 51, 0.92));
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -946,7 +960,7 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     display: flex;
     flex-direction: column;
-    max-height: 82vh;
+    max-height: calc(100vh - 104px);
     min-height: 0;
     overflow: hidden;
 }
@@ -981,6 +995,8 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     padding: 12px 14px 14px;
     display: flex;
     flex-direction: column;
@@ -996,7 +1012,17 @@
     padding: 24px 8px;
     font-size: 12px;
 }
-.gto-context { display: flex; flex-direction: column; gap: 6px; }
+.gto-context {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 8px;
+    background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(15, 33, 46, 0.88));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
 .gto-ctx-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .gto-ctx-line.muted { color: var(--text-muted); font-size: 11px; }
 .gto-pill {
@@ -1035,7 +1061,11 @@
 }
 .gto-ctx-row span { background: rgba(0, 0, 0, 0.25); padding: 4px 8px; border-radius: 6px; }
 
-.gto-grid-wrap { overflow-x: auto; }
+.gto-grid-wrap {
+    max-height: 360px;
+    overflow: auto;
+    scrollbar-gutter: stable;
+}
 .gto-grid {
     border-collapse: separate;
     border-spacing: 1px;
@@ -1062,10 +1092,32 @@
     background: rgba(255, 255, 255, 0.04);
     cursor: default;
 }
+.gto-cell-button {
+    appearance: none;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    display: block;
+    border-radius: inherit;
+}
+.gto-cell-button:focus-visible {
+    outline: 2px solid #6db7ff;
+    outline-offset: -2px;
+}
 .gto-cell.hero {
     outline: 2px solid var(--accent-green);
     outline-offset: -1px;
     box-shadow: 0 0 12px rgba(0, 231, 1, 0.6);
+}
+.gto-cell.selected {
+    outline: 2px solid #ffe680;
+    outline-offset: -1px;
+    box-shadow: 0 0 12px rgba(255, 207, 90, 0.65);
 }
 .gto-cell-fill {
     position: absolute;
@@ -1369,6 +1421,77 @@
 
 .gto-cell.dim { opacity: 0.25; }
 
+.gto-hand-detail {
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+}
+.gto-hand-detail-live {
+    order: -1;
+    border-color: rgba(255, 207, 90, 0.22);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+.gto-hand-detail header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: baseline;
+}
+.gto-hand-detail header span {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.gto-hand-detail header strong {
+    color: #fff;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 20px;
+}
+.gto-hand-detail header em {
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+}
+.gto-hand-detail.tone-raise header em { color: #ff7a7c; }
+.gto-hand-detail.tone-call header em { color: #2af04a; }
+.gto-hand-detail.tone-fold header em { color: var(--text-secondary); }
+.gto-detail-bars {
+    display: grid;
+    gap: 5px;
+}
+.gto-detail-bars span {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 34px;
+    gap: 6px;
+    align-items: center;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+.gto-detail-bars b { font-weight: 950; }
+.gto-detail-bars i {
+    display: block;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+}
+.gto-detail-bars .raise { color: #ff7a7c; }
+.gto-detail-bars .call { color: #2af04a; }
+.gto-detail-bars .fold { color: var(--text-secondary); }
+.gto-hand-detail p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
 .gto-sizing-bar {
     display: block;
     height: 4px;
@@ -1429,8 +1552,47 @@
 }
 .ph-clear:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* Wave 24: 1610x870 fit pass for poker. */
-@media (min-width: 1500px) and (max-height: 920px) {
+/* Wave 24/25: compact desktop fit pass for poker. */
+@media (min-width: 1200px) and (max-height: 920px) {
+    .poker-page {
+        padding: 10px 14px 14px;
+        scrollbar-gutter: stable;
+    }
+    .poker-titlebar {
+        min-height: 66px;
+        padding: 12px 18px;
+        margin-bottom: 10px;
+    }
+    .pk-info-strip {
+        gap: 6px;
+        padding: 6px 10px;
+        margin-bottom: 10px;
+    }
+    .pk-info-cell {
+        padding: 5px 9px;
+        min-height: 40px;
+    }
+    .poker-layout { gap: 12px; padding-bottom: 12px; }
     .poker-table { padding: 10px; }
-    .poker-table-felt { padding: 10px; min-height: 420px; }
+    .poker-table-felt {
+        height: clamp(360px, 46vh, 440px);
+        min-height: 360px;
+        border-width: 10px;
+    }
+    .poker-sidebar { max-height: calc(100vh - 210px); }
+    .gto-grid-wrap { max-height: 250px; }
+    .pk-actions { margin-top: 8px; }
+    .pk-act {
+        height: 42px;
+        padding: 0 14px;
+        font-size: 12px;
+    }
+    .pk-raise {
+        padding: 7px 9px;
+        gap: 6px;
+    }
+    .pk-raise-presets button {
+        padding: 5px 9px;
+        font-size: 10px;
+    }
 }

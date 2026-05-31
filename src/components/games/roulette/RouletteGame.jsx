@@ -220,6 +220,11 @@ export default function RouletteGame() {
                         <span>Total: <strong>{formatCredits(totalStake)}</strong></span>
                         <span>Legs: <strong>{bets.length}</strong></span>
                     </div>
+                    {!bets.length && (
+                        <div className="rou-empty-hint">
+                            Pick a chip, tap the felt, then spin.
+                        </div>
+                    )}
                 </BetPanel>
             }
             aside={

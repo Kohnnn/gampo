@@ -553,7 +553,7 @@
 
 .prog-summary-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px 10px;
 }
 .prog-summary-grid span {
@@ -737,13 +737,157 @@
     font-size: 14px;
 }
 
+.prog-mission-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.prog-mission-summary span,
+.prog-vip-card {
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.prog-mission-summary span {
+    min-width: 0;
+    padding: 7px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.prog-mission-summary small,
+.prog-vip-card small {
+    color: var(--text-muted, #6f7a8d);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.prog-mission-summary strong,
+.prog-vip-card strong {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+}
+
+.prog-mission-summary em,
+.prog-vip-card em {
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.prog-mission.is-claimed > em {
+    color: #9cc8ff;
+    font-size: 11px;
+}
+
+.prog-mission-link {
+    align-self: flex-start;
+    color: #9cc8ff;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
+}
+
+.prog-mission-link:hover {
+    color: var(--accent-green);
+}
+
+.prog-vip-card {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+}
+
+.prog-vip-card > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.prog-vip-progress {
+    grid-column: 1 / -1;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.07);
+    overflow: hidden;
+}
+
+.prog-vip-progress i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #ffd166, #ad7cff);
+}
+
+.prog-vip-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.prog-vip-list li {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.24);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.prog-vip-list li.is-active {
+    border-color: rgba(255, 209, 102, 0.48);
+    background: rgba(255, 209, 102, 0.08);
+}
+
+.prog-vip-list li.is-complete .prog-ach-icon {
+    color: #2af04a;
+    border-color: rgba(42, 240, 74, 0.32);
+    background: rgba(42, 240, 74, 0.1);
+}
+
+.prog-vip-list li > em {
+    align-self: center;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+}
+
 .prog-foot {
     display: flex;
-    justify-content: flex-end;
+    justify-content: stretch;
     align-items: center;
     gap: 6px;
     padding-top: 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.prog-reset-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.prog-reset-grid .prog-reset-btn {
+    justify-content: center;
 }
 .prog-reset-btn,
 .prog-reset-confirm,
@@ -769,14 +913,16 @@
     color: var(--text-primary);
 }
 .prog-confirm {
-    display: inline-flex;
+    width: 100%;
+    display: flex;
     align-items: center;
     gap: 6px;
-    margin-left: auto;
 }
 .prog-confirm span {
+    flex: 1;
     color: var(--text-secondary);
     font-size: 11px;
+    line-height: 1.35;
 }
 .prog-reset-confirm {
     border-color: rgba(237, 66, 69, 0.5);
@@ -784,3 +930,12 @@
     background: rgba(237, 66, 69, 0.12);
 }
 .prog-reset-confirm:hover { background: rgba(237, 66, 69, 0.24); color: #fff; }
+.prog-reset-cancel:hover { color: var(--text-primary); border-color: rgba(255, 255, 255, 0.2); }
+
+@media (max-width: 375px) {
+    .prog-summary { grid-template-columns: 1fr; }
+    .prog-ring { margin: 0 auto; }
+    .prog-vip-card,
+    .prog-mission-summary,
+    .prog-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

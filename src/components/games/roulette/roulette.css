@@ -603,3 +603,28 @@
 }
 
 .rou-summary strong { color: var(--text-primary); }
+
+.rou-empty-hint {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 207, 90, 0.26);
+    background: rgba(255, 207, 90, 0.08);
+    color: #ffe6a8;
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+    .rou-chip {
+        width: 40px;
+        height: 40px;
+        font-size: 11px;
+    }
+
+    .rou-summary {
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 12px;
+    }
+}

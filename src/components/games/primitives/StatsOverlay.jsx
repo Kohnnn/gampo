@@ -29,8 +29,8 @@ export default function StatsOverlay({ stats, definition }) {
             <div className="so-strip" aria-label="Last results">
                 {stats.lastResults && stats.lastResults.length === 0 ? (
                     <span className="so-empty">No plays yet</span>
-                ) : (stats.lastResults || []).map(item => (
-                    <span key={item.id} className={`so-pill ${item.profit > 0 ? 'win' : item.profit < 0 ? 'loss' : 'push'}`}>
+                ) : (stats.lastResults || []).map((item, index) => (
+                    <span key={`${item.id || item.ts || 'result'}-${index}`} className={`so-pill ${item.profit > 0 ? 'win' : item.profit < 0 ? 'loss' : 'push'}`}>
                         {item.label}
                     </span>
                 ))}

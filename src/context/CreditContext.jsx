@@ -6,9 +6,10 @@ export const HISTORY_STORAGE_KEY = 'gampo_history'
 
 const CreditContext = createContext(null)
 
-function readNumber(key, fallback) {
+export function readNumber(key, fallback) {
     try {
         const stored = localStorage.getItem(key)
+        if (stored == null || stored === '') return fallback
         const parsed = Number(stored)
         return Number.isFinite(parsed) ? parsed : fallback
     } catch {

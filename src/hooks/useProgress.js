@@ -32,7 +32,7 @@ import { ACHIEVEMENTS, evaluateAchievements } from '../data/achievements'
 
 const STATS_KEY = 'gampo_progress_stats'
 const UNLOCK_KEY = 'gampo_progress_unlocked'
-const RARE_RARITIES = new Set(['Covert', 'Extraordinary'])
+const RARE_RARITIES = new Set(['Restricted', 'Classified', 'Covert', 'Remarkable', 'Exotic', 'Extraordinary', 'Contraband', '★'])
 
 const DEFAULT_STATS = {
     totalRounds: 0,

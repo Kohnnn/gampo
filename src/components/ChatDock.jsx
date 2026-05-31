@@ -15,7 +15,7 @@ function readInitialState() {
         const raw = localStorage.getItem(STATE_KEY)
         if (raw && VALID.has(raw)) return raw
     } catch { /* ignore */ }
-    return 'open'
+    return 'minimized'
 }
 
 function ChatDock() {

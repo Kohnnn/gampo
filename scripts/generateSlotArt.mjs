@@ -12,6 +12,27 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 
+async function loadDotenv(filePath) {
+    try {
+        const raw = await fs.readFile(filePath, 'utf8')
+        for (const line of raw.split(/\r?\n/)) {
+            const trimmed = line.trim()
+            if (!trimmed || trimmed.startsWith('#')) continue
+            const eq = trimmed.indexOf('=')
+            if (eq < 0) continue
+            const key = trimmed.slice(0, eq).trim()
+            const value = trimmed.slice(eq + 1).trim()
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue
+            if (process.env[key] === undefined) process.env[key] = value
+        }
+    } catch {
+        // optional
+    }
+}
+
+await loadDotenv(path.resolve('.env.local'))
+await loadDotenv(path.resolve('.env'))
+
 const URL = process.env.NINEROUTER_URL
 const KEY = process.env.NINEROUTER_KEY
 const MODEL = process.env.GAMPO_IMAGE_MODEL || 'cx/gpt-5.5-image'
@@ -35,7 +56,7 @@ const COVER_STYLE = [
 const SYMBOL_STYLE = [
     'square 1024x1024',
     'one centered casino slot reel symbol',
-    'transparent or near-black background, soft drop shadow',
+    'transparent alpha background only, no white box, no square card, soft drop shadow',
     'crisp game-icon look with bold rim lighting',
     '3D render style, glossy, high contrast',
     'no text, no numbers, no watermark, no logo, no copyrighted property',
@@ -44,7 +65,7 @@ const SYMBOL_STYLE = [
 
 const TEMPLATES = {
     'vault-rush': {
-        skin: 'bank',
+        skin: 'vault',
         cover: 'a giant chrome bank vault door cracked open with golden coins pouring out, deep navy and gold gradient backdrop',
         symbols: {
             hero: 'a chrome vault door with combination wheel, single icon, polished metal',
@@ -245,7 +266,27 @@ const TEMPLATES = {
     },
 }
 
+const rawArgs = process.argv.slice(2)
+const flags = new Set(rawArgs.filter(arg => arg.startsWith('--')))
+const targetArgs = rawArgs.filter(arg => !arg.startsWith('--'))
+const missingOnly = flags.has('--missing-only')
+const force = flags.has('--force')
+const symbolsOnly = flags.has('--symbols-only')
+
+async function exists(filePath) {
+    try {
+        await fs.access(filePath)
+        return true
+    } catch {
+        return false
+    }
+}
+
 async function generate(prompt, outPath, label) {
+    if (missingOnly && !force && await exists(outPath)) {
+        console.log(`  = ${label}: exists`)
+        return true
+    }
     const body = JSON.stringify({ model: MODEL, prompt, size: '1024x1024' })
     const url = `${URL}/images/generations?response_format=binary`
     try {
@@ -277,8 +318,7 @@ async function generate(prompt, outPath, label) {
     }
 }
 
-const arg = process.argv[2]
-const targets = arg ? [arg] : Object.keys(TEMPLATES)
+const targets = targetArgs.length ? targetArgs : Object.keys(TEMPLATES)
 
 for (const id of targets) {
     const tmpl = TEMPLATES[id]
@@ -288,8 +328,10 @@ for (const id of targets) {
     }
     console.log(`\n== ${id} (skin: ${tmpl.skin}) ==`)
 
-    const coverPath = path.resolve(`public/images/covers/generated/${id}.png`)
-    await generate(`${tmpl.cover}, ${COVER_STYLE}`, coverPath, `${id} cover`)
+    if (!symbolsOnly) {
+        const coverPath = path.resolve(`public/images/covers/generated/${id}.png`)
+        await generate(`${tmpl.cover}, ${COVER_STYLE}`, coverPath, `${id} cover`)
+    }
 
     const skinDir = path.resolve(`public/assets/games/slots/${tmpl.skin}`)
     for (const [role, subject] of Object.entries(tmpl.symbols)) {

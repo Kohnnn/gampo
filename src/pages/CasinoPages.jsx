@@ -13,6 +13,25 @@ import { useProgress } from '../hooks/useProgress'
 import { MISSION_PERIODS, VIP_TIERS, vipTierFor } from '../data/missions'
 import '../styles/casino.css'
 
+const MISSION_ROUTES = {
+    'daily-spins-10': '/originals',
+    'daily-wins-3': '/dice',
+    'daily-multi-5': '/limbo',
+    'daily-3-games': '/',
+    'weekly-spins-100': '/originals',
+    'weekly-wagered-1000': '/slots',
+    'weekly-streak-5': '/mines',
+    'weekly-multi-25': '/wheel',
+    'lifetime-spins-1000': '/originals',
+    'lifetime-wagered-10000': '/slots-lobby',
+    'lifetime-multi-100': '/crash',
+    'lifetime-games-15': '/',
+}
+
+function missionRouteFor(mission) {
+    return MISSION_ROUTES[mission.id] || '/originals'
+}
+
 export function OriginalsPage() {
     return (
         <CasinoSection
@@ -124,13 +143,16 @@ export function MissionsPage() {
                                 <div className="casino-progress"><span style={{ width: `${mission.ratio * 100}%` }} /></div>
                                 <footer>
                                     <small>{mission.value} / {mission.target}</small>
-                                    {mission.claimable ? (
-                                        <button className="casino-action primary" onClick={() => onClaim(mission)}>Claim</button>
-                                    ) : mission.claimed ? (
-                                        <span className="mission-claimed-badge">Claimed</span>
-                                    ) : (
-                                        <span className="mission-progress-pct">{Math.round(mission.ratio * 100)}%</span>
-                                    )}
+                                    <span className="mission-card-actions">
+                                        <Link className="mission-play-link" to={missionRouteFor(mission)}>Play</Link>
+                                        {mission.claimable ? (
+                                            <button className="casino-action primary" onClick={() => onClaim(mission)}>Claim</button>
+                                        ) : mission.claimed ? (
+                                            <span className="mission-claimed-badge">Claimed</span>
+                                        ) : (
+                                            <span className="mission-progress-pct">{Math.round(mission.ratio * 100)}%</span>
+                                        )}
+                                    </span>
                                 </footer>
                             </article>
                         ))}
@@ -528,4 +550,3 @@ export function RacePage() {
         </CasinoSection>
     )
 }
-

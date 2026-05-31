@@ -307,3 +307,11 @@ Fourth audit (`docs/evaluationreport.md` v4) plus three user concerns — Plinko
 - Added Chicken Cross lane fade-out/fade-in motion after safe crossings.
 - Added Video Poker hold-toggle pulse motion for held and unheld cards.
 - Verification: `npm test -- --run` is green at 143 tests across 30 files; `npm run build` is clean in 8.22s with the existing empty-chunk / large row warnings. Browser smoke checked `/roulette`, `/blackjack` desktop/mobile, `/lottery`, `/tower`, `/chickencross`, and `/videopoker`, including the new motion selectors and no horizontal overflow.
+
+## GamPo Quality Overhaul (2026-05-29)
+
+- Reworked Cases into a product-style opener: category browsing, larger selected-case hero, card EV/volatility/rare previews, stronger reel/result reveal, and collection value/discovery summaries without Pokedex copy.
+- Normalized slot presentation with larger reels, distinct template skins, stripped rank-art backgrounds, no `slot-classic` fallbacks after `applyRankArt()`, and QA-forceable bonus feedback for free spins, retriggers, hold/respin, wheel, cascade, and meter collection.
+- Tightened Poker/GTO scroll behavior so table actions remain reachable at desktop/tablet sizes and the GTO decision/detail area stays usable above the grid with an independently scrolling sidebar.
+- Added an audio audit report covering manifest refs, unused WAVs, procedural-loop weakness, and replacement candidates with source/license notes; no external audio was ingested.
+- Verification: `npm test -- --run` is green at 174 tests across 40 files; `npm run build` passes with the existing empty `phaser`/`matter` chunks and large poker-row chunk warnings. Browser smoke captured `/cases`, `/vault-rush`, `/river-catcher`, `/dust-rail`, `/storm-banner`, `/bassline-bonus`, `/phoenix-megaways`, and `/poker` at 375x667, 480x800, 1024x768, and 1610x870 with no horizontal overflow or broken images, plus interaction checks for case opening and forced slot bonus state.

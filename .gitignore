@@ -10,9 +10,13 @@ output
 .vscode
 .idea
 .gemini
+.vercel
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+preview*.log
+tmp-preview*.log
+zrok*.log
 plinko-game-main.zip
 dev-server.err.log
 dev-server.out.log

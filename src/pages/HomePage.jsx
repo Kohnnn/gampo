@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Flame, Plus, RotateCcw, Search, ShieldCheck, Trophy, Sparkles, Dices, Spade, Coins, Clock, GraduationCap } from 'lucide-react'
+import { BookOpen, Flame, Plus, RotateCcw, Search, ShieldCheck, Trophy, Sparkles, Dices, Spade, Coins, Clock, GraduationCap, Pin } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
+import { useSidebarPins } from '../hooks/useSidebarPins'
 import { gameDefinitions, findGameDefinition } from '../data/gameDefinitions'
 import {
     featuredCollections,
@@ -42,6 +43,7 @@ function deriveRecentlyPlayed(transactions) {
 
 function HomePage() {
     const { balance, grantPracticeCredits, resetBalance, transactions } = useCredits()
+    const { pins } = useSidebarPins()
     const [query, setQuery] = useState('')
     const [filter, setFilter] = useState('All')
 
@@ -62,6 +64,12 @@ function HomePage() {
 
     const recent = transactions.slice(0, 5)
     const recentlyPlayed = useMemo(() => deriveRecentlyPlayed(transactions), [transactions])
+    const pinnedRow = useMemo(() => (
+        pins
+            .map(path => fullGameCatalog.find(game => game.path === path))
+            .filter(Boolean)
+            .slice(0, 12)
+    ), [pins])
 
     const originalsRow = gameDefinitions.filter(g => ['Arcade originals', 'Lottery math'].includes(g.category)).slice(0, 12)
     const tablesRow = gameDefinitions.filter(g => ['Table math', 'Card room', 'Dice table', 'Decision games'].includes(g.category)).slice(0, 12)
@@ -129,6 +137,9 @@ function HomePage() {
 
             {recentlyPlayed.length > 0 && (
                 <CategoryRow icon={<Clock size={16} />} title="Recently played" link="/activity" games={recentlyPlayed} />
+            )}
+            {pinnedRow.length > 0 && (
+                <CategoryRow icon={<Pin size={16} />} title="Pinned games" link="/" games={pinnedRow} />
             )}
             <CategoryRow icon={<GraduationCap size={16} />} title="Recommended lessons" link="/learn" games={recommendedRow} />
             <CategoryRow icon={<Sparkles size={16} />} title="Originals" link="/originals" games={originalsRow} />
@@ -212,7 +223,16 @@ function CategoryRow({ icon, title, link, games }) {
     )
 }
 
-export function GameGrid({ games }) {
+export function GameGrid({ games = [] }) {
+    if (!games.length) {
+        return (
+            <div className="casino-empty-state">
+                <strong>No matching games</strong>
+                <span>Try a game name, category, volatility, provider, or mode.</span>
+            </div>
+        )
+    }
+
     return (
         <div className="casino-game-grid">
             {games.map(game => (
@@ -229,6 +249,7 @@ export function GameGrid({ games }) {
                         <div>
                             <b>RTP {game.rtp ? `${(game.rtp * 100).toFixed(1)}%` : 'Lab'}</b>
                             <b>{game.volatility || 'Variable'}</b>
+                            <b>{game.hitFrequency || game.category || 'Practice'}</b>
                         </div>
                     </div>
                 </Link>

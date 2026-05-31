@@ -21,6 +21,14 @@ let sfxVolume = 0.85
 
 const MUTE_STORAGE_KEY = 'gampo:audio:muted'
 const VOLUME_STORAGE_KEY = 'gampo:audio:volumes'
+export const AUDIO_RESUME_TIMEOUT_MS = 250
+
+export function resumeWithTimeout(resumePromise, timeoutMs = AUDIO_RESUME_TIMEOUT_MS) {
+    return Promise.race([
+        resumePromise,
+        new Promise(resolve => setTimeout(resolve, timeoutMs)),
+    ])
+}
 
 function readMuteFromStorage() {
     try {
@@ -143,7 +151,7 @@ export async function unlockAudio() {
                 sfxGain.connect(masterGain)
             }
             if (ctx.state !== 'running') {
-                await ctx.resume()
+                await resumeWithTimeout(ctx.resume())
             }
             return ctx
         } catch (e) {

@@ -3,6 +3,7 @@ import { ChevronDown, Flame, Gauge, Info, Play, RotateCcw, Sparkles, Square, Tic
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useBgm } from '../../../audio/useBgm'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import {
@@ -32,6 +33,7 @@ import {
     buildCascadeTraceCells,
     buildHoldTileStates,
     buildRetriggerFlyers,
+    buildSlotFeatureDemoState,
 } from './slotsMotion'
 import './slots.css'
 
@@ -44,7 +46,7 @@ const FEATURE_LABELS = {
     mystery: 'Mystery',
     'multiplier-zone': 'Multiplier zone',
     'multiplier-wheel': 'Wheel',
-    'hold-and-respin': 'Hold &amp; respin',
+    'hold-and-respin': 'Hold & respin',
 }
 
 const AUTOPLAY_COUNTS = [10, 25, 50, 100]
@@ -66,6 +68,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const definition = findGameDefinition('slots')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const slotSfx = useSfx('slots')
     const session = useGameSession('slots')
 
     const startId = useMemo(() => {
@@ -76,6 +79,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     const [templateId, setTemplateId] = useState(startId)
     const config = useMemo(() => getSlotTemplate(templateId), [templateId])
+    useEffect(() => {
+        setTemplateId(current => current === startId ? current : startId)
+    }, [startId])
+
     // Wave 29 + Wave 32: per-skin BGM. The actual `useBgm()` call is deferred
     // until after `freeSpinSession` is declared so we can swap between
     // `idle` and `bonus` loops when the bonus is live.
@@ -206,6 +213,75 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     useEffect(() => () => clearTimers(), [clearTimers])
 
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined
+        const forceBonusState = () => {
+            const trigger = Date.now()
+            const lastIndex = Math.max(0, cellPositions.length - 1)
+            const scatterIndexes = Array.from(new Set([0, Math.min(7, lastIndex), Math.min(14, lastIndex)]))
+            const demo = buildSlotFeatureDemoState({
+                layout: config.layout,
+                cellPositions,
+                scatterIndexes,
+                retriggerAmount: 5,
+                wheelValue: 10,
+                trigger,
+            })
+            const visibleScatters = demo.scatterCells.map(cell => cell.index)
+            const scatterSymbol = config.symbols.find(symbol => symbol.id === config.features?.scatter?.symbolId) || config.symbols.find(symbol => symbol.type === 'scatter')
+            const demoGrid = grid.map((cell, index) => (scatterSymbol && visibleScatters.includes(index)) ? scatterSymbol : cell)
+            const holdBoard = {
+                size: 12,
+                startFilled: 3,
+                finalFilled: 7,
+                filledIndexes: demo.holdTiles.filter(tile => tile.filled).map(tile => tile.index),
+                newFillIndexes: demo.holdTiles.filter(tile => tile.fresh).map(tile => tile.index),
+            }
+            const featureEvents = [
+                { type: 'free-spins', count: 8 },
+                { type: 'retrigger', amount: 5 },
+                { type: 'multiplier-wheel', value: demo.wheel.value },
+                { type: 'hold-and-respin', award: { name: 'Locked prize', multiplier: demo.wheel.value }, board: holdBoard },
+                { type: 'cascade', steps: 2 },
+                { type: 'money-collect', amount: round2(betAmount * 5) },
+            ]
+            setRunning(false)
+            setSpinPhase('win')
+            setAnticipating(false)
+            setGrid(demoGrid)
+            setWinningCells(visibleScatters)
+            setWheelReveal({ trigger, value: demo.wheel.value })
+            setHoldReveal({ trigger, award: { name: 'Locked prize', multiplier: demo.wheel.value }, board: holdBoard })
+            setRetriggerFlyers(demo.retriggerFlyers)
+            setFreeSpins(8)
+            setFreeSpinSession({ totalAwarded: 8, played: 0, totalWin: 0, baseBet: betAmount, retriggers: 1 })
+            setLastResult({
+                cells: demoGrid,
+                wins: [],
+                winningIndexes: visibleScatters,
+                wildIndexes: [],
+                featureEvents,
+                multiplier: demo.wheel.value,
+                profit: round2(betAmount * (demo.wheel.value - 1)),
+                returnAmount: round2(betAmount * demo.wheel.value),
+                stake: betAmount,
+                baseBet: betAmount,
+                cascadeSteps: 2,
+                moneyTotal: round2(betAmount * 5),
+                moneyValues: visibleScatters.map((index, order) => ({ index, value: round2(betAmount * (order + 1)) })),
+                triggeredFreeSpins: 8,
+            })
+            return { templateId: config.id, featureEvents }
+        }
+        const api = { forceBonusState }
+        window.__gampoSlotQa = { ...(window.__gampoSlotQa || {}), [config.id]: api, forceBonusState }
+        window.dispatchEvent(new CustomEvent('gampo:slot-qa-ready', { detail: { templateId: config.id } }))
+        return () => {
+            if (window.__gampoSlotQa?.[config.id] === api) delete window.__gampoSlotQa[config.id]
+            if (window.__gampoSlotQa?.forceBonusState === forceBonusState) delete window.__gampoSlotQa.forceBonusState
+        }
+    }, [betAmount, cellPositions, config, grid])
+
     const paylineMode = evaluationLabel(config.layout.evaluation)
     const buyTiers = useMemo(() => getBuyTiers(config), [config])
     const activeBuyTier = useMemo(() => buyTiers.find(t => t.id === bonusBuyTierId) || null, [buyTiers, bonusBuyTierId])
@@ -236,20 +312,26 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const wheelEvent = result.featureEvents.find(item => item.type === 'multiplier-wheel')
         if (wheelEvent) {
             setWheelReveal({ trigger: revealTrigger, value: wheelEvent.value })
+            slotSfx.play('wheelLand', { volume: 0.85 })
         } else {
             setWheelReveal(null)
         }
         const holdEvent = result.featureEvents.find(item => item.type === 'hold-and-respin')
         if (holdEvent) {
             setHoldReveal({ trigger: revealTrigger, award: holdEvent.award, board: holdEvent.board })
+            slotSfx.play('holdFill', { volume: 0.85 })
         } else {
             setHoldReveal(null)
         }
+        if (result.mysteryReveal) slotSfx.play('mysteryReveal', { volume: 0.78 })
+        if (result.cascadeSteps > 0) slotSfx.play('cascadeStep', { volume: 0.72 })
+        if (result.featureEvents.some(item => item.type === 'money-collect')) slotSfx.play('moneyCollect', { volume: 0.85 })
 
         // Wave 9: sticky-wild lock — accumulate wild positions during free-spin sessions, drop on session end.
         if (config.features?.stackedWildReel?.sticky || config.features?.stickyWild) {
             if (usedFreeSpin || result.triggeredFreeSpins) {
                 setStickyWilds(prev => Array.from(new Set([...prev, ...(result.wildIndexes || [])])))
+                if (result.wildIndexes?.length) slotSfx.play('stickyLock', { volume: 0.76 })
             }
         }
 
@@ -276,6 +358,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
         const freeSpinEvent = result.featureEvents.find(item => item.type === 'free-spins')
         if (freeSpinEvent?.freeSpins) {
+            slotSfx.play('bonusEnter', { volume: 0.92 })
             if (freeSpinSession && freeSpinEvent.indexes?.length) {
                 const flyers = buildRetriggerFlyers({
                     indexes: freeSpinEvent.indexes,
@@ -335,9 +418,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         })
 
         if (profit > 0 && (result.multiplier >= 8 || profit >= baseBet * 8)) {
+            slotSfx.play('bigwin', { volume: 0.9 })
             playSound('bigwin')
             setBigWin({ trigger: Date.now(), profit, multiplier: result.multiplier })
         } else {
+            slotSfx.play(profit > 0 ? 'win' : 'lose', { volume: profit > 0 ? 0.78 : 0.66 })
             playSound(profit > 0 ? 'win' : 'loss')
         }
 
@@ -347,7 +432,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`,
         )
         resolve({ profit, multiplier: result.multiplier, featureEvents: result.featureEvents })
-    }, [addWinnings, cellPositions, clearTimers, config, freeSpinSession, playSound, session, showToast])
+    }, [addWinnings, cellPositions, clearTimers, config, freeSpinSession, playSound, session, showToast, slotSfx])
 
     const performSpin = useCallback(({ source = 'manual', bet = betAmount, free = canUseFreeSpin, tierId = null } = {}) => (
         new Promise(resolve => {
@@ -403,6 +488,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setRetriggerFlyers([])
             setAnticipating(false)
             playSound('tick')
+            slotSfx.play('spinStart', { volume: 0.85 })
+            slotSfx.play('reelTick', { volume: 0.42 })
 
             ticker.current = window.setInterval(() => {
                 setGrid(prev => prev.map((cell, index) => {
@@ -421,7 +508,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 const captureCol = col
                 timers.current.push(window.setTimeout(() => {
                     playSound('flip')
+                    slotSfx.play('reelStop', { volume: 0.62 })
                     if (willAnticipate && captureCol === anticipationFromCol + 1) {
+                        slotSfx.play('anticipation', { volume: 0.72 })
                         setAnticipating(true)
                     }
                     setStoppedColumnState(captureCol)
@@ -437,7 +526,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 finishRound({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
             }, totalDelay))
         })
-    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, finishRound, freeSpins, placeBet, playSound, running, setStoppedColumnState, showToast, stickyWilds, turbo])
+    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, finishRound, freeSpins, placeBet, playSound, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
 
     const triggerStageSpin = useCallback(() => {
         const tierId = canUseFreeSpin ? null : buyTierIdRef.current
@@ -522,6 +611,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             layout: config.layout,
         })
     }, [cellPositions, config.layout, lastResult, running])
+    const visibleFeatureEvents = useMemo(() => {
+        if (running || !lastResult?.featureEvents?.length) return []
+        return lastResult.featureEvents.slice(0, 3)
+    }, [lastResult, running])
     const cover = `/images/covers/generated/${config.id}.png`
 
     return (
@@ -678,7 +771,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
         >
             <div
-                className={`slot-stage-v2 skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''}`}
+                className={`slot-stage-v2 skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''} ${freeSpinSession || freeSpins > 0 ? 'is-bonus-active' : ''} ${lastResult?.featureEvents?.length ? 'has-feature-event' : ''}`}
                 style={{
                     '--slot-accent': config.accent,
                     '--slot-cover': `url(${cover})`,
@@ -826,6 +919,22 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 accent={config.accent}
                             />
                         )}
+                        {anticipating && running && (
+                            <div className="slot-anticipation-callout" aria-live="polite">
+                                <span>Scatter watch</span>
+                                <strong>reels slowing</strong>
+                            </div>
+                        )}
+                        {visibleFeatureEvents.length > 0 && (
+                            <div className="slot-feature-callouts" aria-live="polite">
+                                {visibleFeatureEvents.map((event, index) => (
+                                    <span key={`${event.type}-${index}`} className={`slot-feature-callout type-${event.type}`}>
+                                        <em>{FEATURE_LABELS[event.type] || event.type}</em>
+                                        <strong>{event.label || (event.freeSpins ? `+${event.freeSpins} spins` : 'Feature hit')}</strong>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -901,7 +1010,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 )}
 
                 {wheelReveal && !running && (
-                    <div className="slot-wheel-overlay" key={wheelReveal.trigger}>
+                    <div className="slot-wheel-overlay" key={`wheel-${wheelReveal.trigger}`}>
                         <span>Multiplier wheel</span>
                         <div className="slot-wheel-disc" aria-hidden>
                             <i className="slot-wheel-pointer" />
@@ -932,7 +1041,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 )}
 
                 {holdReveal && !running && (
-                    <div className="slot-hold-overlay" key={holdReveal.trigger}>
+                    <div className="slot-hold-overlay" key={`hold-${holdReveal.trigger}`}>
                         <header>
                             <span>Hold &amp; Respin</span>
                             <strong>{holdReveal.award.name}</strong>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, Radio, RefreshCcw } from 'lucide-react'
+import { useGameBgm } from '../audio/useBgm'
 import { useCredits } from '../context/CreditContext'
 import { formatCredits } from '../utils/simulationMath'
 import { buildSyntheticSportsbookData, driftSyntheticEvents } from './sportsbookData'
@@ -50,6 +51,7 @@ function titleForView(viewState, sports) {
 }
 
 function SportsbookShell() {
+    useGameBgm('sports', 'idle')
     const navigate = useNavigate()
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const [sports, setSports] = useState(() => initialFeed().sports)
@@ -186,11 +188,11 @@ function SportsbookShell() {
                 onNavigate={navigateSportsbook}
             />
 
-            <main className="sb-main">
+            <section className="sb-main" aria-labelledby="sportsbook-heading">
                 <header className="sb-topbar">
                     <div>
                         <span>Gampo Sportsbook</span>
-                        <strong>{titleForView(viewState, sports)}</strong>
+                        <h1 id="sportsbook-heading">{titleForView(viewState, sports)}</h1>
                     </div>
                     <div className="sb-topbar-actions">
                         {feedLoaded ? <small><Radio size={12} /> optional feed connected</small> : null}
@@ -232,7 +234,7 @@ function SportsbookShell() {
                         onOpenEvent={openEvent}
                     />
                 )}
-            </main>
+            </section>
 
             <div className="sb-desktop-slip">
                 <BetSlip

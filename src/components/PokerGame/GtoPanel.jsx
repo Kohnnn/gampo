@@ -6,8 +6,8 @@
 // QA v4 upgrade: hand search, suggested-action callout pulled from the hero
 // cell, frequency progress bars in the breakdown, and a live legend.
 
-import { useEffect, useMemo, useState } from 'react'
-import { allHandCodes, codeAt, gridCellFor } from '../../poker/util/handCanonicalize'
+import { useEffect, useState } from 'react'
+import { codeAt } from '../../poker/util/handCanonicalize'
 import { fetchPayload } from '../../poker/gto/lookup'
 
 const RANK_HEADERS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
@@ -34,6 +34,7 @@ export default function GtoPanel({ state }) {
     const [loading, setLoading] = useState(true)
     const [exploit, setExploit] = useState(null)
     const [search, setSearch] = useState('')
+    const [selectedHand, setSelectedHand] = useState(null)
 
     useEffect(() => {
         if (!state) { setPayload(null); setLoading(false); return }
@@ -61,6 +62,9 @@ export default function GtoPanel({ state }) {
         { key: 'call', label: 'Call', value: heroCell.call || 0 },
         { key: 'fold', label: 'Fold', value: heroCell.fold || 0 },
     ] : []
+    const selectedCode = selectedHand || payload.heroHand
+    const selectedCell = selectedCode ? payload.grid?.cells?.[selectedCode] : null
+    const selectedAction = selectedCell ? pickAction(selectedCell) : null
 
     return (
         <div className="gto-panel">
@@ -132,7 +136,35 @@ export default function GtoPanel({ state }) {
                 </div>
             </div>
 
-            {payload.grid && <Grid grid={payload.grid} heroHand={payload.heroHand} filterCode={filterCode} />}
+            {selectedCell && (
+                <div className={`gto-hand-detail gto-hand-detail-live tone-${selectedAction.tone}`}>
+                    <header>
+                        <span>{selectedCode === payload.heroHand ? 'Hero hand' : 'Selected hand'}</span>
+                        <strong>{selectedCode}</strong>
+                        <em>{selectedAction.label}</em>
+                    </header>
+                    <div className="gto-detail-bars">
+                        {['raise', 'call', 'fold'].map(key => (
+                            <span key={key} className={key}>
+                                <b>{key}</b>
+                                <i style={{ width: `${(selectedCell[key] || 0) * 100}%` }} />
+                                <strong>{((selectedCell[key] || 0) * 100).toFixed(0)}%</strong>
+                            </span>
+                        ))}
+                    </div>
+                    <p>{detailText(selectedCode, selectedCell, liveMetrics, payload)}</p>
+                </div>
+            )}
+
+            {payload.grid && (
+                <Grid
+                    grid={payload.grid}
+                    heroHand={payload.heroHand}
+                    selectedHand={selectedCode}
+                    filterCode={filterCode}
+                    onSelectHand={setSelectedHand}
+                />
+            )}
 
             {payload.sizings?.length > 0 && (
                 <div className="gto-sizings">
@@ -259,8 +291,7 @@ function classifyHeroHand(cell, payload, continueFreq) {
     return 'Mixed marginal'
 }
 
-function Grid({ grid, heroHand, filterCode }) {
-    const codes = useMemo(() => allHandCodes(), [])
+function Grid({ grid, heroHand, selectedHand, filterCode, onSelectHand }) {
     return (
         <div className="gto-grid-wrap">
             <table className="gto-grid">
@@ -278,14 +309,23 @@ function Grid({ grid, heroHand, filterCode }) {
                                 const code = codeAt(row, col)
                                 const cell = grid.cells?.[code] || { raise: 0, call: 0, fold: 1 }
                                 const isHero = heroHand && heroHand === code
+                                const selected = selectedHand && selectedHand === code
                                 const dimmed = filterCode && !code.toUpperCase().startsWith(filterCode)
                                 const tip = `${code} · raise ${(cell.raise * 100).toFixed(0)}% · call ${(cell.call * 100).toFixed(0)}% · fold ${(cell.fold * 100).toFixed(0)}%`
                                 return (
-                                    <td key={col} className={`gto-cell${isHero ? ' hero' : ''}${dimmed ? ' dim' : ''}`} title={tip}>
-                                        <span className="gto-cell-fill" style={{
-                                            background: cellGradient(cell),
-                                        }} />
-                                        <span className="gto-cell-label">{code}</span>
+                                    <td key={col} className={`gto-cell${isHero ? ' hero' : ''}${selected ? ' selected' : ''}${dimmed ? ' dim' : ''}`} title={tip}>
+                                        <button
+                                            type="button"
+                                            className="gto-cell-button"
+                                            aria-label={tip}
+                                            aria-pressed={selected}
+                                            onClick={() => onSelectHand(code)}
+                                        >
+                                            <span className="gto-cell-fill" style={{
+                                                background: cellGradient(cell),
+                                            }} />
+                                            <span className="gto-cell-label">{code}</span>
+                                        </button>
                                     </td>
                                 )
                             })}
@@ -295,6 +335,13 @@ function Grid({ grid, heroHand, filterCode }) {
             </table>
         </div>
     )
+}
+
+function detailText(code, cell, metrics, payload) {
+    const action = pickAction(cell)
+    const continuePct = (((cell.raise || 0) + (cell.call || 0)) * 100).toFixed(0)
+    const context = payload.mode === 'postflop' ? `on ${payload.textureKey || 'this board'}` : 'preflop'
+    return `${code} is a ${action.label.toLowerCase()}-leaning ${context} combo. Continue ${continuePct}% with pot odds ${metrics.potOdds} and SPR ${metrics.spr}.`
 }
 
 function cellGradient(cell) {

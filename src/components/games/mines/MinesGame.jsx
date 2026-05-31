@@ -66,7 +66,6 @@ function placeBombs(bombs) {
 }
 
 export default function MinesGame() {
-    useGameBgm('mines', 'idle')
     const definition = findGameDefinition('mines') || { name: 'Mines', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
@@ -96,6 +95,8 @@ export default function MinesGame() {
     const currentMult = useMemo(() => multiplierFor(picks, bombs), [picks, bombs])
     const nextMult = useMemo(() => multiplierFor(picks + 1, bombs), [picks, bombs])
     const inRound = phase === 'playing'
+    const minesBgmMode = inRound && currentMult >= 3 ? 'bonus' : 'idle'
+    useGameBgm('mines', minesBgmMode)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (inRound) { resolve({ profit: 0 }); return }
@@ -211,8 +212,8 @@ export default function MinesGame() {
                     onPlayPhaseAction={() => cashOut()}
                 >
                     <div className="bp-section">
-                        <label className="bp-label">Bombs ({bombs})</label>
-                        <input type="range" min="1" max="24" value={bombs} disabled={inRound} onChange={e => setBombs(Number(e.target.value))} className="dice-slider" />
+                        <label className="bp-label" htmlFor="mines-bomb-count">Bombs ({bombs})</label>
+                        <input id="mines-bomb-count" type="range" min="1" max="24" value={bombs} disabled={inRound} onChange={e => setBombs(Number(e.target.value))} className="dice-slider" />
                         <div className="bp-quick-actions">
                             {[1, 3, 5, 10, 24].map(b => (
                                 <button key={b} onClick={() => !inRound && setBombs(b)}>{b}</button>

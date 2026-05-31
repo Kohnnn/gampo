@@ -3,6 +3,7 @@ import {
     SLOT_HOLD_NEW_TILE_PULSE_MS,
     SLOT_RETRIGGER_FLY_MS,
     SLOT_WHEEL_WOBBLE_MS,
+    buildSlotFeatureDemoState,
     buildCascadeTraceCells,
     buildHoldTileStates,
     buildRetriggerFlyers,
@@ -91,5 +92,28 @@ describe('slot motion helpers', () => {
         expect(SLOT_WHEEL_WOBBLE_MS).toBe(350)
         expect(SLOT_HOLD_NEW_TILE_PULSE_MS).toBe(200)
         expect(SLOT_RETRIGGER_FLY_MS).toBe(320)
+    })
+
+    it('builds a deterministic QA state for feature visual checks', () => {
+        const demo = buildSlotFeatureDemoState({
+            layout: { cols: 5, rows: 3 },
+            scatterIndexes: [0, 7, 14],
+            retriggerAmount: 8,
+            wheelValue: 25,
+            holdBoard: {
+                size: 6,
+                startFilled: 2,
+                finalFilled: 5,
+                filledIndexes: [0, 1, 2, 4, 5],
+                newFillIndexes: [2, 4, 5],
+            },
+            trigger: 99,
+        })
+
+        expect(demo.scatterCells.map(cell => cell.index)).toEqual([0, 7, 14])
+        expect(demo.wheel).toEqual({ value: 25, wobbleMs: SLOT_WHEEL_WOBBLE_MS })
+        expect(demo.holdTiles.filter(tile => tile.fresh).map(tile => tile.index)).toEqual([2, 4, 5])
+        expect(demo.retriggerFlyers.map(flyer => flyer.id)).toEqual(['99-0-0', '99-7-1', '99-14-2'])
+        expect(demo.retriggerFlyers.every(flyer => flyer.amount === 8)).toBe(true)
     })
 })

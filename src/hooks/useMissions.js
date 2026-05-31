@@ -24,7 +24,7 @@
 // thin re-export below).
 
 import { useEffect, useState } from 'react'
-import { evaluateMissions } from '../data/missions'
+import { MISSIONS, evaluateMissions } from '../data/missions'
 
 const STATE_KEY = 'gampo_missions_period_state'
 const COMPLETED_KEY = 'gampo_missions_completed'
@@ -198,6 +198,21 @@ export function resetMissions() {
     notify()
 }
 
+export function resetVipProgress() {
+    state = {
+        ...state,
+        lifetime: { ...DEFAULT_PERIOD, uniqueGames: [] },
+    }
+    const lifetimeIds = new Set(MISSIONS.filter(m => m.period === 'lifetime').map(m => m.id))
+    completed = Object.fromEntries(
+        Object.entries(completed).filter(([id]) => !lifetimeIds.has(id)),
+    )
+    recentComplete = recentComplete && lifetimeIds.has(recentComplete.id) ? null : recentComplete
+    writeState()
+    writeCompleted()
+    notify()
+}
+
 export function useMissions() {
     const [, force] = useState(0)
     useEffect(() => {
@@ -236,5 +251,6 @@ export function useMissions() {
         claim: claimMission,
         dismiss: dismissMissionToast,
         reset: resetMissions,
+        resetVip: resetVipProgress,
     }
 }

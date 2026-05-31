@@ -32,6 +32,7 @@ export default function GameShell({
             </>
         )
     const safeVariant = variant === 'rainbet' ? 'rainbet' : 'stake'
+    const playfieldLabel = `${title || definition?.name || 'Game'} playfield`
     return (
         <div
             className={`game-shell gs-variant-${safeVariant}`}
@@ -52,7 +53,7 @@ export default function GameShell({
             </div>
             <div className="gs-layout">
                 <div className="gs-panel">{panel}</div>
-                <div className="gs-playfield">{children}</div>
+                <div className="gs-playfield" role="region" aria-label={playfieldLabel} tabIndex={0}>{children}</div>
                 <div className="gs-aside">{aside}</div>
             </div>
         </div>

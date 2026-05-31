@@ -231,3 +231,61 @@
     height: 8px;
 }
 
+@media (max-width: 640px) {
+    .dice-stage {
+        gap: 14px;
+        padding: 12px 6px;
+    }
+
+    .dice-pips {
+        gap: 5px;
+    }
+
+    .dice-pip {
+        min-height: 42px;
+        padding: 6px 4px;
+        border-radius: 8px;
+    }
+
+    .dice-pip-label {
+        font-size: 13px;
+    }
+
+    .dice-big {
+        font-size: clamp(54px, 20vw, 82px);
+    }
+
+    .dice-track {
+        height: 48px;
+        border-width: 2px;
+    }
+
+    .dice-marker {
+        top: -8px;
+    }
+
+    .dice-marker span {
+        height: 64px;
+        width: 8px;
+    }
+
+    .dice-rule span:nth-child(odd)::after {
+        display: none;
+    }
+
+    .dice-meta-row {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        margin-top: 0;
+    }
+
+    .dice-meta-card {
+        padding: 8px;
+        border-radius: 8px;
+    }
+
+    .dice-meta-card strong {
+        font-size: 15px;
+    }
+}

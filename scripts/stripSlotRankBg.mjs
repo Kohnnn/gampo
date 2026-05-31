@@ -9,6 +9,8 @@
 //
 // Targets:
 //   public/assets/games/slots/<skin>/slot-rank-<template>-{10,J,Q,K,A}.png
+//   with --symbols:
+//   public/assets/games/slots/<skin>/<template>-{hero,mid1,mid2,bonus}.png
 //
 // Pure Node, no deps. Reuses the filter-aware decoder pattern from
 // `sliceSlotRankArt.mjs`.
@@ -16,6 +18,7 @@
 // Usage:
 //   node scripts/stripSlotRankBg.mjs              # process all rank slices
 //   node scripts/stripSlotRankBg.mjs --atlases    # also process the parent atlases
+//   node scripts/stripSlotRankBg.mjs --symbols    # process premium slot symbols
 
 import { mkdir, readFile, readdir, writeFile, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -267,6 +270,117 @@ function stripBackground(img, bg, threshold = 26) {
     return { width, height, rgba: out, stripped, total, ratio: total ? stripped / total : 0 }
 }
 
+function removeLightBoxRemnants(img) {
+    const { width, height, rgba } = img
+    const out = Buffer.from(rgba)
+    let cleaned = 0
+    for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+            const i = (y * width + x) * 4
+            const a = out[i + 3]
+            if (a === 0) continue
+            if (a < 24) {
+                out[i + 3] = 0
+                cleaned += 1
+                continue
+            }
+            const r = out[i]
+            const g = out[i + 1]
+            const b = out[i + 2]
+            const max = Math.max(r, g, b)
+            const min = Math.min(r, g, b)
+            const lowSaturation = max - min <= 18
+            const palePlate = r >= 208 && g >= 208 && b >= 208
+            if (palePlate && lowSaturation && a <= 220) {
+                out[i + 3] = 0
+                cleaned += 1
+            }
+        }
+    }
+    return { width, height, rgba: out, cleaned }
+}
+
+function isNeutralBackdropPixel(rgba, i) {
+    const a = rgba[i + 3]
+    if (a <= 16) return false
+    const r = rgba[i]
+    const g = rgba[i + 1]
+    const b = rgba[i + 2]
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const lum = 0.30 * r + 0.59 * g + 0.11 * b
+    return max - min <= 18 && lum >= 188
+}
+
+function removeNeutralBackdrop(img) {
+    const { width, height, rgba } = img
+    const out = Buffer.from(rgba)
+    let minX = width, minY = height, maxX = 0, maxY = 0
+    let any = false
+    for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+            if (out[(y * width + x) * 4 + 3] <= 16) continue
+            any = true
+            if (x < minX) minX = x
+            if (y < minY) minY = y
+            if (x > maxX) maxX = x
+            if (y > maxY) maxY = y
+        }
+    }
+    if (!any) return { width, height, rgba: out, cleanedBackdrop: 0 }
+
+    const visited = new Uint8Array(width * height)
+    const queue = []
+    function seed(x, y) {
+        if (x < minX || x > maxX || y < minY || y > maxY) return
+        const p = y * width + x
+        if (visited[p]) return
+        const i = p * 4
+        if (!isNeutralBackdropPixel(out, i)) return
+        visited[p] = 1
+        queue.push(p)
+    }
+    for (let x = minX; x <= maxX; x += 1) {
+        seed(x, minY)
+        seed(x, maxY)
+    }
+    for (let y = minY; y <= maxY; y += 1) {
+        seed(minX, y)
+        seed(maxX, y)
+    }
+    for (let y = minY; y <= maxY; y += 1) {
+        for (let x = minX; x <= maxX; x += 1) {
+            const p = y * width + x
+            const i = p * 4
+            if (!isNeutralBackdropPixel(out, i)) continue
+            const touchesTransparent =
+                x === 0 || y === 0 || x === width - 1 || y === height - 1 ||
+                out[(y * width + Math.max(0, x - 1)) * 4 + 3] <= 16 ||
+                out[(y * width + Math.min(width - 1, x + 1)) * 4 + 3] <= 16 ||
+                out[(Math.max(0, y - 1) * width + x) * 4 + 3] <= 16 ||
+                out[(Math.min(height - 1, y + 1) * width + x) * 4 + 3] <= 16
+            if (touchesTransparent) seed(x, y)
+        }
+    }
+
+    let cleanedBackdrop = 0
+    for (let q = 0; q < queue.length; q += 1) {
+        const p = queue[q]
+        const x = p % width
+        const y = Math.floor(p / width)
+        const i = p * 4
+        if (out[i + 3] !== 0) {
+            out[i + 3] = 0
+            cleanedBackdrop += 1
+        }
+        seed(x + 1, y)
+        seed(x - 1, y)
+        seed(x, y + 1)
+        seed(x, y - 1)
+    }
+    return { width, height, rgba: out, cleanedBackdrop }
+}
+
 function tightCrop(img, padPct = 0.08) {
     const { width, height, rgba } = img
     let minX = width, minY = height, maxX = 0, maxY = 0
@@ -325,6 +439,38 @@ function squarePad(img, padding = 0.08) {
     return { width: side, height: side, rgba: canvas }
 }
 
+function resizeImage(img, maxSide = 768) {
+    const side = Math.max(img.width, img.height)
+    if (side <= maxSide) return img
+    const scale = maxSide / side
+    const width = Math.max(1, Math.round(img.width * scale))
+    const height = Math.max(1, Math.round(img.height * scale))
+    const out = Buffer.alloc(width * height * 4)
+    for (let y = 0; y < height; y += 1) {
+        const srcY = (y + 0.5) / scale - 0.5
+        const y0 = Math.max(0, Math.floor(srcY))
+        const y1 = Math.min(img.height - 1, y0 + 1)
+        const fy = srcY - y0
+        for (let x = 0; x < width; x += 1) {
+            const srcX = (x + 0.5) / scale - 0.5
+            const x0 = Math.max(0, Math.floor(srcX))
+            const x1 = Math.min(img.width - 1, x0 + 1)
+            const fx = srcX - x0
+            const di = (y * width + x) * 4
+            const i00 = (y0 * img.width + x0) * 4
+            const i10 = (y0 * img.width + x1) * 4
+            const i01 = (y1 * img.width + x0) * 4
+            const i11 = (y1 * img.width + x1) * 4
+            for (let c = 0; c < 4; c += 1) {
+                const top = img.rgba[i00 + c] * (1 - fx) + img.rgba[i10 + c] * fx
+                const bot = img.rgba[i01 + c] * (1 - fx) + img.rgba[i11 + c] * fx
+                out[di + c] = Math.round(top * (1 - fy) + bot * fy)
+            }
+        }
+    }
+    return { width, height, rgba: out }
+}
+
 // ---- main ----
 
 async function findRankSlices(includeAtlases = false) {
@@ -340,6 +486,22 @@ async function findRankSlices(includeAtlases = false) {
             const isSlice = /-(10|J|Q|K|A)\.png$/.test(f)
             if (isSlice) out.push({ dir, file: f, slice: true })
             else if (includeAtlases) out.push({ dir, file: f, slice: false })
+        }
+    }
+    return out
+}
+
+async function findPremiumSymbols() {
+    const skins = await readdir(SLOTS_DIR, { withFileTypes: true })
+    const out = []
+    for (const dirent of skins) {
+        if (!dirent.isDirectory()) continue
+        const dir = join(SLOTS_DIR, dirent.name)
+        const files = await readdir(dir).catch(() => [])
+        for (const f of files) {
+            if (!/-(hero|mid1|mid2|bonus)\.png$/.test(f)) continue
+            if (f.startsWith('slot-rank-')) continue
+            out.push({ dir, file: f, slice: true, symbol: true })
         }
     }
     return out
@@ -365,7 +527,8 @@ async function safeWrite(fp, buf, retries = 3) {
 async function main() {
     const args = new Set(process.argv.slice(2))
     const includeAtlases = args.has('--atlases')
-    const targets = await findRankSlices(includeAtlases)
+    const includeSymbols = args.has('--symbols')
+    const targets = includeSymbols ? await findPremiumSymbols() : await findRankSlices(includeAtlases)
     let processed = 0
     let skippedTextured = 0
     for (const { dir, file } of targets) {
@@ -373,7 +536,23 @@ async function main() {
         const orig = await readFile(fp)
         const img = decodePng(orig)
         const bg = sampleBackground(img)
-        if (!bg) { processed += 1; continue }
+        if (!bg) {
+            const deboxed = removeNeutralBackdrop(removeLightBoxRemnants(img))
+            if (includeSymbols && Math.max(img.width, img.height) > 512) {
+                const final = resizeImage(deboxed, 512)
+                await safeWrite(fp, encodePng(final.width, final.height, final.rgba))
+                // eslint-disable-next-line no-console
+                console.log(`  ok ${file} ${img.width}x${img.height} → ${final.width}x${final.height} (resized transparent, cleaned ${deboxed.cleaned || 0}/${deboxed.cleanedBackdrop || 0})`)
+            } else if (includeSymbols || deboxed.cleanedBackdrop > 0) {
+                if ((deboxed.cleaned || 0) + (deboxed.cleanedBackdrop || 0) > 0) {
+                    await safeWrite(fp, encodePng(deboxed.width, deboxed.height, deboxed.rgba))
+                    // eslint-disable-next-line no-console
+                    console.log(`  ok ${file} ${img.width}x${img.height} (cleaned ${deboxed.cleaned || 0}/${deboxed.cleanedBackdrop || 0})`)
+                }
+            }
+            processed += 1
+            continue
+        }
         // Wave 39: bumped variance ceiling to 9000 (was 1200) — k-means now
         // resolves a centroid even on noisy backgrounds. Anything above
         // 9000 means the rim itself is multi-toned and stripping would
@@ -389,17 +568,30 @@ async function main() {
         const stripped = stripBackground(img, bg, threshold)
         // If we stripped < 5 % we probably got a non-uniform background; abort.
         if (!stripped.ratio || stripped.ratio < 0.05) {
+            const deboxed = removeNeutralBackdrop(removeLightBoxRemnants(img))
+            if ((deboxed.cleaned || 0) + (deboxed.cleanedBackdrop || 0) > 0) {
+                const cropped = tightCrop(deboxed, 0.08)
+                const padded = squarePad(cropped, includeSymbols ? 0.12 : 0.06)
+                const final = includeSymbols ? resizeImage(padded, 512) : padded
+                await safeWrite(fp, encodePng(final.width, final.height, final.rgba))
+                processed += 1
+                // eslint-disable-next-line no-console
+                console.log(`  ok ${file} ${img.width}x${img.height} → ${final.width}x${final.height} (low-strip cleanup ${(stripped.ratio * 100).toFixed(1)}%, cleaned ${deboxed.cleaned || 0}/${deboxed.cleanedBackdrop || 0})`)
+                continue
+            }
             // eslint-disable-next-line no-console
             console.log(`  skip low-strip ${file} ratio=${(stripped.ratio * 100).toFixed(1)}%`)
             continue
         }
-        const cropped = tightCrop(stripped, 0.08)
-        const final = squarePad(cropped, 0.06)
+        const cleaned = removeNeutralBackdrop(removeLightBoxRemnants(stripped))
+        const cropped = tightCrop(cleaned, 0.08)
+        const padded = squarePad(cropped, includeSymbols ? 0.12 : 0.06)
+        const final = includeSymbols ? resizeImage(padded, 512) : padded
         const out = encodePng(final.width, final.height, final.rgba)
         await safeWrite(fp, out)
         processed += 1
         // eslint-disable-next-line no-console
-        console.log(`  ok ${file} ${img.width}x${img.height} → ${final.width}x${final.height} (stripped ${(stripped.ratio * 100).toFixed(0)}% th=${threshold})`)
+        console.log(`  ok ${file} ${img.width}x${img.height} → ${final.width}x${final.height} (stripped ${(stripped.ratio * 100).toFixed(0)}% th=${threshold}, cleaned ${cleaned.cleaned || 0}/${cleaned.cleanedBackdrop || 0})`)
     }
     // eslint-disable-next-line no-console
     console.log(`[stripSlotRankBg] processed=${processed} skippedTextured=${skippedTextured}`)

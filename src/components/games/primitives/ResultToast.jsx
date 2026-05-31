@@ -3,6 +3,7 @@
 // 180ms out per the implementation guide section 7.
 
 import { useEffect, useState } from 'react'
+import { formatCredits } from '../../../utils/simulationMath'
 
 export default function ResultToast({
     result, // { kind: 'win'|'lose'|'push'|'cashout', amount?, multiplier?, message? } | null
@@ -40,7 +41,10 @@ export default function ResultToast({
                 {Number.isFinite(latched.multiplier) ? <strong className="rt-mult">{formatMult(latched.multiplier)}x</strong> : null}
             </div>
             {Number.isFinite(latched.amount) ? (
-                <div className="rt-amount">{latched.amount > 0 ? `+${latched.amount.toFixed(2)}` : latched.amount.toFixed(2)}</div>
+                <div className="rt-amount">
+                    {latched.amount > 0 ? '+' : latched.amount < 0 ? '-' : ''}
+                    {formatCredits(Math.abs(latched.amount))}
+                </div>
             ) : null}
         </div>
     )

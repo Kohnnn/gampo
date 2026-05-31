@@ -101,7 +101,6 @@ function simulatePlayers(bust) {
 }
 
 export default function CrashGame() {
-    useGameBgm('crash', 'idle')
     const definition = findGameDefinition('crash') || { name: 'Crash', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
@@ -136,6 +135,8 @@ export default function CrashGame() {
     const bettingTickRef = useRef(null)
     const pendingResolveRef = useRef(null)
     const { schedule, cancelAll } = useCancellableTimeouts()
+    const crashBgmMode = phase === 'running' && multiplier >= 5 ? 'bonus' : 'idle'
+    useGameBgm('crash', crashBgmMode)
 
     // Wave 2 deterministic round machine. Crash drives the multiplier
     // through pre-baked events: betting countdown, ramp checkpoints, bust
@@ -420,8 +421,9 @@ export default function CrashGame() {
                     onPlayPhaseAction={cashOut}
                 >
                     <div className="bp-section">
-                        <label className="bp-label">Auto Cashout (×)</label>
+                        <label className="bp-label" htmlFor="crash-auto-cashout">Auto Cashout (×)</label>
                         <input
+                            id="crash-auto-cashout"
                             type="number"
                             min="1.01"
                             max="1000"

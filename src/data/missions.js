@@ -150,7 +150,8 @@ export const MISSION_PERIODS = {
 
 export function evaluateMissions(stats) {
     return MISSIONS.map(m => {
-        const value = m.evaluate(stats) || 0
+        const rawValue = m.evaluate(stats) || 0
+        const value = Array.isArray(rawValue) ? rawValue.length : rawValue
         const progress = Math.min(value, m.target)
         const ratio = m.target > 0 ? Math.min(1, progress / m.target) : 0
         return {

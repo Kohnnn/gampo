@@ -12,7 +12,7 @@
 //
 // Outputs:
 //   public/data/cs-cases.json          curated cases for the carousel game (kept small)
-//   public/data/cs-collection.json     full pokedex catalog (every skin, every wear)
+//   public/data/cs-collection.json     full collection catalog (every skin, every wear)
 //   public/data/cs-prices.json         optional price map keyed by skin id
 //
 // Dataset shape (cs-collection.json):
@@ -37,6 +37,11 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+    fallbackOpenPriceGc,
+    inferCaseCategory,
+    roundGc,
+} from '../src/components/games/cases/caseEconomy.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -218,21 +223,34 @@ async function main() {
     // case's contains list (not by max multiplier). The CS2 rarity ladder
     // maps cleanly to four playable tiers:
     //
-    //   classified    = Mil-Spec / Restricted / Industrial Grade
-    //   covert        = Classified
+    //   classified    = Mil-Spec / Restricted / Industrial Grade / High Grade
+    //   covert        = Classified / Remarkable / Exotic
     //   exceedingly   = Covert
     //   contraband    = Extraordinary / Contraband / ★ knife-grade
     //
     // This replaces the prior `low / mid / high` model that the user
     // asked to retire.
-    const PLAYABLE_TYPES = new Set(['Case', 'Souvenir Package', 'Sticker Capsule', 'Container', 'Patch Pack', 'Music Kit Box'])
+    const PLAYABLE_TYPES = new Set([
+        'Case',
+        'Souvenir',
+        'Souvenir Package',
+        'Souvenir Highlight',
+        'Sticker Capsule',
+        'Autograph Capsule',
+        'Patch Capsule',
+        'Patch Pack',
+        'Music Kit Box',
+    ])
     function rarityRank(name) {
         switch (name) {
             case 'Consumer Grade': return 1
             case 'Industrial Grade': return 2
             case 'Mil-Spec Grade': return 3
+            case 'High Grade': return 3
             case 'Restricted': return 4
+            case 'Remarkable': return 4
             case 'Classified': return 5
+            case 'Exotic': return 5
             case 'Covert': return 6
             case 'Contraband': return 7
             case 'Extraordinary': return 7
@@ -251,9 +269,16 @@ async function main() {
         if (rank >= 5) return 'covert'
         return 'classified'
     }
-    const playable = crates
+    const PLAYABLE_LIMIT = 60
+    const PLAYABLE_CATEGORY_TARGETS = {
+        weapon: 24,
+        souvenir: 14,
+        stickers: 16,
+        music: 6,
+    }
+    const PLAYABLE_CATEGORY_ORDER = ['weapon', 'souvenir', 'stickers', 'music']
+    const playableCandidates = crates
         .filter(c => PLAYABLE_TYPES.has(c.type))
-        .slice(0, 60)
         .map(c => {
             const items = c.items.slice(0, 18).map(it => ({
                 id: it.skinId,
@@ -262,9 +287,10 @@ async function main() {
                 rarity: it.rarity,
                 color: it.color,
                 multiplier: it.multiplier,
+                valueGc: roundGc(it.multiplier || 1, 1),
                 isRare: it.isRare,
             }))
-            return {
+            const base = {
                 id: c.id,
                 name: c.name,
                 image: c.image,
@@ -273,12 +299,41 @@ async function main() {
                 type: c.type,
                 items,
             }
+            const category = inferCaseCategory(base)
+            return {
+                ...base,
+                category,
+                openPriceGc: fallbackOpenPriceGc(base),
+                priceSource: 'fallback-ev',
+            }
         })
         .filter(c => c.items.length > 0)
+
+    const groupedPlayable = PLAYABLE_CATEGORY_ORDER.reduce((acc, category) => {
+        acc[category] = playableCandidates
+            .filter(c => c.category === category)
+            .sort((a, b) => (b.openPriceGc || 0) - (a.openPriceGc || 0) || a.name.localeCompare(b.name))
+        return acc
+    }, {})
+    const selectedPlayable = new Map()
+    for (const category of PLAYABLE_CATEGORY_ORDER) {
+        for (const c of groupedPlayable[category].slice(0, PLAYABLE_CATEGORY_TARGETS[category])) {
+            selectedPlayable.set(c.id, c)
+        }
+    }
+    for (const category of PLAYABLE_CATEGORY_ORDER) {
+        for (const c of groupedPlayable[category]) {
+            if (selectedPlayable.size >= PLAYABLE_LIMIT) break
+            selectedPlayable.set(c.id, c)
+        }
+        if (selectedPlayable.size >= PLAYABLE_LIMIT) break
+    }
+
+    const playable = Array.from(selectedPlayable.values())
         .sort((a, b) => {
-            const ta = { classified: 0, covert: 1, exceedingly: 2, contraband: 3 }[a.tier] ?? 0
-            const tb = { classified: 0, covert: 1, exceedingly: 2, contraband: 3 }[b.tier] ?? 0
-            return ta - tb || a.name.localeCompare(b.name)
+            const ca = PLAYABLE_CATEGORY_ORDER.indexOf(a.category)
+            const cb = PLAYABLE_CATEGORY_ORDER.indexOf(b.category)
+            return ca - cb || (b.openPriceGc || 0) - (a.openPriceGc || 0) || a.name.localeCompare(b.name)
         })
 
     const casesPath = path.join(ROOT, 'public', 'data', 'cs-cases.json')
@@ -351,55 +406,10 @@ async function main() {
     // Optional price enrichment.
     if (args.has('--prices')) {
         const csmarketKey = process.env.csmarketapi_token
-        const steamAnalystKey = process.env.steamanalyst_token
         const map = {}
         let sources = 0
-        if (steamAnalystKey) {
-            console.log('Fetching prices from SteamAnalyst /v2 (full dump)...')
-            try {
-                const url = `https://api.steamanalyst.com/v2/${steamAnalystKey}`
-                const res = await fetch(url)
-                if (res.ok) {
-                    const data = await res.json()
-                    // Response shape: array of item objects keyed by market_name.
-                    const items = Array.isArray(data) ? data
-                        : Array.isArray(data?.items) ? data.items
-                        : Array.isArray(data?.data) ? data.data
-                        : (typeof data === 'object' && data !== null) ? Object.values(data)
-                        : []
-                    for (const item of items) {
-                        const key = item.market_name || item.market_hash_name || item.name
-                        if (!key) continue
-                        const safeRaw = item.safe_price_raw ?? null
-                        const safe = item.safe_price ?? null
-                        const avg7 = item.avg_price_7_days_raw ?? item.avg_price_7_days ?? null
-                        const avg30 = item.avg_price_30_days_raw ?? item.avg_price_30_days ?? null
-                        const cur = item.current_price ?? null
-                        const sugAvg = item.suggested_amount_avg_raw ?? item.suggested_amount_avg ?? null
-                        const price = safeRaw ?? safe ?? avg7 ?? sugAvg ?? cur
-                        if (price === null || price === undefined) continue
-                        map[key] = {
-                            ...(map[key] || {}),
-                            steamAnalyst: {
-                                price: typeof price === 'string' ? Number(price.replace(/,/g, '')) : Number(price),
-                                avg7: avg7 !== null ? Number(avg7) : null,
-                                avg30: avg30 !== null ? Number(avg30) : null,
-                                soldLast24h: item.sold_last_24h ? Number(item.sold_last_24h) : null,
-                                soldLast7d: item.sold_last_7d ? Number(item.sold_last_7d) : null,
-                                manipulated: item.ongoing_price_manipulation === '1' || item.ongoing_price_manipulation === 1,
-                                phases: item.phases || null,
-                                currency: 'USD',
-                            },
-                        }
-                    }
-                    sources += 1
-                    console.log(`  steamAnalyst: ${items.length} rows, ${Object.keys(map).length} priced`)
-                } else {
-                    console.warn(`  steamAnalyst: HTTP ${res.status}`)
-                }
-            } catch (err) {
-                console.warn('  steamAnalyst failed:', err.message)
-            }
+        if (process.env.steamanalyst_token) {
+            console.log('SteamAnalyst token present; skipping /v2 because this tier returns 401.')
         }
         if (csmarketKey) {
             console.log('Fetching CS2 item catalog from csmarketapi /v1/items/ (metadata)...')
@@ -452,6 +462,53 @@ async function main() {
                 }
             } catch (err) {
                 console.warn('  csmarketapi failed:', err.message)
+            }
+            console.log('Fetching playable case prices from csmarketapi /v1/listings/latest/aggregate...')
+            try {
+                let pricedCases = 0
+                for (const caseData of playable) {
+                    const params = new URLSearchParams({
+                        key: csmarketKey,
+                        market_hash_name: caseData.name,
+                        currency: 'USD',
+                    })
+                    const res = await fetch(`https://api.csmarketapi.com/v1/listings/latest/aggregate?${params}`)
+                    if (!res.ok) {
+                        if (pricedCases === 0) console.warn(`  csmarketapi aggregate: HTTP ${res.status}`)
+                        continue
+                    }
+                    const data = await res.json()
+                    const row = Array.isArray(data) ? data[0] : data?.data || data
+                    const median = row?.median_price ?? row?.medianPrice ?? row?.median
+                    const min = row?.min_price ?? row?.minPrice ?? row?.min
+                    const mean = row?.mean_price ?? row?.meanPrice ?? row?.mean
+                    const price = median ?? min ?? mean
+                    if (price === undefined || price === null) continue
+                    const numericPrice = Number(price)
+                    if (!Number.isFinite(numericPrice) || numericPrice <= 0) continue
+                    map[caseData.name] = {
+                        ...(map[caseData.name] || {}),
+                        openPriceGc: roundGc(numericPrice, 1),
+                        csmarket: {
+                            ...(map[caseData.name]?.csmarket || {}),
+                            price: roundGc(numericPrice, 1),
+                            median_price: median !== undefined && median !== null ? Number(median) : null,
+                            min_price: min !== undefined && min !== null ? Number(min) : null,
+                            mean_price: mean !== undefined && mean !== null ? Number(mean) : null,
+                            listings: row?.listings ?? null,
+                            market: row?.market ?? null,
+                            timestamp: row?.timestamp ?? null,
+                            currency: 'USD',
+                        },
+                    }
+                    pricedCases += 1
+                }
+                if (pricedCases > 0) {
+                    if (sources === 0) sources += 1
+                    console.log(`  csmarketapi aggregate: ${pricedCases} playable case prices`)
+                }
+            } catch (err) {
+                console.warn('  csmarketapi aggregate failed:', err.message)
             }
         }
         if (sources === 0) {
