@@ -22,7 +22,7 @@ import {
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
-import { buildBigEyeBoy, buildBigRoad, buildCockroachPig, buildSmallRoad } from './roads'
+import { buildBigEyeBoy, buildBigRoad, buildCockroachPig, buildSmallRoad, latestBigRoadPosition, tailRoadColumns, tailRoadDots } from './roads'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './baccarat.css'
@@ -226,6 +226,11 @@ export default function BaccaratGame() {
     const bigEye = useMemo(() => buildBigEyeBoy(bigRoad), [bigRoad])
     const smallRoad = useMemo(() => buildSmallRoad(bigRoad), [bigRoad])
     const cockroachPig = useMemo(() => buildCockroachPig(bigRoad), [bigRoad])
+    const bigRoadLatest = useMemo(() => latestBigRoadPosition(bigRoad), [bigRoad])
+    const bigRoadTail = useMemo(() => tailRoadColumns(bigRoad, 32), [bigRoad])
+    const bigEyeTail = useMemo(() => tailRoadDots(bigEye, 36), [bigEye])
+    const smallRoadTail = useMemo(() => tailRoadDots(smallRoad, 36), [smallRoad])
+    const cockroachTail = useMemo(() => tailRoadDots(cockroachPig, 36), [cockroachPig])
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
     const playerScore = hand ? handTotal(hand.player) : null
     const bankerScore = hand ? handTotal(hand.banker) : null
@@ -343,28 +348,33 @@ export default function BaccaratGame() {
                         <div className="bac-road-card">
                             <h4>Big Road</h4>
                             <div className="bac-road-grid">
-                                {bigRoad.map((col, ci) => col.items.map((it, ri) => (
-                                    <div key={`${ci}-${ri}`} className={`bac-road-cell ${it.type === 'B' ? 'banker' : it.type === 'P' ? 'player' : 'tie'}`} style={{ gridRow: ri + 1, gridColumn: ci + 1 }} />
+                                {bigRoadTail.columns.map((col, ci) => col.items.map((it, ri) => (
+                                    <div
+                                        key={`${bigRoadTail.offset + ci}-${ri}`}
+                                        className={`bac-road-cell ${it.type === 'B' ? 'banker' : it.type === 'P' ? 'player' : 'tie'} ${it.tie ? 'has-tie' : ''} ${bigRoadLatest?.colIndex === bigRoadTail.offset + ci && bigRoadLatest?.rowIndex === ri ? 'latest' : ''}`}
+                                        style={{ gridRow: ri + 1, gridColumn: ci + 1 }}
+                                        aria-label={`${it.type === 'B' ? 'Banker' : it.type === 'P' ? 'Player' : 'Tie'} road cell${it.tie ? ' with tie' : ''}`}
+                                    />
                                 )))}
                             </div>
                         </div>
                         <div className="bac-road-card">
                             <h4>Big Eye Boy</h4>
                             <div className="bac-road-grid">
-                                {bigEye.slice(0, 36).map((d, i) => (
-                                    <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
+                                {bigEyeTail.dots.map((d, i) => (
+                                    <div key={`${bigEyeTail.offset}-${i}`} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'} ${bigEyeTail.offset + i === bigEye.length - 1 ? 'latest' : ''}`} />
                                 ))}
                             </div>
                             <h4 style={{ marginTop: 4 }}>Small Road</h4>
                             <div className="bac-road-grid">
-                                {smallRoad.slice(0, 36).map((d, i) => (
-                                    <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
+                                {smallRoadTail.dots.map((d, i) => (
+                                    <div key={`${smallRoadTail.offset}-${i}`} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'} ${smallRoadTail.offset + i === smallRoad.length - 1 ? 'latest' : ''}`} />
                                 ))}
                             </div>
                             <h4 style={{ marginTop: 4 }}>Cockroach Pig</h4>
                             <div className="bac-road-grid">
-                                {cockroachPig.slice(0, 36).map((d, i) => (
-                                    <div key={i} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'}`} />
+                                {cockroachTail.dots.map((d, i) => (
+                                    <div key={`${cockroachTail.offset}-${i}`} className={`bac-road-cell ${d === 'red' ? 'dot-red' : 'dot-blue'} ${cockroachTail.offset + i === cockroachPig.length - 1 ? 'latest' : ''}`} />
                                 ))}
                             </div>
                         </div>

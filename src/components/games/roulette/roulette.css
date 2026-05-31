@@ -87,6 +87,17 @@
     filter: drop-shadow(0 24px 40px rgba(0, 0, 0, 0.55));
 }
 
+.rou-wheel-area.spin-phase-launch,
+.rou-wheel-area.spin-phase-rolling,
+.rou-wheel-area.spin-phase-drop {
+    animation: rouWheelAreaPulse 520ms ease-in-out infinite alternate;
+}
+
+@keyframes rouWheelAreaPulse {
+    from { filter: drop-shadow(0 22px 36px rgba(0, 0, 0, 0.52)); }
+    to { filter: drop-shadow(0 26px 46px rgba(232, 200, 120, 0.2)); }
+}
+
 .rou-wheel {
     position: absolute;
     inset: 0;
@@ -160,6 +171,17 @@
 .rou-seg.black,
 .rou-seg.green { background: transparent; box-shadow: none; }
 
+.rou-seg.winner {
+    color: #fff7cc;
+    text-shadow: 0 0 8px #ffe680, 0 0 14px rgba(255, 209, 102, 0.86);
+    animation: rouPocketGlow 900ms ease-in-out 3;
+}
+
+@keyframes rouPocketGlow {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.8); }
+}
+
 /* Ball orbit. Outer wrapper rotates (rou-ball-track) and the ball sits at
    `--ball-radius` percentage from center. JS shrinks `--ball-radius` from
    46% (outer track) to ~28% (pocket ring) over the spin to spiral inward. */
@@ -193,9 +215,25 @@
     animation: rouBallRattle 0.16s linear infinite alternate;
 }
 
+.rou-ball.spin-phase-launch {
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.8),
+        0 0 22px rgba(255, 255, 255, 0.55),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.rou-ball.spin-phase-drop {
+    animation: rouBallDropBounce 120ms linear infinite alternate;
+}
+
 @keyframes rouBallRattle {
     from { transform: translateY(calc(-1 * var(--ball-radius))) scale(1); }
     to { transform: translateY(calc(-1 * var(--ball-radius) + 2px)) scale(0.95); }
+}
+
+@keyframes rouBallDropBounce {
+    from { transform: translateY(calc(-1 * var(--ball-radius) + 1px)) scale(1); }
+    to { transform: translateY(calc(-1 * var(--ball-radius) + 5px)) scale(0.9); }
 }
 
 .rou-recent-rail-col,
@@ -297,10 +335,32 @@
 
 @media (prefers-reduced-motion: reduce) {
     .rou-num-pop.idle span,
-    .rou-wheel.is-idle { animation: none; }
+    .rou-wheel.is-idle,
+    .rou-wheel-area,
+    .rou-ball,
+    .rou-seg.winner {
+        animation: none !important;
+    }
+
+    .rou-wheel,
+    .rou-ball-track,
+    .rou-ball {
+        transition-duration: 1ms !important;
+    }
 }
 .gampo-reduce-motion .rou-num-pop.idle span,
-.gampo-reduce-motion .rou-wheel.is-idle { animation: none; }
+.gampo-reduce-motion .rou-wheel.is-idle,
+.gampo-reduce-motion .rou-wheel-area,
+.gampo-reduce-motion .rou-ball,
+.gampo-reduce-motion .rou-seg.winner {
+    animation: none !important;
+}
+
+.gampo-reduce-motion .rou-wheel,
+.gampo-reduce-motion .rou-ball-track,
+.gampo-reduce-motion .rou-ball {
+    transition-duration: 1ms !important;
+}
 
 .rou-history {
     display: flex;
@@ -548,6 +608,34 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.4);
     border: 2px solid rgba(255, 255, 255, 0.45);
     animation: chipPlace 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.rou-cell.covered-bet {
+    box-shadow:
+        inset 0 0 0 2px rgba(109, 183, 255, 0.5),
+        0 0 14px rgba(109, 183, 255, 0.22);
+}
+
+.rou-cell.covered-bet::before {
+    content: attr(data-cover);
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    min-width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: rgba(109, 183, 255, 0.92);
+    color: #06121b;
+    font-size: 9px;
+    font-weight: 950;
+    box-shadow: 0 0 12px rgba(109, 183, 255, 0.5);
+}
+
+.rou-cell.has-bet.covered-bet::before {
+    left: 3px;
+    right: auto;
 }
 
 @keyframes chipPlace {

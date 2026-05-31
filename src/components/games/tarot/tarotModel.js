@@ -2,6 +2,8 @@ import { nextRoll } from '../../../utils/fairRng'
 
 export const TARGET_RTP = 0.96
 export const MATCH_BONUS = 3
+export const TAROT_ASSET_BASE = '/assets/tarot/monochrome'
+export const TAROT_BACK_IMAGE = `${TAROT_ASSET_BASE}/back.png`
 
 export const SUITS = {
     wands: { id: 'wands', name: 'Wands', mark: 'W', color: '#ff7a7c' },
@@ -10,7 +12,15 @@ export const SUITS = {
     pentacles: { id: 'pentacles', name: 'Pentacles', mark: 'P', color: '#ffd166' },
 }
 
-export const DECK = [
+export function tarotCardImageByIndex(index) {
+    return `${TAROT_ASSET_BASE}/${String(index).padStart(2, '0')}.png`
+}
+
+export function tarotCardImage(card) {
+    return tarotCardImageByIndex(card?.assetIndex ?? 0)
+}
+
+const MAJOR_ARCANA = [
     { id: 'fool', number: '0', name: 'The Fool', suit: 'wands', base: 0.6, keywords: 'Leap, variance' },
     { id: 'magician', number: 'I', name: 'The Magician', suit: 'wands', base: 1.6, keywords: 'Focus, action' },
     { id: 'priestess', number: 'II', name: 'High Priestess', suit: 'cups', base: 1.4, keywords: 'Hidden info' },
@@ -34,6 +44,12 @@ export const DECK = [
     { id: 'judgement', number: 'XX', name: 'Judgement', suit: 'pentacles', base: 2.4, keywords: 'Reveal' },
     { id: 'world', number: 'XXI', name: 'The World', suit: 'pentacles', base: 5.0, keywords: 'Top omen' },
 ]
+
+export const DECK = MAJOR_ARCANA.map((card, assetIndex) => ({
+    ...card,
+    assetIndex,
+    image: tarotCardImageByIndex(assetIndex),
+}))
 
 export function rawCardValue(card, pickedSuit) {
     return card.base * (card.suit === pickedSuit ? MATCH_BONUS : 1)

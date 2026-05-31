@@ -30,6 +30,15 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
+import {
+    canDoubleHand,
+    canSplitHand,
+    canSurrenderHand,
+    makeBlackjackHand,
+    nextPlayableHandIndex,
+    settleBlackjackHands,
+    splitBlackjackHand,
+} from './blackjackRules'
 import './blackjack.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
@@ -121,10 +130,12 @@ export default function BlackjackGame() {
     const [decks, setDecks] = useState(4)
     const [hitsSoft17, setHitsSoft17] = useState(false)
     const [shoe, setShoe] = useState(() => buildShoe(4))
-    const [player, setPlayer] = useState([])
+    const [hands, setHands] = useState([])
+    const [activeHandIndex, setActiveHandIndex] = useState(0)
     const [dealer, setDealer] = useState([])
     const [phase, setPhase] = useState('idle') // idle | playing
     const [activeBet, setActiveBet] = useState(0)
+    const [originalBet, setOriginalBet] = useState(0)
     const [insurance, setInsurance] = useState(0)
     const [insuranceOffered, setInsuranceOffered] = useState(false)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
@@ -132,6 +143,7 @@ export default function BlackjackGame() {
     const [studyResults, setStudyResults] = useState(null)
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const [outcomeSummary, setOutcomeSummary] = useState(null)
     const [chipSlide, setChipSlide] = useState(null)
     const chipSlideTimer = useRef(null)
 
@@ -161,54 +173,79 @@ export default function BlackjackGame() {
     const drawTop = (sourceShoe) => [sourceShoe[0], sourceShoe.slice(1)]
     const ensureShoe = (source) => (source.length < decks * 13) ? buildShoe(decks) : source
 
-    const settle = (finalPlayer, finalDealer, wager) => {
-        const playerScore = scoreBlackjackHand(finalPlayer)
-        const dealerScore = scoreBlackjackHand(finalDealer)
-        let multiplier = 0
-        let label = 'Loss'
-        const isBlackjack = finalPlayer.length === 2 && playerScore === 21
-        if (playerScore > 21) {
-            multiplier = 0
-        } else if (dealerScore > 21 || playerScore > dealerScore) {
-            multiplier = isBlackjack ? 2.5 : 2
-            label = isBlackjack ? 'Blackjack' : 'Win'
-        } else if (playerScore === dealerScore) {
-            multiplier = 1
-            label = 'Push'
-        }
-        let returnAmount = wager * multiplier
-        if (insurance > 0) {
-            const dealerBlackjack = finalDealer.length === 2 && dealerScore === 21
-            if (dealerBlackjack) returnAmount += insurance * 3
-        }
-        const profit = returnAmount - wager - insurance
-        if (returnAmount > 0) addWinnings(returnAmount, 'Blackjack return')
+    const finishRound = useCallback((finalHands, finalDealer) => {
+        const settlement = settleBlackjackHands(finalHands, finalDealer, insurance)
+        const bestMultiplier = settlement.hands.reduce((best, hand) => Math.max(best, hand.result?.multiplier || 0), 0)
+        const labels = settlement.hands.map((hand, index) => `H${index + 1} ${hand.result?.label || 'Loss'}`).join(' · ')
+        if (settlement.totalReturn > 0) addWinnings(settlement.totalReturn, 'Blackjack return')
+        setHands(settlement.hands)
+        setOutcomeSummary(settlement)
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-            label, profit, betAmount: wager + insurance,
-            multiplier: multiplier > 0 ? multiplier : 0,
-            meta: { playerScore, dealerScore, isBlackjack },
+            label: labels || 'Blackjack',
+            profit: settlement.profit,
+            betAmount: settlement.wagered + insurance,
+            multiplier: bestMultiplier,
+            meta: {
+                hands: settlement.hands.map(hand => hand.result),
+                dealerScore: settlement.dealerScore,
+                insuranceReturn: settlement.insuranceReturn,
+            },
         })
-        if (label === 'Blackjack') {
+        if (bestMultiplier >= 2.5) {
             playSound('bigwin')
-            setBigWin({ trigger: Date.now(), profit, multiplier: 2.5 })
+            setBigWin({ trigger: Date.now(), profit: settlement.profit, multiplier: bestMultiplier })
         } else {
-            playSound(profit >= 0 ? 'win' : 'loss')
+            playSound(settlement.profit >= 0 ? 'win' : 'loss')
         }
-        sfx.play(profit > 0 ? 'win' : profit === 0 ? 'reveal' : 'lose')
+        sfx.play(settlement.profit > 0 ? 'win' : settlement.profit === 0 ? 'reveal' : 'lose')
         setToast({
-            kind: profit > 0 ? 'win' : profit === 0 ? 'push' : 'lose',
-            multiplier: multiplier > 0 ? multiplier : null,
-            amount: profit,
-            message: `Blackjack ${label}`,
+            kind: settlement.profit > 0 ? 'win' : settlement.profit === 0 ? 'push' : 'lose',
+            multiplier: bestMultiplier > 0 ? bestMultiplier : null,
+            amount: settlement.profit,
+            message: labels || 'Blackjack settled',
         })
-        machine.finish({ kind: label.toLowerCase(), profit, multiplier, playerScore, dealerScore })
-        showToast(profit >= 0 ? 'win' : profit === 0 ? 'bet' : 'loss', `Blackjack ${label}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+        machine.finish({ kind: settlement.profit > 0 ? 'win' : settlement.profit === 0 ? 'push' : 'lose', profit: settlement.profit, multiplier: bestMultiplier, dealerScore: settlement.dealerScore })
+        showToast(settlement.profit >= 0 ? 'win' : settlement.profit === 0 ? 'bet' : 'loss', 'Blackjack settled', `${settlement.profit >= 0 ? '+' : ''}${formatCredits(settlement.profit)}`)
         setPhase('idle')
         setActiveBet(0)
+        setOriginalBet(0)
         setInsurance(0)
         setInsuranceOffered(false)
-    }
+    }, [addWinnings, insurance, machine, playSound, session, showToast, sfx])
+
+    const finishDealerAndSettle = useCallback((finalHands, sourceShoe = shoe) => {
+        let nextShoe = sourceShoe
+        const nextDealer = [...dealer]
+        const dealerShouldPlay = finalHands.some(hand => hand.status !== 'surrendered' && scoreBlackjackHand(hand.cards) <= 21)
+        const dealerKeepHitting = () => {
+            const score = scoreBlackjackHand(nextDealer)
+            if (score < 17) return true
+            if (score === 17 && hitsSoft17 && isSoftHand(nextDealer)) return true
+            return false
+        }
+        if (dealerShouldPlay) {
+            while (dealerKeepHitting()) {
+                let card
+                ;[card, nextShoe] = drawTop(nextShoe)
+                nextDealer.push(card)
+            }
+        }
+        setDealer(nextDealer)
+        setShoe(nextShoe)
+        window.setTimeout(() => finishRound(finalHands, nextDealer), 220)
+    }, [dealer, finishRound, hitsSoft17, shoe])
+
+    const advanceFromHand = useCallback((nextHands, nextShoe = shoe, completedIndex = activeHandIndex) => {
+        const nextIndex = nextPlayableHandIndex(nextHands, completedIndex)
+        setHands(nextHands)
+        setActiveBet(nextHands.reduce((sum, hand) => sum + (hand.wager || 0), 0))
+        if (nextIndex >= 0) {
+            setActiveHandIndex(nextIndex)
+            return
+        }
+        finishDealerAndSettle(nextHands, nextShoe)
+    }, [activeHandIndex, finishDealerAndSettle, shoe])
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (phase === 'playing') { resolve({ profit: 0 }); return }
@@ -238,103 +275,120 @@ export default function BlackjackGame() {
             initialDealer.push(card)
         }
         setShoe(nextShoe)
-        setPlayer(initialPlayer)
+        const initialHands = [makeBlackjackHand({ cards: initialPlayer, wager: betAmount, id: `hand-${Date.now()}` })]
+        setHands(initialHands)
+        setActiveHandIndex(0)
         setDealer(initialDealer)
         setActiveBet(betAmount)
+        setOriginalBet(betAmount)
+        setOutcomeSummary(null)
         triggerChipSlide(betAmount)
         setPhase('playing')
         setInsurance(0)
         setInsuranceOffered(initialDealer[0]?.rank === 'A')
         if (scoreBlackjackHand(initialPlayer) === 21) {
-            window.setTimeout(() => settle(initialPlayer, initialDealer, betAmount), 320)
+            window.setTimeout(() => finishRound(initialHands, initialDealer), 320)
         }
         resolve({ profit: 0 })
     })
 
     const hit = () => {
         if (phase !== 'playing') return
+        const activeHand = hands[activeHandIndex]
+        if (!activeHand || activeHand.status !== 'active' || activeHand.isSplitAces) return
         playSound('flip')
         let nextShoe = shoe; let card
         ;[card, nextShoe] = drawTop(nextShoe)
-        const nextPlayer = [...player, card]
-        setPlayer(nextPlayer); setShoe(nextShoe)
-        if (scoreBlackjackHand(nextPlayer) > 21) {
-            window.setTimeout(() => settle(nextPlayer, dealer, activeBet), 300)
+        const nextCards = [...activeHand.cards, card]
+        const nextHand = {
+            ...activeHand,
+            cards: nextCards,
+            status: scoreBlackjackHand(nextCards) > 21 ? 'busted' : 'active',
         }
+        const nextHands = hands.map((hand, index) => index === activeHandIndex ? nextHand : hand)
+        setShoe(nextShoe)
+        if (nextHand.status === 'busted') {
+            window.setTimeout(() => advanceFromHand(nextHands, nextShoe), 300)
+            return
+        }
+        setHands(nextHands)
     }
 
     const stand = () => {
         if (phase !== 'playing') return
+        const activeHand = hands[activeHandIndex]
+        if (!activeHand || activeHand.status !== 'active') return
         playSound('click')
-        let nextShoe = shoe
-        const nextDealer = [...dealer]
-        const dealerKeepHitting = () => {
-            const score = scoreBlackjackHand(nextDealer)
-            if (score < 17) return true
-            if (score === 17 && hitsSoft17 && isSoftHand(nextDealer)) return true
-            return false
-        }
-        while (dealerKeepHitting()) {
-            let card
-            ;[card, nextShoe] = drawTop(nextShoe)
-            nextDealer.push(card)
-        }
-        setDealer(nextDealer); setShoe(nextShoe)
-        window.setTimeout(() => settle(player, nextDealer, activeBet), 220)
+        const nextHands = hands.map((hand, index) => index === activeHandIndex ? { ...hand, status: 'standing' } : hand)
+        advanceFromHand(nextHands, shoe)
     }
 
     const doubleDown = () => {
-        if (phase !== 'playing' || player.length !== 2) return
-        if (!placeBet(activeBet, 'Blackjack double')) {
+        if (phase !== 'playing') return
+        const activeHand = hands[activeHandIndex]
+        if (!canDoubleHand(activeHand)) return
+        if (!placeBet(activeHand.wager, 'Blackjack double')) {
             showToast('error', 'Not enough credits', 'Cannot double')
             return
         }
         playSound('deal')
         let nextShoe = shoe; let card
         ;[card, nextShoe] = drawTop(nextShoe)
-        const nextPlayer = [...player, card]
-        setPlayer(nextPlayer); setShoe(nextShoe)
-        const finalBet = activeBet * 2
-        setActiveBet(finalBet)
-        if (scoreBlackjackHand(nextPlayer) > 21) {
-            window.setTimeout(() => settle(nextPlayer, dealer, finalBet), 300)
-            return
+        const nextCards = [...activeHand.cards, card]
+        const nextHand = {
+            ...activeHand,
+            cards: nextCards,
+            doubled: true,
+            wager: activeHand.wager * 2,
+            status: scoreBlackjackHand(nextCards) > 21 ? 'busted' : 'standing',
         }
-        // Auto-stand
-        let dealerShoe = nextShoe
-        const nextDealer = [...dealer]
-        const dealerKeepHitting = () => {
-            const score = scoreBlackjackHand(nextDealer)
-            if (score < 17) return true
-            if (score === 17 && hitsSoft17 && isSoftHand(nextDealer)) return true
-            return false
-        }
-        while (dealerKeepHitting()) {
-            let dCard
-            ;[dCard, dealerShoe] = drawTop(dealerShoe)
-            nextDealer.push(dCard)
-        }
-        setDealer(nextDealer); setShoe(dealerShoe)
-        window.setTimeout(() => settle(nextPlayer, nextDealer, finalBet), 320)
+        const nextHands = hands.map((hand, index) => index === activeHandIndex ? nextHand : hand)
+        setShoe(nextShoe)
+        window.setTimeout(() => advanceFromHand(nextHands, nextShoe), 300)
     }
 
     const surrender = () => {
-        if (phase !== 'playing' || player.length !== 2) return
-        const returnAmount = activeBet / 2
-        addWinnings(returnAmount, 'Blackjack surrender')
-        const profit = returnAmount - activeBet
+        if (phase !== 'playing') return
+        const activeHand = hands[activeHandIndex]
+        if (!canSurrenderHand(activeHand, activeHandIndex, hands)) return
         playSound('click')
-        session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-            label: 'Surrender', profit, betAmount: activeBet,
-        })
-        showToast('loss', 'Surrender', `${formatCredits(profit)}`)
-        setPhase('idle'); setActiveBet(0); setInsurance(0); setInsuranceOffered(false)
+        const nextHands = hands.map((hand, index) => index === activeHandIndex ? { ...hand, status: 'surrendered', surrendered: true } : hand)
+        advanceFromHand(nextHands, shoe)
+    }
+
+    const split = () => {
+        if (phase !== 'playing') return
+        const activeHand = hands[activeHandIndex]
+        if (!canSplitHand(activeHand, hands)) return
+        if (!placeBet(activeHand.wager, 'Blackjack split')) {
+            showToast('error', 'Not enough credits', 'Cannot split')
+            return
+        }
+        playSound('deal')
+        let nextShoe = shoe
+        let firstCard; let secondCard
+        ;[firstCard, nextShoe] = drawTop(nextShoe)
+        ;[secondCard, nextShoe] = drawTop(nextShoe)
+        const splitHands = splitBlackjackHand(activeHand, firstCard, secondCard)
+        const nextHands = [
+            ...hands.slice(0, activeHandIndex),
+            ...splitHands,
+            ...hands.slice(activeHandIndex + 1),
+        ]
+        setShoe(nextShoe)
+        setHands(nextHands)
+        setActiveBet(nextHands.reduce((sum, hand) => sum + (hand.wager || 0), 0))
+        const nextIndex = nextPlayableHandIndex(nextHands, activeHandIndex - 1)
+        if (nextIndex >= 0) {
+            setActiveHandIndex(nextIndex)
+            return
+        }
+        finishDealerAndSettle(nextHands, nextShoe)
     }
 
     const takeInsurance = () => {
         if (!insuranceOffered || phase !== 'playing') return
-        const cost = activeBet / 2
+        const cost = originalBet / 2
         if (!placeBet(cost, 'Blackjack insurance')) {
             showToast('error', 'Not enough credits', 'Cannot insure')
             return
@@ -388,13 +442,17 @@ export default function BlackjackGame() {
         window.setTimeout(work, 30)
     }
 
-    const playerScore = scoreBlackjackHand(player)
-    const hint = phase === 'playing' ? basicStrategyHint(player, dealer[0]) : 'Deal a hand to receive guidance.'
+    const activeHand = hands[activeHandIndex] || hands[0] || makeBlackjackHand({ cards: [], wager: 0, status: 'idle', id: 'empty' })
+    const activeScore = scoreBlackjackHand(activeHand.cards)
+    const hint = phase === 'playing' ? basicStrategyHint(activeHand.cards, dealer[0]) : 'Deal a hand to receive guidance.'
     const recentProfit = useMemo(() => session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0), [session.history])
     const inRound = phase === 'playing'
     const hintAction = hintActionFromText(hint)
     const dealerVisible = dealer[0] ? `${dealer[0].rank}${suitGlyph(dealer[0].suit)} (${dealerUpValue(dealer[0])})` : '—'
-    const playerTotalLabel = player.length ? `${playerScore}${isSoftHand(player) ? ' soft' : ''}` : '—'
+    const playerTotalLabel = activeHand.cards.length ? `${activeScore}${isSoftHand(activeHand.cards) ? ' soft' : ''}` : '—'
+    const canSplitActive = canSplitHand(activeHand, hands)
+    const canDoubleActive = canDoubleHand(activeHand)
+    const canSurrenderActive = canSurrenderHand(activeHand, activeHandIndex, hands)
 
     return (
         <GameShell
@@ -469,7 +527,7 @@ export default function BlackjackGame() {
                         </div>
                         <div>
                             <span>Active bet</span>
-                            <strong>{activeBet ? formatCredits(activeBet) : '—'}</strong>
+                            <strong>{activeBet ? `${formatCredits(activeHand.wager || activeBet)} / ${formatCredits(activeBet)}` : '—'}</strong>
                         </div>
                     </div>
                     <Hand
@@ -478,27 +536,62 @@ export default function BlackjackGame() {
                         hideHole={phase === 'playing'}
                         emptyHint={phase === 'idle' ? 'Press Deal to start' : null}
                     />
-                    <Hand
-                        label={`Player ${player.length ? playerScore : '--'}`}
-                        cards={player}
-                        emptyHint={phase === 'idle' ? 'Pick decks · S17/H17 · then Deal' : null}
-                    />
+                    {hands.length > 1 && (
+                        <div className="bj-hand-tabs" role="tablist" aria-label="Blackjack hands">
+                            {hands.map((hand, index) => (
+                                <button
+                                    key={hand.id}
+                                    type="button"
+                                    role="tab"
+                                    className={index === activeHandIndex ? 'active' : ''}
+                                    disabled={phase !== 'playing' || hand.status !== 'active'}
+                                    onClick={() => setActiveHandIndex(index)}
+                                >
+                                    <span>Hand {index + 1}</span>
+                                    <strong>{scoreBlackjackHand(hand.cards)}</strong>
+                                    <em>{formatCredits(hand.wager)}</em>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {hands.length ? hands.map((hand, index) => (
+                        <Hand
+                            key={hand.id}
+                            label={`Hand ${index + 1} · ${scoreBlackjackHand(hand.cards)}${isSoftHand(hand.cards) ? ' soft' : ''}`}
+                            cards={hand.cards}
+                            active={phase === 'playing' && index === activeHandIndex && hand.status === 'active'}
+                            status={hand.result?.label || hand.status}
+                            wager={hand.wager}
+                        />
+                    )) : (
+                        <Hand
+                            label="Player --"
+                            cards={[]}
+                            emptyHint={phase === 'idle' ? 'Pick decks · S17/H17 · then Deal' : null}
+                        />
+                    )}
                     <div className="bj-actions">
-                        <button className={`bj-primary-action ${hintAction === 'hit' ? 'recommended' : ''}`} disabled={phase !== 'playing'} onClick={hit}>Hit</button>
-                        <button className={`bj-primary-action ${hintAction === 'stand' ? 'recommended' : ''}`} disabled={phase !== 'playing'} onClick={stand}>Stand</button>
-                        <button disabled={phase !== 'playing' || player.length !== 2} onClick={doubleDown}>Double</button>
-                        <button disabled={phase !== 'playing' || player.length !== 2} onClick={surrender}>Surrender</button>
+                        <button className={`bj-primary-action ${hintAction === 'hit' ? 'recommended' : ''}`} disabled={phase !== 'playing' || activeHand.status !== 'active' || activeHand.isSplitAces} onClick={hit}>Hit</button>
+                        <button className={`bj-primary-action ${hintAction === 'stand' ? 'recommended' : ''}`} disabled={phase !== 'playing' || activeHand.status !== 'active'} onClick={stand}>Stand</button>
+                        <button disabled={phase !== 'playing' || !canSplitActive} onClick={split}>Split</button>
+                        <button disabled={phase !== 'playing' || !canDoubleActive} onClick={doubleDown}>Double</button>
+                        <button disabled={phase !== 'playing' || !canSurrenderActive} onClick={surrender}>Surrender</button>
                     </div>
                     {insuranceOffered && (
                         <div className="bj-insurance">
                             <span>Dealer shows Ace · Insurance?</span>
-                            <button onClick={takeInsurance}>Yes ({formatCredits(activeBet / 2)})</button>
+                            <button onClick={takeInsurance}>Yes ({formatCredits(originalBet / 2)})</button>
                             <button onClick={() => setInsuranceOffered(false)}>Decline</button>
                         </div>
                     )}
                     <p className="bj-hint">{hint}</p>
                     <div className="bj-meta">
                         <MultiplierBadge label="Bet" value={activeBet || 0} suffix="" size="sm" state={inRound ? 'active' : 'idle'} />
+                        {outcomeSummary && (
+                            <span className={`bj-outcome-summary ${outcomeSummary.profit >= 0 ? 'pos' : 'neg'}`}>
+                                Return {formatCredits(outcomeSummary.totalReturn)} · P/L {outcomeSummary.profit >= 0 ? '+' : ''}{formatCredits(outcomeSummary.profit)}
+                            </span>
+                        )}
                     </div>
                     <ActionLockOverlay active={false} />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
@@ -510,11 +603,15 @@ export default function BlackjackGame() {
     )
 }
 
-function Hand({ label, cards, hideHole = false, emptyHint = null, emptySlots = 2 }) {
+function Hand({ label, cards, hideHole = false, emptyHint = null, emptySlots = 2, active = false, status = null, wager = null }) {
     const isEmpty = cards.length === 0
     return (
-        <div className="bj-hand">
-            <span className="bj-hand-label">{label}</span>
+        <div className={`bj-hand ${active ? 'active' : ''} ${status ? `status-${String(status).toLowerCase()}` : ''}`}>
+            <span className="bj-hand-label">
+                <span>{label}</span>
+                {status && <em>{status}</em>}
+                {wager ? <strong>{formatCredits(wager)}</strong> : null}
+            </span>
             <div className="bj-hand-row">
                 {isEmpty ? (
                     <>

@@ -5,7 +5,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
-import { BOARD_NUMBERS, WHEEL_ORDER, colorOf, makeBet } from './layout'
+import { BOARD_NUMBERS, WHEEL_ORDER, buildRouletteCoverage, colorOf, makeBet } from './layout'
 import EducationPanel from '../../EducationPanel'
 import './roulette.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -13,6 +13,15 @@ import { useGameBgm } from '../../../audio/useBgm'
 const CHIP_VALUES = [1, 5, 25, 100, 500]
 const SIM_NAMES = ['Kira', 'Reno', 'Mika', 'Jules', 'Vex', 'Nia', 'Sable', 'Ozzy', 'Tess', 'Rune']
 const BETTING_OPEN_MS = 6000
+
+const SPIN_PHASE_LABELS = {
+    idle: 'Ready',
+    betting: 'Betting open',
+    launch: 'Launch',
+    rolling: 'Rolling',
+    drop: 'Ball drop',
+    settled: 'Settled',
+}
 
 function makeSimPlayers(number = null) {
     return Array.from({ length: 8 }, (_, i) => {
@@ -68,6 +77,7 @@ export default function RouletteGame() {
     const [bets, setBets] = useState([]) // [{ id, type, params, amount }]
     const [result, setResult] = useState(null)
     const [spinning, setSpinning] = useState(false)
+    const [spinPhase, setSpinPhase] = useState('idle')
     const [wheelRotation, setWheelRotation] = useState(0)
     const [ballRotation, setBallRotation] = useState(0)
     const [ballRadius, setBallRadius] = useState('46%')
@@ -82,10 +92,11 @@ export default function RouletteGame() {
     const [lastChips, setLastChips] = useState([])
     const [lastTotal, setLastTotal] = useState(null)
 
+    const roundLocked = spinning || bettingMs > 0
     const totalStake = bets.reduce((sum, b) => sum + b.amount, 0)
 
     const addBet = (type, params = {}) => {
-        if (spinning) return
+        if (roundLocked) return
         if (chip <= 0) return
         setBets(prev => [...prev, bestBetForCell(makeBet(type, params).numbers, chip, type, params)])
     }
@@ -135,13 +146,23 @@ export default function RouletteGame() {
         // Begin spin animation.
         const beginSpin = () => {
             setSpinning(true)
+            setSpinPhase('launch')
             const idx = WHEEL_ORDER.indexOf(number)
             const segAngle = 360 / 37
             const targetAngle = 360 - idx * segAngle
+            const reducedMotion = Boolean(
+                window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+                || document.documentElement.classList.contains('gampo-reduce-motion'),
+            )
+            const spinMs = reducedMotion ? 120 : 3200
             setBallRadius('46%')
             setWheelRotation(prev => prev + 360 * 6 + 96)
             setBallRotation(prev => prev - 360 * 9 + targetAngle + 4)
-            window.setTimeout(() => setBallRadius('28%'), 1500)
+            window.setTimeout(() => setSpinPhase('rolling'), reducedMotion ? 20 : 160)
+            window.setTimeout(() => {
+                setSpinPhase('drop')
+                setBallRadius('28%')
+            }, reducedMotion ? 40 : 1500)
             window.setTimeout(() => {
                 // settle
                 let totalReturn = 0
@@ -155,6 +176,7 @@ export default function RouletteGame() {
                 setResult(number)
                 setLastWon(profit > 0)
                 setSpinning(false)
+                setSpinPhase('settled')
                 setHistory(prev => [number, ...prev].slice(0, 18))
                 if (effectiveMult >= 5) {
                     playSound('bigwin')
@@ -170,8 +192,9 @@ export default function RouletteGame() {
                 })
                 showToast(profit >= 0 ? 'win' : 'loss', `Roulette ${number}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
                 setBets([]) // clear placed bets after spin; lastChips snapshot keeps Auto/Rebet alive
+                window.setTimeout(() => setSpinPhase('idle'), 900)
                 resolve({ profit })
-            }, 3200)
+            }, spinMs)
         }
 
         // Trigger 6s betting open countdown if mode is manual; auto-loop
@@ -180,6 +203,7 @@ export default function RouletteGame() {
             beginSpin()
         } else {
             setBettingMs(BETTING_OPEN_MS)
+            setSpinPhase('betting')
             const start = performance.now()
             const beat = () => {
                 const remaining = Math.max(0, BETTING_OPEN_MS - (performance.now() - start))
@@ -202,7 +226,13 @@ export default function RouletteGame() {
         .filter(b => b.type === type && JSON.stringify(b.params) === JSON.stringify(params))
         .reduce((s, b) => s + b.amount, 0)
 
-    const cellBet = (n) => betTotal('straight', { n })
+    const coverageMap = useMemo(() => buildRouletteCoverage(bets), [bets])
+    const cellBet = (n) => coverageMap.get(n)?.straightAmount || 0
+    const cellCoverage = (n) => coverageMap.get(n)
+    const cellCoverLabel = (coverage) => (coverage?.bets || [])
+        .filter(b => !b.isStraight)
+        .map(b => `${betLabel(b.type, b.params)} ${formatCredits(b.amount)}`)
+        .join(', ')
     const groupedBets = useMemo(() => {
         const map = new Map()
         for (const bet of bets) {
@@ -222,6 +252,26 @@ export default function RouletteGame() {
     const resultText = result === null
         ? (bettingMs > 0 ? 'Bets closing' : 'Ready')
         : `${result} ${colorOf(result)}`
+    const spinPhaseText = SPIN_PHASE_LABELS[spinPhase] || resultText
+    const cellClassName = (n, extra = '') => {
+        const coverage = cellCoverage(n)
+        return [
+            'rou-cell',
+            extra,
+            colorOf(n),
+            cellBet(n) ? 'has-bet' : '',
+            coverage?.coverCount ? 'covered-bet' : '',
+            result === n ? 'winner' : '',
+        ].filter(Boolean).join(' ')
+    }
+    const cellTitle = (n) => {
+        const coverage = cellCoverage(n)
+        const labels = cellCoverLabel(coverage)
+        const pieces = [`Number ${n}`]
+        if (coverage?.straightAmount) pieces.push(`Straight ${formatCredits(coverage.straightAmount)}`)
+        if (labels) pieces.push(`Covered by ${labels}`)
+        return pieces.join(' · ')
+    }
 
     return (
         <GameShell
@@ -233,7 +283,7 @@ export default function RouletteGame() {
                 <BetPanel
                     balance={balance}
                     initialBet={5}
-                    runningRound={spinning}
+                    runningRound={roundLocked}
                     actionLabel={`Spin (${formatCredits(totalStake)} on ${bets.length} bets)`}
                     onPlay={performPlay}
                     disableAuto={false}
@@ -270,12 +320,12 @@ export default function RouletteGame() {
                 </>
             }
         >
-            <div className={`roulette-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+            <div className={`roulette-stage spin-phase-${spinPhase} ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className={`rou-state-card ${meta?.color || 'idle'}`}>
                     <div>
                         <span>Wheel state</span>
-                        <strong>{spinning ? 'Spinning' : resultText}</strong>
+                        <strong>{roundLocked || spinPhase !== 'idle' ? spinPhaseText : resultText}</strong>
                     </div>
                     <div>
                         <span>Ticket</span>
@@ -287,7 +337,7 @@ export default function RouletteGame() {
                     </div>
                 </div>
                 <div className="rou-top-deck">
-                    <div className="rou-wheel-area" ref={wheelAreaRef} style={{ '--ball-radius': ballRadius }}>
+                    <div className={`rou-wheel-area spin-phase-${spinPhase}`} ref={wheelAreaRef} style={{ '--ball-radius': ballRadius }}>
                         <div
                             className={`rou-wheel ${spinning ? 'is-spinning' : 'is-idle'}`}
                             style={spinning
@@ -302,21 +352,21 @@ export default function RouletteGame() {
                                 {WHEEL_ORDER.map((n, i) => {
                                     const angle = i * (360 / 37)
                                     return (
-                                        <span key={n} className={`rou-seg ${colorOf(n)}`} style={{ transform: `rotate(${angle}deg) translateY(-44%) rotate(${-angle}deg)` }}>{n}</span>
+                                        <span key={n} className={`rou-seg ${colorOf(n)} ${result === n ? 'winner' : ''}`} style={{ transform: `rotate(${angle}deg) translateY(-44%) rotate(${-angle}deg)` }}>{n}</span>
                                     )
                                 })}
                             </div>
                             <div className="rou-spindle" />
                         </div>
-                        <div className="rou-ball-track" style={{ transform: `rotate(${ballRotation}deg)` }}>
-                            <span className={`rou-ball ${spinning ? 'spinning' : ''}`} />
+                        <div className={`rou-ball-track spin-phase-${spinPhase}`} style={{ transform: `rotate(${ballRotation}deg)` }}>
+                            <span className={`rou-ball ${spinning ? 'spinning' : ''} spin-phase-${spinPhase}`} />
                         </div>
                         <div className={`rou-num-pop ${meta?.color || ''} ${result === null ? 'idle' : ''}`}>
                             {result === null ? <span aria-hidden="true">⟳</span> : result}
                         </div>
                     </div>
                     <div className="rou-recent-rail-col">
-                        <div className="rou-live-head"><span>Recent spins</span><strong>{spinning ? 'Rolling' : bettingMs > 0 ? `Betting ${(bettingMs / 1000).toFixed(1)}s` : result === null ? 'Open' : `${result} ${colorOf(result)}`}</strong></div>
+                        <div className="rou-live-head"><span>Recent spins</span><strong>{spinning ? spinPhaseText : bettingMs > 0 ? `Betting ${(bettingMs / 1000).toFixed(1)}s` : result === null ? 'Open' : `${result} ${colorOf(result)}`}</strong></div>
                         <div className="rou-recent-rail">
                             {history.length === 0 ? <span className="sim-muted">No spins yet</span> : history.map((n, i) => (
                                 <span key={i} className={`rou-history-pill ${colorOf(n)}`}>{n}</span>
@@ -361,17 +411,22 @@ export default function RouletteGame() {
                 </div>
 
                 <div className="rou-board" aria-label="Roulette betting table">
-                    <div className={`rou-cell zero ${result === 0 ? 'winner' : ''}`} data-bet={cellBet(0) || ''}
+                    <div className={cellClassName(0, 'zero')} data-bet={cellBet(0) || ''}
+                        data-cover={cellCoverage(0)?.coverCount || ''}
+                        data-cover-label={cellCoverLabel(cellCoverage(0))}
+                        title={cellTitle(0)}
                         onClick={() => addBet('straight', { n: 0 })}
-                        style={cellBet(0) ? {} : {}}
                         data-has={cellBet(0) ? 'yes' : ''}
                     >0</div>
                     <div className="rou-bottom">
                         {[0, 1, 2].map(rowIdx => (
                             BOARD_NUMBERS[rowIdx].map(n => (
                                 <div key={n}
-                                    className={`rou-cell ${colorOf(n)} ${cellBet(n) ? 'has-bet' : ''} ${result === n ? 'winner' : ''}`}
+                                    className={cellClassName(n)}
                                     data-bet={cellBet(n) || ''}
+                                    data-cover={cellCoverage(n)?.coverCount || ''}
+                                    data-cover-label={cellCoverLabel(cellCoverage(n))}
+                                    title={cellTitle(n)}
                                     onClick={() => addBet('straight', { n })}
                                 >{n}</div>
                             ))

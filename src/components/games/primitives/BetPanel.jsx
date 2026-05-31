@@ -27,6 +27,7 @@ export default function BetPanel({
     actionLabel = 'Play',
     disableAuto = false,
     children, // game-specific controls injected into manual tab body
+    afterPlayChildren, // optional lower-priority controls shown after the primary CTA
     autoChildren, // optional extra auto controls
     lastBet = null,
     // Mid-round CTA support: when playPhase is set, BetPanel hides the bet input
@@ -41,6 +42,7 @@ export default function BetPanel({
     // QA v4: gap between consecutive auto-play rounds. Plinko sets this to 500
     // so multiple balls drop at a clean cadence.
     autoIntervalMs = 120,
+    playButtonProps = {},
 }) {
     const panelId = useId()
     const [tab, setTab] = useState('manual')
@@ -311,9 +313,11 @@ export default function BetPanel({
             <button className={`bp-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''} ${inRound ? 'in-round' : ''}`}
                 disabled={runningRound && !isAutoLive && !inRound}
                 onClick={handlePlay}
+                {...playButtonProps}
             >
                 {isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>}
             </button>
+            {afterPlayChildren}
         </div>
     )
 }

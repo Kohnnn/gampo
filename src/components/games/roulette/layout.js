@@ -59,6 +59,40 @@ export function makeBet(type, params = {}) {
     }
 }
 
+export function buildRouletteCoverage(bets = []) {
+    const map = new Map()
+    for (const bet of bets || []) {
+        const amount = Number(bet?.amount) || 0
+        const made = makeBet(bet?.type, bet?.params || {})
+        const isStraight = bet?.type === 'straight'
+        for (const n of made.numbers) {
+            if (!Number.isInteger(n) || n < 0 || n > 36) continue
+            const current = map.get(n) || {
+                number: n,
+                straightAmount: 0,
+                coveredAmount: 0,
+                coverCount: 0,
+                bets: [],
+            }
+            if (isStraight) {
+                current.straightAmount += amount
+            } else {
+                current.coveredAmount += amount
+                current.coverCount += 1
+            }
+            current.bets.push({
+                type: bet.type,
+                params: bet.params || {},
+                amount,
+                payout: made.payout,
+                isStraight,
+            })
+            map.set(n, current)
+        }
+    }
+    return map
+}
+
 // Standard 12x3 board number ordering
 export const BOARD_NUMBERS = (() => {
     const rows = []
