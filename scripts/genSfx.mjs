@@ -369,6 +369,10 @@ async function main() {
     const args = new Set(process.argv.slice(2))
     const doSfx = !args.has('--bgm')
     const doBgm = !args.has('--sfx')
+    const gameArg = process.argv.find(arg => arg.startsWith('--games='))
+    const selectedGames = gameArg
+        ? new Set(gameArg.slice('--games='.length).split(',').map(s => s.trim()).filter(Boolean))
+        : null
 
     const tasks = []
     if (doSfx) {
@@ -377,16 +381,20 @@ async function main() {
         }
     }
     if (doBgm) {
-        for (const [rel, gen] of Object.entries(BGM)) {
-            tasks.push(writeOne(rel, gen()))
-        }
-        for (const [rel, gen] of Object.entries(BGM_BONUS)) {
-            tasks.push(writeOne(rel, gen()))
+        if (!selectedGames) {
+            for (const [rel, gen] of Object.entries(BGM)) {
+                tasks.push(writeOne(rel, gen()))
+            }
+            for (const [rel, gen] of Object.entries(BGM_BONUS)) {
+                tasks.push(writeOne(rel, gen()))
+            }
         }
         for (const [rel, gen] of Object.entries(BGM_GAMES)) {
+            if (selectedGames && !selectedGames.has(rel.split('/')[2])) continue
             tasks.push(writeOne(rel, gen()))
         }
         for (const [rel, gen] of Object.entries(BGM_GAMES_BONUS)) {
+            if (selectedGames && !selectedGames.has(rel.split('/')[2])) continue
             tasks.push(writeOne(rel, gen()))
         }
     }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
@@ -71,6 +72,7 @@ export default function RouletteGame() {
     const definition = findGameDefinition('roulette')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('roulette')
     const session = useGameSession('roulette')
 
     const [chip, setChip] = useState(5)
@@ -99,16 +101,24 @@ export default function RouletteGame() {
         if (roundLocked) return
         if (chip <= 0) return
         setBets(prev => [...prev, bestBetForCell(makeBet(type, params).numbers, chip, type, params)])
+        sfx.play('chip', { volume: type === 'straight' ? 0.42 : 0.56 })
     }
 
-    const undo = () => setBets(prev => prev.slice(0, -1))
-    const clear = () => setBets([])
+    const undo = () => {
+        sfx.play('click', { volume: 0.28 })
+        setBets(prev => prev.slice(0, -1))
+    }
+    const clear = () => {
+        sfx.play('click', { volume: 0.28 })
+        setBets([])
+    }
 
     const restoreLastChips = () => {
         if (!lastChips.length) {
             showToast('error', 'No previous bets', 'Place chips to seed Rebet')
             return
         }
+        sfx.play('chip', { volume: 0.5 })
         setBets(lastChips.map(b => ({ ...b, id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}` })))
     }
 
@@ -134,6 +144,7 @@ export default function RouletteGame() {
         setLastChips(activeBets.map(b => ({ type: b.type, params: b.params, amount: b.amount })))
         setLastTotal(stake)
         playSound('tick')
+        sfx.play('click', { volume: 0.35 })
 
         // Pre-roll: simulated bettors are populated immediately so the
         // table feels live during the betting countdown. The actual wheel
@@ -147,6 +158,7 @@ export default function RouletteGame() {
         const beginSpin = () => {
             setSpinning(true)
             setSpinPhase('launch')
+            sfx.play('spin', { volume: 0.52 })
             const idx = WHEEL_ORDER.indexOf(number)
             const segAngle = 360 / 37
             const targetAngle = 360 - idx * segAngle
@@ -158,10 +170,14 @@ export default function RouletteGame() {
             setBallRadius('46%')
             setWheelRotation(prev => prev + 360 * 6 + 96)
             setBallRotation(prev => prev - 360 * 9 + targetAngle + 4)
-            window.setTimeout(() => setSpinPhase('rolling'), reducedMotion ? 20 : 160)
+            window.setTimeout(() => {
+                setSpinPhase('rolling')
+                sfx.play('tick', { volume: 0.38 })
+            }, reducedMotion ? 20 : 160)
             window.setTimeout(() => {
                 setSpinPhase('drop')
                 setBallRadius('28%')
+                sfx.play('tick', { volume: 0.58 })
             }, reducedMotion ? 40 : 1500)
             window.setTimeout(() => {
                 // settle
@@ -177,6 +193,7 @@ export default function RouletteGame() {
                 setLastWon(profit > 0)
                 setSpinning(false)
                 setSpinPhase('settled')
+                sfx.play('land', { volume: 0.78 })
                 setHistory(prev => [number, ...prev].slice(0, 18))
                 if (effectiveMult >= 5) {
                     playSound('bigwin')
@@ -184,6 +201,7 @@ export default function RouletteGame() {
                 } else {
                     playSound(profit > 0 ? 'win' : 'loss')
                 }
+                sfx.play(profit > 0 ? 'win' : 'lose', { volume: profit > 0 ? 0.72 : 0.5 })
                 session.record({
                     id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                     label: `${number} ${colorOf(number)}`,

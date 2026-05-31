@@ -1,12 +1,10 @@
 // Stake-style Tarot (Wave 4 Batch 4B).
 //
-// Player picks a suit (Wands / Cups / Swords / Pentacles) before the
-// reveal. Three cards are drawn as Past / Present / Future from a
-// curated 22-card Major Arcana deck (each card mapped to a suit). Cards
-// matching the chosen suit get a 3x bonus on their base contribution.
-// Round payout = sum of three card contributions vs stake.
+// Player picks a suit before the reveal. Three cards are drawn from the
+// 78-card Plateau Tarot deck. Minor cards matching the chosen suit get a
+// bonus; Major Arcana are high-variance omen cards.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -31,7 +29,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import TarotCardArt from './TarotCardArt'
-import { contributionFor, drawSpread, expectedMultiplierForSuit, SUITS, TARGET_RTP, topContributionForSuit } from './tarotModel'
+import { contributionFor, drawSpread, expectedMultiplierForSuit, MATCH_BONUS, readingFor, SUITS, TARGET_RTP, topContributionForSuit } from './tarotModel'
 import './tarot.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
@@ -40,7 +38,6 @@ const REVEAL_STAGGER_MS = 240
 const POSITIONS = ['Past', 'Present', 'Future']
 
 export default function TarotGame() {
-    useGameBgm('tarot', 'idle')
     const definition = findGameDefinition('tarot') || { name: 'Tarot', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
@@ -51,11 +48,16 @@ export default function TarotGame() {
     const [pickedSuit, setPickedSuit] = useState('wands')
     const [running, setRunning] = useState(false)
     const [revealed, setRevealed] = useState([null, null, null]) // { card, contribution, matched }
+    const [activeReadingIndex, setActiveReadingIndex] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
 
     const machine = useRoundMachine({})
+    const matchedCount = revealed.filter(r => r && r.matched).length
+    const majorCount = revealed.filter(r => r?.card?.isMajor).length
+    const bgmMode = running || majorCount > 0 || matchedCount >= 2 ? 'bonus' : 'idle'
+    useGameBgm('tarot', bgmMode)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (running) { resolve({ profit: 0 }); return }
@@ -67,9 +69,11 @@ export default function TarotGame() {
         setLastBet(betAmount)
         setRunning(true)
         setToast(null)
+        setActiveReadingIndex(null)
         setRevealed([null, null, null])
         playSound('click')
         sfx.play('click')
+        sfx.play('deal', { volume: 0.5 })
 
         const draws = drawSpread(() => nextRoll('tarot').roll)
         const contributions = draws.map(c => ({ card: c, contribution: contributionFor(c, pickedSuit), matched: c.suit === pickedSuit }))
@@ -90,7 +94,9 @@ export default function TarotGame() {
                     out[i] = entry
                     return out
                 })
+                setActiveReadingIndex(i)
                 sfx.play('reveal')
+                if (entry.card.isMajor) sfx.play('major', { volume: 0.45 })
             }, REVEAL_DELAY_MS + i * REVEAL_STAGGER_MS)
         })
 
@@ -107,6 +113,7 @@ export default function TarotGame() {
             })
             if (won && headlineMult >= 5) {
                 playSound('bigwin')
+                sfx.play('bonus', { volume: 0.72 })
                 setBigWin({ trigger: Date.now(), profit, multiplier: headlineMult })
             } else {
                 playSound(won ? 'win' : 'loss')
@@ -126,7 +133,10 @@ export default function TarotGame() {
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
-    const matchedCount = revealed.filter(r => r && r.matched).length
+    const activeReading = useMemo(() => {
+        const entry = activeReadingIndex === null ? null : revealed[activeReadingIndex]
+        return readingFor(entry, POSITIONS[activeReadingIndex] || 'Present', pickedSuit)
+    }, [activeReadingIndex, pickedSuit, revealed])
 
     return (
         <GameShell
@@ -144,11 +154,15 @@ export default function TarotGame() {
                     onPlay={performPlay}
                     lastBet={lastBet}
                     disableAuto
+                    playButtonProps={{
+                        'data-game-action': 'tarot-pull',
+                        'data-testid': 'tarot-pull-cta',
+                    }}
                 >
-                    <p className="bp-hint">Pick a suit before pulling. Matching cards receive a 3× raw omen boost, then the spread is normalized to {Math.round(TARGET_RTP * 100)}% RTP.</p>
+                    <p className="bp-hint">Pick a suit before pulling. Matching Minor Arcana receive a {MATCH_BONUS.toFixed(1)}× raw omen boost, then the spread is normalized to {Math.round(TARGET_RTP * 100)}% RTP.</p>
                     <div className="bp-bal-line">
                         <span>Suit bonus</span>
-                        <strong>×3</strong>
+                        <strong>×{MATCH_BONUS.toFixed(1)}</strong>
                     </div>
                     <div className="bp-bal-line">
                         <span>Top single</span>
@@ -193,17 +207,25 @@ export default function TarotGame() {
                             ].join(' ')
                             return (
                                 <div key={i} className={`tarot-slot ${cls}`} style={{ '--rarity': matched ? SUITS[pickedSuit].color : 'rgba(180, 120, 255, 0.45)' }}>
-                                    <TarotCardArt
-                                        card={card}
-                                        hidden={!card}
-                                        position={POSITIONS[i]}
-                                        matched={matched}
-                                        multiplier={entry?.contribution || 0}
-                                    />
+                                    <button
+                                        className="tarot-card-button"
+                                        type="button"
+                                        disabled={!card}
+                                        aria-pressed={activeReadingIndex === i}
+                                        onClick={() => setActiveReadingIndex(i)}
+                                    >
+                                        <TarotCardArt
+                                            card={card}
+                                            hidden={!card}
+                                            position={POSITIONS[i]}
+                                            matched={matched}
+                                            multiplier={entry?.contribution || 0}
+                                        />
+                                    </button>
                                     {card && (
                                         <div className="tarot-card-readout">
-                                            <span>{SUITS[card.suit].name}</span>
-                                            <strong>{matched ? 'Matched omen' : 'Base omen'}</strong>
+                                            <span>{SUITS[card.suit]?.name || 'Major Arcana'}</span>
+                                            <strong>{card.isMajor ? 'Major omen' : matched ? 'Matched omen' : 'Base omen'}</strong>
                                         </div>
                                     )}
                                 </div>
@@ -213,6 +235,35 @@ export default function TarotGame() {
                     <div>
                         <MultiplierBadge label="Matched" value={matchedCount} suffix="" size="sm" state={running ? 'active' : 'idle'} />
                     </div>
+                    {activeReading && (
+                        <section className="tarot-reading-panel" aria-live="polite">
+                            <header>
+                                <span>{activeReading.subtitle}</span>
+                                <strong>{activeReading.title}</strong>
+                            </header>
+                            <div className="tarot-reading-grid">
+                                <span>
+                                    <small>Arcana</small>
+                                    <b>{activeReading.arcana}</b>
+                                </span>
+                                <span>
+                                    <small>Suit</small>
+                                    <b>{activeReading.suit}</b>
+                                </span>
+                                <span>
+                                    <small>Rank</small>
+                                    <b>{activeReading.rank}</b>
+                                </span>
+                                <span>
+                                    <small>Omen</small>
+                                    <b>x{activeReading.contribution.toFixed(2)}</b>
+                                </span>
+                            </div>
+                            <p className="tarot-reading-symbols">{activeReading.symbols}</p>
+                            <p>{activeReading.description}</p>
+                            <em>{activeReading.omen}</em>
+                        </section>
+                    )}
                     <ActionLockOverlay active={running} label="Pulling..." />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>

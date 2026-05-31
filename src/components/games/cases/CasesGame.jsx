@@ -54,9 +54,11 @@ import {
     CASE_PRIZE_ZOOM_LEAD_MS,
     CASE_REVEAL_MS,
     CASE_SETTLE_PAD_MS,
+    CASE_VISIBLE_PHASES,
     casePhaseLabel,
     claimCaseSettlement,
     finalPrizeOffset,
+    hasReachedCasePhase,
     pickCelebrationDrop,
     summarizeCaseSettlement,
 } from './casesAnimation'
@@ -182,7 +184,9 @@ export default function CasesGame() {
     const [tracks, setTracks] = useState([]) // [[item, item, ...], ...]
     const [trackOffsets, setTrackOffsets] = useState([])
     const [results, setResults] = useState([]) // resolved drops list (with wear/statTrak)
-    const [casePhase, setCasePhase] = useState('idle') // idle | lid | spinning | finale | zoom | settling
+    const [casePhase, setCasePhase] = useState('idle') // idle | arming | lid | spin | slowdown | land | reveal | settled
+    const [quickOpen, setQuickOpen] = useState(false)
+    const [autoOpen, setAutoOpen] = useState(false)
     const [celebrationDrop, setCelebrationDrop] = useState(null)
     const [settlementSummary, setSettlementSummary] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
@@ -198,6 +202,7 @@ export default function CasesGame() {
     const [caseGridSearch, setCaseGridSearch] = useState('')
     const tickRef = useRef({ ids: [], landId: null })
     const revealTimersRef = useRef([])
+    const autoTimerRef = useRef(null)
     const pendingRoundRef = useRef(null)
     const celebrationTimerRef = useRef(null)
     const casesBgmMode = celebrationDrop ? 'bonus' : 'idle'
@@ -262,16 +267,17 @@ export default function CasesGame() {
 
     useEffect(() => () => {
         clearRevealTimers()
+        if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current)
         if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
     }, [clearRevealTimers])
 
-    const scheduleTickSfx = useCallback(() => {
+    const scheduleTickSfx = useCallback((durationMs = CASE_REVEAL_MS) => {
         tickRef.current.ids.forEach(id => window.clearTimeout(id))
         const ids = []
         const TICKS = 14
         for (let i = 0; i < TICKS; i += 1) {
             const t = i / (TICKS - 1)
-            const at = Math.round(cubicOut(t) * CASE_REVEAL_MS)
+            const at = Math.round(cubicOut(t) * durationMs)
             const vol = Math.max(0.18, 0.6 * (1 - t * 0.65))
             const id = window.setTimeout(() => {
                 sfx.play('tick', { volume: vol })
@@ -282,7 +288,7 @@ export default function CasesGame() {
         if (tickRef.current.landId) window.clearTimeout(tickRef.current.landId)
         tickRef.current.landId = window.setTimeout(() => {
             sfx.play('land', { volume: 0.85 })
-        }, CASE_REVEAL_MS - 40)
+        }, Math.max(60, durationMs - 40))
     }, [sfx])
 
     const finishPendingRound = useCallback(({ skipped = false } = {}) => {
@@ -293,7 +299,7 @@ export default function CasesGame() {
         const { caseData, picks, resolve, stake, tracks: pendingTracks, offsets: pendingOffsets, rows: roundRows } = pending
         setTracks(pendingTracks)
         setTrackOffsets(pendingOffsets)
-        setCasePhase('settling')
+        setCasePhase('reveal')
 
         const settlement = summarizeCaseSettlement({ picks, stake, rows: roundRows })
         const returnAmount = settlement.totalReturn
@@ -357,7 +363,7 @@ export default function CasesGame() {
         })
         showToast(won ? 'win' : 'loss', `${caseData.name} ${won ? 'win' : 'miss'}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         setRunning(false)
-        setCasePhase('idle')
+        setCasePhase('settled')
         pendingRoundRef.current = null
         resolve({ profit })
     }, [addWinnings, clearRevealTimers, collection, machine, playSound, session, showToast, sfx])
@@ -387,10 +393,9 @@ export default function CasesGame() {
         setResults([])
         setTracks([])
         setTrackOffsets([])
-        setCasePhase('lid')
+        setCasePhase('arming')
         playSound('click')
         sfx.play('open', { volume: 0.65 })
-        sfx.play('lid', { volume: 0.78 })
         sfx.play('click')
         setView('open')
 
@@ -447,9 +452,24 @@ export default function CasesGame() {
             { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { stake, rows }, at: 0 },
         ], { autoFinish: false })
 
+        const reducedMotion = Boolean(
+            window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+            || document.documentElement.classList.contains('gampo-reduce-motion'),
+        )
+        const revealMs = reducedMotion ? 160 : quickOpen ? 1320 : CASE_REVEAL_MS
+        const lidMs = reducedMotion ? 24 : CASE_LID_LIFT_MS
+        const sweepLeadMs = Math.min(CASE_LIGHT_SWEEP_LEAD_MS, Math.max(280, revealMs * 0.38))
+        const zoomLeadMs = Math.min(CASE_PRIZE_ZOOM_LEAD_MS, Math.max(140, revealMs * 0.2))
+
         queueRevealTimer(() => {
             if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
-            setCasePhase('spinning')
+            setCasePhase('lid')
+            sfx.play('lid', { volume: 0.78 })
+        }, reducedMotion ? 0 : 90)
+
+        queueRevealTimer(() => {
+            if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+            setCasePhase('spin')
             setTracks(newTracks)
             setTrackOffsets(newTracks.map(() => 0))
             sfx.play('multispin', { volume: rows >= 3 ? 0.62 : 0.36 })
@@ -457,23 +477,51 @@ export default function CasesGame() {
                 if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
                 setTrackOffsets(finalOffsets)
             }, 32)
-            scheduleTickSfx()
-        }, CASE_LID_LIFT_MS)
+            scheduleTickSfx(revealMs)
+        }, lidMs)
 
         queueRevealTimer(() => {
             if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
-            setCasePhase('finale')
-        }, CASE_LID_LIFT_MS + CASE_REVEAL_MS - CASE_LIGHT_SWEEP_LEAD_MS)
+            setCasePhase('slowdown')
+        }, lidMs + Math.max(90, revealMs * 0.58))
 
         queueRevealTimer(() => {
             if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
-            setCasePhase('zoom')
-        }, CASE_LID_LIFT_MS + CASE_REVEAL_MS - CASE_PRIZE_ZOOM_LEAD_MS)
+            setCasePhase('land')
+        }, lidMs + Math.max(80, revealMs - sweepLeadMs))
+
+        queueRevealTimer(() => {
+            if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+            setCasePhase('reveal')
+        }, lidMs + Math.max(100, revealMs - zoomLeadMs))
 
         queueRevealTimer(() => {
             finishPendingRound()
-        }, CASE_LID_LIFT_MS + CASE_REVEAL_MS + CASE_SETTLE_PAD_MS)
+        }, lidMs + revealMs + CASE_SETTLE_PAD_MS)
     })
+
+    useEffect(() => {
+        if (autoTimerRef.current) {
+            window.clearTimeout(autoTimerRef.current)
+            autoTimerRef.current = null
+        }
+        if (!autoOpen || running || casePhase !== 'settled' || !activeCase) return undefined
+        if (balance < totalStake) {
+            setAutoOpen(false)
+            showToast('error', 'Auto stopped', `Need ${formatCredits(totalStake)}`)
+            return undefined
+        }
+        autoTimerRef.current = window.setTimeout(() => {
+            autoTimerRef.current = null
+            performPlay({ betAmount: casePrice })
+        }, quickOpen ? 360 : 900)
+        return () => {
+            if (autoTimerRef.current) {
+                window.clearTimeout(autoTimerRef.current)
+                autoTimerRef.current = null
+            }
+        }
+    }, [activeCase, autoOpen, balance, casePhase, casePrice, quickOpen, running, showToast, totalStake])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
     const stageLoading = !preloader.ready || !allCases
@@ -616,7 +664,7 @@ export default function CasesGame() {
                     fixedBetAmount={casePrice}
                     betLabel="Case price"
                     runningRound={running}
-                    actionLabel={activeCase ? `Open ${rows > 1 ? `×${rows}` : ''} (${formatCredits(totalStake)})` : 'Loading...'}
+                    actionLabel={activeCase ? `OPEN ${rows > 1 ? `×${rows}` : '×1'} (${formatCredits(totalStake)})` : 'Loading...'}
                     onPlay={performPlay}
                     lastBet={lastBet}
                     disableAuto
@@ -702,7 +750,10 @@ export default function CasesGame() {
             }
         >
             <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
-                <div className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}`}>
+                <div
+                    className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}`}
+                    style={{ '--case-spin-ms': `${quickOpen ? 1320 : CASE_REVEAL_MS}ms` }}
+                >
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
 
                     <div className="cases-view-tabs">
@@ -761,13 +812,13 @@ export default function CasesGame() {
                                 </div>
                             </div>
                             <div className="cases-opening-timeline" aria-hidden={!running && results.length === 0}>
-                                {['lid', 'spinning', 'finale', 'zoom'].map((phase, index) => (
+                                {CASE_VISIBLE_PHASES.map(phase => (
                                     <span
                                         key={phase}
-                                        className={(casePhase === phase || (results.length > 0 && index < 4)) ? 'active' : ''}
+                                        className={(hasReachedCasePhase(casePhase, phase) || results.length > 0) ? 'active' : ''}
                                     >
                                         <i />
-                                        {phase === 'lid' ? 'Unlock' : phase === 'spinning' ? 'Reel' : phase === 'finale' ? 'Pointer' : 'Reveal'}
+                                        {phase === 'arming' ? 'Unlock' : phase === 'lid' ? 'Lid' : phase === 'spin' ? 'Reel' : phase === 'slowdown' ? 'Slow' : phase === 'land' ? 'Pointer' : 'Reveal'}
                                     </span>
                                 ))}
                             </div>
@@ -825,7 +876,7 @@ export default function CasesGame() {
                                 {categoryCases.map(c => (
                                     <button
                                         key={c.id}
-                                        className={`cases-case-card ${activeCase?.id === c.id ? 'active' : ''} ${casePhase === 'lid' && activeCase?.id === c.id ? 'is-lifting' : ''}`}
+                                        className={`cases-case-card ${activeCase?.id === c.id ? 'active' : ''} ${(casePhase === 'arming' || casePhase === 'lid') && activeCase?.id === c.id ? 'is-lifting' : ''}`}
                                         disabled={running}
                                         onClick={() => selectCase(c.id)}
                                         title={`${c.name} · ${formatCredits(c.openPriceGc || 0)} · ${c.items.length} items · EV ${formatCredits(c.evGc || 0)} · ${c.volatility?.label || 'volatility'}`}
@@ -859,7 +910,7 @@ export default function CasesGame() {
                                                 {track.map((item, idx) => (
                                                     <div
                                                         key={`${ti}-${idx}-${item.id}`}
-                                                        className={`cases-carousel-tile ${idx === CASE_PRIZE_INDEX && (casePhase === 'zoom' || results.length > 0) ? 'is-target' : ''} ${idx === CASE_PRIZE_INDEX && results.length > 0 ? 'is-prize' : ''}`}
+                                                        className={`cases-carousel-tile ${idx === CASE_PRIZE_INDEX && (hasReachedCasePhase(casePhase, 'reveal') || results.length > 0) ? 'is-target' : ''} ${idx === CASE_PRIZE_INDEX && results.length > 0 ? 'is-prize' : ''}`}
                                                         style={{ borderColor: item.color, '--rarity': item.color }}
                                                     >
                                                         <img src={item.image} alt={item.name} loading="lazy" />
@@ -923,12 +974,37 @@ export default function CasesGame() {
                                     </div>
                                 </div>
                             )}
+                            <div className="cases-result-actions" aria-label="Case opening controls">
+                                <button
+                                    type="button"
+                                    className="cases-result-primary"
+                                    data-game-action="case-open-again"
+                                    onClick={() => performPlay({ betAmount: casePrice })}
+                                    disabled={running || !activeCase}
+                                >
+                                    Open again
+                                </button>
+                                <button type="button" aria-pressed={quickOpen} onClick={() => setQuickOpen(v => !v)} disabled={running}>
+                                    Quick {quickOpen ? 'on' : 'off'}
+                                </button>
+                                <button type="button" aria-pressed={autoOpen} onClick={() => setAutoOpen(v => !v)} disabled={running}>
+                                    Auto {autoOpen ? 'on' : 'off'}
+                                </button>
+                                <button type="button" aria-pressed={rows === 1} onClick={() => selectRows(1)} disabled={running}>
+                                    Single
+                                </button>
+                                <button type="button" aria-pressed={rows > 1} onClick={() => selectRows(rows > 1 ? rows : 5)} disabled={running}>
+                                    Multi
+                                </button>
+                            </div>
                             <div className="cases-stack-row">
                                 <MultiplierBadge label="Rows" value={rows} suffix="" size="sm" state={running ? 'active' : 'idle'} />
                                 {activeCase && (
                                     <>
                                         <span className="cases-stack-pill">Case {formatCredits(casePrice)}</span>
                                         <span className="cases-stack-pill">Total {formatCredits(totalStake)}</span>
+                                        <span className="cases-stack-pill">{quickOpen ? 'Quick open' : 'Full spin'}</span>
+                                        <span className="cases-stack-pill">{autoOpen ? 'Auto armed' : 'Manual'}</span>
                                         <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
                                             {activeCase.items.length} skins · {activeCase.type || 'Case'}
                                         </span>

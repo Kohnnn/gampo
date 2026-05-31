@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
     CASE_PRIZE_INDEX,
     CASE_TILE_PX,
+    CASE_OPEN_PHASES,
     casePhaseLabel,
     claimCaseSettlement,
     finalPrizeOffset,
+    hasReachedCasePhase,
     pickCelebrationDrop,
     shouldCelebrateDrop,
     summarizeCaseSettlement,
@@ -17,9 +19,14 @@ describe('cases animation helpers', () => {
     })
 
     it('labels the visible phase for the lock overlay', () => {
+        expect(CASE_OPEN_PHASES).toEqual(['idle', 'arming', 'lid', 'spin', 'slowdown', 'land', 'reveal', 'settled'])
+        expect(casePhaseLabel('arming', 1)).toBe('Preparing drop...')
         expect(casePhaseLabel('lid', 1)).toBe('Lifting lid...')
-        expect(casePhaseLabel('zoom', 5)).toBe('Locking prize...')
-        expect(casePhaseLabel('spinning', 3)).toBe('Unboxing 3 rows...')
+        expect(casePhaseLabel('spin', 3)).toBe('Rolling 3 rows...')
+        expect(casePhaseLabel('land', 5)).toBe('Pointer locked...')
+        expect(casePhaseLabel('settled', 5)).toBe('Drop recorded')
+        expect(hasReachedCasePhase('reveal', 'spin')).toBe(true)
+        expect(hasReachedCasePhase('lid', 'land')).toBe(false)
     })
 
     it('celebrates Restricted+ and special variants', () => {
@@ -38,7 +45,7 @@ describe('cases animation helpers', () => {
         expect(drop.name).toBe('Gold')
     })
 
-    it.each([1, 5, 10])('summarizes %i-row case settlement with every result', rows => {
+    it.each([1, 3, 5, 10])('summarizes %i-row case settlement with every result', rows => {
         const picks = Array.from({ length: rows }, (_, index) => ({
             name: `Drop ${index + 1}`,
             valueGc: 1.5 + index,

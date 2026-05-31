@@ -18,8 +18,8 @@ const SPECIFIC_COPY = {
         risk: 'Road maps show streak patterns but do not predict the next shoe result. Use them as history, not a forecasting model.',
     },
     tarot: {
-        objective: 'Pick a suit, then reveal a Past, Present, and Future spread from a 22-card major-arcana deck.',
-        payout: 'Each card contributes a multiplier from its omen value. Cards matching your chosen suit get a 3x raw omen boost, then the spread is normalized to the target RTP.',
+        objective: 'Pick a suit, then reveal a Past, Present, and Future spread from the 78-card Plateau Tarot deck.',
+        payout: 'Each card contributes a multiplier from its omen value. Matching Minor Arcana get a 2.5x raw omen boost, Major Arcana use their special raw table, then the spread is normalized to the target RTP.',
         strategy: 'Suit choice changes which cards spike the spread but no suit has a hidden RTP advantage after normalization.',
         risk: 'Most spreads produce small returns. Big rounds need high-value cards and one or more suit matches.',
     },

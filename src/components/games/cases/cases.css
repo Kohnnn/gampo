@@ -346,8 +346,8 @@
 
 .cases-opening-timeline {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
     min-height: 34px;
 }
 
@@ -414,8 +414,8 @@
     mix-blend-mode: screen;
     z-index: 4;
 }
-.case-phase-finale .cases-carousel-frame::after,
-.case-phase-zoom .cases-carousel-frame::after {
+.case-phase-land .cases-carousel-frame::after,
+.case-phase-reveal .cases-carousel-frame::after {
     animation: caseLightSweep 1300ms cubic-bezier(0.16, 0.92, 0.28, 1) both;
 }
 @keyframes caseLightSweep {
@@ -433,7 +433,7 @@
     display: flex;
     gap: 4px;
     /* Extended cubic-out deceleration for a heavier CS-style case opening. */
-    transition: transform 5200ms cubic-bezier(0.11, 0.84, 0.16, 1);
+    transition: transform var(--case-spin-ms, 5200ms) cubic-bezier(0.11, 0.84, 0.16, 1);
     will-change: transform;
 }
 
@@ -561,6 +561,60 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-wrap: wrap;
+}
+
+.cases-result-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 209, 102, 0.16);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.18)),
+        rgba(0, 0, 0, 0.25);
+}
+
+.cases-result-actions button {
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(10, 17, 27, 0.88);
+    color: var(--text-primary, #fff);
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.cases-result-actions button:hover:not(:disabled),
+.cases-result-actions button:focus-visible {
+    border-color: rgba(255, 209, 102, 0.58);
+    box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.12);
+    outline: none;
+}
+
+.cases-result-actions button[aria-pressed='true'] {
+    color: #071018;
+    border-color: rgba(255, 226, 128, 0.7);
+    background: linear-gradient(180deg, #ffe680, #b89035);
+}
+
+.cases-result-actions button:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+}
+
+.cases-result-actions .cases-result-primary {
+    min-width: 132px;
+    color: #071018;
+    border-color: rgba(255, 226, 128, 0.74);
+    background: linear-gradient(180deg, #ffe680, #b89035);
+    box-shadow: 0 12px 22px rgba(184, 144, 53, 0.24);
 }
 
 /* Wave 18: panel collection summary pills */
@@ -1594,8 +1648,9 @@
 @media (prefers-reduced-motion: reduce) {
     .cases-case-card.is-lifting::before,
     .cases-case-card.is-lifting::after,
-    .case-phase-finale .cases-carousel-frame::after,
-    .case-phase-zoom .cases-carousel-frame::after,
+    .case-phase-land .cases-carousel-frame::after,
+    .case-phase-reveal .cases-carousel-frame::after,
+    .cases-carousel-track,
     .cases-carousel-tile.is-target,
     .cases-prize-popover,
     .cases-prize-popover::before,
@@ -1605,13 +1660,24 @@
 }
 .gampo-reduce-motion .cases-case-card.is-lifting::before,
 .gampo-reduce-motion .cases-case-card.is-lifting::after,
-.gampo-reduce-motion .case-phase-finale .cases-carousel-frame::after,
-.gampo-reduce-motion .case-phase-zoom .cases-carousel-frame::after,
+.gampo-reduce-motion .case-phase-land .cases-carousel-frame::after,
+.gampo-reduce-motion .case-phase-reveal .cases-carousel-frame::after,
+.gampo-reduce-motion .cases-carousel-track,
 .gampo-reduce-motion .cases-carousel-tile.is-target,
 .gampo-reduce-motion .cases-prize-popover,
 .gampo-reduce-motion .cases-prize-popover::before,
 .gampo-reduce-motion .cases-prize-card {
     animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cases-carousel-track {
+        transition: none !important;
+    }
+}
+
+.gampo-reduce-motion .cases-carousel-track {
+    transition: none !important;
 }
 
 /* === Wave 43: Oki-style case opening hierarchy === */
@@ -1857,6 +1923,26 @@
 @media (max-width: 480px) {
     .cases-market-reel {
         min-height: 142px;
+    }
+
+    .cases-opening-timeline {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 5px;
+    }
+
+    .cases-opening-timeline span {
+        padding: 6px 7px;
+        font-size: 9px;
+    }
+
+    .cases-result-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cases-result-actions .cases-result-primary {
+        grid-column: 1 / -1;
+        width: 100%;
     }
 
     .cases-market-reel-head {
