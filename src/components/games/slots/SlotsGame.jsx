@@ -771,7 +771,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
         >
             <div
-                className={`slot-stage-v2 skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''} ${freeSpinSession || freeSpins > 0 ? 'is-bonus-active' : ''} ${lastResult?.featureEvents?.length ? 'has-feature-event' : ''}`}
+                className={`slot-stage-v2 slot-template-${config.id} skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''} ${freeSpinSession || freeSpins > 0 ? 'is-bonus-active' : ''} ${lastResult?.featureEvents?.length ? 'has-feature-event' : ''}`}
                 style={{
                     '--slot-accent': config.accent,
                     '--slot-cover': `url(${cover})`,
@@ -840,7 +840,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                 return (
                                                     <div
                                                         key={`${index}-${item?.id || 'na'}`}
-                                                        className={`slot-cell type-${item?.type || 'pay'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''}`}
+                                                        className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''}`}
                                                     >
                                                         <Asset src={item?.asset} alt={item?.label} fallback={<strong>{item?.label}</strong>} />
                                                         <em>{item?.label}</em>
@@ -864,7 +864,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     return (
                                         <div
                                             key={`${index}-${item.id}`}
-                                            className={`slot-cell type-${item.type || 'pay'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''}`}
+                                            className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''}`}
                                             style={{ animationDelay: `${col * 45}ms` }}
                                         >
                                             <Asset src={item.asset} alt={item.label} fallback={<strong>{item.label}</strong>} />

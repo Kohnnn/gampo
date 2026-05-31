@@ -195,7 +195,12 @@ async function waitForReady(client, sessionId, timeoutMs = 8000) {
     const start = Date.now()
     while (Date.now() - start < timeoutMs) {
         const result = await client.send('Runtime.evaluate', {
-            expression: `document.readyState === 'complete' && !!document.querySelector('#root') && document.querySelector('#root').children.length > 0 && !document.querySelector('.route-fallback')`,
+            expression: `document.readyState === 'complete'
+              && !!document.querySelector('#root')
+              && document.querySelector('#root').children.length > 0
+              && !document.querySelector('.route-fallback')
+              && !document.querySelector('.core-stage.is-loading')
+              && !/LOADING\\s+(LAB|STAGE)/i.test(document.body.innerText || '')`,
             returnByValue: true,
         }, sessionId)
         if (result.result?.value) return
@@ -271,6 +276,7 @@ async function evaluatePage(client, sessionId, route) {
     });
   const action = controls.find(control => pattern.test(control.text));
   const titleEl = document.querySelector('h1, .game-badge, .game-title, [data-game-title]');
+  const loadingBlocking = Boolean(document.querySelector('.core-stage.is-loading')) || /LOADING\\s+(LAB|STAGE)/i.test(document.body.innerText || '');
   return {
     title: titleEl ? titleEl.textContent.trim().replace(/\\s+/g, ' ').slice(0, 90) : document.title,
     viewport: { width: viewportWidth, height: viewportHeight },
@@ -283,6 +289,7 @@ async function evaluatePage(client, sessionId, route) {
     visibleControlCount: controls.length,
     keyActionVisible: Boolean(action),
     keyAction: action || null,
+    loadingBlocking,
   };
 })()`
     const result = await client.send('Runtime.evaluate', {
@@ -302,6 +309,8 @@ async function run() {
     const viewports = parseViewportArg(argValue('viewports', ''))
     const browser = findBrowser()
     const port = Number(argValue('port', String(9300 + Math.floor(Math.random() * 400))))
+    const readyTimeoutMs = Number(argValue('readyTimeoutMs', '12000'))
+    const settleMs = Number(argValue('settleMs', '700'))
     const userDataDir = join(tmpdir(), `gampo-smoke-${process.pid}`)
     const runDir = join(outDir, label)
     const screenshotDir = join(runDir, 'screenshots')
@@ -345,8 +354,8 @@ async function run() {
                 const url = `${baseUrl}${route}`
                 await client.send('Page.navigate', { url }, sessionId)
                 await waitForLoad(client, sessionId)
-                await waitForReady(client, sessionId)
-                await sleep(700)
+                await waitForReady(client, sessionId, readyTimeoutMs)
+                await sleep(settleMs)
                 const events = client.drainEvents(sessionId)
                 const metrics = await evaluatePage(client, sessionId, route)
                 const screenshotName = `${viewport.width}x${viewport.height}-${routeSlug(route)}.png`
@@ -368,7 +377,7 @@ async function run() {
             }
         }
 
-        const failures = results.filter(item => item.overflowX || item.brokenImages.length || item.errors.length || !item.keyActionVisible)
+        const failures = results.filter(item => item.overflowX || item.loadingBlocking || item.brokenImages.length || item.errors.length || !item.keyActionVisible)
         const report = {
             baseUrl,
             browser,
@@ -388,10 +397,10 @@ async function run() {
             `Total checks: ${results.length}`,
             `Failures: ${failures.length}`,
             '',
-            '| Viewport | Route | Overflow | Key Action | Broken Images | Errors | Screenshot |',
-            '| --- | --- | ---: | --- | ---: | ---: | --- |',
+            '| Viewport | Route | Overflow | Loading | Key Action | Broken Images | Errors | Screenshot |',
+            '| --- | --- | ---: | --- | --- | ---: | ---: | --- |',
             ...results.map(item => (
-                `| ${item.viewport.width}x${item.viewport.height} | ${item.route} | ${item.overflowDelta}px | ${item.keyActionVisible ? 'yes' : 'no'} | ${item.brokenImages.length} | ${item.errors.length} | ${item.screenshot.replaceAll('\\', '/')} |`
+                `| ${item.viewport.width}x${item.viewport.height} | ${item.route} | ${item.overflowDelta}px | ${item.loadingBlocking ? 'yes' : 'no'} | ${item.keyActionVisible ? 'yes' : 'no'} | ${item.brokenImages.length} | ${item.errors.length} | ${item.screenshot.replaceAll('\\', '/')} |`
             )),
             '',
         ].join('\n'))

@@ -21,6 +21,16 @@ export const SLOT_TEMPLATE_ROUTES = [
     { id: 'gummy-drops', path: '/gummy-drops' },
 ]
 
+export const SLOT_TEMPLATE_ROUTE_ALIASES = [
+    { path: '/scarab', target: '/scarab-spin' },
+    { path: '/bass-bayou-collect', target: '/bass-bayou' },
+    { path: '/bass-bayou-collection', target: '/bass-bayou' },
+    { path: '/ghostblade', target: '/ghostblade-strike' },
+    { path: '/miko-spirit-lanterns', target: '/miko-spirit' },
+    { path: '/miko-spirit-laterns', target: '/miko-spirit' },
+    { path: '/forge-of-the-anvil', target: '/forge-anvil' },
+]
+
 const slotRouteMap = new Map(SLOT_TEMPLATE_ROUTES.map(route => [route.id, route.path]))
 
 export function slotPath(templateId) {

@@ -3,6 +3,7 @@
 // current game. Replaces the in-titlebar block of education metrics.
 
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { bankrollRisk, expectedValue, formatCredits } from '../../../utils/simulationMath'
 
@@ -29,7 +30,7 @@ export default function OddsPopup({ open, onClose, definition, betAmount = 5, ba
         trials: 20,
     })
 
-    return (
+    const popup = (
         <div className="odds-popup-backdrop" onClick={onClose} role="dialog" aria-label="Game odds and probability">
             <div className="odds-popup-card" onClick={e => e.stopPropagation()}>
                 <header className="odds-popup-head">
@@ -63,6 +64,8 @@ export default function OddsPopup({ open, onClose, definition, betAmount = 5, ba
             </div>
         </div>
     )
+
+    return typeof document === 'undefined' ? popup : createPortal(popup, document.body)
 }
 
 function Card({ label, value, cls = '' }) {
