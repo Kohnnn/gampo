@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCredits } from '../../context/CreditContext'
 import { useAudio } from '../../audio/AudioProvider'
+import { useGameBgm } from '../../audio/useBgm'
 import { formatCredits } from '../../utils/simulationMath'
 import { applyAction, createInitialState, dealNext, legalActions, startHand } from '../../poker/engine/Game'
 import HeuristicBot from '../../poker/bots/HeuristicBot'
@@ -103,6 +104,7 @@ function PokerCard({ card, hidden }) {
 }
 
 export default function PokerGame() {
+    useGameBgm('poker', 'idle')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
 

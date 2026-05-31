@@ -2,16 +2,16 @@
 //
 // What changed:
 //   - Loads the playable case roster from `/data/cs-cases.json` (60 cases).
-//   - Loads the full pokedex catalog (~2,000 unique skins) on demand.
-//   - "Pokedex" view replaces the old collection grid: searchable, rarity-filtered,
+//   - Loads the full collection catalog (~2,000 unique skins) on demand.
+//   - Collection view replaces the old grid: searchable, rarity-filtered,
 //     shows discovered/total per crate + a global completion bar. No selling.
 //   - Multi-row simultaneous open: pick 1 / 3 / 5 / 10 rows; every row spins
 //     independently with its own carousel, all settle within the 3.5s window.
 //   - Each drop rolls a wear condition + StatTrak / souvenir flag from the
-//     skin's wear range so float and StatTrak count as separate pokedex
-//     variants ("gotta gather them all").
-//   - Case grid replaces the old tier-chip + thin row layout. Tiers still
-//     filter the grid; expanded peek panel shows the full contains list.
+//     skin's wear range so float and StatTrak count as separate collection
+//     variants.
+//   - Case grid replaces the old tier-chip + thin row layout. Type/value
+//     categories filter the grid; expanded peek panel shows the full contents.
 //   - SFX: open / tick / land / rare / reveal / win / lose all wired through
 //     the procedural 16-bit binaries from Wave 29.
 //   - Animations preserved: 3.5s cubic-out reel, anchor scale, rare burst.
@@ -38,7 +38,6 @@ import {
     RecentResultsStrip,
     StatsOverlay,
     useGameSession,
-    SegmentedModeTabs,
     MultiplierBadge,
     ResultToast,
     ActionLockOverlay,
@@ -59,12 +58,22 @@ import {
     finalPrizeOffset,
     pickCelebrationDrop,
 } from './casesAnimation'
+import {
+    CASE_CATEGORIES,
+    caseCategoryCounts,
+    caseCategoryStats,
+    casePriceBand,
+    filterCasesByCategory,
+    normalizeCaseForRuntime,
+    roundGc,
+    roundSignedGc,
+} from './caseEconomy'
 import './cases.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
 const CAROUSEL_VISIBLE = 32
 const ROW_OPTIONS = [1, 3, 5, 10]
-const RARE_TIERS = new Set(['Covert', 'Extraordinary', 'Contraband', '★'])
+const RARE_TIERS = new Set(['Restricted', 'Classified', 'Covert', 'Remarkable', 'Exotic', 'Extraordinary', 'Contraband', '★'])
 const STATTRAK_CHANCE = 0.1
 const SOUVENIR_CHANCE = 0.06
 const RARITY_FILTERS = [
@@ -151,24 +160,7 @@ function formatRelative(ts) {
     return `${Math.round(diff / 86_400_000)}d`
 }
 
-function tierFromCase(c) {
-    return c.tier || 'classified'
-}
-
-const TIER_LABEL = {
-    classified: 'Classified',
-    covert: 'Covert',
-    exceedingly: 'Exceedingly Rare',
-    contraband: 'Contraband',
-    // Legacy fallbacks so any in-flight stored data still renders.
-    low: 'Classified',
-    mid: 'Covert',
-    high: 'Contraband',
-}
-const TIER_ORDER = ['classified', 'covert', 'exceedingly', 'contraband']
-
 export default function CasesGame() {
-    useGameBgm('cases', 'idle')
     const definition = findGameDefinition('cases') || { name: 'Cases', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
@@ -179,7 +171,7 @@ export default function CasesGame() {
     const collection = useCaseCollection({ catalogTotal: csCatalog.catalog?.totalSkins || 0 })
 
     const [allCases, setAllCases] = useState(null)
-    const [tier, setTier] = useState('classified')
+    const [category, setCategory] = useState('popular')
     const [caseId, setCaseId] = useState(null)
     const [rows, setRows] = useState(1)
     const [running, setRunning] = useState(false)
@@ -191,25 +183,37 @@ export default function CasesGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
-    const [view, setView] = useState('open') // 'open' | 'history' | 'pokedex'
+    const [view, setView] = useState('open') // 'open' | 'history' | 'pokedex' (Collection UI)
     // Wave 41: filter to also show locked silhouettes from the full catalog.
     const [showLocked, setShowLocked] = useState(true)
     const [historyFilter, setHistoryFilter] = useState('')
     const [pokedexFilter, setPokedexFilter] = useState('')
     const [rarityFilter, setRarityFilter] = useState('all')
-    const [pokedexSort, setPokedexSort] = useState('multiplier')
+    const [pokedexSort, setPokedexSort] = useState('value')
     const [caseGridSearch, setCaseGridSearch] = useState('')
     const tickRef = useRef({ ids: [], landId: null })
     const revealTimersRef = useRef([])
     const pendingRoundRef = useRef(null)
     const celebrationTimerRef = useRef(null)
+    const casesBgmMode = celebrationDrop ? 'bonus' : 'idle'
+    useGameBgm('cases', casesBgmMode)
+
+    useEffect(() => {
+        if (view === 'pokedex') csCatalog.load()
+    }, [view, csCatalog.load])
 
     useEffect(() => {
         let cancelled = false
-        fetch('/data/cs-cases.json').then(r => r.json()).then(data => {
+        Promise.all([
+            fetch('/data/cs-cases.json').then(r => r.json()),
+            fetch('/data/cs-prices.json')
+                .then(r => r.ok ? r.json() : {})
+                .catch(() => ({})),
+        ]).then(([data, priceMap]) => {
             if (cancelled) return
-            setAllCases(data)
-            const first = data.find(c => tierFromCase(c) === 'classified') || data[0]
+            const normalized = data.map(c => normalizeCaseForRuntime(c, priceMap))
+            setAllCases(normalized)
+            const first = filterCasesByCategory(normalized, 'popular')[0] || normalized[0]
             if (first) setCaseId(first.id)
         }).catch(err => {
             // eslint-disable-next-line no-console
@@ -218,20 +222,22 @@ export default function CasesGame() {
         return () => { cancelled = true }
     }, [])
 
-    const tierCases = useMemo(() => {
-        const list = (allCases || []).filter(c => tierFromCase(c) === tier)
+    const categoryCases = useMemo(() => {
+        const list = filterCasesByCategory(allCases || [], category)
         const q = caseGridSearch.trim().toLowerCase()
         return q ? list.filter(c => c.name.toLowerCase().includes(q)) : list
-    }, [allCases, tier, caseGridSearch])
+    }, [allCases, category, caseGridSearch])
 
-    const activeCase = useMemo(() => (allCases || []).find(c => c.id === caseId) || tierCases[0], [allCases, caseId, tierCases])
+    const activeCase = useMemo(() => (allCases || []).find(c => c.id === caseId) || categoryCases[0], [allCases, caseId, categoryCases])
+    const casePrice = activeCase ? Math.max(1, roundGc(activeCase.openPriceGc, 1)) : 5
+    const totalStake = roundGc(casePrice * rows, casePrice)
 
     useEffect(() => {
-        if (activeCase && tierFromCase(activeCase) !== tier) {
-            const fresh = tierCases[0]
+        if (activeCase && !categoryCases.some(c => c.id === activeCase.id)) {
+            const fresh = categoryCases[0]
             if (fresh) setCaseId(fresh.id)
         }
-    }, [tier, tierCases, activeCase])
+    }, [categoryCases, activeCase])
 
     const machine = useRoundMachine({})
 
@@ -285,10 +291,10 @@ export default function CasesGame() {
         setTrackOffsets(pendingOffsets)
         setCasePhase('settling')
 
-        const totalMultiplier = picks.reduce((s, p) => s + (p.multiplier || 0), 0)
-        // payout = stake x (sum of per-row multipliers / rows)
-        const returnAmount = (stake / roundRows) * totalMultiplier
-        const profit = returnAmount - stake
+        const totalValueGc = roundGc(picks.reduce((s, p) => s + (p.valueGc || 0), 0), 0)
+        const returnAmount = totalValueGc
+        const profit = roundSignedGc(returnAmount - stake, 0)
+        const averageMultiplier = stake > 0 ? returnAmount / stake : 0
         if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')
         setResults(picks)
 
@@ -296,6 +302,7 @@ export default function CasesGame() {
             collection.recordDrop(pick, {
                 caseId: caseData.id,
                 caseName: caseData.name,
+                openPriceGc: pick.openPriceGc,
             })
             recordProgressCaseDrop(pick)
         })
@@ -333,13 +340,13 @@ export default function CasesGame() {
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
             label: `${caseData.name} x${roundRows}`,
-            profit, betAmount: stake, multiplier: totalMultiplier / roundRows,
-            meta: { picks: picks.map(p => ({ id: p.skinId, rarity: p.rarity, multiplier: p.multiplier, wear: p.wear, statTrak: p.statTrak })) },
+            profit, betAmount: stake, multiplier: averageMultiplier,
+            meta: { picks: picks.map(p => ({ id: p.skinId, rarity: p.rarity, multiplier: p.multiplier, valueGc: p.valueGc, openPriceGc: p.openPriceGc, wear: p.wear, statTrak: p.statTrak })) },
         })
         machine.finish({
             kind: won ? 'win' : 'lose',
             profit,
-            multiplier: totalMultiplier / roundRows,
+            multiplier: averageMultiplier,
             picks: picks.map(p => p.skinId),
             skipped,
         })
@@ -358,7 +365,8 @@ export default function CasesGame() {
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (running) { resolve({ profit: 0 }); return }
         if (!activeCase) { showToast('error', 'Loading cases', 'Try again'); resolve({ profit: 0 }); return }
-        const stake = Math.max(1, Math.round(betAmount * rows * 100) / 100)
+        const unitPrice = Math.max(1, roundGc(activeCase.openPriceGc || betAmount || 1, 1))
+        const stake = roundGc(unitPrice * rows, unitPrice)
         if (!placeBet(stake, 'Cases')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`)
             resolve({ profit: 0 })
@@ -366,7 +374,7 @@ export default function CasesGame() {
         }
         clearRevealTimers()
         if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
-        setLastBet(betAmount)
+        setLastBet(unitPrice)
         setToast(null)
         setCelebrationDrop(null)
         setRunning(true)
@@ -391,7 +399,8 @@ export default function CasesGame() {
             const wearMult = wear?.mult || 1
             const stMult = statTrak ? 1.6 : 1
             const svMult = souvenir ? 1.3 : 1
-            const multiplier = Math.round(((base.multiplier || 1) * wearMult * stMult * svMult) * 100) / 100
+            const valueGc = roundGc((base.valueGc || base.multiplier || 1) * wearMult * stMult * svMult, 1)
+            const multiplier = unitPrice > 0 ? roundGc(valueGc / unitPrice, 0) : 0
             return {
                 ...base,
                 skinId: base.id,
@@ -401,6 +410,9 @@ export default function CasesGame() {
                 statTrak,
                 souvenir,
                 multiplier,
+                valueGc,
+                openPriceGc: unitPrice,
+                profitGc: roundSignedGc(valueGc - unitPrice, 0),
             }
         })
 
@@ -483,6 +495,7 @@ export default function CasesGame() {
             case 'count':      return [...list].sort((a, b) => (b.count || 0) - (a.count || 0))
             case 'name':       return [...list].sort((a, b) => a.name.localeCompare(b.name))
             case 'wear':       return [...list].sort((a, b) => (a.float || 0) - (b.float || 0))
+            case 'value':      return [...list].sort((a, b) => (b.valueGc || 0) - (a.valueGc || 0))
             case 'multiplier':
             default:           return [...list].sort((a, b) => (b.multiplier || 0) - (a.multiplier || 0))
         }
@@ -514,17 +527,18 @@ export default function CasesGame() {
         // Cap to 240 locked rows so the grid stays performant.
         return list.slice(0, 240)
     }, [showLocked, csCatalog.loaded, csCatalog.catalog, pokedexList, rarityFilter, pokedexFilter])
+    const collectionTotalSkins = csCatalog.loaded ? csCatalog.catalog.totalSkins : collection.summary.uniqueVariants
+    const collectionLockedCount = Math.max(0, (collectionTotalSkins || 0) - collection.summary.uniqueVariants)
 
     const cases = allCases || []
-    const tierCounts = useMemo(() => {
-        const out = Object.fromEntries(TIER_ORDER.map(t => [t, 0]))
-        for (const c of cases) out[tierFromCase(c)] = (out[tierFromCase(c)] || 0) + 1
-        return out
-    }, [cases])
+    const categoryCounts = useMemo(() => caseCategoryCounts(cases), [cases])
+    const categoryStats = useMemo(() => caseCategoryStats(cases), [cases])
+    const activeCategoryMeta = CASE_CATEGORIES.find(c => c.value === category) || CASE_CATEGORIES[0]
+    const activeCategoryStats = categoryStats[category] || { count: 0, minPriceGc: 0, maxPriceGc: 0, avgPriceGc: 0, band: 'Budget' }
 
     const renderRarityFilter = () => (
         <>
-            <select className="cases-rarity-select" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
+            <select className="cases-rarity-select" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)} aria-label="Rarity filter">
                 {RARITY_FILTERS.map(option => (
                     <option key={option.value} value={option.value}>{option.selectLabel}</option>
                 ))}
@@ -555,33 +569,41 @@ export default function CasesGame() {
             panel={
                 <BetPanel
                     balance={balance}
-                    initialBet={5}
+                    initialBet={casePrice}
+                    fixedBetAmount={casePrice}
+                    betLabel="Case price"
                     runningRound={running}
-                    actionLabel={activeCase ? `Open ${rows > 1 ? `×${rows}` : ''} (${formatCredits(activeCase ? Math.round((Number(lastBet || 5)) * rows * 100) / 100 : 0)})` : 'Loading...'}
+                    actionLabel={activeCase ? `Open ${rows > 1 ? `×${rows}` : ''} (${formatCredits(totalStake)})` : 'Loading...'}
                     onPlay={performPlay}
                     lastBet={lastBet}
                     disableAuto
                 >
                     <div className="bp-section">
-                        <label className="bp-label">Tier ({tierCounts[tier] || 0} cases)</label>
-                        <SegmentedModeTabs
-                            options={TIER_ORDER.map(t => ({ value: t, label: TIER_LABEL[t] }))}
-                            value={tier}
-                            onChange={t => !running && setTier(t)}
-                            size="sm"
-                        />
+                        <span className="bp-label" id="cases-category-label">Case type ({categoryCounts[category] || 0} cases)</span>
+                        <select
+                            className="cases-panel-select"
+                            value={category}
+                            disabled={running}
+                            aria-labelledby="cases-category-label"
+                            onChange={e => setCategory(e.target.value)}
+                        >
+                            {CASE_CATEGORIES.map(c => (
+                                <option key={c.value} value={c.value}>{c.label}</option>
+                            ))}
+                        </select>
+                        <p className="bp-hint">{activeCategoryMeta.description}</p>
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">Rows ({rows})</label>
-                        <div className="bp-row">
+                        <span className="bp-label" id="cases-rows-label">Rows ({rows})</span>
+                        <div className="bp-row" role="group" aria-labelledby="cases-rows-label">
                             {ROW_OPTIONS.map(n => (
-                                <button key={n} className={`bp-bet-btn ${rows === n ? 'active' : ''}`} disabled={running} onClick={() => setRows(n)}>{n}</button>
+                                <button key={n} className={`bp-bet-btn ${rows === n ? 'active' : ''}`} disabled={running} onClick={() => setRows(n)} aria-pressed={rows === n}>{n}</button>
                             ))}
                         </div>
                     </div>
                     <div className="bp-bal-line">
                         <span>Total stake</span>
-                        <strong>{formatCredits(Math.round(Number(lastBet || 5) * rows * 100) / 100)}</strong>
+                        <strong>{formatCredits(totalStake)}</strong>
                     </div>
                     <div className="bp-section cases-skip-section">
                         <label className="bp-label">Animation</label>
@@ -590,6 +612,7 @@ export default function CasesGame() {
                             disabled={!running || !pendingRoundRef.current}
                             onClick={skipCaseAnimation}
                             type="button"
+                            aria-label="Skip case opening animation"
                         >
                             Skip animation
                         </button>
@@ -606,6 +629,9 @@ export default function CasesGame() {
                             </span>
                             <span className="cases-stat-pill">
                                 <small>Best</small><strong>×{collection.summary.bestMultiplier.toFixed(2)}</strong>
+                            </span>
+                            <span className="cases-stat-pill">
+                                <small>Value</small><strong>{formatCredits(collection.summary.totalValueGc || 0)}</strong>
                             </span>
                         </div>
                         {csCatalog.loaded && (
@@ -624,7 +650,7 @@ export default function CasesGame() {
             }
         >
             <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
-                <div className={`cases-stage case-phase-${casePhase}`}>
+                <div className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
 
                     <div className="cases-view-tabs">
@@ -639,32 +665,101 @@ export default function CasesGame() {
 
                     {view === 'open' && (
                         <>
-                            <div className="cases-tier-row">
-                                {TIER_ORDER.map(t => (
-                                    <button key={t} className={`cases-tier-chip ${tier === t ? 'active' : ''}`} disabled={running} onClick={() => setTier(t)}>
-                                        {TIER_LABEL[t]} · {tierCounts[t] || 0}
+                            {activeCase && (
+                                <section className="cases-selected-case" aria-label="Selected case">
+                                    <img src={activeCase.image} alt="" loading="lazy" />
+                                    <div className="cases-selected-copy">
+                                        <span>{activeCase.categoryLabel || activeCase.type || 'Case'}</span>
+                                        <strong>{activeCase.name}</strong>
+                                        <em>{activeCase.items.length} possible drops · {activeCase.priceSource === 'csmarket' ? 'market median' : 'EV estimate'}</em>
+                                        <div className="cases-selected-metrics">
+                                            <b>EV {formatCredits(activeCase.evGc || 0)}</b>
+                                            <b>{activeCase.volatility?.label || casePriceBand(casePrice)}</b>
+                                            <b>{casePriceBand(casePrice)}</b>
+                                        </div>
+                                    </div>
+                                    <div className="cases-selected-rares" aria-label="Rare item preview">
+                                        {(activeCase.rarePreview || []).map(item => (
+                                            <span key={item.id} title={`${item.name} · ${item.rarity || 'Rare'}`} style={{ '--rarity': item.color }}>
+                                                <img src={item.image} alt="" loading="lazy" />
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <aside>
+                                        <span>Open price</span>
+                                        <strong>{formatCredits(casePrice)}</strong>
+                                        <em>{rows} row{rows > 1 ? 's' : ''} · {formatCredits(totalStake)}</em>
+                                    </aside>
+                                </section>
+                            )}
+                            <div className="cases-room-summary" aria-live="polite">
+                                <div>
+                                    <span>{activeCategoryMeta.label}</span>
+                                    <strong>{activeCategoryStats.count} cases</strong>
+                                    <em>{activeCategoryMeta.description}</em>
+                                </div>
+                                <div className="cases-room-priceband">
+                                    <span>{activeCategoryStats.band}</span>
+                                    <strong>
+                                        {activeCategoryStats.minPriceGc > 0
+                                            ? `${formatCredits(activeCategoryStats.minPriceGc)} - ${formatCredits(activeCategoryStats.maxPriceGc)}`
+                                            : 'Loading'}
+                                    </strong>
+                                    <em>category price range</em>
+                                </div>
+                            </div>
+                            <div className="cases-opening-timeline" aria-hidden={!running && results.length === 0}>
+                                {['lid', 'spinning', 'finale', 'zoom'].map((phase, index) => (
+                                    <span
+                                        key={phase}
+                                        className={(casePhase === phase || (results.length > 0 && index < 4)) ? 'active' : ''}
+                                    >
+                                        <i />
+                                        {phase === 'lid' ? 'Unlock' : phase === 'spinning' ? 'Reel' : phase === 'finale' ? 'Pointer' : 'Reveal'}
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="cases-category-row">
+                                {CASE_CATEGORIES.map(c => (
+                                    <button key={c.value} className={`cases-category-chip ${category === c.value ? 'active' : ''}`} disabled={running} onClick={() => setCategory(c.value)}>
+                                        <span>{c.label}</span>
+                                        <strong>{categoryCounts[c.value] || 0}</strong>
+                                        <em>{categoryStats[c.value]?.band || 'Budget'}</em>
                                     </button>
                                 ))}
                                 <input
                                     type="search"
                                     className="cases-search cases-grid-search"
                                     placeholder="Filter cases..."
+                                    aria-label="Filter cases"
                                     value={caseGridSearch}
                                     onChange={e => setCaseGridSearch(e.target.value)}
                                 />
                             </div>
                             <div className="cases-case-grid">
-                                {tierCases.map(c => (
+                                {categoryCases.map(c => (
                                     <button
                                         key={c.id}
                                         className={`cases-case-card ${activeCase?.id === c.id ? 'active' : ''} ${casePhase === 'lid' && activeCase?.id === c.id ? 'is-lifting' : ''}`}
                                         disabled={running}
                                         onClick={() => setCaseId(c.id)}
-                                        title={`${c.name} · ${c.items.length} items · ${c.type || 'Case'}`}
+                                        title={`${c.name} · ${formatCredits(c.openPriceGc || 0)} · ${c.items.length} items · EV ${formatCredits(c.evGc || 0)} · ${c.volatility?.label || 'volatility'}`}
                                     >
                                         <img src={c.image} alt={c.name} loading="lazy" />
+                                        <strong className="cases-case-price">{formatCredits(c.openPriceGc || 0)}</strong>
                                         <span title={c.name}>{c.name}</span>
-                                        <em>{c.items.length} items</em>
+                                        <em>{casePriceBand(c.openPriceGc)} · {c.items.length} items · {c.type || 'Case'}</em>
+                                        <div className="cases-case-metrics" aria-label="Expected value and volatility">
+                                            <b>EV {formatCredits(c.evGc || 0)}</b>
+                                            <b>{c.volatility?.label || 'Stable'}</b>
+                                        </div>
+                                        <div className="cases-rare-preview" aria-label="Rare item preview">
+                                            {(c.rarePreview || []).slice(0, 3).map(item => (
+                                                <i key={item.id} title={`${item.name} · ${item.rarity || 'Rare'}`} style={{ '--rarity': item.color }}>
+                                                    <img src={item.image} alt="" loading="lazy" />
+                                                </i>
+                                            ))}
+                                        </div>
                                     </button>
                                 ))}
                             </div>
@@ -697,10 +792,18 @@ export default function CasesGame() {
                                     {results.map((r, i) => (
                                         <div key={i} className={`cases-result-card ${RARE_TIERS.has(r.rarity) ? 'rare' : ''} ${r.statTrak ? 'stattrak' : ''} ${r.souvenir ? 'souvenir' : ''}`} style={{ '--rarity': r.color }}>
                                             <img src={r.image} alt={r.name} />
-                                            <small>{r.statTrak && <em>StatTrak™ </em>}{r.souvenir && <em>Souvenir </em>}{r.name}</small>
+                                            <div className="cases-result-badges">
+                                                {r.statTrak && <b className="stattrak">StatTrak™</b>}
+                                                {r.souvenir && <b className="souvenir">Souvenir</b>}
+                                                {r.rarity && <b>{r.rarity}</b>}
+                                            </div>
+                                            <small>{r.name}</small>
                                             <span className="cases-result-meta">
                                                 <em>{r.wearShort} · {r.float?.toFixed(3) ?? '—'}</em>
-                                                <strong>×{r.multiplier.toFixed(2)}</strong>
+                                                <strong>{formatCredits(r.valueGc || 0)}</strong>
+                                            </span>
+                                            <span className={`cases-result-profit ${(r.profitGc || 0) >= 0 ? 'pos' : 'neg'}`}>
+                                                {(r.profitGc || 0) >= 0 ? '+' : ''}{formatCredits(r.profitGc || 0)}
                                             </span>
                                             {RARE_TIERS.has(r.rarity) && (
                                                 <span className="cases-particles" aria-hidden>
@@ -716,9 +819,13 @@ export default function CasesGame() {
                             <div className="cases-stack-row">
                                 <MultiplierBadge label="Rows" value={rows} suffix="" size="sm" state={running ? 'active' : 'idle'} />
                                 {activeCase && (
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-                                        {activeCase.items.length} skins · {activeCase.type || 'Case'}
-                                    </span>
+                                    <>
+                                        <span className="cases-stack-pill">Case {formatCredits(casePrice)}</span>
+                                        <span className="cases-stack-pill">Total {formatCredits(totalStake)}</span>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                                            {activeCase.items.length} skins · {activeCase.type || 'Case'}
+                                        </span>
+                                    </>
                                 )}
                             </div>
                             {celebrationDrop && (
@@ -730,7 +837,8 @@ export default function CasesGame() {
                                             {celebrationDrop.souvenir && <em>Souvenir </em>}
                                             {celebrationDrop.name}
                                         </span>
-                                        <strong>×{(celebrationDrop.multiplier || 0).toFixed(2)}</strong>
+                                        <strong>{formatCredits(celebrationDrop.valueGc || 0)}</strong>
+                                        <small>{(celebrationDrop.profitGc || 0) >= 0 ? '+' : ''}{formatCredits(celebrationDrop.profitGc || 0)} vs open</small>
                                         <span className="cases-particles" aria-hidden>
                                             {Array.from({ length: 18 }).map((_, p) => (
                                                 <i key={p} style={{ '--dx': `${(Math.cos(p * 0.349) * 92).toFixed(0)}px`, '--dy': `${(Math.sin(p * 0.349) * 92).toFixed(0)}px`, '--delay': `${p * 18}ms` }} />
@@ -776,7 +884,7 @@ export default function CasesGame() {
                                             <span className="cases-history-rarity">{d.rarity || ''}</span>
                                             <span className="cases-history-wear">{d.wearShort} · {d.float?.toFixed(3) ?? '—'}</span>
                                             <span className="cases-history-case">{d.caseName || ''}</span>
-                                            <strong>×{(d.multiplier || 0).toFixed(2)}</strong>
+                                            <strong>{d.valueGc ? formatCredits(d.valueGc) : `×${(d.multiplier || 0).toFixed(2)}`}</strong>
                                             <em>{formatRelative(d.ts)}</em>
                                         </li>
                                     ))}
@@ -792,18 +900,39 @@ export default function CasesGame() {
                                 <small>
                                     {filteredPokedex.length} of {pokedexList.length} variants shown
                                     {csCatalog.loaded && ` · ${collection.summary.uniqueVariants} unique discovered of ${csCatalog.catalog.totalSkins} skins (${collection.summary.completionPct}%)`}
+                                    {` · ${formatCredits(collection.summary.totalValueGc || 0)} inventory value`}
                                 </small>
                             </header>
+                            <div className="cases-collection-summary" aria-label="Collection summary">
+                                <span>
+                                    <small>Total value</small>
+                                    <strong>{formatCredits(collection.summary.totalValueGc || 0)}</strong>
+                                </span>
+                                <span>
+                                    <small>Discovered</small>
+                                    <strong>{collection.summary.uniqueVariants}</strong>
+                                </span>
+                                <span>
+                                    <small>Locked</small>
+                                    <strong>{collectionLockedCount}</strong>
+                                </span>
+                                <span>
+                                    <small>Variants</small>
+                                    <strong>{collection.summary.totalDrops}</strong>
+                                </span>
+                            </div>
                             <div className="cases-filters">
                                 <input
                                     type="search"
                                     className="cases-search"
+                                    aria-label="Search collection skins"
                                     value={pokedexFilter}
                                     onChange={e => setPokedexFilter(e.target.value)}
                                     placeholder="Search skins..."
                                 />
                                 {renderRarityFilter()}
-                                <select className="cases-rarity-select" value={pokedexSort} onChange={e => setPokedexSort(e.target.value)}>
+                                <select className="cases-rarity-select" value={pokedexSort} onChange={e => setPokedexSort(e.target.value)} aria-label="Sort collection">
+                                    <option value="value">Sort: Highest value</option>
                                     <option value="multiplier">Sort: Best multiplier</option>
                                     <option value="recent">Sort: Recent</option>
                                     <option value="count">Sort: Count</option>
@@ -838,7 +967,12 @@ export default function CasesGame() {
                                             </small>
                                             <span className="cases-skin-meta">
                                                 <em>{skin.wearShort} · {skin.float?.toFixed(3) ?? '—'}</em>
-                                                <strong>×{(skin.multiplier || 0).toFixed(2)}</strong>
+                                                <strong>{skin.valueGc ? formatCredits(skin.valueGc) : `×${(skin.multiplier || 0).toFixed(2)}`}</strong>
+                                            </span>
+                                            <span className="cases-skin-badges">
+                                                {skin.statTrak && <b>StatTrak</b>}
+                                                {skin.souvenir && <b>Souvenir</b>}
+                                                {skin.rarity && <b>{skin.rarity}</b>}
                                             </span>
                                             <i className="cases-skin-count">×{skin.count}</i>
                                         </div>
@@ -870,7 +1004,7 @@ export default function CasesGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} betAmount={casePrice} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

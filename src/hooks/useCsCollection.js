@@ -1,8 +1,8 @@
-// useCsCollection — Wave 31 catalog loader for the full CS2 pokedex.
+// useCsCollection — Wave 31 catalog loader for the full CS2 collection.
 //
 // Lazy-fetches `/data/cs-collection.json` once per session and caches it
 // in module scope. The dataset is ~8 MB so we only pull it when the
-// Pokedex tab is opened. Cases-only games keep using the smaller
+// Collection tab is opened. Cases-only games keep using the smaller
 // `/data/cs-cases.json` (~390 KB) loaded inside CasesGame directly.
 //
 // Exposes:
@@ -38,8 +38,10 @@ async function load() {
             return cached
         } finally {
             loadingPromise = null
+            notify()
         }
     })()
+    notify()
     return loadingPromise
 }
 
@@ -48,7 +50,6 @@ export function useCsCollection() {
     useEffect(() => {
         const fn = () => force(n => n + 1)
         listeners.add(fn)
-        if (!cached) load()
         return () => { listeners.delete(fn) }
     }, [])
     return {
@@ -56,6 +57,7 @@ export function useCsCollection() {
         loaded: !!cached && !cached.error,
         loading: !cached && !!loadingPromise,
         error: cached?.error || null,
+        load,
     }
 }
 

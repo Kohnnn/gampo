@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import NotFoundPage from './components/NotFoundPage'
 import ErrorBoundary from './components/ErrorBoundary'
 import HomePage from './pages/HomePage'
+import { SLOT_TEMPLATE_ROUTES } from './data/slotRoutes'
 
 // Casino lobby surfaces (small, eager)
 import {
@@ -133,21 +134,13 @@ function App() {
                 <Route path="packs" element={lazied(<PacksGame />)} />
                 <Route path="tomeoflife" element={lazied(<TomeOfLifeGame />)} />
                 <Route path="tarot" element={lazied(<TarotGame />)} />
-                <Route path="scarab-spin" element={lazied(<SlotsGame initialTemplateId="scarab-spin" />)} />
-                <Route path="bars" element={lazied(<SlotsGame initialTemplateId="bars" />)} />
-                <Route path="blue-samurai" element={lazied(<SlotsGame initialTemplateId="blue-samurai" />)} />
-                <Route path="wanted-revelation" element={lazied(<SlotsGame initialTemplateId="wanted-revelation" />)} />
-                <Route path="gates-ascent" element={lazied(<SlotsGame initialTemplateId="gates-ascent" />)} />
-                <Route path="bass-bayou" element={lazied(<SlotsGame initialTemplateId="bass-bayou" />)} />
-                <Route path="mummy-cascade" element={lazied(<SlotsGame initialTemplateId="mummy-cascade" />)} />
-                <Route path="phoenix-megaways" element={lazied(<SlotsGame initialTemplateId="phoenix-megaways" />)} />
-                <Route path="mansion-megaways" element={lazied(<SlotsGame initialTemplateId="mansion-megaways" />)} />
-                <Route path="ghostblade-strike" element={lazied(<SlotsGame initialTemplateId="ghostblade-strike" />)} />
-                <Route path="iron-fist" element={lazied(<SlotsGame initialTemplateId="iron-fist" />)} />
-                <Route path="coop-cluck" element={lazied(<SlotsGame initialTemplateId="coop-cluck" />)} />
-                <Route path="miko-spirit" element={lazied(<SlotsGame initialTemplateId="miko-spirit" />)} />
-                <Route path="forge-anvil" element={lazied(<SlotsGame initialTemplateId="forge-anvil" />)} />
-                <Route path="gummy-drops" element={lazied(<SlotsGame initialTemplateId="gummy-drops" />)} />
+                {SLOT_TEMPLATE_ROUTES.map(route => (
+                    <Route
+                        key={route.id}
+                        path={route.path.slice(1)}
+                        element={lazied(<SlotsGame initialTemplateId={route.id} />)}
+                    />
+                ))}
                 <Route path="*" element={<NotFoundPage />} />
             </Route>
         </Routes>

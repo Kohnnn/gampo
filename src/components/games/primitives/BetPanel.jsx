@@ -7,7 +7,7 @@
 //   - Strategy tab: simple Martingale / Reverse / Flat presets
 //   - Auto-play loop integration via onPlay callback
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Play, Pause, ChevronsRight, Settings, Sliders, RotateCcw } from 'lucide-react'
 import { formatCredits } from '../../../utils/simulationMath'
 import { withTimeout } from '../../../utils/scheduling'
@@ -19,6 +19,8 @@ export default function BetPanel({
     minBet = 0.01,
     maxBet = 10000,
     initialBet = 5,
+    fixedBetAmount = null,
+    betLabel = 'Bet Amount',
     onPlay,
     onStop,
     runningRound,
@@ -40,6 +42,7 @@ export default function BetPanel({
     // so multiple balls drop at a clean cadence.
     autoIntervalMs = 120,
 }) {
+    const panelId = useId()
     const [tab, setTab] = useState('manual')
     const [betAmount, setBetAmount] = useState(initialBet)
     // Auto state
@@ -54,6 +57,8 @@ export default function BetPanel({
     const [onLossReset, setOnLossReset] = useState(true)
     // Strategy presets
     const [strategy, setStrategy] = useState('flat')
+    const hasFixedBet = Number.isFinite(Number(fixedBetAmount)) && Number(fixedBetAmount) > 0
+    const effectiveBetAmount = hasFixedBet ? Number(fixedBetAmount) : betAmount
 
     const autoRunning = useRef(false)
     const autoLeft = useRef(0)
@@ -84,13 +89,13 @@ export default function BetPanel({
         }
         if (tab === 'manual') {
             if (!onPlay) return
-            await onPlay({ betAmount, mode: 'manual' })
+            await onPlay({ betAmount: effectiveBetAmount, mode: 'manual' })
             return
         }
         if (tab === 'strategy') {
             // Strategy is just a single play with the strategy hint passed through
             if (!onPlay) return
-            await onPlay({ betAmount, mode: 'strategy', strategy })
+            await onPlay({ betAmount: effectiveBetAmount, mode: 'strategy', strategy })
             return
         }
         if (autoRunning.current) {
@@ -99,9 +104,9 @@ export default function BetPanel({
         }
         autoRunning.current = true
         autoLeft.current = autoInfinite ? Infinity : Math.max(1, Number(autoCount) || 1)
-        autoBaseBet.current = betAmount
+        autoBaseBet.current = effectiveBetAmount
         sessionProfit.current = 0
-        let currentBet = betAmount
+        let currentBet = effectiveBetAmount
         const limitProfit = Number(stopProfit)
         const limitLoss = Number(stopLoss)
         const limitBigWin = Number(stopBigWin)
@@ -147,7 +152,7 @@ export default function BetPanel({
             await new Promise(res => setTimeout(res, autoIntervalMs))
         }
         autoRunning.current = false
-    }, [tab, onPlay, betAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs])
+    }, [tab, onPlay, effectiveBetAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs])
 
     useEffect(() => () => { autoRunning.current = false }, [])
 
@@ -226,20 +231,21 @@ export default function BetPanel({
             </div>
 
             <div className="bp-section">
-                <label className="bp-label">Bet Amount</label>
+                <label className="bp-label" htmlFor={`${panelId}-bet-amount`}>{betLabel}</label>
                 <div className="bp-bet-row">
-                    <input type="number" className="bp-bet-input" min={minBet} max={maxBet} step={0.5}
-                        value={betAmount}
+                    <input id={`${panelId}-bet-amount`} type="number" className="bp-bet-input" min={minBet} max={maxBet} step={0.5}
+                        value={effectiveBetAmount}
+                        disabled={hasFixedBet}
                         onChange={e => setBetAmount(Math.max(minBet, Number(e.target.value) || 0))}
                     />
-                    <button className="bp-bet-btn" onClick={half}>½</button>
-                    <button className="bp-bet-btn" onClick={double}>2×</button>
-                    <button className="bp-bet-btn" onClick={max}>Max</button>
+                    <button className="bp-bet-btn" onClick={half} disabled={hasFixedBet}>½</button>
+                    <button className="bp-bet-btn" onClick={double} disabled={hasFixedBet}>2×</button>
+                    <button className="bp-bet-btn" onClick={max} disabled={hasFixedBet}>Max</button>
                 </div>
                 <div className="bp-quick-actions">
-                    <button onClick={min}>Min</button>
-                    <button onClick={() => setBetAmount(initialBet)}>Reset</button>
-                    <button onClick={rebet} disabled={!lastBet}><RotateCcw size={11} style={{ marginRight: 3 }} />Rebet</button>
+                    <button onClick={min} disabled={hasFixedBet}>Min</button>
+                    <button onClick={() => setBetAmount(initialBet)} disabled={hasFixedBet}>Reset</button>
+                    <button onClick={rebet} disabled={hasFixedBet || !lastBet}><RotateCcw size={11} style={{ marginRight: 3 }} />Rebet</button>
                 </div>
                 <div className="bp-bal-line">
                     <span>Balance</span>
@@ -252,39 +258,39 @@ export default function BetPanel({
             {tab === 'auto' && (
                 <>
                     <div className="bp-section">
-                        <label className="bp-label">Number of Bets</label>
+                        <label className="bp-label" htmlFor={`${panelId}-auto-count`}>Number of Bets</label>
                         <div className="bp-row">
-                            <input type="number" min="1" className="bp-bet-input" value={autoInfinite ? 0 : autoCount} disabled={autoInfinite} onChange={e => setAutoCount(Math.max(1, Number(e.target.value) || 1))} />
+                            <input id={`${panelId}-auto-count`} type="number" min="1" className="bp-bet-input" value={autoInfinite ? 0 : autoCount} disabled={autoInfinite} onChange={e => setAutoCount(Math.max(1, Number(e.target.value) || 1))} />
                             <button className={`bp-bet-btn ${autoInfinite ? 'active' : ''}`} onClick={() => setAutoInfinite(v => !v)}>∞</button>
                         </div>
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">On Win</label>
-                        <div className="bp-row">
+                        <span className="bp-label" id={`${panelId}-on-win-label`}>On Win</span>
+                        <div className="bp-row" role="group" aria-labelledby={`${panelId}-on-win-label`}>
                             <button className={`bp-bet-btn ${onWinReset ? 'active' : ''}`} onClick={() => setOnWinReset(true)}>Reset</button>
                             <button className={`bp-bet-btn ${!onWinReset ? 'active' : ''}`} onClick={() => setOnWinReset(false)}>Increase</button>
-                            {!onWinReset && <input className="bp-bet-input" type="number" placeholder="%" value={onWinPct} onChange={e => setOnWinPct(Number(e.target.value) || 0)} />}
+                            {!onWinReset && <input className="bp-bet-input" type="number" placeholder="%" aria-label="On win increase percentage" value={onWinPct} onChange={e => setOnWinPct(Number(e.target.value) || 0)} />}
                         </div>
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">On Loss</label>
-                        <div className="bp-row">
+                        <span className="bp-label" id={`${panelId}-on-loss-label`}>On Loss</span>
+                        <div className="bp-row" role="group" aria-labelledby={`${panelId}-on-loss-label`}>
                             <button className={`bp-bet-btn ${onLossReset ? 'active' : ''}`} onClick={() => setOnLossReset(true)}>Reset</button>
                             <button className={`bp-bet-btn ${!onLossReset ? 'active' : ''}`} onClick={() => setOnLossReset(false)}>Increase</button>
-                            {!onLossReset && <input className="bp-bet-input" type="number" placeholder="%" value={onLossPct} onChange={e => setOnLossPct(Number(e.target.value) || 0)} />}
+                            {!onLossReset && <input className="bp-bet-input" type="number" placeholder="%" aria-label="On loss increase percentage" value={onLossPct} onChange={e => setOnLossPct(Number(e.target.value) || 0)} />}
                         </div>
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">Stop on Profit</label>
-                        <input className="bp-bet-input" type="number" placeholder="0 = off" value={stopProfit} onChange={e => setStopProfit(e.target.value)} />
+                        <label className="bp-label" htmlFor={`${panelId}-stop-profit`}>Stop on Profit</label>
+                        <input id={`${panelId}-stop-profit`} className="bp-bet-input" type="number" placeholder="0 = off" value={stopProfit} onChange={e => setStopProfit(e.target.value)} />
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">Stop on Loss</label>
-                        <input className="bp-bet-input" type="number" placeholder="0 = off" value={stopLoss} onChange={e => setStopLoss(e.target.value)} />
+                        <label className="bp-label" htmlFor={`${panelId}-stop-loss`}>Stop on Loss</label>
+                        <input id={`${panelId}-stop-loss`} className="bp-bet-input" type="number" placeholder="0 = off" value={stopLoss} onChange={e => setStopLoss(e.target.value)} />
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">Stop on Single Win ≥</label>
-                        <input className="bp-bet-input" type="number" placeholder="0 = off" value={stopBigWin} onChange={e => setStopBigWin(e.target.value)} />
+                        <label className="bp-label" htmlFor={`${panelId}-stop-big-win`}>Stop on Single Win ≥</label>
+                        <input id={`${panelId}-stop-big-win`} className="bp-bet-input" type="number" placeholder="0 = off" value={stopBigWin} onChange={e => setStopBigWin(e.target.value)} />
                     </div>
                     {autoChildren}
                 </>

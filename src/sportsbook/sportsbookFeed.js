@@ -125,13 +125,27 @@ function mergeLeagues(baseLeagues, events) {
     })
 }
 
-async function fetchFreeProviderFeed() {
+function isLocalVitePreview() {
+    const location = globalThis.location
+    if (!location) return false
+    const host = location.hostname || ''
+    return (host === '127.0.0.1' || host === 'localhost') && location.port === '4173'
+}
+
+export async function fetchFreeProviderFeed() {
+    if (isLocalVitePreview()) return { events: [], errors: [], quotas: {} }
     try {
         const response = await fetch('/api/sportsbook/free-feed', {
             method: 'GET',
             headers: { accept: 'application/json' },
         })
-        if (!response.ok) return { events: [], errors: [`free feed proxy ${response.status}`], quotas: {} }
+        if (!response.ok) {
+            return {
+                events: [],
+                errors: response.status === 404 ? [] : [`free feed proxy ${response.status}`],
+                quotas: {},
+            }
+        }
         const payload = await response.json()
         return normalizeFreeProviderPayload(payload)
     } catch {

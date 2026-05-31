@@ -179,6 +179,31 @@ export const sfxManifest = {
         win: '/audio/cases/win.wav',
         lose: '/audio/cases/lose.wav',
     },
+    slots: {
+        click: '/audio/common/click.wav',
+        spin: '/audio/slots/spinStart.wav',
+        spinStart: '/audio/slots/spinStart.wav',
+        reelStop: '/audio/slots/reelStop.wav',
+        reelTick: '/audio/slots/reelTick.wav',
+        reveal: '/audio/slots/mysteryReveal.wav',
+        settle: '/audio/slots/winLine.wav',
+        win: '/audio/slots/winLine.wav',
+        lose: '/audio/common/lose.wav',
+        bigwin: '/audio/common/bigwin.wav',
+        scatter: '/audio/slots/scatter.wav',
+        bonus: '/audio/slots/scatter.wav',
+        bonusEnter: '/audio/slots/scatter.wav',
+        bonusExit: '/audio/slots/moneyCollect.wav',
+        wheelLand: '/audio/slots/wheelLand.wav',
+        holdFill: '/audio/slots/holdFill.wav',
+        stickyLock: '/audio/slots/stickyLock.wav',
+        mysteryReveal: '/audio/slots/mysteryReveal.wav',
+        wantedSlam: '/audio/slots/wantedSlam.wav',
+        moneyCollect: '/audio/slots/moneyCollect.wav',
+        collect: '/audio/slots/moneyCollect.wav',
+        cascadeStep: '/audio/slots/cascadeStep.wav',
+        anticipation: '/audio/slots/anticipation.wav',
+    },
     drill: {
         click: null,
         reveal: null,
@@ -257,8 +282,8 @@ export function resolveSfx(slug, role) {
     return null
 }
 
-// Wave 27: per-template slot SFX roles. Declared silent; binaries arrive in
-// Wave 29. Each slot template emits these when the matching feature fires.
+// Per-template slot SFX roles. Each slot template can emit these when the
+// matching feature fires; paths are mapped by `sfxManifest.slots` above.
 export const slotSfxRoles = {
     spinStart: 'Reels start',
     reelStop: 'Per-reel stop',

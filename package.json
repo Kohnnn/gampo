@@ -8,6 +8,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "test": "vitest run",
+        "smoke:browser": "node scripts/browserSmoke.mjs",
         "gen:assets": "node scripts/genAssets.js"
     },
     "dependencies": {

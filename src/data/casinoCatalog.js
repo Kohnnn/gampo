@@ -1,4 +1,5 @@
 import { gameDefinitions, sportsbookDefinition } from './gameDefinitions'
+import { slotPath } from './slotRoutes'
 
 export const casinoSections = [
     { id: 'lobby', label: 'Lobby', path: '/', icon: 'layout' },
@@ -154,46 +155,36 @@ export const vipLevels = [
 ]
 
 export const slotCatalog = [
-    { name: 'Vault Rush', path: '/slots', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/vault-rush.png' },
-    { name: 'River Catcher', path: '/slots', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/river-catcher.png' },
-    { name: 'Dust Rail Bounty', path: '/slots', volatility: 'Medium high', rtp: 0.94, image: '/images/covers/generated/dust-rail.png' },
-    { name: 'Storm Banner', path: '/slots', volatility: 'High', rtp: 0.95, image: '/images/covers/generated/storm-banner.png' },
-    { name: 'Bassline Bonus', path: '/slots', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/bassline-bonus.png' },
-    { name: 'Scarab Spin', path: '/scarab-spin', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/scarab-spin.png' },
-    { name: 'Bars', path: '/bars', volatility: 'Low', rtp: 0.95, image: '/images/covers/generated/bars.png' },
-    { name: 'Blue Samurai', path: '/blue-samurai', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/blue-samurai.png' },
-    { name: 'Wanted Revelation', path: '/wanted-revelation', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/wanted-revelation.png' },
-    { name: 'Gates of Ascent', path: '/gates-ascent', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/gates-ascent.png' },
-    { name: 'Bass Bayou Collect', path: '/bass-bayou', volatility: 'Medium high', rtp: 0.945, image: '/images/covers/generated/bass-bayou.png' },
-    { name: 'Mummy Cascade', path: '/mummy-cascade', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/mummy-cascade.png' },
-    { name: 'Phoenix Megaways', path: '/phoenix-megaways', volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/phoenix-megaways.png' },
-    { name: 'Mansion Megaways', path: '/mansion-megaways', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/mansion-megaways.png' },
-    { name: 'Ghostblade Strike', path: '/ghostblade-strike', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/ghostblade-strike.png' },
-    { name: 'Iron Fist Demolition', path: '/iron-fist', volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/iron-fist.png' },
-    { name: 'Coop Cluck Cluster', path: '/coop-cluck', volatility: 'Medium high', rtp: 0.945, image: '/images/covers/generated/coop-cluck.png' },
-    { name: 'Miko Spirit Lanterns', path: '/miko-spirit', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/miko-spirit.png' },
-    { name: 'Forge of the Anvil', path: '/forge-anvil', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/forge-anvil.png' },
-    { name: 'Gummy Drops', path: '/gummy-drops', volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/gummy-drops.png' },
-    { name: 'Wanted Revelation', path: '/wanted-revelation', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/wanted-revelation.png' },
-    { name: 'Gates of Ascent', path: '/gates-ascent', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/gates-ascent.png' },
-    { name: 'Bass Bayou Collect', path: '/bass-bayou', volatility: 'Medium high', rtp: 0.945, image: '/images/covers/generated/bass-bayou.png' },
-    { name: 'Mummy Cascade', path: '/mummy-cascade', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/mummy-cascade.png' },
-    { name: 'Phoenix Megaways', path: '/phoenix-megaways', volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/phoenix-megaways.png' },
-    { name: 'Mansion Megaways', path: '/mansion-megaways', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/mansion-megaways.png' },
-    { name: 'Ghostblade Strike', path: '/ghostblade-strike', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/ghostblade-strike.png' },
-    { name: 'Iron Fist Demolition', path: '/iron-fist', volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/iron-fist.png' },
-    { name: 'Coop Cluck Cluster', path: '/coop-cluck', volatility: 'Medium high', rtp: 0.945, image: '/images/covers/generated/coop-cluck.png' },
-    { name: 'Miko Spirit Lanterns', path: '/miko-spirit', volatility: 'High', rtp: 0.945, image: '/images/covers/generated/miko-spirit.png' },
-    { name: 'Forge of the Anvil', path: '/forge-anvil', volatility: 'High', rtp: 0.94, image: '/images/covers/generated/forge-anvil.png' },
-    { name: 'Gummy Drops', path: '/gummy-drops', volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/gummy-drops.png' },
+    { id: 'vault-rush', name: 'Vault Rush', path: slotPath('vault-rush'), volatility: 'High', rtp: 0.94, image: '/images/covers/generated/vault-rush.png' },
+    { id: 'river-catcher', name: 'River Catcher', path: slotPath('river-catcher'), volatility: 'High', rtp: 0.945, image: '/images/covers/generated/river-catcher.png' },
+    { id: 'dust-rail', name: 'Dust Rail Bounty', path: slotPath('dust-rail'), volatility: 'Medium high', rtp: 0.94, image: '/images/covers/generated/dust-rail.png' },
+    { id: 'storm-banner', name: 'Storm Banner', path: slotPath('storm-banner'), volatility: 'High', rtp: 0.95, image: '/images/covers/generated/storm-banner.png' },
+    { id: 'bassline-bonus', name: 'Bassline Bonus', path: slotPath('bassline-bonus'), volatility: 'High', rtp: 0.94, image: '/images/covers/generated/bassline-bonus.png' },
+    { id: 'scarab-spin', name: 'Scarab Spin', path: slotPath('scarab-spin'), volatility: 'High', rtp: 0.945, image: '/images/covers/generated/scarab-spin.png' },
+    { id: 'bars', name: 'Bars', path: slotPath('bars'), volatility: 'Low', rtp: 0.95, image: '/images/covers/generated/bars.png' },
+    { id: 'blue-samurai', name: 'Blue Samurai', path: slotPath('blue-samurai'), volatility: 'High', rtp: 0.945, image: '/images/covers/generated/blue-samurai.png' },
+    { id: 'wanted-revelation', name: 'Wanted Revelation', path: slotPath('wanted-revelation'), volatility: 'High', rtp: 0.945, image: '/images/covers/generated/wanted-revelation.png' },
+    { id: 'gates-ascent', name: 'Gates of Ascent', path: slotPath('gates-ascent'), volatility: 'High', rtp: 0.94, image: '/images/covers/generated/gates-ascent.png' },
+    { id: 'bass-bayou', name: 'Bass Bayou Collect', path: slotPath('bass-bayou'), volatility: 'Medium high', rtp: 0.945, image: '/images/covers/generated/bass-bayou.png' },
+    { id: 'mummy-cascade', name: 'Mummy Cascade', path: slotPath('mummy-cascade'), volatility: 'High', rtp: 0.945, image: '/images/covers/generated/mummy-cascade.png' },
+    { id: 'phoenix-megaways', name: 'Phoenix Megaways', path: slotPath('phoenix-megaways'), volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/phoenix-megaways.png' },
+    { id: 'mansion-megaways', name: 'Mansion Megaways', path: slotPath('mansion-megaways'), volatility: 'High', rtp: 0.945, image: '/images/covers/generated/mansion-megaways.png' },
+    { id: 'ghostblade-strike', name: 'Ghostblade Strike', path: slotPath('ghostblade-strike'), volatility: 'High', rtp: 0.945, image: '/images/covers/generated/ghostblade-strike.png' },
+    { id: 'iron-fist', name: 'Iron Fist Demolition', path: slotPath('iron-fist'), volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/iron-fist.png' },
+    { id: 'coop-cluck', name: 'Coop Cluck Cluster', path: slotPath('coop-cluck'), volatility: 'Medium high', rtp: 0.945, image: '/images/covers/generated/coop-cluck.png' },
+    { id: 'miko-spirit', name: 'Miko Spirit Lanterns', path: slotPath('miko-spirit'), volatility: 'High', rtp: 0.945, image: '/images/covers/generated/miko-spirit.png' },
+    { id: 'forge-anvil', name: 'Forge of the Anvil', path: slotPath('forge-anvil'), volatility: 'High', rtp: 0.94, image: '/images/covers/generated/forge-anvil.png' },
+    { id: 'gummy-drops', name: 'Gummy Drops', path: slotPath('gummy-drops'), volatility: 'Very high', rtp: 0.94, image: '/images/covers/generated/gummy-drops.png' },
 ].map((entry, index) => ({
-    id: `slot-${index + 1}`,
+    id: entry.id || `slot-${index + 1}`,
     provider: 'GamPo Lab',
     ...entry,
 }))
 
+const slotCatalogIds = new Set(slotCatalog.map(slot => slot.id))
+
 export const fullGameCatalog = [
     sportsbookDefinition,
-    ...gameDefinitions,
+    ...gameDefinitions.filter(game => !slotCatalogIds.has(game.id)),
     ...slotCatalog,
 ]

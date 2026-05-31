@@ -191,8 +191,8 @@ export default function DiceGame() {
                     lastBet={lastBet}
                 >
                     <div className="bp-section">
-                        <label className="bp-label">Win Chance: {winChance}%</label>
-                        <input type="range" min="2" max="95" value={winChance} onChange={e => setWinChance(Number(e.target.value))} className="dice-slider" disabled={running} />
+                        <label className="bp-label" htmlFor="dice-win-chance">Win Chance: {winChance}%</label>
+                        <input id="dice-win-chance" type="range" min="2" max="95" value={winChance} onChange={e => setWinChance(Number(e.target.value))} className="dice-slider" disabled={running} />
                     </div>
                     <div className="bp-section">
                         <SegmentedModeTabs

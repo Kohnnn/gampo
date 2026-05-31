@@ -89,3 +89,43 @@ export function buildCascadeTraceCells({ indexes = [], cellPositions = [], layou
         })
         .filter(Boolean)
 }
+
+function defaultCellPositions(layout = {}) {
+    const cols = Math.max(1, Math.floor(toFiniteNumber(layout.cols, 5)))
+    const rows = Math.max(1, Math.floor(toFiniteNumber(layout.rows, 3)))
+    return Array.from({ length: cols * rows }, (_, index) => ({
+        col: index % cols,
+        row: Math.floor(index / cols),
+    }))
+}
+
+export function buildSlotFeatureDemoState({
+    layout = { cols: 5, rows: 3 },
+    cellPositions,
+    scatterIndexes = [0, 7, 14],
+    retriggerAmount = 5,
+    wheelValue = 10,
+    holdBoard = { size: 12, startFilled: 3, finalFilled: 7 },
+    trigger = 1,
+} = {}) {
+    const positions = cellPositions?.length ? cellPositions : defaultCellPositions(layout)
+    const normalizedScatters = uniqueNumbers(scatterIndexes)
+        .filter(index => index >= 0 && index < positions.length)
+    return {
+        scatterCells: normalizedScatters
+            .map(index => ({ index, center: getCellCenterPercent(index, positions, layout) }))
+            .filter(cell => cell.center),
+        wheel: {
+            value: wheelValue,
+            wobbleMs: SLOT_WHEEL_WOBBLE_MS,
+        },
+        holdTiles: buildHoldTileStates(holdBoard),
+        retriggerFlyers: buildRetriggerFlyers({
+            indexes: normalizedScatters,
+            cellPositions: positions,
+            layout,
+            amount: retriggerAmount,
+            trigger,
+        }),
+    }
+}

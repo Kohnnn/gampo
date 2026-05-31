@@ -782,7 +782,30 @@ const RANK_ART_INDEX = {
     'gummy-drops':        { dir: 'gummy',   base: 'slot-rank-gummy-drops' },
 }
 
-function applyRankArt(config) {
+const THEME_SYMBOL_ART_TEMPLATES = new Set([
+    'vault-rush',
+    'river-catcher',
+    'dust-rail',
+    'storm-banner',
+    'bassline-bonus',
+    'scarab-spin',
+    'bars',
+    'blue-samurai',
+    'wanted-revelation',
+    'gates-ascent',
+    'bass-bayou',
+    'mummy-cascade',
+    'phoenix-megaways',
+    'mansion-megaways',
+    'ghostblade-strike',
+    'iron-fist',
+    'coop-cluck',
+    'miko-spirit',
+    'forge-anvil',
+    'gummy-drops',
+])
+
+export function applyRankArt(config) {
     const idx = RANK_ART_INDEX[config.id]
     if (!idx) return config
     const root = `/assets/games/slots/${idx.dir}`
@@ -790,38 +813,41 @@ function applyRankArt(config) {
     // 4-asset set under `<dir>/<config.id>-{hero,mid1,mid2,bonus}.png`.
     // Any symbol still pointing at `slot-classic-*` art for hero / mid /
     // bonus gets swapped to the themed equivalent based on payout band.
-    const themeBase = `${root}/${config.id}`
-    const heroAssets = {
-        hero: `${themeBase}-hero.png`,
-        mid1: `${themeBase}-mid1.png`,
-        mid2: `${themeBase}-mid2.png`,
-        bonus: `${themeBase}-bonus.png`,
-    }
-    // Sort theme-eligible symbols by payout descending so the highest pays
-    // get the hero asset, the next two get mid1/mid2, scatter/wild get bonus.
-    const themeEligibleIds = config.symbols
-        .filter(s => !RANK_ID_TO_KEY[s.id] && !RANK_LABEL_TO_KEY[s.label])
-        .map(s => s.id)
-    const sortedTheme = config.symbols
-        .filter(s => themeEligibleIds.includes(s.id))
-        .slice()
-        .sort((a, b) => (b.payout || 0) - (a.payout || 0))
     const themeAssetMap = {}
-    let heroAssigned = false
-    let mid1Assigned = false
-    let mid2Assigned = false
-    for (const sym of sortedTheme) {
-        if (sym.type === 'scatter' || sym.type === 'wild' || sym.type === 'mystery') {
-            themeAssetMap[sym.id] = heroAssets.bonus
-            continue
+    if (THEME_SYMBOL_ART_TEMPLATES.has(config.id)) {
+        const themeBase = `${root}/${config.id}`
+        const heroAssets = {
+            hero: `${themeBase}-hero.png`,
+            mid1: `${themeBase}-mid1.png`,
+            mid2: `${themeBase}-mid2.png`,
+            bonus: `${themeBase}-bonus.png`,
         }
-        if (sym.type === 'coin' || sym.type === 'money') {
+        // Sort theme-eligible symbols by payout descending so the highest pays
+        // get the hero asset, the next two get mid1/mid2, scatter/wild get bonus.
+        const themeEligibleIds = config.symbols
+            .filter(s => !RANK_ID_TO_KEY[s.id] && !RANK_LABEL_TO_KEY[s.label])
+            .map(s => s.id)
+        const sortedTheme = config.symbols
+            .filter(s => themeEligibleIds.includes(s.id))
+            .slice()
+            .sort((a, b) => (b.payout || 0) - (a.payout || 0))
+        let heroAssigned = false
+        let mid1Assigned = false
+        let mid2Assigned = false
+        for (const sym of sortedTheme) {
+            if (sym.type === 'scatter' || sym.type === 'wild' || sym.type === 'mystery') {
+                themeAssetMap[sym.id] = heroAssets.bonus
+                continue
+            }
+            if (sym.type === 'coin' || sym.type === 'money') {
+                themeAssetMap[sym.id] = heroAssets.mid2
+                continue
+            }
+            if (!heroAssigned) { themeAssetMap[sym.id] = heroAssets.hero; heroAssigned = true; continue }
+            if (!mid1Assigned) { themeAssetMap[sym.id] = heroAssets.mid1; mid1Assigned = true; continue }
+            if (!mid2Assigned) { themeAssetMap[sym.id] = heroAssets.mid2; mid2Assigned = true; continue }
             themeAssetMap[sym.id] = heroAssets.mid2
-            continue
         }
-        if (!heroAssigned) { themeAssetMap[sym.id] = heroAssets.hero; heroAssigned = true; continue }
-        if (!mid1Assigned) { themeAssetMap[sym.id] = heroAssets.mid1; mid1Assigned = true; continue }
-        if (!mid2Assigned) { themeAssetMap[sym.id] = heroAssets.mid2; mid2Assigned = true; continue }
     }
     const symbols = config.symbols.map(sym => {
         const rankKey = RANK_ID_TO_KEY[sym.id] || RANK_LABEL_TO_KEY[sym.label]

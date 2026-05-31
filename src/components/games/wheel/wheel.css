@@ -89,3 +89,35 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+@media (max-width: 640px) {
+    .wheel-stage {
+        gap: 12px;
+        padding: 12px 6px 16px;
+    }
+
+    .wheel-stage .sim-bet-strip {
+        max-height: 72px;
+    }
+
+    .wheel-pointer {
+        border-left-width: 18px;
+        border-right-width: 18px;
+        border-top-width: 30px;
+        margin-bottom: -8px;
+    }
+
+    .wheel-disc {
+        width: min(300px, 72vw);
+        border-width: 12px;
+    }
+
+    .wheel-disc span {
+        inset: 18px;
+        font-size: 16px;
+    }
+
+    .wheel-last {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+}

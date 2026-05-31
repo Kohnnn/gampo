@@ -179,8 +179,8 @@ export default function LimboGame() {
                     lastBet={lastBet}
                 >
                     <div className="bp-section">
-                        <label className="bp-label">Target Multiplier</label>
-                        <input type="number" min="1.01" max="100" step="0.1" value={target} onChange={event => setTarget(clamp(Number(event.target.value) || 1.01, 1.01, 100))} className="bp-bet-input" disabled={running} />
+                        <label className="bp-label" htmlFor="limbo-target-multiplier">Target Multiplier</label>
+                        <input id="limbo-target-multiplier" type="number" min="1.01" max="100" step="0.1" value={target} onChange={event => setTarget(clamp(Number(event.target.value) || 1.01, 1.01, 100))} className="bp-bet-input" disabled={running} />
                     </div>
                     <div className="bp-quick-actions">
                         {[1.5, 2, 5, 10, 50, 100].map(t => (

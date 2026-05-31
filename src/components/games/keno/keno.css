@@ -53,6 +53,20 @@
 @keyframes kenoHit { 0% { transform: scale(0.6); } 60% { transform: scale(1.22); } 100% { transform: scale(1); } }
 
 @media (max-width: 640px) {
-    .keno-grid { grid-template-columns: repeat(5, 1fr); }
-}
+    .keno-stage {
+        gap: 10px;
+        padding: 12px 6px;
+    }
 
+    .keno-grid {
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        gap: 5px;
+    }
+
+    .keno-grid button {
+        border-width: 1px;
+        border-radius: 7px;
+        font-size: 12px;
+        min-width: 0;
+    }
+}

@@ -1,10 +1,10 @@
-export const CASE_LID_LIFT_MS = 260
-export const CASE_REVEAL_MS = 3500
-export const CASE_SETTLE_PAD_MS = 60
+export const CASE_LID_LIFT_MS = 420
+export const CASE_REVEAL_MS = 5200
+export const CASE_SETTLE_PAD_MS = 180
 export const CASE_TILE_PX = 100
 export const CASE_PRIZE_INDEX = 28
-export const CASE_LIGHT_SWEEP_LEAD_MS = 1000
-export const CASE_PRIZE_ZOOM_LEAD_MS = 600
+export const CASE_LIGHT_SWEEP_LEAD_MS = 1500
+export const CASE_PRIZE_ZOOM_LEAD_MS = 760
 
 export const CASE_CELEBRATION_RARITIES = new Set([
     'Restricted',

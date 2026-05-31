@@ -1,19 +1,19 @@
-// useCaseCollection — Wave 31 rewrite for the full CS2 pokedex catalog.
+// useCaseCollection — Wave 31 rewrite for the full CS2 collection catalog.
 //
 // Drops every collected skin into a discovered map keyed by `skinId+wear+stattrak`
-// so float/wear/StatTrak/souvenir variants count as separate "Pokedex" entries.
+// so float/wear/StatTrak/souvenir variants count as separate collection entries.
 // Every roll permanently adds to the collection (no cap, no pruning).
 //
 // Storage:
 //   gampo_cases_drops_v2     — last N=400 drops, newest-first
 //   gampo_cases_pokedex      — { [variantKey]: { count, name, image, rarity, color,
 //                                                wear, float, statTrak, souvenir,
-//                                                multiplier, firstSeen, lastSeen, skinId } }
+//                                                multiplier, valueGc, firstSeen, lastSeen, skinId } }
 //
 // Variant key shape: `${skinId}::${wear}::${statTrak ? 'st' : 'reg'}::${souvenir ? 'sv' : 'std'}`.
 //
-// Pokedex entries also store a representative `multiplier` so the collection
-// summary can show best-multiplier-ever.
+// Collection entries also store representative `multiplier` and `valueGc`
+// values so the collection summary can show best hit and total inventory value.
 //
 // Backwards compatibility: Wave 18 used `gampo_cases_drops` and
 // `gampo_cases_collection`. We keep them readable but ignore them; the new
@@ -89,6 +89,9 @@ export function recordDrop(pick, ctx = {}) {
         statTrak: !!pick.statTrak,
         souvenir: !!pick.souvenir,
         multiplier: pick.multiplier,
+        valueGc: pick.valueGc,
+        openPriceGc: ctx.openPriceGc,
+        profitGc: pick.profitGc,
         ts: Date.now(),
         caseId: ctx.caseId,
         caseName: ctx.caseName,
@@ -111,6 +114,8 @@ export function recordDrop(pick, ctx = {}) {
             statTrak: !!pick.statTrak,
             souvenir: !!pick.souvenir,
             multiplier: Math.max(prev.multiplier || 0, pick.multiplier || 0),
+            valueGc: Math.max(prev.valueGc || 0, pick.valueGc || 0),
+            totalValueGc: (prev.totalValueGc || 0) + (Number(pick.valueGc) || 0),
             count: (prev.count || 0) + 1,
             firstSeen: prev.firstSeen || Date.now(),
             lastSeen: Date.now(),
@@ -134,8 +139,12 @@ export function resetCases() {
 function summarise(catalogTotal = 0) {
     const list = Object.values(pokedex)
     let bestMultiplier = 0
+    let bestValueGc = 0
+    let totalValueGc = 0
     let bestSkin = null
     for (const skin of list) {
+        totalValueGc += Number(skin.totalValueGc ?? skin.valueGc ?? 0) || 0
+        if ((skin.valueGc || 0) > bestValueGc) bestValueGc = skin.valueGc || 0
         if ((skin.multiplier || 0) > bestMultiplier) {
             bestMultiplier = skin.multiplier
             bestSkin = skin
@@ -147,6 +156,8 @@ function summarise(catalogTotal = 0) {
         catalogTotal,
         completionPct: catalogTotal > 0 ? Math.min(100, Math.round((list.length / catalogTotal) * 100)) : 0,
         bestMultiplier,
+        bestValueGc,
+        totalValueGc,
         bestSkin,
     }
 }

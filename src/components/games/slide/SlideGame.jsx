@@ -166,12 +166,12 @@ export default function SlideGame() {
                     lastBet={lastBet}
                 >
                     <div className="bp-section">
-                        <label className="bp-label">Target width: {targetWidth}%</label>
-                        <input type="range" min="5" max="80" step="1" value={targetWidth} disabled={running} onChange={e => setTargetWidth(Number(e.target.value))} className="dice-slider" />
+                        <label className="bp-label" htmlFor="slide-target-width">Target width: {targetWidth}%</label>
+                        <input id="slide-target-width" type="range" min="5" max="80" step="1" value={targetWidth} disabled={running} onChange={e => setTargetWidth(Number(e.target.value))} className="dice-slider" />
                     </div>
                     <div className="bp-section">
-                        <label className="bp-label">Target center: {targetCenter}</label>
-                        <input type="range" min="0" max="100" step="1" value={targetCenter} disabled={running} onChange={e => setTargetCenter(Number(e.target.value))} className="dice-slider" />
+                        <label className="bp-label" htmlFor="slide-target-center">Target center: {targetCenter}</label>
+                        <input id="slide-target-center" type="range" min="0" max="100" step="1" value={targetCenter} disabled={running} onChange={e => setTargetCenter(Number(e.target.value))} className="dice-slider" />
                     </div>
                     <div className="bp-bal-line">
                         <span>Hit chance</span>

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { Pin, PinOff } from 'lucide-react'
 import { useSidebarPins } from '../hooks/useSidebarPins'
 import { sidebarPaths } from '../data/sidebarIcons'
+import { slotPath } from '../data/slotRoutes'
 
 // ---- Casino sidebar data (unchanged from prior waves) ----
 const navSections = [
@@ -102,26 +103,26 @@ const gameItems = [
     { group: 'Originals', icon: 'lottery', label: 'Lottery', path: '/lottery' },
 
     { group: 'Slots', icon: 'slots-vault', label: 'Slot Factory', path: '/slots' },
-    { group: 'Slots', icon: 'slots-vault', label: 'Vault Rush', path: '/slots' },
-    { group: 'Slots', icon: 'slots-river', label: 'River Catcher', path: '/slots' },
-    { group: 'Slots', icon: 'slots-west', label: 'Dust Rail Bounty', path: '/slots' },
-    { group: 'Slots', icon: 'slots-mythic', label: 'Storm Banner', path: '/slots' },
-    { group: 'Slots', icon: 'slots-rock', label: 'Bassline Bonus', path: '/slots' },
-    { group: 'Slots', icon: 'slots-scarab', label: 'Scarab Spin', path: '/scarab-spin' },
-    { group: 'Slots', icon: 'slots-bars', label: 'Bars', path: '/bars' },
-    { group: 'Slots', icon: 'slots-samurai', label: 'Blue Samurai', path: '/blue-samurai' },
-    { group: 'Slots', icon: 'slots-wanted', label: 'Wanted Revelation', path: '/wanted-revelation' },
-    { group: 'Slots', icon: 'slots-olympus', label: 'Gates of Ascent', path: '/gates-ascent' },
-    { group: 'Slots', icon: 'slots-bayou', label: 'Bass Bayou', path: '/bass-bayou' },
-    { group: 'Slots', icon: 'slots-mummy', label: 'Mummy Cascade', path: '/mummy-cascade' },
-    { group: 'Slots', icon: 'slots-phoenix', label: 'Phoenix Megaways', path: '/phoenix-megaways' },
-    { group: 'Slots', icon: 'slots-mansion', label: 'Mansion Megaways', path: '/mansion-megaways' },
-    { group: 'Slots', icon: 'slots-ronin', label: 'Ghostblade Strike', path: '/ghostblade-strike' },
-    { group: 'Slots', icon: 'slots-iron', label: 'Iron Fist', path: '/iron-fist' },
-    { group: 'Slots', icon: 'slots-coop', label: 'Coop Cluck', path: '/coop-cluck' },
-    { group: 'Slots', icon: 'slots-spirit', label: 'Miko Spirit', path: '/miko-spirit' },
-    { group: 'Slots', icon: 'slots-forge', label: 'Forge Anvil', path: '/forge-anvil' },
-    { group: 'Slots', icon: 'slots-gummy', label: 'Gummy Drops', path: '/gummy-drops' },
+    { group: 'Slots', icon: 'slots-vault', label: 'Vault Rush', path: slotPath('vault-rush') },
+    { group: 'Slots', icon: 'slots-river', label: 'River Catcher', path: slotPath('river-catcher') },
+    { group: 'Slots', icon: 'slots-west', label: 'Dust Rail Bounty', path: slotPath('dust-rail') },
+    { group: 'Slots', icon: 'slots-mythic', label: 'Storm Banner', path: slotPath('storm-banner') },
+    { group: 'Slots', icon: 'slots-rock', label: 'Bassline Bonus', path: slotPath('bassline-bonus') },
+    { group: 'Slots', icon: 'slots-scarab', label: 'Scarab Spin', path: slotPath('scarab-spin') },
+    { group: 'Slots', icon: 'slots-bars', label: 'Bars', path: slotPath('bars') },
+    { group: 'Slots', icon: 'slots-samurai', label: 'Blue Samurai', path: slotPath('blue-samurai') },
+    { group: 'Slots', icon: 'slots-wanted', label: 'Wanted Revelation', path: slotPath('wanted-revelation') },
+    { group: 'Slots', icon: 'slots-olympus', label: 'Gates of Ascent', path: slotPath('gates-ascent') },
+    { group: 'Slots', icon: 'slots-bayou', label: 'Bass Bayou', path: slotPath('bass-bayou') },
+    { group: 'Slots', icon: 'slots-mummy', label: 'Mummy Cascade', path: slotPath('mummy-cascade') },
+    { group: 'Slots', icon: 'slots-phoenix', label: 'Phoenix Megaways', path: slotPath('phoenix-megaways') },
+    { group: 'Slots', icon: 'slots-mansion', label: 'Mansion Megaways', path: slotPath('mansion-megaways') },
+    { group: 'Slots', icon: 'slots-ronin', label: 'Ghostblade Strike', path: slotPath('ghostblade-strike') },
+    { group: 'Slots', icon: 'slots-iron', label: 'Iron Fist', path: slotPath('iron-fist') },
+    { group: 'Slots', icon: 'slots-coop', label: 'Coop Cluck', path: slotPath('coop-cluck') },
+    { group: 'Slots', icon: 'slots-spirit', label: 'Miko Spirit', path: slotPath('miko-spirit') },
+    { group: 'Slots', icon: 'slots-forge', label: 'Forge Anvil', path: slotPath('forge-anvil') },
+    { group: 'Slots', icon: 'slots-gummy', label: 'Gummy Drops', path: slotPath('gummy-drops') },
 
     { group: 'Tables', icon: 'roulette', label: 'Roulette', path: '/roulette' },
     { group: 'Tables', icon: 'blackjack', label: 'Blackjack', path: '/blackjack' },

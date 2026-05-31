@@ -32,6 +32,7 @@ const baseSkin = {
     wearShort: 'FT',
     float: 0.22,
     multiplier: 4.2,
+    valueGc: 12.5,
 }
 
 describe('useCaseCollection v2', () => {
@@ -46,6 +47,8 @@ describe('useCaseCollection v2', () => {
         const key = variantKey(baseSkin)
         expect(pokedex[key].count).toBe(1)
         expect(pokedex[key].multiplier).toBe(4.2)
+        expect(pokedex[key].valueGc).toBe(12.5)
+        expect(pokedex[key].totalValueGc).toBe(12.5)
     })
 
     it('treats StatTrak and souvenir as separate pokedex variants', () => {
@@ -78,6 +81,16 @@ describe('useCaseCollection v2', () => {
         const key = variantKey(baseSkin)
         expect(pokedex[key].count).toBe(3)
         expect(pokedex[key].multiplier).toBe(9.1)
+    })
+
+    it('keeps best value and cumulative value per variant', () => {
+        recordDrop({ ...baseSkin, valueGc: 8 })
+        recordDrop({ ...baseSkin, valueGc: 22 })
+        recordDrop({ ...baseSkin, valueGc: 10 })
+        const pokedex = readPokedex()
+        const key = variantKey(baseSkin)
+        expect(pokedex[key].valueGc).toBe(22)
+        expect(pokedex[key].totalValueGc).toBe(40)
     })
 
     it('reset clears history and pokedex', () => {

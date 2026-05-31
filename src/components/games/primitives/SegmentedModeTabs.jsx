@@ -9,9 +9,10 @@ export default function SegmentedModeTabs({
     onChange,
     className = '',
     size = 'md',
+    ariaLabel = 'Mode options',
 }) {
     return (
-        <div className={`seg-tabs seg-${size} ${className}`} role="tablist">
+        <div className={`seg-tabs seg-${size} ${className}`} role="tablist" aria-label={ariaLabel}>
             {options.map(opt => {
                 const id = typeof opt === 'string' ? opt : opt.value
                 const label = typeof opt === 'string' ? opt : (opt.label || opt.value)

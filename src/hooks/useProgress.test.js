@@ -49,11 +49,12 @@ describe('useProgress', () => {
 
     it('counts case drops and flags rare drops separately', () => {
         recordCaseDrop({ rarity: 'Mil-Spec Grade' })
+        recordCaseDrop({ rarity: 'Restricted' })
         recordCaseDrop({ rarity: 'Covert' })
         recordCaseDrop({ rarity: 'Extraordinary' })
         const stats = JSON.parse(globalThis.localStorage.getItem('gampo_progress_stats'))
-        expect(stats.casesTotalDrops).toBe(3)
-        expect(stats.casesRareDrops).toBe(2)
+        expect(stats.casesTotalDrops).toBe(4)
+        expect(stats.casesRareDrops).toBe(3)
         const unlocked = JSON.parse(globalThis.localStorage.getItem('gampo_progress_unlocked'))
         expect(unlocked['cases-rare']).toBeTypeOf('number')
     })

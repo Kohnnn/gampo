@@ -12,6 +12,29 @@ import { resolveBgm } from './bgmManifest'
 import { resolveGameBgm } from './gameBgmManifest'
 
 const bufferCache = new Map()
+export const BGM_UNLOCK_EVENTS = ['pointerdown', 'keydown', 'touchstart']
+
+export function addBgmUnlockRetry(target, retry) {
+    if (!target?.addEventListener || !target?.removeEventListener || typeof retry !== 'function') {
+        return () => {}
+    }
+    let done = false
+    const cleanup = () => {
+        BGM_UNLOCK_EVENTS.forEach(eventName => {
+            target.removeEventListener(eventName, handler, true)
+        })
+    }
+    const handler = () => {
+        if (done) return
+        done = true
+        cleanup()
+        retry()
+    }
+    BGM_UNLOCK_EVENTS.forEach(eventName => {
+        target.addEventListener(eventName, handler, { once: true, capture: true })
+    })
+    return cleanup
+}
 
 async function loadBuffer(url) {
     if (!url) return null
@@ -39,6 +62,15 @@ function useBgmInner(url) {
 
     useEffect(() => {
         let cancelled = false
+        let cleanupUnlockRetry = null
+
+        const armUnlockRetry = () => {
+            if (cleanupUnlockRetry || typeof window === 'undefined') return
+            cleanupUnlockRetry = addBgmUnlockRetry(window, () => {
+                cleanupUnlockRetry = null
+                start()
+            })
+        }
 
         async function start() {
             if (!url) return
@@ -46,6 +78,10 @@ function useBgmInner(url) {
             await unlockAudio()
             const ctx = getAudioCtx()
             const dest = getBgmGain()
+            if (!ctx || ctx.state !== 'running') {
+                armUnlockRetry()
+                return
+            }
             if (!ctx || !dest) return
             const buf = await loadBuffer(url)
             if (cancelled || !buf) return
@@ -87,6 +123,10 @@ function useBgmInner(url) {
 
         return () => {
             cancelled = true
+            if (cleanupUnlockRetry) {
+                cleanupUnlockRetry()
+                cleanupUnlockRetry = null
+            }
             if (sourceRef.current) {
                 const ctx = getAudioCtx()
                 try {

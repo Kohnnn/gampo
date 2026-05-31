@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
     SLOT_TEMPLATES,
     getSlotTemplate,
+    applyRankArt,
     getCellCount,
     getColumnRows,
     makeInitialGrid,
@@ -65,6 +66,28 @@ describe('slotFactory layout helpers', () => {
         expect(getColumnRows(config, 2)).toBe(6)
         expect(getColumnRows(config, 3)).toBe(3)
         expect(getCellCount(config)).toBe(2 + 4 + 6 + 3)
+    })
+
+    it('assigns themed symbol art to early templates while still applying rank art', () => {
+        const config = getSlotTemplate('vault-rush')
+        expect(config.symbols.find(s => s.id === 'rank-a').asset).toContain('/slot-rank-vault-rush-A.png')
+        expect(config.symbols.find(s => s.id === 'vault').asset).toBe('/assets/games/slots/vault/vault-rush-hero.png')
+        expect(config.symbols.find(s => s.id === 'bonus').asset).toBe('/assets/games/slots/vault/vault-rush-bonus.png')
+    })
+
+    it('assigns themed symbol art for templates that ship a complete high-symbol set', () => {
+        const config = getSlotTemplate('wanted-revelation')
+        expect(config.symbols.find(s => s.id === 'badge').asset).toBe('/assets/games/slots/wanted/wanted-revelation-hero.png')
+        expect(config.symbols.find(s => s.id === 'star').asset).toBe('/assets/games/slots/wanted/wanted-revelation-bonus.png')
+    })
+
+    it('returns final slot configs with no slot-classic assets', () => {
+        SLOT_TEMPLATES.forEach(template => {
+            const config = applyRankArt(template)
+            for (const symbol of config.symbols) {
+                expect(symbol.asset, `${template.id}:${symbol.id}`).not.toContain('slot-classic')
+            }
+        })
     })
 })
 
