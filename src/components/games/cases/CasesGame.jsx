@@ -29,7 +29,6 @@ import { useCsCollection } from '../../../hooks/useCsCollection'
 import { recordCaseDrop as recordProgressCaseDrop } from '../../../hooks/useProgress'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
-import { nextRoll } from '../../../utils/fairRng'
 import {
     BetPanel,
     BigWinOverlay,
@@ -54,14 +53,16 @@ import {
     CASE_PRIZE_ZOOM_LEAD_MS,
     CASE_REVEAL_MS,
     CASE_SETTLE_PAD_MS,
+    CASE_TILE_GAP_PX,
+    CASE_TILE_PX,
     CASE_VISIBLE_PHASES,
     casePhaseLabel,
     claimCaseSettlement,
-    finalPrizeOffset,
     hasReachedCasePhase,
     pickCelebrationDrop,
     summarizeCaseSettlement,
 } from './casesAnimation'
+import { createCaseOpeningRound } from './caseOpening'
 import {
     CASE_CATEGORIES,
     caseCategoryCounts,
@@ -75,13 +76,11 @@ import {
 import './cases.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
-const CAROUSEL_VISIBLE = 32
 const ROW_OPTIONS = [1, 3, 5, 10]
 const REEL_PREVIEW_ROWS = 5
 const REEL_PREVIEW_TILES = 18
+const CASE_REEL_START_OFFSET = -((CASE_TILE_PX + CASE_TILE_GAP_PX) * 4)
 const RARE_TIERS = new Set(['Restricted', 'Classified', 'Covert', 'Remarkable', 'Exotic', 'Extraordinary', 'Contraband', '★'])
-const STATTRAK_CHANCE = 0.1
-const SOUVENIR_CHANCE = 0.06
 const RARITY_FILTERS = [
     { value: 'all', label: 'All', selectLabel: 'All rarities' },
     { value: 'Mil-Spec Grade', label: 'Mil-Spec', selectLabel: 'Mil-Spec' },
@@ -91,67 +90,6 @@ const RARITY_FILTERS = [
     { value: 'Extraordinary', label: 'Extraordinary', selectLabel: 'Extraordinary' },
     { value: 'Contraband', label: 'Contraband', selectLabel: 'Contraband' },
 ]
-
-const STANDARD_WEARS = [
-    { wear: 'Factory New',    short: 'FN', minFloat: 0.00, maxFloat: 0.07, weight: 12, mult: 1.10 },
-    { wear: 'Minimal Wear',   short: 'MW', minFloat: 0.07, maxFloat: 0.15, weight: 22, mult: 1.04 },
-    { wear: 'Field-Tested',   short: 'FT', minFloat: 0.15, maxFloat: 0.38, weight: 36, mult: 1.00 },
-    { wear: 'Well-Worn',      short: 'WW', minFloat: 0.38, maxFloat: 0.45, weight: 18, mult: 0.92 },
-    { wear: 'Battle-Scarred', short: 'BS', minFloat: 0.45, maxFloat: 1.00, weight: 12, mult: 0.85 },
-]
-
-function rollWear() {
-    const total = STANDARD_WEARS.reduce((s, w) => s + w.weight, 0)
-    let r = nextRoll('cases-wear').roll * total
-    for (const w of STANDARD_WEARS) {
-        r -= w.weight
-        if (r <= 0) return w
-    }
-    return STANDARD_WEARS[STANDARD_WEARS.length - 1]
-}
-
-function rollFloat(wear) {
-    if (!wear) return 0.18
-    const span = wear.maxFloat - wear.minFloat
-    const r = nextRoll('cases-float').roll
-    return Math.round((wear.minFloat + r * span) * 1000) / 1000
-}
-
-function rarityWeight(item) {
-    if (item.isRare) return 0.4
-    switch (item.rarity) {
-        case 'Mil-Spec Grade': return 78.92
-        case 'Restricted': return 15.98
-        case 'Classified': return 3.20
-        case 'Covert': return 0.64
-        case 'Extraordinary':
-        case 'Contraband':
-        case '★': return 0.26
-        default: return 12
-    }
-}
-
-function weightedPick(items) {
-    const totalWeight = items.reduce((s, it) => s + rarityWeight(it), 0)
-    const r = nextRoll('cases').roll * totalWeight
-    let acc = 0
-    for (const it of items) {
-        acc += rarityWeight(it)
-        if (r < acc) return it
-    }
-    return items[items.length - 1]
-}
-
-function buildTrack(items, prizeIndex) {
-    const len = CAROUSEL_VISIBLE
-    const track = []
-    for (let i = 0; i < len; i += 1) {
-        const idx = Math.floor(nextRoll('cases').roll * items.length)
-        track.push(items[idx])
-    }
-    track[CASE_PRIZE_INDEX] = items[prizeIndex]
-    return track
-}
 
 function cubicOut(t) {
     return 1 - Math.pow(1 - t, 3)
@@ -205,6 +143,7 @@ export default function CasesGame() {
     const autoTimerRef = useRef(null)
     const pendingRoundRef = useRef(null)
     const celebrationTimerRef = useRef(null)
+    const resultsPanelRef = useRef(null)
     const casesBgmMode = celebrationDrop ? 'bonus' : 'idle'
     useGameBgm('cases', casesBgmMode)
 
@@ -365,6 +304,17 @@ export default function CasesGame() {
         setRunning(false)
         setCasePhase('settled')
         pendingRoundRef.current = null
+        const scrollId = window.setTimeout(() => {
+            const reducedMotion = Boolean(
+                window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+                || document.documentElement.classList.contains('gampo-reduce-motion'),
+            )
+            resultsPanelRef.current?.scrollIntoView({
+                behavior: reducedMotion ? 'auto' : 'smooth',
+                block: 'center',
+            })
+        }, 80)
+        revealTimersRef.current.push(scrollId)
         resolve({ profit })
     }, [addWinnings, clearRevealTimers, collection, machine, playSound, session, showToast, sfx])
 
@@ -399,44 +349,19 @@ export default function CasesGame() {
         sfx.play('click')
         setView('open')
 
-        // Resolve drops up front. Each row picks a base skin, then rolls
-        // wear + StatTrak + souvenir for the variant.
-        const picks = Array.from({ length: rows }, () => {
-            const base = weightedPick(activeCase.items)
-            const wear = rollWear()
-            const float = rollFloat(wear)
-            const statTrak = nextRoll('cases-st').roll < STATTRAK_CHANCE
-            const souvenir = !statTrak && nextRoll('cases-sv').roll < SOUVENIR_CHANCE
-            const wearMult = wear?.mult || 1
-            const stMult = statTrak ? 1.6 : 1
-            const svMult = souvenir ? 1.3 : 1
-            const valueGc = roundGc((base.valueGc || base.multiplier || 1) * wearMult * stMult * svMult, 1)
-            const multiplier = unitPrice > 0 ? roundGc(valueGc / unitPrice, 0) : 0
-            return {
-                ...base,
-                skinId: base.id,
-                wear: wear?.wear,
-                wearShort: wear?.short,
-                float,
-                statTrak,
-                souvenir,
-                multiplier,
-                valueGc,
-                openPriceGc: unitPrice,
-                profitGc: roundSignedGc(valueGc - unitPrice, 0),
-            }
+        const round = createCaseOpeningRound({
+            caseData: activeCase,
+            rows,
+            stake,
+            unitPrice,
+            targetIndex: CASE_PRIZE_INDEX,
         })
-
-        const newTracks = picks.map(pick => {
-            const prizeIndex = activeCase.items.findIndex(it => it.id === pick.skinId)
-            return buildTrack(activeCase.items, Math.max(0, prizeIndex))
-        })
-        const finalOffsets = newTracks.map(() => {
-            const jitter = (nextRoll('cases-jit').roll - 0.5) * 14
-            return finalPrizeOffset(jitter)
-        })
+        const picks = round.outcomes
+        const newTracks = round.tracks
+        const finalOffsets = round.offsets
         pendingRoundRef.current = {
             caseData: activeCase,
+            entries: round.entries,
             offsets: finalOffsets,
             picks,
             resolve,
@@ -471,7 +396,7 @@ export default function CasesGame() {
             if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
             setCasePhase('spin')
             setTracks(newTracks)
-            setTrackOffsets(newTracks.map(() => 0))
+            setTrackOffsets(newTracks.map(() => CASE_REEL_START_OFFSET))
             sfx.play('multispin', { volume: rows >= 3 ? 0.62 : 0.36 })
             queueRevealTimer(() => {
                 if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
@@ -527,6 +452,39 @@ export default function CasesGame() {
     const stageLoading = !preloader.ready || !allCases
 
     const pokedexList = useMemo(() => Object.values(collection.pokedex), [collection.pokedex])
+    const caseUxStats = useMemo(() => {
+        const drops = collection.drops || []
+        const spent = session.history.reduce((sum, item) => sum + (Number(item.betAmount) || 0), 0)
+        const profit = session.history.reduce((sum, item) => sum + (Number(item.profit) || 0), 0)
+        const returnPct = spent > 0 ? Math.max(0, ((spent + profit) / spent) * 100) : 0
+        const countBy = key => drops.reduce((acc, drop) => {
+            const value = drop?.[key] || 'Other'
+            acc[value] = (acc[value] || 0) + 1
+            return acc
+        }, {})
+        const rarityCounts = countBy('rarity')
+        const wearCounts = countBy('wearShort')
+        const rarityRows = ['Covert', 'Classified', 'Restricted', 'Mil-Spec Grade'].map(label => ({
+            label,
+            count: rarityCounts[label] || 0,
+            pct: drops.length ? ((rarityCounts[label] || 0) / drops.length) * 100 : 0,
+        }))
+        const wearRows = ['FN', 'MW', 'FT', 'WW', 'BS'].map(label => ({
+            label,
+            count: wearCounts[label] || 0,
+            pct: drops.length ? ((wearCounts[label] || 0) / drops.length) * 100 : 0,
+        }))
+        return {
+            best: drops.slice().sort((a, b) => (Number(b.valueGc) || 0) - (Number(a.valueGc) || 0)).slice(0, 3),
+            opened: drops.length,
+            profit,
+            rarityRows,
+            recent: drops.slice(0, 8),
+            returnPct,
+            spent,
+            wearRows,
+        }
+    }, [collection.drops, session.history])
 
     const filteredDrops = useMemo(() => {
         const q = historyFilter.trim().toLowerCase()
@@ -752,7 +710,11 @@ export default function CasesGame() {
             <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
                 <div
                     className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}`}
-                    style={{ '--case-spin-ms': `${quickOpen ? 1320 : CASE_REVEAL_MS}ms` }}
+                    style={{
+                        '--case-spin-ms': `${quickOpen ? 1320 : CASE_REVEAL_MS}ms`,
+                        '--case-tile-gap': `${CASE_TILE_GAP_PX}px`,
+                        '--case-tile-px': `${CASE_TILE_PX}px`,
+                    }}
                 >
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
 
@@ -795,6 +757,82 @@ export default function CasesGame() {
                                     </aside>
                                 </section>
                             )}
+                            <section className="cases-command-bar" aria-label="Case opening command bar">
+                                <div className="cases-command-segment" role="group" aria-label="Open mode">
+                                    <button type="button" className={rows === 1 ? 'active' : ''} aria-pressed={rows === 1} disabled={running} onClick={() => selectRows(1)}>Single</button>
+                                    <button type="button" className={rows > 1 && rows < 10 ? 'active' : ''} aria-pressed={rows > 1 && rows < 10} disabled={running} onClick={() => selectRows(rows > 1 && rows < 10 ? rows : 5)}>Multi</button>
+                                    <button type="button" className={rows === 10 ? 'active' : ''} aria-pressed={rows === 10} disabled={running} onClick={() => selectRows(10)}>Bulk</button>
+                                </div>
+                                <div className="cases-command-rows" role="group" aria-label="Rows">
+                                    {ROW_OPTIONS.map(n => (
+                                        <button key={n} type="button" className={rows === n ? 'active' : ''} aria-pressed={rows === n} disabled={running} onClick={() => selectRows(n)}>
+                                            ×{n}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button type="button" className="cases-command-toggle" aria-pressed={autoOpen} onClick={() => setAutoOpen(v => !v)} disabled={running}>
+                                    Auto {autoOpen ? 'on' : 'off'}
+                                </button>
+                                <button type="button" className="cases-command-toggle" aria-pressed={quickOpen} onClick={() => setQuickOpen(v => !v)} disabled={running}>
+                                    Quick {quickOpen ? 'on' : 'off'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="cases-command-primary"
+                                    data-game-action={results.length > 0 ? 'case-open-again' : 'case-open'}
+                                    onClick={() => performPlay({ betAmount: casePrice })}
+                                    disabled={running || !activeCase}
+                                >
+                                    {results.length > 0 ? `Open again (${formatCredits(totalStake)})` : `Open ×${rows} (${formatCredits(totalStake)})`}
+                                </button>
+                            </section>
+                            <section className="cases-session-dock" aria-label="Case session summary">
+                                <div className="cases-session-stats">
+                                    <span><small>Opened</small><strong>{caseUxStats.opened}</strong></span>
+                                    <span><small>Spent</small><strong>{formatCredits(caseUxStats.spent)}</strong></span>
+                                    <span className={caseUxStats.profit >= 0 ? 'pos' : 'neg'}><small>Profit/Loss</small><strong>{caseUxStats.profit >= 0 ? '+' : ''}{formatCredits(caseUxStats.profit)}</strong></span>
+                                    <span><small>Return</small><strong>{caseUxStats.spent > 0 ? `${caseUxStats.returnPct.toFixed(1)}%` : '—'}</strong></span>
+                                </div>
+                                <div className="cases-best-opened">
+                                    <strong>Best opened</strong>
+                                    {caseUxStats.best.length === 0 ? (
+                                        <em>No opens yet</em>
+                                    ) : caseUxStats.best.map((drop, index) => (
+                                        <span key={`${drop.variantKey || drop.skinId}-${index}`} style={{ '--rarity': drop.color }}>
+                                            <b>#{index + 1}</b>
+                                            <img src={drop.image} alt="" loading="lazy" />
+                                            <small>{drop.name}</small>
+                                            <strong>{formatCredits(drop.valueGc || 0)}</strong>
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="cases-distribution" aria-label="Rarity and wear distribution">
+                                    <strong>Distribution</strong>
+                                    {caseUxStats.rarityRows.map(row => (
+                                        <span key={row.label}>
+                                            <small>{row.label}</small>
+                                            <i><b style={{ width: `${Math.min(100, row.pct)}%` }} /></i>
+                                            <em>{row.count}</em>
+                                        </span>
+                                    ))}
+                                    <div className="cases-wear-strip">
+                                        {caseUxStats.wearRows.map(row => (
+                                            <b key={row.label} title={`${row.label}: ${row.count}`}>{row.label} {row.pct.toFixed(0)}%</b>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="cases-recent-mini">
+                                    <strong>Recent</strong>
+                                    {caseUxStats.recent.length === 0 ? (
+                                        <em>No recent opens</em>
+                                    ) : caseUxStats.recent.map((drop, index) => (
+                                        <span key={`${drop.variantKey || drop.skinId}-recent-${index}`} style={{ '--rarity': drop.color }}>
+                                            <small>{drop.statTrak && 'ST™ '}{drop.name}</small>
+                                            <b>{formatCredits(drop.valueGc || 0)}</b>
+                                        </span>
+                                    ))}
+                                </div>
+                            </section>
                             <div className="cases-room-summary" aria-live="polite">
                                 <div>
                                     <span>{activeCategoryMeta.label}</span>
@@ -902,21 +940,31 @@ export default function CasesGame() {
                             {tracks.length > 0 && (
                                 <div className="cases-rows">
                                     {tracks.map((track, ti) => (
-                                        <div key={ti} className="cases-carousel-frame">
+                                        <div key={ti} className="cases-carousel-frame" data-case-row-index={ti}>
                                             <div
                                                 className="cases-carousel-track"
                                                 style={{ transform: `translate(${trackOffsets[ti] || 0}px, -50%)` }}
                                             >
-                                                {track.map((item, idx) => (
-                                                    <div
-                                                        key={`${ti}-${idx}-${item.id}`}
-                                                        className={`cases-carousel-tile ${idx === CASE_PRIZE_INDEX && (hasReachedCasePhase(casePhase, 'reveal') || results.length > 0) ? 'is-target' : ''} ${idx === CASE_PRIZE_INDEX && results.length > 0 ? 'is-prize' : ''}`}
-                                                        style={{ borderColor: item.color, '--rarity': item.color }}
-                                                    >
-                                                        <img src={item.image} alt={item.name} loading="lazy" />
-                                                        <small>{item.name}</small>
-                                                    </div>
-                                                ))}
+                                                {track.map((item, idx) => {
+                                                    const isTarget = idx === CASE_PRIZE_INDEX
+                                                    const targetReady = isTarget && (hasReachedCasePhase(casePhase, 'reveal') || results.length > 0)
+                                                    return (
+                                                        <div
+                                                            key={`${ti}-${idx}-${item.id}-${item.variantKey || 'base'}`}
+                                                            className={`cases-carousel-tile ${targetReady ? 'is-target' : ''} ${isTarget && results.length > 0 ? 'is-prize' : ''}`}
+                                                            style={{ borderColor: item.color, '--rarity': item.color }}
+                                                            data-case-target={isTarget ? 'true' : undefined}
+                                                            data-case-outcome-id={item.skinId || item.id}
+                                                            data-case-outcome-variant={item.variantKey || ''}
+                                                        >
+                                                            <img src={item.image} alt={item.name} loading="lazy" />
+                                                            <small>{item.statTrak && 'ST™ '}{item.souvenir && 'SV '}{item.name}</small>
+                                                            {item.valueGc != null && (
+                                                                <em className="cases-carousel-value">{formatCredits(item.valueGc)}</em>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
                                             <span className="cases-carousel-pointer" />
                                         </div>
@@ -924,7 +972,7 @@ export default function CasesGame() {
                                 </div>
                             )}
                             {results.length > 0 && (
-                                <div className="cases-results-panel" aria-live="polite">
+                                <div className="cases-results-panel" aria-live="polite" ref={resultsPanelRef}>
                                     {settlementSummary && (
                                         <div className="cases-round-summary">
                                             <span>
@@ -947,7 +995,14 @@ export default function CasesGame() {
                                     )}
                                     <div className="cases-result-row">
                                         {results.map((r, i) => (
-                                            <div key={i} className={`cases-result-card ${RARE_TIERS.has(r.rarity) ? 'rare' : ''} ${r.statTrak ? 'stattrak' : ''} ${r.souvenir ? 'souvenir' : ''}`} style={{ '--rarity': r.color }}>
+                                            <div
+                                                key={i}
+                                                className={`cases-result-card ${results.length === 1 ? 'single' : ''} ${RARE_TIERS.has(r.rarity) ? 'rare' : ''} ${r.statTrak ? 'stattrak' : ''} ${r.souvenir ? 'souvenir' : ''}`}
+                                                style={{ '--rarity': r.color }}
+                                                data-case-row-index={i}
+                                                data-case-outcome-id={r.skinId || r.id}
+                                                data-case-outcome-variant={r.variantKey || ''}
+                                            >
                                                 <img src={r.image} alt={r.name} />
                                                 <div className="cases-result-badges">
                                                     {r.statTrak && <b className="stattrak">StatTrak™</b>}
@@ -974,29 +1029,31 @@ export default function CasesGame() {
                                     </div>
                                 </div>
                             )}
-                            <div className="cases-result-actions" aria-label="Case opening controls">
-                                <button
-                                    type="button"
-                                    className="cases-result-primary"
-                                    data-game-action="case-open-again"
-                                    onClick={() => performPlay({ betAmount: casePrice })}
-                                    disabled={running || !activeCase}
-                                >
-                                    Open again
-                                </button>
-                                <button type="button" aria-pressed={quickOpen} onClick={() => setQuickOpen(v => !v)} disabled={running}>
-                                    Quick {quickOpen ? 'on' : 'off'}
-                                </button>
-                                <button type="button" aria-pressed={autoOpen} onClick={() => setAutoOpen(v => !v)} disabled={running}>
-                                    Auto {autoOpen ? 'on' : 'off'}
-                                </button>
-                                <button type="button" aria-pressed={rows === 1} onClick={() => selectRows(1)} disabled={running}>
-                                    Single
-                                </button>
-                                <button type="button" aria-pressed={rows > 1} onClick={() => selectRows(rows > 1 ? rows : 5)} disabled={running}>
-                                    Multi
-                                </button>
-                            </div>
+                            {results.length > 0 && (
+                                <div className="cases-result-actions" aria-label="Case opening controls">
+                                    <button
+                                        type="button"
+                                        className="cases-result-primary"
+                                        data-game-action="case-open-again"
+                                        onClick={() => performPlay({ betAmount: casePrice })}
+                                        disabled={running || !activeCase}
+                                    >
+                                        Open again
+                                    </button>
+                                    <button type="button" aria-pressed={quickOpen} onClick={() => setQuickOpen(v => !v)} disabled={running}>
+                                        Quick {quickOpen ? 'on' : 'off'}
+                                    </button>
+                                    <button type="button" aria-pressed={autoOpen} onClick={() => setAutoOpen(v => !v)} disabled={running}>
+                                        Auto {autoOpen ? 'on' : 'off'}
+                                    </button>
+                                    <button type="button" aria-pressed={rows === 1} onClick={() => selectRows(1)} disabled={running}>
+                                        Single
+                                    </button>
+                                    <button type="button" aria-pressed={rows > 1} onClick={() => selectRows(rows > 1 ? rows : 5)} disabled={running}>
+                                        Multi
+                                    </button>
+                                </div>
+                            )}
                             <div className="cases-stack-row">
                                 <MultiplierBadge label="Rows" value={rows} suffix="" size="sm" state={running ? 'active' : 'idle'} />
                                 {activeCase && (

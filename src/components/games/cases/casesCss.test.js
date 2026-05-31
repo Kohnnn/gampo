@@ -10,6 +10,9 @@ describe('cases CSS polish', () => {
 
     it('keeps the case reel deceleration paced for a full reveal', () => {
         expect(css).toContain('--case-spin-ms')
+        expect(css).toContain('--case-tile-px')
+        expect(css).toContain('--case-tile-gap')
+        expect(css).toMatch(/\.cases-carousel-track\s*\{[^}]*left:\s*50%/s)
         expect(css).toContain('transition: transform var(--case-spin-ms, 5200ms) cubic-bezier')
         expect(css).toContain('animation: casePrizeZoom 760ms')
     })
