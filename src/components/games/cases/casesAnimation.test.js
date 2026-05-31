@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+    CASE_TILE_GAP_PX,
     CASE_PRIZE_INDEX,
     CASE_TILE_PX,
     CASE_OPEN_PHASES,
@@ -14,7 +15,9 @@ import {
 
 describe('cases animation helpers', () => {
     it('keeps the carousel prize offset centered on the pointer', () => {
-        expect(finalPrizeOffset(0)).toBe(-((CASE_PRIZE_INDEX * CASE_TILE_PX) - 50))
+        expect(CASE_TILE_PX).toBe(118)
+        expect(CASE_TILE_GAP_PX).toBe(4)
+        expect(finalPrizeOffset(0)).toBe(-((CASE_PRIZE_INDEX * (CASE_TILE_PX + CASE_TILE_GAP_PX)) + (CASE_TILE_PX / 2)))
         expect(finalPrizeOffset(6)).toBe(finalPrizeOffset(0) + 6)
     })
 
