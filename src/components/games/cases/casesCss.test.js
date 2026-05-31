@@ -16,4 +16,14 @@ describe('cases CSS polish', () => {
         expect(css).toContain('transition: transform var(--case-spin-ms, 5200ms) cubic-bezier')
         expect(css).toContain('animation: casePrizeZoom 760ms')
     })
+
+    it('defines the x10 mini-grid layout and keeps case stats readable', () => {
+        expect(css).toContain('.cases-multi-open-grid')
+        expect(css).toMatch(/\.cases-multi-open-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax/s)
+        expect(css).toContain('.cases-mini-reel-frame')
+        expect(css).toContain('.cases-carousel-tile.is-mini img')
+        expect(css).toMatch(/\.game-shell:has\(\.cases-stage-frame\) \.stats-overlay\s*\{[^}]*grid-template-columns:\s*1fr/s)
+        expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.game-shell:has\(\.cases-stage-frame\) \.gs-aside\s*\{[^}]*overflow-x:\s*hidden/s)
+        expect(css).toMatch(/@media \(max-width: 640px\)[\s\S]*\.game-shell:has\(\.cases-stage-frame\) \.so-row\s*\{[^}]*grid-template-columns:\s*1fr/s)
+    })
 })
