@@ -1,4 +1,5 @@
 import { formatCredits, bankrollRisk, expectedValue } from '../utils/simulationMath'
+import { getGameEducation } from '../data/gameEducation'
 import '../styles/education.css'
 
 function percent(value) {
@@ -24,6 +25,7 @@ function EducationPanel({
         lossProbability: 1 - probability,
         trials: 20,
     })
+    const details = getGameEducation(definition)
 
     return (
         <aside className="education-panel">
@@ -62,6 +64,25 @@ function EducationPanel({
             <div className="education-note">
                 <strong>Lesson</strong>
                 <p>{definition?.lesson || 'Short-run results can diverge sharply from long-run expectation.'}</p>
+            </div>
+
+            <div className="education-details" aria-label={`${definition?.name || 'Game'} detailed explanation`}>
+                <div>
+                    <span>How to play</span>
+                    <p>{details.objective}</p>
+                </div>
+                <div>
+                    <span>Payout model</span>
+                    <p>{details.payout}</p>
+                </div>
+                <div>
+                    <span>Decision cue</span>
+                    <p>{details.strategy}</p>
+                </div>
+                <div>
+                    <span>Risk note</span>
+                    <p>{details.risk}</p>
+                </div>
             </div>
 
             <div className="education-note compact">

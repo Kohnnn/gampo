@@ -6,7 +6,7 @@
 // matching the chosen suit get a 3x bonus on their base contribution.
 // Round payout = sum of three card contributions vs stake.
 
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -30,61 +30,14 @@ import {
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
+import TarotCardArt from './TarotCardArt'
+import { contributionFor, drawSpread, expectedMultiplierForSuit, SUITS, TARGET_RTP, topContributionForSuit } from './tarotModel'
 import './tarot.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
 const REVEAL_DELAY_MS = 360
 const REVEAL_STAGGER_MS = 240
 const POSITIONS = ['Past', 'Present', 'Future']
-
-const SUITS = {
-    wands: { id: 'wands', name: 'Wands', glyph: '🪄', color: '#ff7a7c' },
-    cups: { id: 'cups', name: 'Cups', glyph: '🍷', color: '#4cc9f0' },
-    swords: { id: 'swords', name: 'Swords', glyph: '⚔️', color: '#9aa3b3' },
-    pentacles: { id: 'pentacles', name: 'Pentacles', glyph: '🪙', color: '#ffd166' },
-}
-
-// Major Arcana mapped to suits. Base values are designed to sum near
-// the no-edge target across the four suits; we apply (1 - houseEdge) at
-// settle.
-const DECK = [
-    { id: 'fool', name: 'The Fool', glyph: '🃏', suit: 'wands', base: 0.6 },
-    { id: 'magician', name: 'The Magician', glyph: '🪄', suit: 'wands', base: 1.6 },
-    { id: 'priestess', name: 'High Priestess', glyph: '🌙', suit: 'cups', base: 1.4 },
-    { id: 'empress', name: 'The Empress', glyph: '👑', suit: 'pentacles', base: 1.4 },
-    { id: 'emperor', name: 'The Emperor', glyph: '🏛️', suit: 'swords', base: 1.6 },
-    { id: 'hierophant', name: 'The Hierophant', glyph: '📜', suit: 'pentacles', base: 1.0 },
-    { id: 'lovers', name: 'The Lovers', glyph: '💞', suit: 'cups', base: 1.8 },
-    { id: 'chariot', name: 'The Chariot', glyph: '🛡️', suit: 'swords', base: 2.0 },
-    { id: 'strength', name: 'Strength', glyph: '🦁', suit: 'wands', base: 2.4 },
-    { id: 'hermit', name: 'The Hermit', glyph: '🕯️', suit: 'pentacles', base: 0.8 },
-    { id: 'wheel', name: 'Wheel of Fortune', glyph: '🎡', suit: 'wands', base: 3.2 },
-    { id: 'justice', name: 'Justice', glyph: '⚖️', suit: 'swords', base: 1.2 },
-    { id: 'hanged', name: 'The Hanged Man', glyph: '🕊️', suit: 'cups', base: 0.4 },
-    { id: 'death', name: 'Death', glyph: '☠️', suit: 'swords', base: 0 },
-    { id: 'temperance', name: 'Temperance', glyph: '🍶', suit: 'cups', base: 1.2 },
-    { id: 'devil', name: 'The Devil', glyph: '🐐', suit: 'wands', base: 0.2 },
-    { id: 'tower', name: 'The Tower', glyph: '🗼', suit: 'swords', base: 0 },
-    { id: 'star', name: 'The Star', glyph: '⭐', suit: 'cups', base: 2.6 },
-    { id: 'moon', name: 'The Moon', glyph: '🌚', suit: 'cups', base: 1.8 },
-    { id: 'sun', name: 'The Sun', glyph: '☀️', suit: 'wands', base: 4.0 },
-    { id: 'judgement', name: 'Judgement', glyph: '🎺', suit: 'pentacles', base: 2.4 },
-    { id: 'world', name: 'The World', glyph: '🌍', suit: 'pentacles', base: 5.0 },
-]
-
-const HOUSE_EDGE = 0.04
-
-function pickCard(rngTag) {
-    const idx = Math.floor(nextRoll(rngTag).roll * DECK.length)
-    return DECK[Math.max(0, Math.min(DECK.length - 1, idx))]
-}
-
-function contributionFor(card, pickedSuit) {
-    const matched = card.suit === pickedSuit
-    const base = card.base
-    const raw = matched ? base * 3 : base
-    return Number((raw * (1 - HOUSE_EDGE) / 3).toFixed(3))
-}
 
 export default function TarotGame() {
     useGameBgm('tarot', 'idle')
@@ -118,9 +71,9 @@ export default function TarotGame() {
         playSound('click')
         sfx.play('click')
 
-        const draws = [pickCard('tarot'), pickCard('tarot'), pickCard('tarot')]
+        const draws = drawSpread(() => nextRoll('tarot').roll)
         const contributions = draws.map(c => ({ card: c, contribution: contributionFor(c, pickedSuit), matched: c.suit === pickedSuit }))
-        const totalMult = contributions.reduce((s, r) => s + r.contribution, 0)
+        const totalMult = Number(contributions.reduce((s, r) => s + r.contribution, 0).toFixed(3))
         const returnAmount = betAmount * totalMult
         const profit = returnAmount - betAmount
 
@@ -163,7 +116,7 @@ export default function TarotGame() {
                 id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                 label: `${pickedSuit} ${headlineMult.toFixed(2)}×`,
                 profit, betAmount, multiplier: headlineMult,
-                meta: { suit: pickedSuit, draws: draws.map(c => c.id) },
+                        meta: { suit: pickedSuit, draws: draws.map(c => c.id) },
             })
             machine.finish({ kind: won ? 'win' : 'lose', profit, multiplier: headlineMult, draws: draws.map(c => c.id) })
             showToast(won ? 'win' : 'loss', `Tarot ${pickedSuit}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
@@ -192,14 +145,18 @@ export default function TarotGame() {
                     lastBet={lastBet}
                     disableAuto
                 >
-                    <p className="bp-hint">Pick a suit before pulling. Cards matching get a 3× bonus.</p>
+                    <p className="bp-hint">Pick a suit before pulling. Matching cards receive a 3× raw omen boost, then the spread is normalized to {Math.round(TARGET_RTP * 100)}% RTP.</p>
                     <div className="bp-bal-line">
                         <span>Suit bonus</span>
                         <strong>×3</strong>
                     </div>
                     <div className="bp-bal-line">
                         <span>Top single</span>
-                        <strong>×{(5 * 3 * (1 - HOUSE_EDGE) / 3).toFixed(2)}</strong>
+                        <strong>×{topContributionForSuit(pickedSuit).toFixed(2)}</strong>
+                    </div>
+                    <div className="bp-bal-line">
+                        <span>Suit EV</span>
+                        <strong>×{expectedMultiplierForSuit(pickedSuit).toFixed(2)}</strong>
                     </div>
                 </BetPanel>
             }
@@ -221,7 +178,7 @@ export default function TarotGame() {
                                 disabled={running}
                                 onClick={() => setPickedSuit(s)}
                             >
-                                <span className="glyph">{SUITS[s].glyph}</span>
+                                <span className="glyph" style={{ color: SUITS[s].color }}>{SUITS[s].mark}</span>
                                 {SUITS[s].name}
                             </button>
                         ))}
@@ -235,21 +192,19 @@ export default function TarotGame() {
                                 matched ? 'matched' : '',
                             ].join(' ')
                             return (
-                                <div key={i} className={`tarot-card ${cls}`} style={{ '--rarity': matched ? SUITS[pickedSuit].color : 'rgba(180, 120, 255, 0.45)' }}>
-                                    <span className="tarot-card-position">{POSITIONS[i]}</span>
-                                    {card ? (
-                                        <>
-                                            <span className="tarot-card-glyph">{card.glyph}</span>
-                                            <span className="tarot-card-name">{card.name}</span>
-                                            <span className="tarot-card-suit" style={{ color: SUITS[card.suit].color }}>{SUITS[card.suit].glyph} {SUITS[card.suit].name}</span>
-                                            <span className="tarot-card-mult">×{entry.contribution.toFixed(2)}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="tarot-card-glyph">?</span>
-                                            <span className="tarot-card-name">Pull</span>
-                                            <span className="tarot-card-suit">—</span>
-                                        </>
+                                <div key={i} className={`tarot-slot ${cls}`} style={{ '--rarity': matched ? SUITS[pickedSuit].color : 'rgba(180, 120, 255, 0.45)' }}>
+                                    <TarotCardArt
+                                        card={card}
+                                        hidden={!card}
+                                        position={POSITIONS[i]}
+                                        matched={matched}
+                                        multiplier={entry?.contribution || 0}
+                                    />
+                                    {card && (
+                                        <div className="tarot-card-readout">
+                                            <span>{SUITS[card.suit].name}</span>
+                                            <strong>{matched ? 'Matched omen' : 'Base omen'}</strong>
+                                        </div>
                                     )}
                                 </div>
                             )
@@ -263,7 +218,7 @@ export default function TarotGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={0.5} payoutMultiplier={1.4} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} betAmount={5} winProbability={0.42} payoutMultiplier={TARGET_RTP / 0.42} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

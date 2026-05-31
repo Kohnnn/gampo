@@ -93,6 +93,13 @@ function basicStrategyHint(player, dealerCard) {
     return 'Hit.'
 }
 
+function hintActionFromText(hint) {
+    if (!hint) return null
+    if (hint.startsWith('Stand')) return 'stand'
+    if (hint.startsWith('Hit')) return 'hit'
+    return null
+}
+
 function suitGlyph(s) {
     if (s === 'H') return '\u2665'
     if (s === 'D') return '\u2666'
@@ -385,6 +392,9 @@ export default function BlackjackGame() {
     const hint = phase === 'playing' ? basicStrategyHint(player, dealer[0]) : 'Deal a hand to receive guidance.'
     const recentProfit = useMemo(() => session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0), [session.history])
     const inRound = phase === 'playing'
+    const hintAction = hintActionFromText(hint)
+    const dealerVisible = dealer[0] ? `${dealer[0].rank}${suitGlyph(dealer[0].suit)} (${dealerUpValue(dealer[0])})` : '—'
+    const playerTotalLabel = player.length ? `${playerScore}${isSoftHand(player) ? ' soft' : ''}` : '—'
 
     return (
         <GameShell
@@ -444,6 +454,24 @@ export default function BlackjackGame() {
                             {formatCredits(chipSlide.amount)}
                         </span>
                     ) : null}
+                    <div className="bj-table-status" aria-label="Blackjack table status">
+                        <div>
+                            <span>Dealer up-card</span>
+                            <strong>{dealerVisible}</strong>
+                        </div>
+                        <div>
+                            <span>Player total</span>
+                            <strong>{playerTotalLabel}</strong>
+                        </div>
+                        <div>
+                            <span>Rule</span>
+                            <strong>{decks} decks · {hitsSoft17 ? 'H17' : 'S17'}</strong>
+                        </div>
+                        <div>
+                            <span>Active bet</span>
+                            <strong>{activeBet ? formatCredits(activeBet) : '—'}</strong>
+                        </div>
+                    </div>
                     <Hand
                         label={`Dealer ${dealer.length && phase !== 'playing' ? scoreBlackjackHand(dealer) : phase === 'playing' && dealer[0] ? `(${dealerUpValue(dealer[0])})` : '--'}`}
                         cards={dealer}
@@ -456,8 +484,8 @@ export default function BlackjackGame() {
                         emptyHint={phase === 'idle' ? 'Pick decks · S17/H17 · then Deal' : null}
                     />
                     <div className="bj-actions">
-                        <button className="bj-primary-action" disabled={phase !== 'playing'} onClick={hit}>Hit</button>
-                        <button className="bj-primary-action" disabled={phase !== 'playing'} onClick={stand}>Stand</button>
+                        <button className={`bj-primary-action ${hintAction === 'hit' ? 'recommended' : ''}`} disabled={phase !== 'playing'} onClick={hit}>Hit</button>
+                        <button className={`bj-primary-action ${hintAction === 'stand' ? 'recommended' : ''}`} disabled={phase !== 'playing'} onClick={stand}>Stand</button>
                         <button disabled={phase !== 'playing' || player.length !== 2} onClick={doubleDown}>Double</button>
                         <button disabled={phase !== 'playing' || player.length !== 2} onClick={surrender}>Surrender</button>
                     </div>

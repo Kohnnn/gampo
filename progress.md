@@ -315,3 +315,11 @@ Fourth audit (`docs/evaluationreport.md` v4) plus three user concerns — Plinko
 - Tightened Poker/GTO scroll behavior so table actions remain reachable at desktop/tablet sizes and the GTO decision/detail area stays usable above the grid with an independently scrolling sidebar.
 - Added an audio audit report covering manifest refs, unused WAVs, procedural-loop weakness, and replacement candidates with source/license notes; no external audio was ingested.
 - Verification: `npm test -- --run` is green at 174 tests across 40 files; `npm run build` passes with the existing empty `phaser`/`matter` chunks and large poker-row chunk warnings. Browser smoke captured `/cases`, `/vault-rush`, `/river-catcher`, `/dust-rail`, `/storm-banner`, `/bassline-bonus`, `/phoenix-megaways`, and `/poker` at 375x667, 480x800, 1024x768, and 1610x870 with no horizontal overflow or broken images, plus interaction checks for case opening and forced slot bonus state.
+
+## GamPo Card Tables Polish (2026-05-31)
+
+- Added shared game education copy through `src/data/gameEducation.js` and expanded the in-game education panel with how-to-play, payout model, decision cue, and risk note content.
+- Improved Poker, Roulette, Baccarat, and Blackjack table readability with clearer status strips, action context, ticket/result summaries, winner/highlight states, and desktop/mobile layout tuning.
+- Rebuilt Tarot around a 22-card generated deck model with deterministic no-replacement spread draws, normalized 96% RTP per suit, generated SVG card fronts/backs, and clearer suit EV/top-card guidance.
+- Added `tarotModel.test.js` coverage for no-replacement draws, suit EV normalization, and matching-suit contribution boosts.
+- Verification: `npm test -- --run` is green at 178 tests across 41 files; `npm run build` passes with the existing empty `phaser`/`matter` chunks and large `rows-*` chunk warnings. Browser smoke `round3-card-tables-verified` checked `/poker`, `/roulette`, `/baccarat`, `/blackjack`, and `/tarot` at 375x667, 480x800, 1024x768, and 1610x870 with no horizontal overflow, no console errors, no broken images, and key actions visible.
