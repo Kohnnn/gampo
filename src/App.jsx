@@ -4,7 +4,7 @@ import Layout from './components/Layout'
 import NotFoundPage from './components/NotFoundPage'
 import ErrorBoundary from './components/ErrorBoundary'
 import HomePage from './pages/HomePage'
-import { SLOT_TEMPLATE_ROUTES } from './data/slotRoutes'
+import { SLOT_TEMPLATE_ROUTES, SLOT_TEMPLATE_ROUTE_ALIASES } from './data/slotRoutes'
 
 // Casino lobby surfaces (small, eager)
 import {
@@ -139,6 +139,13 @@ function App() {
                         key={route.id}
                         path={route.path.slice(1)}
                         element={lazied(<SlotsGame initialTemplateId={route.id} />)}
+                    />
+                ))}
+                {SLOT_TEMPLATE_ROUTE_ALIASES.map(route => (
+                    <Route
+                        key={route.path}
+                        path={route.path.slice(1)}
+                        element={<Navigate to={route.target} replace />}
                     />
                 ))}
                 <Route path="*" element={<NotFoundPage />} />

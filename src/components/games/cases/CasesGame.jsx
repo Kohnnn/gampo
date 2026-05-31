@@ -73,6 +73,8 @@ import { useGameBgm } from '../../../audio/useBgm'
 
 const CAROUSEL_VISIBLE = 32
 const ROW_OPTIONS = [1, 3, 5, 10]
+const REEL_PREVIEW_ROWS = 5
+const REEL_PREVIEW_TILES = 18
 const RARE_TIERS = new Set(['Restricted', 'Classified', 'Covert', 'Remarkable', 'Exotic', 'Extraordinary', 'Contraband', '★'])
 const STATTRAK_CHANCE = 0.1
 const SOUVENIR_CHANCE = 0.06
@@ -535,10 +537,47 @@ export default function CasesGame() {
     const categoryStats = useMemo(() => caseCategoryStats(cases), [cases])
     const activeCategoryMeta = CASE_CATEGORIES.find(c => c.value === category) || CASE_CATEGORIES[0]
     const activeCategoryStats = categoryStats[category] || { count: 0, minPriceGc: 0, maxPriceGc: 0, avgPriceGc: 0, band: 'Budget' }
+    const reelPreviewRows = useMemo(() => {
+        if (!activeCase?.items?.length) return []
+        const premium = activeCase.items
+            .slice()
+            .sort((a, b) => (b.valueGc || b.multiplier || 0) - (a.valueGc || a.multiplier || 0))
+        const mixed = activeCase.items.slice()
+        return Array.from({ length: REEL_PREVIEW_ROWS }, (_, rowIndex) => (
+            Array.from({ length: REEL_PREVIEW_TILES }, (_, tileIndex) => {
+                const source = tileIndex % 5 === 0 ? premium : mixed
+                return source[(tileIndex * 3 + rowIndex * 5) % source.length]
+            })
+        ))
+    }, [activeCase])
+
+    const selectView = useCallback((nextView) => {
+        if (running || view === nextView) return
+        sfx.play('click', { volume: 0.34 })
+        setView(nextView)
+    }, [running, sfx, view])
+
+    const selectCategory = useCallback((nextCategory) => {
+        if (running || category === nextCategory) return
+        sfx.play('click', { volume: 0.32 })
+        setCategory(nextCategory)
+    }, [category, running, sfx])
+
+    const selectRows = useCallback((nextRows) => {
+        if (running || rows === nextRows) return
+        sfx.play('click', { volume: 0.32 })
+        setRows(nextRows)
+    }, [rows, running, sfx])
+
+    const selectCase = useCallback((nextCaseId) => {
+        if (running || caseId === nextCaseId) return
+        sfx.play('reveal', { volume: 0.24 })
+        setCaseId(nextCaseId)
+    }, [caseId, running, sfx])
 
     const renderRarityFilter = () => (
         <>
-            <select className="cases-rarity-select" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)} aria-label="Rarity filter">
+            <select className="cases-rarity-select" value={rarityFilter} onChange={e => { sfx.play('click', { volume: 0.24 }); setRarityFilter(e.target.value) }} aria-label="Rarity filter">
                 {RARITY_FILTERS.map(option => (
                     <option key={option.value} value={option.value}>{option.selectLabel}</option>
                 ))}
@@ -550,7 +589,7 @@ export default function CasesGame() {
                         type="button"
                         className={rarityFilter === option.value ? 'active' : ''}
                         aria-pressed={rarityFilter === option.value}
-                        onClick={() => setRarityFilter(option.value)}
+                        onClick={() => { sfx.play('click', { volume: 0.24 }); setRarityFilter(option.value) }}
                     >
                         {option.label}
                     </button>
@@ -585,7 +624,7 @@ export default function CasesGame() {
                             value={category}
                             disabled={running}
                             aria-labelledby="cases-category-label"
-                            onChange={e => setCategory(e.target.value)}
+                            onChange={e => selectCategory(e.target.value)}
                         >
                             {CASE_CATEGORIES.map(c => (
                                 <option key={c.value} value={c.value}>{c.label}</option>
@@ -597,7 +636,7 @@ export default function CasesGame() {
                         <span className="bp-label" id="cases-rows-label">Rows ({rows})</span>
                         <div className="bp-row" role="group" aria-labelledby="cases-rows-label">
                             {ROW_OPTIONS.map(n => (
-                                <button key={n} className={`bp-bet-btn ${rows === n ? 'active' : ''}`} disabled={running} onClick={() => setRows(n)} aria-pressed={rows === n}>{n}</button>
+                                <button key={n} className={`bp-bet-btn ${rows === n ? 'active' : ''}`} disabled={running} onClick={() => selectRows(n)} aria-pressed={rows === n}>{n}</button>
                             ))}
                         </div>
                     </div>
@@ -654,11 +693,11 @@ export default function CasesGame() {
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
 
                     <div className="cases-view-tabs">
-                        <button className={view === 'open' ? 'active' : ''} onClick={() => setView('open')} disabled={running}>Open</button>
-                        <button className={view === 'history' ? 'active' : ''} onClick={() => setView('history')} disabled={running}>
+                        <button className={view === 'open' ? 'active' : ''} onClick={() => selectView('open')} disabled={running}>Open</button>
+                        <button className={view === 'history' ? 'active' : ''} onClick={() => selectView('history')} disabled={running}>
                             History {collection.drops.length > 0 && <em>{collection.drops.length}</em>}
                         </button>
-                        <button className={view === 'pokedex' ? 'active' : ''} onClick={() => setView('pokedex')} disabled={running}>
+                        <button className={view === 'pokedex' ? 'active' : ''} onClick={() => selectView('pokedex')} disabled={running}>
                             Collection {pokedexList.length > 0 && <em>{pokedexList.length}</em>}
                         </button>
                     </div>
@@ -719,9 +758,9 @@ export default function CasesGame() {
                                     </span>
                                 ))}
                             </div>
-                            <div className="cases-category-row">
-                                {CASE_CATEGORIES.map(c => (
-                                    <button key={c.value} className={`cases-category-chip ${category === c.value ? 'active' : ''}`} disabled={running} onClick={() => setCategory(c.value)}>
+                                <div className="cases-category-row">
+                                    {CASE_CATEGORIES.map(c => (
+                                    <button key={c.value} className={`cases-category-chip ${category === c.value ? 'active' : ''}`} disabled={running} onClick={() => selectCategory(c.value)}>
                                         <span>{c.label}</span>
                                         <strong>{categoryCounts[c.value] || 0}</strong>
                                         <em>{categoryStats[c.value]?.band || 'Budget'}</em>
@@ -736,13 +775,46 @@ export default function CasesGame() {
                                     onChange={e => setCaseGridSearch(e.target.value)}
                                 />
                             </div>
+                            {activeCase && reelPreviewRows.length > 0 && tracks.length === 0 && (
+                                <section className="cases-market-reel" aria-label={`${activeCase.name} drop reel preview`}>
+                                    <header className="cases-market-reel-head">
+                                        <span>{activeCase.items.length} possible drops</span>
+                                        <strong>{activeCase.name}</strong>
+                                        <em>{formatCredits(casePrice)} open · EV {formatCredits(activeCase.evGc || 0)}</em>
+                                    </header>
+                                    <div className="cases-market-reel-window" aria-hidden="true">
+                                        {reelPreviewRows.map((row, rowIndex) => (
+                                            <div
+                                                key={`preview-${activeCase.id}-${rowIndex}`}
+                                                className="cases-preview-row"
+                                                style={{
+                                                    '--row-offset': `${-56 - rowIndex * 22}px`,
+                                                    '--row-duration': `${34 + rowIndex * 5}s`,
+                                                }}
+                                            >
+                                                {row.map((item, itemIndex) => (
+                                                    <span
+                                                        key={`${rowIndex}-${itemIndex}-${item.id}`}
+                                                        className="cases-preview-tile"
+                                                        style={{ '--rarity': item.color }}
+                                                    >
+                                                        <img src={item.image} alt="" loading="lazy" />
+                                                        <em>{formatCredits(item.valueGc || item.multiplier || 0)}</em>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ))}
+                                        <span className="cases-market-pointer" />
+                                    </div>
+                                </section>
+                            )}
                             <div className="cases-case-grid">
                                 {categoryCases.map(c => (
                                     <button
                                         key={c.id}
                                         className={`cases-case-card ${activeCase?.id === c.id ? 'active' : ''} ${casePhase === 'lid' && activeCase?.id === c.id ? 'is-lifting' : ''}`}
                                         disabled={running}
-                                        onClick={() => setCaseId(c.id)}
+                                        onClick={() => selectCase(c.id)}
                                         title={`${c.name} · ${formatCredits(c.openPriceGc || 0)} · ${c.items.length} items · EV ${formatCredits(c.evGc || 0)} · ${c.volatility?.label || 'volatility'}`}
                                     >
                                         <img src={c.image} alt={c.name} loading="lazy" />

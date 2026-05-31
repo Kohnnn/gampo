@@ -9,6 +9,7 @@
 //   - a "Rotate seeds" button that reveals the active server seed before rotating
 
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Shield, X, RotateCw } from 'lucide-react'
 import {
     getProvablyFair,
@@ -55,7 +56,7 @@ export default function FairnessDrawer({ open, onClose }) {
 
     if (!open) return null
 
-    return (
+    const drawer = (
         <div className="fair-drawer-backdrop" onClick={onClose}>
             <aside className="fair-drawer" role="dialog" aria-label="Provably-fair drawer" onClick={e => e.stopPropagation()}>
                 <header className="fair-drawer-head">
@@ -120,4 +121,6 @@ export default function FairnessDrawer({ open, onClose }) {
             </aside>
         </div>
     )
+
+    return typeof document === 'undefined' ? drawer : createPortal(drawer, document.body)
 }
