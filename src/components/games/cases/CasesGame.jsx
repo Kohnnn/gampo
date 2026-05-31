@@ -104,6 +104,115 @@ function formatRelative(ts) {
     return `${Math.round(diff / 86_400_000)}d`
 }
 
+export function CaseReelTile({
+    item,
+    rowIndex,
+    tileIndex,
+    targetReady,
+    isPrize,
+    compact = false,
+}) {
+    const isTarget = tileIndex === CASE_PRIZE_INDEX
+    const displayName = `${item.statTrak ? 'ST™ ' : ''}${item.souvenir ? 'SV ' : ''}${item.name}`
+    return (
+        <div
+            key={`${rowIndex}-${tileIndex}-${item.id}-${item.variantKey || 'base'}`}
+            className={`cases-carousel-tile ${compact ? 'is-mini' : ''} ${targetReady ? 'is-target' : ''} ${isPrize ? 'is-prize' : ''}`}
+            style={{ borderColor: item.color, '--rarity': item.color }}
+            data-case-target={isTarget ? 'true' : undefined}
+            data-case-outcome-id={item.skinId || item.id}
+            data-case-outcome-variant={item.variantKey || ''}
+        >
+            <img src={item.image} alt={item.name} loading="lazy" />
+            <small>{displayName}</small>
+            {item.valueGc != null && (
+                <em className="cases-carousel-value">{formatCredits(item.valueGc)}</em>
+            )}
+        </div>
+    )
+}
+
+export function CaseMultiOpenGrid({
+    activeCase,
+    casePhase,
+    results,
+    trackOffsets,
+    tracks,
+}) {
+    const revealReady = hasReachedCasePhase(casePhase, 'reveal') || results.length > 0
+    return (
+        <div className="cases-multi-open-grid" data-case-layout="multi-grid" aria-label="Bulk case opening reels">
+            {tracks.map((track, rowIndex) => {
+                const result = results[rowIndex]
+                const target = track[CASE_PRIZE_INDEX] || result || track[0]
+                const isRare = result && RARE_TIERS.has(result.rarity)
+                const profit = Number(result?.profitGc) || 0
+                return (
+                    <article
+                        key={`bulk-${rowIndex}-${target?.variantKey || target?.id || rowIndex}`}
+                        className={`cases-multi-slot ${result ? 'is-settled' : ''} ${isRare ? 'rare' : ''} ${result?.statTrak ? 'stattrak' : ''} ${result?.souvenir ? 'souvenir' : ''}`}
+                        style={{ '--rarity': result?.color || target?.color || '#ffd166' }}
+                        data-case-row-index={rowIndex}
+                        data-case-outcome-id={result?.skinId || result?.id || target?.skinId || target?.id || ''}
+                        data-case-outcome-variant={result?.variantKey || target?.variantKey || ''}
+                    >
+                        <header className="cases-multi-slot-head">
+                            <span>#{rowIndex + 1}</span>
+                            <strong>{activeCase?.name || 'Case'}</strong>
+                            <em>{result ? 'Landed' : casePhaseLabel(casePhase, 1)}</em>
+                        </header>
+                        <div className="cases-mini-reel-frame">
+                            <div
+                                className="cases-carousel-track cases-mini-reel-track"
+                                style={{ transform: `translate(${trackOffsets[rowIndex] || 0}px, -50%)` }}
+                            >
+                                {track.map((item, tileIndex) => {
+                                    const isTarget = tileIndex === CASE_PRIZE_INDEX
+                                    return (
+                                        <CaseReelTile
+                                            key={`${rowIndex}-${tileIndex}-${item.id}-${item.variantKey || 'base'}`}
+                                            item={item}
+                                            rowIndex={rowIndex}
+                                            tileIndex={tileIndex}
+                                            compact
+                                            targetReady={isTarget && revealReady}
+                                            isPrize={isTarget && results.length > 0}
+                                        />
+                                    )
+                                })}
+                            </div>
+                            <span className="cases-carousel-pointer cases-mini-pointer" />
+                        </div>
+                        {result ? (
+                            <div className="cases-mini-result">
+                                <img src={result.image} alt={result.name} loading="lazy" />
+                                <div>
+                                    <span className="cases-mini-badges">
+                                        {result.statTrak && <b className="stattrak">ST™</b>}
+                                        {result.souvenir && <b className="souvenir">SV</b>}
+                                        {result.rarity && <b>{result.rarity}</b>}
+                                    </span>
+                                    <strong>{result.name}</strong>
+                                    <em>{result.wearShort} · {result.float?.toFixed(3) ?? '—'}</em>
+                                </div>
+                                <aside>
+                                    <strong>{formatCredits(result.valueGc || 0)}</strong>
+                                    <small className={profit >= 0 ? 'pos' : 'neg'}>{profit >= 0 ? '+' : ''}{formatCredits(profit)}</small>
+                                </aside>
+                            </div>
+                        ) : (
+                            <div className="cases-mini-armed">
+                                <span>{target?.rarity || 'Rolling'}</span>
+                                <strong>{casePhaseLabel(casePhase, 1)}</strong>
+                            </div>
+                        )}
+                    </article>
+                )
+            })}
+        </div>
+    )
+}
+
 export default function CasesGame() {
     const definition = findGameDefinition('cases') || { name: 'Cases', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
@@ -937,8 +1046,17 @@ export default function CasesGame() {
                                     </button>
                                 ))}
                             </div>
-                            {tracks.length > 0 && (
-                                <div className="cases-rows">
+                            {tracks.length > 0 && rows === 10 && (
+                                <CaseMultiOpenGrid
+                                    activeCase={activeCase}
+                                    casePhase={casePhase}
+                                    results={results}
+                                    trackOffsets={trackOffsets}
+                                    tracks={tracks}
+                                />
+                            )}
+                            {tracks.length > 0 && rows !== 10 && (
+                                <div className="cases-rows" data-case-layout="stacked-rows">
                                     {tracks.map((track, ti) => (
                                         <div key={ti} className="cases-carousel-frame" data-case-row-index={ti}>
                                             <div
@@ -949,20 +1067,14 @@ export default function CasesGame() {
                                                     const isTarget = idx === CASE_PRIZE_INDEX
                                                     const targetReady = isTarget && (hasReachedCasePhase(casePhase, 'reveal') || results.length > 0)
                                                     return (
-                                                        <div
+                                                        <CaseReelTile
                                                             key={`${ti}-${idx}-${item.id}-${item.variantKey || 'base'}`}
-                                                            className={`cases-carousel-tile ${targetReady ? 'is-target' : ''} ${isTarget && results.length > 0 ? 'is-prize' : ''}`}
-                                                            style={{ borderColor: item.color, '--rarity': item.color }}
-                                                            data-case-target={isTarget ? 'true' : undefined}
-                                                            data-case-outcome-id={item.skinId || item.id}
-                                                            data-case-outcome-variant={item.variantKey || ''}
-                                                        >
-                                                            <img src={item.image} alt={item.name} loading="lazy" />
-                                                            <small>{item.statTrak && 'ST™ '}{item.souvenir && 'SV '}{item.name}</small>
-                                                            {item.valueGc != null && (
-                                                                <em className="cases-carousel-value">{formatCredits(item.valueGc)}</em>
-                                                            )}
-                                                        </div>
+                                                            item={item}
+                                                            rowIndex={ti}
+                                                            tileIndex={idx}
+                                                            targetReady={targetReady}
+                                                            isPrize={isTarget && results.length > 0}
+                                                        />
                                                     )
                                                 })}
                                             </div>

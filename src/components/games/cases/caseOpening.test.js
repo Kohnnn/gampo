@@ -37,6 +37,12 @@ describe('case opening source of truth', () => {
             expect(entry.reelTrack[entry.targetIndex]).toBe(entry.outcome)
             expect(entry.reelTrack[entry.targetIndex].variantKey).toBe(entry.outcome.variantKey)
             expect(entry.reelTrack[entry.targetIndex].valueGc).toBe(entry.outcome.valueGc)
+            expect(entry.reelTrack[entry.targetIndex].rarity).toBe(entry.outcome.rarity)
+            expect(entry.reelTrack[entry.targetIndex].wear).toBe(entry.outcome.wear)
+            expect(entry.reelTrack[entry.targetIndex].float).toBe(entry.outcome.float)
+            expect(entry.reelTrack[entry.targetIndex].statTrak).toBe(entry.outcome.statTrak)
+            expect(entry.reelTrack[entry.targetIndex].souvenir).toBe(entry.outcome.souvenir)
+            expect(entry.reelTrack[entry.targetIndex].profitGc).toBe(entry.outcome.profitGc)
         })
     })
 
