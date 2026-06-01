@@ -29,12 +29,28 @@ const listeners = new Set()
 let drops = readDrops()
 let pokedex = readPokedex()
 
+function makeDropId(entry = {}, index = 0) {
+    if (entry.dropId) return entry.dropId
+    const stamp = entry.ts || 0
+    const key = entry.key || entry.variantKey || entry.skinId || 'drop'
+    return `${stamp}::${key}::${index}`
+}
+
+function normalizeDrop(entry, index) {
+    return {
+        ...entry,
+        dropId: makeDropId(entry, index),
+        favorite: !!entry.favorite,
+        archived: !!entry.archived,
+    }
+}
+
 function readDrops() {
     try {
         const raw = localStorage.getItem(DROPS_KEY)
         if (!raw) return []
         const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed : []
+        return Array.isArray(parsed) ? parsed.map(normalizeDrop) : []
     } catch {
         return []
     }
@@ -76,7 +92,9 @@ export function variantKey({ skinId, wear, statTrak, souvenir }) {
 export function recordDrop(pick, ctx = {}) {
     if (!pick || !pick.skinId) return
     const key = variantKey(pick)
+    const ts = Date.now()
     const entry = {
+        dropId: `${ts}-${Math.random().toString(16).slice(2, 8)}`,
         key,
         skinId: pick.skinId,
         name: pick.name,
@@ -92,9 +110,11 @@ export function recordDrop(pick, ctx = {}) {
         valueGc: pick.valueGc,
         openPriceGc: ctx.openPriceGc,
         profitGc: pick.profitGc,
-        ts: Date.now(),
+        ts,
         caseId: ctx.caseId,
         caseName: ctx.caseName,
+        favorite: false,
+        archived: false,
     }
     drops = [entry, ...drops].slice(0, DROPS_LIMIT)
     const prev = pokedex[key] || { count: 0 }
@@ -117,13 +137,87 @@ export function recordDrop(pick, ctx = {}) {
             valueGc: Math.max(prev.valueGc || 0, pick.valueGc || 0),
             totalValueGc: (prev.totalValueGc || 0) + (Number(pick.valueGc) || 0),
             count: (prev.count || 0) + 1,
-            firstSeen: prev.firstSeen || Date.now(),
-            lastSeen: Date.now(),
+            firstSeen: prev.firstSeen || ts,
+            lastSeen: ts,
         },
     }
     writeDrops()
     writePokedex()
     notify()
+}
+
+function patchDrop(dropId, patch) {
+    let changed = false
+    drops = drops.map((drop, index) => {
+        const normalized = normalizeDrop(drop, index)
+        if (normalized.dropId !== dropId) return normalized
+        changed = true
+        return { ...normalized, ...patch }
+    })
+    if (changed) {
+        writeDrops()
+        notify()
+    }
+    return changed
+}
+
+export function toggleFavorite(dropId) {
+    const drop = drops.find((entry, index) => normalizeDrop(entry, index).dropId === dropId)
+    if (!drop) return false
+    return patchDrop(dropId, { favorite: !drop.favorite })
+}
+
+export function archiveDrop(dropId) {
+    return patchDrop(dropId, { archived: true })
+}
+
+export function restoreDrop(dropId) {
+    return patchDrop(dropId, { archived: false })
+}
+
+export function removeJunk({ maxValueGc = 1.5, keepPerVariant = 1 } = {}) {
+    const seen = new Map()
+    let archivedCount = 0
+    drops = drops.map((drop, index) => {
+        const normalized = normalizeDrop(drop, index)
+        if (normalized.archived || normalized.favorite) return normalized
+        const key = normalized.key || variantKey(normalized)
+        const count = seen.get(key) || 0
+        seen.set(key, count + 1)
+        const lowValue = (Number(normalized.valueGc) || 0) <= maxValueGc
+        if (lowValue && count >= keepPerVariant) {
+            archivedCount += 1
+            return { ...normalized, archived: true }
+        }
+        return normalized
+    })
+    if (archivedCount > 0) {
+        writeDrops()
+        notify()
+    }
+    return archivedCount
+}
+
+export function exportInventory() {
+    return JSON.stringify({
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        drops: drops.map(normalizeDrop),
+        pokedex,
+    }, null, 2)
+}
+
+export function importInventory(payload) {
+    const parsed = typeof payload === 'string' ? JSON.parse(payload) : payload
+    if (!parsed || !Array.isArray(parsed.drops) || !parsed.pokedex || typeof parsed.pokedex !== 'object') {
+        throw new Error('Invalid cases inventory export')
+    }
+    drops = parsed.drops.map(normalizeDrop).slice(0, DROPS_LIMIT)
+    pokedex = parsed.pokedex
+    writeDrops()
+    writePokedex()
+    notify()
+    return { drops: drops.length, variants: Object.keys(pokedex).length }
 }
 
 export function resetCases() {
@@ -138,6 +232,9 @@ export function resetCases() {
 
 function summarise(catalogTotal = 0) {
     const list = Object.values(pokedex)
+    const activeDrops = drops.filter(drop => !drop.archived)
+    const archivedDrops = drops.filter(drop => drop.archived)
+    const favoriteDrops = drops.filter(drop => drop.favorite && !drop.archived)
     let bestMultiplier = 0
     let bestValueGc = 0
     let totalValueGc = 0
@@ -152,6 +249,9 @@ function summarise(catalogTotal = 0) {
     }
     return {
         totalDrops: drops.length,
+        activeDrops: activeDrops.length,
+        archivedDrops: archivedDrops.length,
+        favoriteDrops: favoriteDrops.length,
         uniqueVariants: list.length,
         catalogTotal,
         completionPct: catalogTotal > 0 ? Math.min(100, Math.round((list.length / catalogTotal) * 100)) : 0,
@@ -175,5 +275,11 @@ export function useCaseCollection({ catalogTotal = 0 } = {}) {
         summary: summarise(catalogTotal),
         recordDrop,
         reset: resetCases,
+        toggleFavorite,
+        archiveDrop,
+        restoreDrop,
+        removeJunk,
+        exportInventory,
+        importInventory,
     }
 }

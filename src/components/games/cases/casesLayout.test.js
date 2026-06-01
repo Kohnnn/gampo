@@ -18,4 +18,22 @@ describe('cases x10 layout contract', () => {
         expect(source).toContain('data-case-outcome-id={result?.skinId')
         expect(source).toContain('data-case-outcome-variant={result?.variantKey')
     })
+
+    it('moves case commands into one right-panel contract', () => {
+        expect(source).toContain('function CaseRightPanel')
+        expect(source).toContain('data-case-panel="commands"')
+        expect(source).toContain('data-case-action="quick-toggle"')
+        expect(source).toContain('data-case-action={autoOpen ?')
+        expect(source).toContain('data-case-action="case-switch"')
+        expect(source.match(/data-game-action=/g)).toHaveLength(1)
+        expect(source).not.toContain('className="cases-command-bar"')
+        expect(source).not.toContain('className="cases-result-actions"')
+    })
+
+    it('keeps inventory actions addressable for browser smoke tests', () => {
+        expect(source).toContain('data-inventory-action="favorite"')
+        expect(source).toContain("data-inventory-action={drop.archived ? 'restore' : 'archive'}")
+        expect(source).toContain('data-inventory-action="export"')
+        expect(source).toContain('data-inventory-action="import"')
+    })
 })
