@@ -1,7 +1,17 @@
 // useCaseCollection tests — Wave 31 schema (skinId + wear + statTrak variants).
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { recordDrop, resetCases, variantKey } from './useCaseCollection'
+import {
+    archiveDrop,
+    exportInventory,
+    importInventory,
+    recordDrop,
+    removeJunk,
+    resetCases,
+    restoreDrop,
+    toggleFavorite,
+    variantKey,
+} from './useCaseCollection'
 
 beforeEach(() => {
     const store = new Map()
@@ -40,6 +50,9 @@ describe('useCaseCollection v2', () => {
         recordDrop(baseSkin, { caseId: 'case-a', caseName: 'Case A' })
         const dropsAfter = readDrops()
         expect(dropsAfter.length).toBe(1)
+        expect(dropsAfter[0].dropId).toBeTruthy()
+        expect(dropsAfter[0].favorite).toBe(false)
+        expect(dropsAfter[0].archived).toBe(false)
         expect(dropsAfter[0].skinId).toBe('sk1')
         expect(dropsAfter[0].caseId).toBe('case-a')
 
@@ -98,6 +111,46 @@ describe('useCaseCollection v2', () => {
         resetCases()
         expect(readDrops().length).toBe(0)
         expect(Object.keys(readPokedex()).length).toBe(0)
+    })
+
+    it('favorites and archives drops without deleting them', () => {
+        recordDrop(baseSkin)
+        const [drop] = readDrops()
+        expect(toggleFavorite(drop.dropId)).toBe(true)
+        expect(readDrops()[0].favorite).toBe(true)
+
+        expect(archiveDrop(drop.dropId)).toBe(true)
+        expect(readDrops()[0].archived).toBe(true)
+        expect(readDrops()).toHaveLength(1)
+
+        expect(restoreDrop(drop.dropId)).toBe(true)
+        expect(readDrops()[0].archived).toBe(false)
+    })
+
+    it('archives only duplicate low-value junk and preserves the first copy', () => {
+        const cheap = { ...baseSkin, skinId: 'cheap', rarity: 'Mil-Spec Grade', valueGc: 0.45 }
+        recordDrop(cheap)
+        recordDrop(cheap)
+        recordDrop({ ...baseSkin, skinId: 'rare', valueGc: 18 })
+
+        expect(removeJunk({ maxValueGc: 1.5, keepPerVariant: 1 })).toBe(1)
+        const archived = readDrops().filter(drop => drop.archived)
+        expect(archived).toHaveLength(1)
+        expect(archived[0].skinId).toBe('cheap')
+        expect(readDrops().filter(drop => !drop.archived)).toHaveLength(2)
+    })
+
+    it('exports and imports inventory json with drops and pokedex', () => {
+        recordDrop(baseSkin)
+        const exported = exportInventory()
+        resetCases()
+        expect(readDrops()).toHaveLength(0)
+
+        const result = importInventory(exported)
+        expect(result.drops).toBe(1)
+        expect(result.variants).toBe(1)
+        expect(readDrops()[0].dropId).toBeTruthy()
+        expect(Object.keys(readPokedex())).toHaveLength(1)
     })
 
     it('variantKey is stable for identical attributes', () => {
