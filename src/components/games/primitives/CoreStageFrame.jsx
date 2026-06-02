@@ -25,13 +25,16 @@ export default function CoreStageFrame({
 }) {
     const style = {}
     if (aspect) style.aspectRatio = aspect
-    if (minHeight) style.minHeight = `${minHeight}px`
+    if (minHeight) {
+        style['--core-stage-min-height'] = `${minHeight}px`
+        style.minHeight = `min(${minHeight}px, calc(100dvh - 220px))`
+    }
     if (maxWidth) style.maxWidth = `${maxWidth}px`
     if (width) style.width = `${width}px`
     if (height) style.height = `${height}px`
     if (backdrop) style.backgroundImage = `url("${backdrop}")`
     return (
-        <div className={`core-stage ${loading ? 'is-loading' : ''} ${className}`} style={style}>
+        <div className={`core-stage ${loading ? 'is-loading' : ''} ${className}`} style={style} data-game-stage>
             {loading ? (
                 <div className="core-stage-loading">
                     {loadingNode || <DefaultLoader />}

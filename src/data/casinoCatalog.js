@@ -6,7 +6,7 @@ export const casinoSections = [
     { id: 'originals', label: 'Originals', path: '/originals', icon: 'spark' },
     { id: 'slots', label: 'Slots', path: '/slots-lobby', icon: 'slots' },
     { id: 'live', label: 'Live Studio', path: '/live', icon: 'broadcast' },
-    { id: 'sports', label: 'Sportsbook', path: '/sports', icon: 'trophy' },
+    { id: 'sports', label: 'Sportsbook', path: '/sportsbook', icon: 'trophy' },
     { id: 'missions', label: 'Missions', path: '/missions', icon: 'target' },
     { id: 'vip', label: 'VIP Lab', path: '/vip', icon: 'crown' },
     { id: 'learn', label: 'Risk Academy', path: '/learn', icon: 'book' },
@@ -57,7 +57,7 @@ export const featuredCollections = [
         id: 'sports',
         title: 'Sportsbook Lab',
         description: 'Synthetic fixtures with fair odds, vig, overround and ticket settlement.',
-        path: '/sports',
+        path: '/sportsbook',
         accent: '#58a6ff',
     },
 ]

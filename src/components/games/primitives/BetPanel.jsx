@@ -247,7 +247,14 @@ export default function BetPanel({
                 <div className="bp-quick-actions">
                     <button onClick={min} disabled={hasFixedBet}>Min</button>
                     <button onClick={() => setBetAmount(initialBet)} disabled={hasFixedBet}>Reset</button>
-                    <button onClick={rebet} disabled={hasFixedBet || !lastBet}><RotateCcw size={11} style={{ marginRight: 3 }} />Rebet</button>
+                    <button
+                        onClick={rebet}
+                        disabled={hasFixedBet || !lastBet}
+                        title={!lastBet ? 'Place your first bet to enable Rebet' : hasFixedBet ? 'Rebet is locked during this round' : 'Repeat last bet amount'}
+                        data-disabled-reason={!lastBet ? 'Place your first bet to enable Rebet' : hasFixedBet ? 'Rebet is locked during this round' : undefined}
+                    >
+                        <RotateCcw size={11} style={{ marginRight: 3 }} />Rebet
+                    </button>
                 </div>
                 <div className="bp-bal-line">
                     <span>Balance</span>

@@ -12,7 +12,7 @@ const DEFAULT_ROUTES = [
     '/slots',
     '/poker',
     '/missions',
-    '/sports',
+    '/sportsbook',
     '/mines',
     '/dice',
     '/plinko',
@@ -56,6 +56,12 @@ const KEY_ACTIONS = {
     '/poker': /sit|deal|start|call|check|fold|raise|bet/i,
     '/missions': /claim|play|open|mission|reset/i,
     '/sports': /add|bet slip|odds|search|events|ticket|sports home|top matches/i,
+    '/sportsbook': /add|bet slip|odds|search|events|ticket|sports home|top matches/i,
+    '/sportsbook/soccer': /add|bet slip|odds|search|events|ticket|soccer|winner/i,
+    '/risk-academy': /practice games|risk|academy|originals/i,
+    '/vip-lab': /practice games|vip|tier|originals/i,
+    '/slot-factory': /spin|bet|buy|auto|play/i,
+    '/pnl-stats': /stats|profit|chat|add 500|reset lab/i,
     '/mines': /bet|start|cashout|pick|reveal/i,
     '/dice': /roll|bet|play/i,
     '/plinko': /drop|bet|play/i,
@@ -75,17 +81,19 @@ const KEY_ACTIONS = {
 function argValue(name, fallback) {
     const prefix = `--${name}=`
     const match = process.argv.find(arg => arg.startsWith(prefix))
-    return match ? match.slice(prefix.length) : fallback
+    if (match) return match.slice(prefix.length)
+    const envKey = `npm_config_${name.toLowerCase()}`
+    return process.env[envKey] || fallback
 }
 
 function parseListArg(name, fallback) {
     const raw = argValue(name, '')
-    return raw ? raw.split(',').map(item => item.trim()).filter(Boolean) : fallback
+    return raw ? raw.split(/[,\s]+/).map(item => item.trim()).filter(Boolean) : fallback
 }
 
 function parseViewportArg(raw) {
     if (!raw) return DEFAULT_VIEWPORTS
-    return raw.split(',').map(item => {
+    return raw.split(/[,\s]+/).filter(Boolean).map(item => {
         const [width, height] = item.split('x').map(Number)
         if (!Number.isFinite(width) || !Number.isFinite(height)) {
             throw new Error(`Invalid viewport "${item}". Use WIDTHxHEIGHT.`)
@@ -304,7 +312,7 @@ async function run() {
     const baseUrl = argValue('baseUrl', 'http://127.0.0.1:5173').replace(/\/$/, '')
     const outDir = resolve(argValue('out', 'output/browser-smoke'))
     const label = argValue('label', new Date().toISOString().replace(/[:.]/g, '-'))
-    const clean = process.argv.includes('--clean')
+    const clean = process.argv.includes('--clean') || process.env.npm_config_clean === 'true'
     const routes = parseListArg('routes', DEFAULT_ROUTES)
     const viewports = parseViewportArg(argValue('viewports', ''))
     const browser = findBrowser()

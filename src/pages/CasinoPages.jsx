@@ -175,6 +175,7 @@ export function VipPage() {
             title="VIP Lab"
             text="Tiers track simulated wager volume across all games. Perks are cosmetic — no real-world value."
             icon={<Crown size={18} />}
+            action={<Link to="/originals" className="casino-action primary">Practice games</Link>}
         >
             <div className="vip-headline">
                 <div>
@@ -224,6 +225,7 @@ export function LearnPage() {
             title="Probability lessons"
             text="A compact reference desk for RTP, edge, volatility, hit frequency, bankroll risk and sportsbook margin."
             icon={<BookOpen size={18} />}
+            action={<Link to="/originals" className="casino-action primary">Practice games</Link>}
         >
             <div className="lesson-grid">
                 {sourceNotes.map(note => (
@@ -355,7 +357,7 @@ export function PromotionsPage() {
             badge: 'Sim feed',
             description: 'Build singles, parlays, and 2-of-N system tickets and compare model probability vs implied odds.',
             cta: 'Open Sportsbook',
-            link: '/sports',
+            link: '/sportsbook',
             accent: '#7c5cff',
             emoji: '\u26BD',
             gradient: 'linear-gradient(135deg, rgba(124, 92, 255, 0.32), rgba(50, 25, 120, 0.95))',

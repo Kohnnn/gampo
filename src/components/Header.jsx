@@ -21,6 +21,7 @@ const GAME_PATHS = [
     '/rps',
     '/guess',
     '/hilo',
+    '/sportsbook',
     '/sports',
     '/originals',
     '/slots-lobby',
@@ -122,6 +123,7 @@ function Header() {
                         className="credit-balance-display"
                         onClick={() => setShowCredits(prev => !prev)}
                         aria-expanded={showCredits}
+                        title="Practice sessions are tab-isolated. A second browser tab starts its own local balance."
                     >
                         <CreditIcon size={18} />
                         <span className="credit-balance-amount">{formattedBalance}</span>
@@ -146,7 +148,7 @@ function Header() {
                                     <CreditIcon size={28} fontSize={13} />
                                     {formattedBalance}
                                 </div>
-                                <p>Fake credits only. No cash value, accounts, payouts, or transfers.</p>
+                                <p>Fake credits only. No cash value, accounts, payouts, or transfers. Practice sessions are tab-isolated.</p>
                             </div>
 
                             <div className="credit-actions">

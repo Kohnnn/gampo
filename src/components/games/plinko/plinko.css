@@ -1,8 +1,9 @@
 .plinko-stage {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     color: var(--text-primary);
+    min-height: 0;
 }
 
 .plinko-canvas-wrap {
@@ -15,7 +16,15 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+}
+
+.plinko-stage .sim-bet-strip {
+    max-height: 88px;
+}
+
+.plinko-stage .rrs-strip {
+    margin-bottom: 0;
 }
 
 .plinko-live-rail {
@@ -57,8 +66,7 @@
     display: block;
     width: 100%;
     max-width: 760px;
-    aspect-ratio: 760 / 570;
-    height: auto;
+    height: clamp(280px, 46dvh, 500px);
     background: transparent;
 }
 
@@ -147,9 +155,17 @@
 .gampo-reduce-motion .plinko-bin-chip.hit { animation: none; }
 
 @media (max-width: 720px) {
-    .plinko-canvas-wrap { padding: 10px 6px; }
+    .plinko-stage { gap: 6px; }
+    .plinko-stage .rrs-strip {
+        min-height: 30px;
+        padding: 5px 8px;
+    }
+    .plinko-canvas-wrap { padding: 8px 6px; gap: 5px; }
     .plinko-bins { padding: 0 26px; }
     .plinko-bin-chip { font-size: 9px; padding: 4px 0; }
     .plinko-ball-grid { grid-template-columns: repeat(6, 1fr); }
     .plinko-ball-chip img { height: 20px; }
+    .plinko-stage .sim-bet-strip { display: none; }
+    .plinko-canvas { height: clamp(116px, 22dvh, 190px); }
+    .plinko-meta { padding: 8px 10px; font-size: 10px; }
 }

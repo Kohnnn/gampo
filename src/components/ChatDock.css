@@ -451,7 +451,7 @@
         right: 8px;
         bottom: 8px;
         width: calc(100vw - 16px);
-        max-height: 60vh;
+        max-height: min(54vh, 420px);
     }
 }
 

@@ -7,6 +7,25 @@
     min-width: 280px;
 }
 
+.education-scroll-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 10px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-decoration: none;
+    text-transform: uppercase;
+}
+
+.education-scroll-hint::before {
+    content: "↓";
+    color: var(--accent-green);
+    font-size: 12px;
+}
+
 /* Education stays below the playfield content and the playfield scrolls when
    needed. Keeping it visible gives every simulator an inspectable rules/math
    explanation without shrinking the primary stage. */

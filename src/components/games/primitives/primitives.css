@@ -2363,6 +2363,7 @@ input:focus-visible,
     overflow: hidden;
     background-size: cover;
     background-position: center;
+    min-height: min(var(--core-stage-min-height, 420px), calc(100dvh - 220px));
 }
 .core-stage-body {
     position: relative;
@@ -2403,6 +2404,18 @@ input:focus-visible,
 }
 @keyframes core-stage-spin {
     to { transform: rotate(360deg); }
+}
+
+@media (max-width: 760px) {
+    .core-stage {
+        min-height: min(var(--core-stage-min-height, 420px), calc(100dvh - 250px)) !important;
+    }
+}
+
+@media (max-height: 740px) {
+    .core-stage {
+        min-height: min(var(--core-stage-min-height, 420px), calc(100dvh - 210px)) !important;
+    }
 }
 
 /* AudioToggle */
