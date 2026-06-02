@@ -4,6 +4,7 @@ import { Pin, PinOff } from 'lucide-react'
 import { useSidebarPins } from '../hooks/useSidebarPins'
 import { sidebarPaths } from '../data/sidebarIcons'
 import { slotPath } from '../data/slotRoutes'
+import { sportsbookPathForView } from '../sportsbook/sportsbookRoutes'
 
 // ---- Casino sidebar data (unchanged from prior waves) ----
 const navSections = [
@@ -14,7 +15,7 @@ const navSections = [
             { icon: 'originals', label: 'Originals', path: '/originals' },
             { icon: 'slotsLobby', label: 'Slots Lobby', path: '/slots-lobby' },
             { icon: 'live', label: 'Live Studio', path: '/live' },
-            { icon: 'sports', label: 'Sportsbook', path: '/sports' },
+            { icon: 'sports', label: 'Sportsbook', path: '/sportsbook' },
         ],
     },
     {
@@ -52,10 +53,6 @@ const sidebarActions = [
 ]
 
 // ---- Sportsbook sidebar data (Wave 22) ----
-// Kept in sync with `SportsbookShell` view-state navigation events. The
-// sidebar emits `gampo:sports-navigate` so the shell can update its view
-// without a full route change. Falls back to /sports navigation if the
-// shell isn't listening (e.g. cold-load on /sports).
 const sportsViews = [
     { id: 'home', icon: 'sports', label: 'Sportsbook Home', view: 'home' },
     { id: 'live', icon: 'radio', label: 'Live Events', view: 'live' },
@@ -341,64 +338,58 @@ function CasinoSidebar({ search, setSearch }) {
     )
 }
 
-function emitSportsNav(detail) {
-    document.dispatchEvent(new CustomEvent('gampo:sports-navigate', { detail }))
-}
-
 function SportsbookSidebar() {
     return (
         <>
             <div className="nav-section compact">
                 <h3 className="nav-title">Sportsbook</h3>
                 {sportsViews.map(view => (
-                    <button
+                    <NavLink
                         key={view.id}
-                        type="button"
-                        className="nav-item nav-item-action"
+                        to={sportsbookPathForView({ view: view.view })}
+                        end={view.view === 'home'}
+                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                         title={view.label}
-                        onClick={() => emitSportsNav({ view: view.view })}
                     >
                         <span className="nav-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[view.icon] || icons.sports}</svg>
                         </span>
                         <span>{view.label}</span>
-                    </button>
+                    </NavLink>
                 ))}
             </div>
 
             <div className="nav-section compact">
                 <h3 className="nav-title">Top Sports</h3>
                 {sportsTopList.map(sport => (
-                    <button
+                    <NavLink
                         key={sport.id}
-                        type="button"
-                        className="nav-item nav-item-action"
+                        to={sportsbookPathForView({ view: 'sport', sportId: sport.id })}
+                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                         title={sport.label}
-                        onClick={() => emitSportsNav({ view: 'sport', sportId: sport.id })}
                     >
                         <span className="nav-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[sport.icon] || icons.sports}</svg>
                         </span>
                         <span>{sport.label}</span>
-                    </button>
+                    </NavLink>
                 ))}
             </div>
 
             <div className="nav-section compact">
                 <h3 className="nav-title">Esports</h3>
                 {sportsEsports.map(sport => (
-                    <button
+                    <NavLink
                         key={sport.id}
-                        type="button"
-                        className="nav-item nav-item-action"
+                        to={sportsbookPathForView({ view: 'sport', sportId: sport.id })}
+                        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                         title={sport.label}
-                        onClick={() => emitSportsNav({ view: 'sport', sportId: sport.id })}
                     >
                         <span className="nav-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{icons[sport.icon] || icons.esports}</svg>
                         </span>
                         <span>{sport.label}</span>
-                    </button>
+                    </NavLink>
                 ))}
             </div>
 
@@ -438,7 +429,7 @@ function SportsbookSidebar() {
 function Sidebar({ isOpen, toggleSidebar }) {
     const [gameSearch, setGameSearch] = useState('')
     const location = useLocation()
-    const isSportsRoute = location.pathname.startsWith('/sports')
+    const isSportsRoute = location.pathname.startsWith('/sportsbook') || location.pathname.startsWith('/sports')
 
     return (
         <aside className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''} ${isSportsRoute ? 'app-sidebar-sports' : 'app-sidebar-casino'}`}>
@@ -450,7 +441,7 @@ function Sidebar({ isOpen, toggleSidebar }) {
                     <NavLink to="/" end className={({ isActive }) => `switch-btn ${isActive || (!isSportsRoute) ? 'active' : ''}`}>
                         Games
                     </NavLink>
-                    <NavLink to="/sports" className={() => `switch-btn ${isSportsRoute ? 'active' : ''}`}>
+                    <NavLink to="/sportsbook" className={() => `switch-btn ${isSportsRoute ? 'active' : ''}`}>
                         Sports
                     </NavLink>
                 </div>

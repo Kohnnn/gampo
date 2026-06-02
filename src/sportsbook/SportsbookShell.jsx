@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AlertTriangle, Radio, RefreshCcw } from 'lucide-react'
 import { useGameBgm } from '../audio/useBgm'
 import { useCredits } from '../context/CreditContext'
@@ -17,6 +17,7 @@ import {
     syncSelectionsWithEvents,
     toggleSelection,
 } from './sportsbookState'
+import { parseSportsbookRoute, sportsbookPathForView } from './sportsbookRoutes'
 import BetSlip from './components/BetSlip'
 import EventDetail from './components/EventDetail'
 import EventList from './components/EventList'
@@ -53,11 +54,13 @@ function titleForView(viewState, sports) {
 function SportsbookShell() {
     useGameBgm('sports', 'idle')
     const navigate = useNavigate()
+    const location = useLocation()
     const { balance, placeBet, addWinnings, showToast } = useCredits()
+    const routeViewState = useMemo(() => parseSportsbookRoute(location.pathname), [location.pathname])
     const [sports, setSports] = useState(() => initialFeed().sports)
     const [leagues, setLeagues] = useState(() => initialFeed().leagues)
     const [events, setEvents] = useState(() => initialFeed().events)
-    const [viewState, setViewState] = useState({ view: 'home', sportId: null, eventId: null })
+    const [viewState, setViewState] = useState(routeViewState)
     const [selections, setSelections] = useState([])
     const [tickets, setTickets] = useState([])
     const [stake, setStake] = useState(10)
@@ -104,22 +107,9 @@ function SportsbookShell() {
         if (settleTimer.current) window.clearTimeout(settleTimer.current)
     }, [])
 
-    // Wave 22: respond to `gampo:sports-navigate` events from the app
-    // sidebar (Casino/Sports adaptive). Detail mirrors the navigateSportsbook
-    // payload: { view, sportId?, group?, eventId? }.
     useEffect(() => {
-        const onNav = (e) => {
-            const detail = e.detail || {}
-            setViewState({
-                view: detail.view || 'home',
-                sportId: detail.sportId || null,
-                eventId: detail.eventId || null,
-                group: detail.group || null,
-            })
-        }
-        document.addEventListener('gampo:sports-navigate', onNav)
-        return () => document.removeEventListener('gampo:sports-navigate', onNav)
-    }, [])
+        setViewState(routeViewState)
+    }, [routeViewState])
 
     const selectedIds = useMemo(() => new Set(selections.map(selection => selection.selectionId)), [selections])
     const leagueMap = useMemo(() => new Map(leagues.map(league => [league.id, league])), [leagues])
@@ -130,12 +120,14 @@ function SportsbookShell() {
     const betSlipStatus = deriveBetSlipStatus({ selections, stake, settings, placing, lastTicket: tickets[0] })
 
     const navigateSportsbook = (next) => {
-        setViewState({
+        const nextState = {
             view: next.view || 'home',
             sportId: next.sportId || null,
             eventId: next.eventId || null,
             group: next.group || null,
-        })
+        }
+        setViewState(nextState)
+        if (!nextState.eventId) navigate(sportsbookPathForView(nextState))
     }
 
     const openEvent = (eventId) => {
@@ -180,7 +172,7 @@ function SportsbookShell() {
     }
 
     return (
-        <div className="sb-page">
+        <div className="sb-page" data-sportsbook-view={viewState.view}>
             <SportsRail
                 sports={sports}
                 view={viewState.view}

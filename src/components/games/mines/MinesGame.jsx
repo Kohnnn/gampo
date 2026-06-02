@@ -82,6 +82,7 @@ export default function MinesGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const [autoCashoutPicks, setAutoCashoutPicks] = useState(3)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('mines', { bombs: 3, count: 9, cap: 10 }))
     const simSeqRef = useRef(0)
     const { schedule, cancelAll } = useCancellableTimeouts()
@@ -98,13 +99,14 @@ export default function MinesGame() {
     const minesBgmMode = inRound && currentMult >= 3 ? 'bonus' : 'idle'
     useGameBgm('mines', minesBgmMode)
 
-    const performPlay = ({ betAmount }) => new Promise(resolve => {
+    const performPlay = ({ betAmount, mode }) => new Promise(resolve => {
         if (inRound) { resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Mines')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
         cancelAll()
         setLastBet(betAmount)
         setStake(betAmount)
-        setBombSet(placeBombs(bombs))
+        const nextBombSet = placeBombs(bombs)
+        setBombSet(nextBombSet)
         setRevealed([])
         setPhase('playing')
         setToast(null)
@@ -117,6 +119,70 @@ export default function MinesGame() {
             { index: 1, type: ROUND_EVENTS.INPUT_LOCK, payload: {}, at: 0 },
             { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount, bombs }, at: 0 },
         ], { autoFinish: false })
+        if (mode === 'auto') {
+            const targetPicks = Math.max(1, Math.min(autoCashoutPicks, GRID - bombs))
+            const remaining = Array.from({ length: GRID }, (_, i) => i)
+            const picked = []
+            let hit = null
+            for (let i = 0; i < targetPicks; i++) {
+                const { roll } = nextRoll('mines-auto')
+                const nextIndex = Math.floor(roll * remaining.length)
+                const cell = remaining.splice(nextIndex, 1)[0]
+                picked.push(cell)
+                if (nextBombSet.has(cell)) {
+                    hit = cell
+                    break
+                }
+            }
+            schedule(() => {
+                setRevealed(picked)
+                setBurstKey(k => k + 1)
+                if (hit !== null) {
+                    playSound('explode')
+                    sfx.play('lose')
+                    session.record({
+                        id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                        label: `Auto bust ${picked.length} picks`,
+                        profit: -betAmount,
+                        betAmount,
+                        meta: { bombs, hit, autoCashoutPicks: targetPicks },
+                    })
+                    showToast('loss', 'Mines auto bust', `-${formatCredits(betAmount)}`)
+                    setToast({ kind: 'lose', amount: -betAmount, message: 'Mines auto bust' })
+                    machine.finish({ won: false, profit: -betAmount, picks: picked.length, hit })
+                    pushSimResult({ bombs, outcome: 'auto-bust' })
+                    setPhase('busted')
+                    schedule(() => {
+                        setPhase('idle')
+                        resolve({ profit: -betAmount })
+                    }, 420)
+                    return
+                }
+                const m = multiplierFor(picked.length, bombs)
+                const profit = betAmount * m - betAmount
+                addWinnings(betAmount * m, 'Mines auto return')
+                playSound(m >= 5 ? 'bigwin' : 'win')
+                sfx.play('cashout')
+                session.record({
+                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    label: `Auto ${m.toFixed(2)}×`,
+                    profit,
+                    betAmount,
+                    multiplier: m,
+                    meta: { bombs, picks: picked.length, autoCashoutPicks: targetPicks },
+                })
+                showToast('win', 'Mines auto cashout', `+${formatCredits(profit)}`)
+                setToast({ kind: 'cashout', amount: profit, multiplier: m, message: 'Mines auto cashout' })
+                machine.finish({ won: true, profit, multiplier: m, picks: picked.length })
+                pushSimResult({ bombs, outcome: 'auto-cashout' })
+                setPhase('cashed')
+                schedule(() => {
+                    setPhase('idle')
+                    resolve({ profit })
+                }, 420)
+            }, 160)
+            return
+        }
         resolve({ profit: 0 })
     })
 
@@ -205,7 +271,25 @@ export default function MinesGame() {
                     runningRound={false}
                     actionLabel="Place Bet"
                     onPlay={performPlay}
-                    disableAuto
+                    autoChildren={
+                        <div className="bp-section">
+                            <label className="bp-label" htmlFor="mines-auto-cashout">Auto cashout after safe picks</label>
+                            <input
+                                id="mines-auto-cashout"
+                                type="range"
+                                min="1"
+                                max={Math.max(1, GRID - bombs)}
+                                value={Math.min(autoCashoutPicks, GRID - bombs)}
+                                onChange={event => setAutoCashoutPicks(Number(event.target.value))}
+                                className="dice-slider"
+                            />
+                            <div className="bp-quick-actions">
+                                {[1, 2, 3, 5, 8].filter(value => value <= GRID - bombs).map(value => (
+                                    <button key={value} type="button" onClick={() => setAutoCashoutPicks(value)}>{value}</button>
+                                ))}
+                            </div>
+                        </div>
+                    }
                     lastBet={lastBet}
                     playPhase={inRound && picks > 0 ? 'in-round' : null}
                     playLabel={inRound && picks > 0 ? `Cashout ${currentMult.toFixed(2)}×` : 'Place Bet'}

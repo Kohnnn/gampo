@@ -205,6 +205,10 @@ export default function LimboGame() {
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim limbo" />
                     <div className="limbo-stars-bg" />
+                    <div className="limbo-target-label">
+                        <MultiplierBadge label="Target" value={target} state={running ? 'active' : lastWon === true ? 'win' : lastWon === false ? 'bust' : 'idle'} size="sm" />
+                        <span>Hit chance {(chance * 100).toFixed(2)}%</span>
+                    </div>
                     <div className="limbo-rocket-row">
                         <div className="limbo-gauge">
                             <div className="limbo-gauge-fill" style={{ height: `${gaugePct}%`, background: lastWon === false ? 'linear-gradient(0deg, #ed4245, #ffcf5a)' : 'linear-gradient(0deg, #00e701, #41d6ff)' }} />
@@ -214,9 +218,6 @@ export default function LimboGame() {
                             <span><NumberRoll value={last === null ? 1 : Number(last.toFixed(2))} format={v => `${v.toFixed(2)}×`} /></span>
                         </div>
                         {lastWon && burstKey > 0 && <Particles key={burstKey} count={18} color="#41d6ff" />}
-                    </div>
-                    <div className="limbo-target-label">
-                        <MultiplierBadge label="Target" value={target} state={running ? 'active' : lastWon === true ? 'win' : lastWon === false ? 'bust' : 'idle'} size="sm" />
                     </div>
                     <ActionLockOverlay active={running} label="Climbing..." />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />

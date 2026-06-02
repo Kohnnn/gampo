@@ -3,12 +3,13 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 28px;
+    gap: 18px;
     align-items: center;
-    padding: 40px 12px;
+    padding: 26px 12px;
     border-radius: 16px;
     overflow: hidden;
     transition: box-shadow 0.4s ease;
+    min-height: 0;
 }
 
 .limbo-stars-bg {
@@ -71,7 +72,7 @@
 }
 
 .limbo-ring {
-    width: min(360px, 70vw);
+    width: min(360px, 70vw, 46dvh);
     aspect-ratio: 1;
     border-radius: 50%;
     display: grid;
@@ -119,14 +120,47 @@
 }
 
 .limbo-target-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     color: var(--text-primary);
     font-weight: 900;
-    font-size: 18px;
+    font-size: 12px;
     background: rgba(0, 0, 0, 0.4);
-    padding: 8px 18px;
+    padding: 8px 12px;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     z-index: 2;
+}
+
+.limbo-target-label > span {
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+@media (max-height: 740px) {
+    .limbo-stage {
+        gap: 10px;
+        padding: 12px 8px;
+    }
+
+    .limbo-gauge {
+        height: 220px;
+    }
+
+    .limbo-ring {
+        width: min(300px, 64vw, 40dvh);
+        box-shadow:
+            inset 0 0 0 16px var(--bg-secondary),
+            inset 0 0 28px rgba(255, 255, 255, 0.06),
+            0 24px 54px rgba(0, 0, 0, 0.46);
+    }
+
+    .limbo-ring span {
+        font-size: clamp(38px, 7vw, 62px);
+    }
 }
 
 @media (max-width: 640px) {
@@ -163,5 +197,7 @@
     .limbo-target-label {
         font-size: 13px;
         padding: 6px 12px;
+        flex-wrap: wrap;
+        justify-content: center;
     }
 }

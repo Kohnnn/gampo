@@ -80,11 +80,13 @@ class PlinkoEngine {
 
     _setupCanvasHDPI() {
         const dpr = window.devicePixelRatio || 1;
-        // The CSS size is fixed to WIDTH x HEIGHT
+        // The backing store is fixed for deterministic coordinates. Display
+        // size is controlled by CSS so mobile layouts can keep payout bins in
+        // view without changing physics math.
         this.canvas.width = WIDTH * dpr;
         this.canvas.height = HEIGHT * dpr;
-        this.canvas.style.width = `${WIDTH}px`;
-        this.canvas.style.height = `${HEIGHT}px`;
+        this.canvas.style.width = '';
+        this.canvas.style.height = '';
 
         // Normalize coordinate system to use css pixels
         this.ctx.scale(dpr, dpr);

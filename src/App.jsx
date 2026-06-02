@@ -1,10 +1,11 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Layout from './components/Layout'
 import NotFoundPage from './components/NotFoundPage'
 import ErrorBoundary from './components/ErrorBoundary'
 import HomePage from './pages/HomePage'
 import { SLOT_TEMPLATE_ROUTES, SLOT_TEMPLATE_ROUTE_ALIASES } from './data/slotRoutes'
+import { legacySportsbookPath } from './sportsbook/sportsbookRoutes'
 
 // Casino lobby surfaces (small, eager)
 import {
@@ -63,7 +64,7 @@ const TomeOfLifeGame = lazy(() => import('./components/games/tomeoflife/TomeOfLi
 const TarotGame = lazy(() => import('./components/games/tarot/TarotGame'))
 function RouteFallback() {
     return (
-        <div className="route-fallback">
+        <div className="route-fallback" data-route-fallback="loading">
             <div className="route-spinner" />
             <span>Loading lab...</span>
         </div>
@@ -76,6 +77,11 @@ function lazied(element) {
             <Suspense fallback={<RouteFallback />}>{element}</Suspense>
         </ErrorBoundary>
     )
+}
+
+function SportsLegacyRedirect() {
+    const location = useLocation()
+    return <Navigate to={legacySportsbookPath(location.pathname)} replace />
 }
 
 function App() {
@@ -97,7 +103,10 @@ function App() {
                 <Route path="plinko" element={lazied(<PlinkoGame />)} />
                 <Route path="dino" element={lazied(<DinoGame />)} />
                 <Route path="mines" element={lazied(<MinesGame />)} />
-                <Route path="sports" element={lazied(<SportsPage />)} />
+                <Route path="sportsbook" element={lazied(<SportsPage />)} />
+                <Route path="sportsbook/:viewOrSport" element={lazied(<SportsPage />)} />
+                <Route path="sports" element={<SportsLegacyRedirect />} />
+                <Route path="sports/:viewOrSport" element={<SportsLegacyRedirect />} />
                 <Route path="dice" element={lazied(<DiceGame />)} />
                 <Route path="limbo" element={lazied(<LimboGame />)} />
                 <Route path="keno" element={lazied(<KenoGame />)} />
@@ -148,6 +157,10 @@ function App() {
                         element={<Navigate to={route.target} replace />}
                     />
                 ))}
+                <Route path="risk-academy" element={<Navigate to="/learn" replace />} />
+                <Route path="vip-lab" element={<Navigate to="/vip" replace />} />
+                <Route path="slot-factory" element={<Navigate to="/slots" replace />} />
+                <Route path="pnl-stats" element={<Navigate to="/?dock=stats" replace />} />
                 <Route path="*" element={<NotFoundPage />} />
             </Route>
         </Routes>

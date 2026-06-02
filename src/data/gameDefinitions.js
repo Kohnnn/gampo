@@ -704,7 +704,7 @@ export const gameDefinitions = [
 export const sportsbookDefinition = {
     id: 'sports',
     name: 'Sportsbook Lab',
-    path: '/sports',
+    path: '/sportsbook',
     category: 'Sports probability',
     status: 'new',
     rtp: 0.95,

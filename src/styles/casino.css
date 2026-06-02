@@ -266,8 +266,10 @@
 
 .casino-game-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
     gap: 16px;
+    width: min(1380px, 100%);
+    margin: 0 auto;
 }
 
 .category-row {
@@ -721,7 +723,8 @@
 }
 
 .casino-game-card {
-    min-height: 318px;
+    min-width: 0;
+    min-height: 286px;
     display: flex;
     flex-direction: column;
     border-radius: 18px;
@@ -741,7 +744,7 @@
 
 .casino-game-art {
     position: relative;
-    height: 248px;
+    height: clamp(170px, 24vw, 238px);
     display: grid;
     place-items: center;
     background:
@@ -799,7 +802,7 @@
 
 .casino-game-titlemark strong {
     color: var(--text-primary);
-    font-size: clamp(26px, 2.5vw, 38px);
+    font-size: clamp(21px, 2.1vw, 34px);
     font-weight: 950;
     line-height: 0.95;
     text-shadow: 0 2px 18px rgba(0, 0, 0, 0.72);
@@ -1098,6 +1101,30 @@
     .casino-stat-grid,
     .activity-table > div {
         grid-template-columns: 1fr;
+    }
+
+    .casino-game-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+        gap: 10px;
+    }
+
+    .casino-game-card {
+        min-height: 232px;
+        border-radius: 10px;
+    }
+
+    .casino-game-art {
+        height: clamp(132px, 36vw, 172px);
+    }
+
+    .casino-game-titlemark {
+        inset: auto 8px 8px;
+        padding: 8px;
+        border-radius: 8px;
+    }
+
+    .casino-game-body {
+        padding: 9px;
     }
 }
 

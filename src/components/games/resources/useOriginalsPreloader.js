@@ -17,12 +17,25 @@ import { useEffect, useMemo, useState } from 'react'
 import { originalsManifest, resolveRole } from './originalsManifest'
 import { classifyRole } from './resourceRoles'
 
-function imagePromise(url) {
+function imagePromise(url, timeoutMs = 4500) {
     return new Promise(resolve => {
         if (!url) { resolve({ url, ok: false }); return }
         const img = new Image()
-        img.onload = () => resolve({ url, ok: true })
-        img.onerror = () => resolve({ url, ok: false })
+        let settled = false
+        const finish = (ok) => {
+            if (settled) return
+            settled = true
+            resolve({ url, ok })
+        }
+        const timer = window.setTimeout(() => finish(false), timeoutMs)
+        img.onload = () => {
+            window.clearTimeout(timer)
+            finish(true)
+        }
+        img.onerror = () => {
+            window.clearTimeout(timer)
+            finish(false)
+        }
         img.src = url
     })
 }

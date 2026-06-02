@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { MessageCircle, Minus, X, Send, Trophy, BarChart3, Award } from 'lucide-react'
 import { useSocial } from '../context/SocialContext'
 import { formatCredits } from '../utils/simulationMath'
@@ -19,6 +20,7 @@ function readInitialState() {
 }
 
 function ChatDock() {
+    const location = useLocation()
     const { messages, postMessage, race } = useSocial()
     const [state, setState] = useState(readInitialState)
     const [text, setText] = useState('')
@@ -26,6 +28,10 @@ function ChatDock() {
     const [unread, setUnread] = useState(0)
     const lastSeenRef = useRef(messages.length)
     const scrollRef = useRef(null)
+    const transientDockRef = useRef(false)
+    const routeRef = useRef(null)
+    const stateRef = useRef(state)
+    const tabRef = useRef(tab)
 
     useEffect(() => {
         try { localStorage.setItem(STATE_KEY, state) } catch { /* ignore */ }
@@ -40,6 +46,30 @@ function ChatDock() {
         }
     }, [state, tab, messages.length])
 
+    useEffect(() => {
+        stateRef.current = state
+        tabRef.current = tab
+    }, [state, tab])
+
+    useEffect(() => {
+        const routeKey = location.pathname
+        if (routeRef.current && routeRef.current !== routeKey) {
+            if (transientDockRef.current && stateRef.current === 'open' && ['stats', 'progress'].includes(tabRef.current)) {
+                setState('minimized')
+            }
+            transientDockRef.current = false
+        }
+        routeRef.current = routeKey
+    }, [location.pathname])
+
+    useEffect(() => {
+        const requested = new URLSearchParams(location.search).get('dock')
+        if (!requested || !VALID_TABS.has(requested)) return
+        setTab(requested)
+        setState('open')
+        transientDockRef.current = ['stats', 'progress'].includes(requested)
+    }, [location.search])
+
     // Allow other components (e.g. Sidebar Row 3 chat trigger) to open the
     // dock by dispatching a 'gampo:open-chat' event on the document. The
     // detail.tab can request 'chat', 'race', or 'stats'.
@@ -47,10 +77,23 @@ function ChatDock() {
         const onOpen = (e) => {
             const requested = e.detail?.tab
             if (requested && VALID_TABS.has(requested)) setTab(requested)
+            transientDockRef.current = ['stats', 'progress'].includes(requested)
             setState('open')
         }
         document.addEventListener('gampo:open-chat', onOpen)
         return () => document.removeEventListener('gampo:open-chat', onOpen)
+    }, [])
+
+    useEffect(() => {
+        const onKeyDown = (event) => {
+            if (event.key !== 'Escape') return
+            if (stateRef.current === 'open') {
+                transientDockRef.current = false
+                setState('minimized')
+            }
+        }
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
     }, [])
 
     // Track unread count when the dock is minimized or on a non-chat tab.
@@ -120,7 +163,7 @@ function ChatDock() {
                         aria-label="Stats"
                         aria-pressed={tab === 'stats'}
                         className={tab === 'stats' ? 'active' : ''}
-                        onClick={() => setTab('stats')}
+                        onClick={() => { transientDockRef.current = false; setTab('stats') }}
                     >
                         <BarChart3 size={14} />
                         <span className="chat-dock-tab-label">Stats</span>
@@ -130,7 +173,7 @@ function ChatDock() {
                         aria-label="Progress"
                         aria-pressed={tab === 'progress'}
                         className={tab === 'progress' ? 'active' : ''}
-                        onClick={() => setTab('progress')}
+                        onClick={() => { transientDockRef.current = false; setTab('progress') }}
                     >
                         <Award size={14} />
                         <span className="chat-dock-tab-label">Progress</span>
@@ -140,7 +183,7 @@ function ChatDock() {
                         aria-label="Chat"
                         aria-pressed={tab === 'chat'}
                         className={tab === 'chat' ? 'active' : ''}
-                        onClick={() => setTab('chat')}
+                        onClick={() => { transientDockRef.current = false; setTab('chat') }}
                     >
                         <MessageCircle size={14} />
                         <span className="chat-dock-tab-label">Chat</span>
@@ -150,7 +193,7 @@ function ChatDock() {
                         aria-label="Race"
                         aria-pressed={tab === 'race'}
                         className={tab === 'race' ? 'active' : ''}
-                        onClick={() => setTab('race')}
+                        onClick={() => { transientDockRef.current = false; setTab('race') }}
                     >
                         <Trophy size={14} />
                         <span className="chat-dock-tab-label">Race</span>

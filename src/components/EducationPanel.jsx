@@ -28,7 +28,10 @@ function EducationPanel({
     const details = getGameEducation(definition)
 
     return (
-        <aside className="education-panel">
+        <aside className="education-panel" id="probability-lab">
+            <a className="education-scroll-hint" href="#probability-lab" data-scroll-hint>
+                Probability Lab below
+            </a>
             <div className="education-panel-header">
                 <span>Probability Lab</span>
                 <strong>{definition?.name || 'Simulator'}</strong>
