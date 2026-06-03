@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BET_MODES, ODDS_POLICIES } from './sportsbookMath'
+import { buildSyntheticSportsbookData } from './sportsbookData'
 import {
     DEFAULT_BETSLIP_SETTINGS,
     acceptSelectionOdds,
@@ -106,5 +107,17 @@ describe('sportsbookState', () => {
         expect(settled.status).toBe('settled')
         expect(settled.legs).toHaveLength(1)
         expect(Number.isFinite(settled.profit)).toBe(true)
+    })
+
+    it('uses the same selection identity for sportsbook home top matches', () => {
+        const { events } = buildSyntheticSportsbookData('qa-v2-top-match')
+        const topEvent = events.find(item => item.tags?.includes('top'))
+        const selection = topEvent.marketGroups[0].selections.find(item => !item.suspended)
+        const selected = toggleSelection([], events, selection.id)
+
+        expect(selected).toHaveLength(1)
+        expect(selected[0].selectionId).toBe(selection.id)
+        expect(selected[0].eventId).toBe(topEvent.id)
+        expect(toggleSelection(selected, events, selection.id)).toHaveLength(0)
     })
 })

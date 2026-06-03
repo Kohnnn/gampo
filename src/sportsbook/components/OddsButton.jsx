@@ -19,7 +19,10 @@ function OddsButton({ selection, selected = false, onToggle, compact = false, ma
                     direction ? `is-${direction}` : '',
                     compact ? 'is-compact' : '',
                 ].filter(Boolean).join(' ')}
-                onClick={onToggle}
+                onClick={(event) => {
+                    event.stopPropagation()
+                    onToggle?.(selection.id, event)
+                }}
                 disabled={disabled}
                 title={disabled ? 'Market suspended' : `${selection.label} ${Number(selection.decimalOdds).toFixed(2)}`}
             >

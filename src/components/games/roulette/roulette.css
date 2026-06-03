@@ -490,20 +490,29 @@
 
 .rou-player-feed li {
     display: grid;
-    grid-template-columns: 0.9fr 0.9fr 0.7fr;
-    gap: 8px;
+    grid-template-columns: minmax(74px, 1.1fr) minmax(54px, 0.85fr) minmax(62px, 0.8fr);
+    gap: 6px;
     align-items: center;
-    padding: 7px 9px;
+    padding: 7px 8px;
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.035);
     color: var(--text-secondary);
     font-size: 12px;
     font-weight: 850;
+    min-width: 0;
 }
 
+.rou-player-feed span,
+.rou-player-feed em,
+.rou-player-feed strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .rou-player-feed span { color: var(--text-primary); }
-.rou-player-feed em { font-style: normal; text-align: center; }
-.rou-player-feed strong { text-align: right; font-weight: 950; }
+.rou-player-feed em { font-style: normal; text-align: center; font-size: 11px; }
+.rou-player-feed strong { text-align: right; font-weight: 950; font-size: 11px; font-variant-numeric: tabular-nums; }
 .rou-player-feed .won strong { color: var(--accent-green); }
 .rou-player-feed .lost strong { color: var(--accent-red); }
 .rou-player-feed .pending strong { color: var(--text-muted); }

@@ -1,14 +1,19 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
     SLOT_TEMPLATES,
     getSlotTemplate,
     applyRankArt,
     getCellCount,
+    getCellPositions,
     getColumnRows,
     makeInitialGrid,
     resolveSlotSpin,
     getBuyTiers,
 } from './slotFactory'
+
+const slotsGameSource = readFileSync(new URL('./SlotsGame.jsx', import.meta.url), 'utf8')
+const slotsCssSource = readFileSync(new URL('./slots.css', import.meta.url), 'utf8')
 
 beforeEach(() => {
     const store = new Map()
@@ -43,6 +48,30 @@ describe('slotFactory layout helpers', () => {
             expect(grid.length).toBe(getCellCount(template))
             grid.forEach(item => expect(item.id).toBeTypeOf('string'))
         })
+    })
+
+    it('documents the Bars switch size mismatch that the renderer must guard', () => {
+        const tall = getSlotTemplate('vault-rush')
+        const bars = getSlotTemplate('bars')
+
+        expect(makeInitialGrid(tall).length).not.toBe(getCellPositions(bars).length)
+        expect(slotsGameSource).toContain('resetSlotTemplate')
+        expect(slotsGameSource).toContain('displayGrid')
+        expect(slotsGameSource).toContain('cellPositions.map')
+        expect(slotsGameSource).toContain('cellPositions.map(({ col }, index)')
+        expect(slotsGameSource).toContain('slot-panel-v2" style={{ \'--slot-accent\': config.accent }}')
+        expect(slotsGameSource).not.toContain('grid.map((item')
+    })
+
+    it('renders a slot loading state while assets preload', () => {
+        expect(slotsGameSource).toContain('slotAssetsReady')
+        expect(slotsGameSource).toContain('Loading lab...')
+        expect(slotsGameSource).toContain('data-route-fallback="loading"')
+    })
+
+    it('keeps the mobile panel spin CTA promoted above secondary controls', () => {
+        expect(slotsCssSource).toContain('.slot-panel-spin')
+        expect(slotsCssSource).toContain('order: -1')
     })
 
     it('uses uniform rows for non-megaways layouts', () => {

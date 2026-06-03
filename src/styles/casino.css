@@ -830,14 +830,18 @@
     display: none;
 }
 
-.casino-game-body div {
+.casino-game-badges {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
     margin-top: auto;
+    min-height: 21px;
+    overflow: hidden;
 }
 
-.casino-game-body b {
+.casino-game-badges b {
+    flex: 0 1 auto;
+    min-width: 0;
     border-radius: 999px;
     background: rgba(15, 33, 46, 0.82);
     color: var(--text-secondary);
@@ -848,6 +852,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.casino-game-badges .casino-game-more {
+    flex: 0 0 auto;
+    color: color-mix(in srgb, var(--accent), white 24%);
+    border: 1px solid color-mix(in srgb, var(--accent), transparent 62%);
 }
 
 .casino-rail {

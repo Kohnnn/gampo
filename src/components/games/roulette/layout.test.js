@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildRouletteCoverage, makeBet, ORPHELINS, TIER, VOISINS, ZERO_NEIGHBOURS } from './layout'
+
+const rouletteCss = readFileSync(new URL('./roulette.css', import.meta.url), 'utf8')
+const rouletteSource = readFileSync(new URL('./RouletteGame.jsx', import.meta.url), 'utf8')
 
 function coveredNumbers(type) {
     return [...buildRouletteCoverage([{ type, params: {}, amount: 5 }]).keys()].sort((a, b) => a - b)
@@ -29,5 +33,13 @@ describe('roulette layout helpers', () => {
         expect(coverage.get(17).coveredAmount).toBe(10)
         expect(coverage.get(17).coverCount).toBe(1)
         expect(makeBet('dozen2').numbers).toContain(17)
+    })
+
+    it('keeps live-table rows from truncating the whole panel', () => {
+        expect(rouletteCss).toContain('grid-template-columns: minmax(74px, 1.1fr)')
+        expect(rouletteCss).toContain('text-overflow: ellipsis')
+        expect(rouletteCss).toContain('font-variant-numeric: tabular-nums')
+        expect(rouletteSource).toContain('title={p.name}')
+        expect(rouletteSource).toContain('title={p.label}')
     })
 })

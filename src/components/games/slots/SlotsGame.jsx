@@ -125,6 +125,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [wheelReveal, setWheelReveal] = useState(null)
     const [holdReveal, setHoldReveal] = useState(null)
     const [retriggerFlyers, setRetriggerFlyers] = useState([])
+    const [slotAssetsReady, setSlotAssetsReady] = useState(false)
     // Wave 10: free-spin session tracking
     const [freeSpinSession, setFreeSpinSession] = useState(null) // { totalAwarded, played, totalWin, baseBet }
     const [bonusEndBanner, setBonusEndBanner] = useState(null) // { trigger, totalWin, played }
@@ -143,6 +144,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const stopsRef = useRef(advancedStops)
     const buyTierIdRef = useRef(null)
     const reelFrameRef = useRef(null)
+    const templateResetRef = useRef(startTemplate.id)
 
     useEffect(() => { stopsRef.current = advancedStops }, [advancedStops])
     useEffect(() => { buyTierIdRef.current = bonusBuyTierId }, [bonusBuyTierId])
@@ -184,21 +186,23 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setStoppedCols(value)
     }, [])
 
-    useEffect(() => {
+    const resetSlotTemplate = useCallback((nextConfig, { clearStats = false } = {}) => {
         clearTimers()
-        setGrid(makeInitialGrid(config))
+        setGrid(makeInitialGrid(nextConfig))
         setRunning(false)
         setSpinPhase('idle')
-        setStoppedColumnState(config.layout.cols)
+        setStoppedColumnState(nextConfig.layout.cols)
         setWinningCells([])
         setLastResult(null)
         setBonusBuyTierId(null)
         setShowBuyModal(false)
         setFreeSpins(0)
         setCoinMeter(0)
-        setShowIntro(Boolean(config.features?.introOverlay))
+        setShowIntro(Boolean(nextConfig.features?.introOverlay))
         setAutoplayActive(false)
         setAutoplayRemaining(0)
+        autoplayRemainingRef.current = 0
+        autoplayInfiniteRef.current = false
         autoplayPendingRef.current = false
         setAnticipating(false)
         setMysteryReveal(null)
@@ -209,7 +213,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setRetriggerFlyers([])
         setFreeSpinSession(null)
         setBonusEndBanner(null)
-    }, [clearTimers, config, setStoppedColumnState])
+        if (clearStats) session.clear()
+    }, [clearTimers, session.clear, setStoppedColumnState])
+
+    useEffect(() => {
+        const clearStats = templateResetRef.current !== config.id
+        resetSlotTemplate(config, { clearStats })
+        templateResetRef.current = config.id
+    }, [config, resetSlotTemplate])
 
     useEffect(() => () => clearTimers(), [clearTimers])
 
@@ -615,7 +626,43 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         if (running || !lastResult?.featureEvents?.length) return []
         return lastResult.featureEvents.slice(0, 3)
     }, [lastResult, running])
-    const cover = `/images/covers/generated/${config.id}.png`
+    const cover = useMemo(() => `/images/covers/generated/${config.id}.png`, [config.id])
+    const displayGrid = useMemo(() => {
+        if (grid.length === cellPositions.length && grid.every(Boolean)) return grid
+        return makeInitialGrid(config)
+    }, [cellPositions.length, config, grid])
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof Image === 'undefined') {
+            setSlotAssetsReady(true)
+            return undefined
+        }
+
+        let cancelled = false
+        setSlotAssetsReady(false)
+        const urls = Array.from(new Set([
+            cover,
+            ...(config.symbols || []).map(item => item.asset),
+        ].filter(Boolean)))
+
+        const timeout = window.setTimeout(() => {
+            if (!cancelled) setSlotAssetsReady(true)
+        }, 2400)
+
+        Promise.allSettled(urls.map(url => new Promise(resolve => {
+            const image = new Image()
+            image.onload = resolve
+            image.onerror = resolve
+            image.src = url
+        }))).then(() => {
+            if (!cancelled) setSlotAssetsReady(true)
+        })
+
+        return () => {
+            cancelled = true
+            window.clearTimeout(timeout)
+        }
+    }, [config.symbols, cover])
 
     return (
         <GameShell
@@ -625,7 +672,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             accent={config.accent}
             backdrop={config.backdrop}
             panel={
-                <div className="slot-panel-v2">
+                <div className="slot-panel-v2" style={{ '--slot-accent': config.accent }}>
                     <div className="slot-panel-card slot-panel-template">
                         <label className="slot-panel-label" htmlFor="slot-template">Template</label>
                         <div className="slot-template-row">
@@ -771,12 +818,20 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
         >
             <div
-                className={`slot-stage-v2 slot-template-${config.id} skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''} ${freeSpinSession || freeSpins > 0 ? 'is-bonus-active' : ''} ${lastResult?.featureEvents?.length ? 'has-feature-event' : ''}`}
+                className={`slot-stage-v2 slot-template-${config.id} skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''} ${freeSpinSession || freeSpins > 0 ? 'is-bonus-active' : ''} ${lastResult?.featureEvents?.length ? 'has-feature-event' : ''} ${slotAssetsReady ? '' : 'is-loading'}`}
                 style={{
                     '--slot-accent': config.accent,
                     '--slot-cover': `url(${cover})`,
+                    '--slot-rows': config.layout.rows,
+                    '--slot-cols': config.layout.cols,
                 }}
             >
+                {!slotAssetsReady && (
+                    <div className="slot-stage-loader" data-route-fallback="loading" role="status" aria-live="polite">
+                        <div className="route-spinner" />
+                        <span>Loading lab...</span>
+                    </div>
+                )}
                 <header className="slot-stage-header">
                     <div className="slot-stage-title">
                         <span className="slot-benchmark-badge">Benchmark · {config.benchmark}</span>
@@ -833,7 +888,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     return (
                                         <div key={`col-${col}`} className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''}`}>
                                             {cellsInCol.map(({ index }) => {
-                                                const item = grid[index]
+                                                const item = displayGrid[index] || config.symbols?.[0]
                                                 const spinning = running && col >= stoppedCols
                                                 const winning = winningCells.includes(index)
                                                 const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
@@ -853,9 +908,16 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 })}
                             </div>
                         ) : (
-                            <div className="slot-reel-grid" style={{ gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))` }}>
-                                {grid.map((item, index) => {
-                                    const { col } = cellPositions[index]
+                            <div
+                                className="slot-reel-grid"
+                                style={{
+                                    gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))`,
+                                    gridTemplateRows: `repeat(${config.layout.rows}, minmax(0, 1fr))`,
+                                }}
+                            >
+                                {cellPositions.map(({ col }, index) => {
+                                    const item = displayGrid[index] || config.symbols?.[0]
+                                    if (!item) return null
                                     const spinning = running && col >= stoppedCols
                                     const winning = winningCells.includes(index)
                                     const inAnticipationCol = anticipating && col >= config.layout.cols - 2 && spinning

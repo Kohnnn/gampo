@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Volume2, VolumeX, ZapOff, Zap } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { useAudio } from '../audio/AudioProvider'
 import { useReduceMotion } from './fx'
+import { fullGameCatalog } from '../data/casinoCatalog'
+import { searchGames } from '../utils/gameSearch'
 
 const GAME_PATHS = [
     '/crash',
@@ -44,6 +46,7 @@ const CreditIcon = ({ size = 20, fontSize = 11 }) => (
 
 function Header() {
     const location = useLocation()
+    const navigate = useNavigate()
     const {
         balance,
         grantPracticeCredits,
@@ -55,9 +58,14 @@ function Header() {
     const [reduceMotion, setReduceMotion] = useReduceMotion()
     const [showCredits, setShowCredits] = useState(false)
     const [grantAmount, setGrantAmount] = useState('')
+    const [searchQuery, setSearchQuery] = useState('')
+    const [searchOpen, setSearchOpen] = useState(false)
+    const [activeSearchIndex, setActiveSearchIndex] = useState(0)
     const dropdownRef = useRef(null)
+    const searchRef = useRef(null)
 
     const isPlaySurface = GAME_PATHS.some(path => location.pathname.startsWith(path))
+    const searchResults = useMemo(() => searchGames(fullGameCatalog, searchQuery, 8), [searchQuery])
     const formattedBalance = balance.toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
@@ -68,10 +76,23 @@ function Header() {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setShowCredits(false)
             }
+            if (searchRef.current && !searchRef.current.contains(event.target)) {
+                setSearchOpen(false)
+                setActiveSearchIndex(0)
+            }
         }
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
+
+    useEffect(() => {
+        setSearchOpen(false)
+        setActiveSearchIndex(0)
+    }, [location.pathname])
+
+    useEffect(() => {
+        setActiveSearchIndex(0)
+    }, [searchQuery])
 
     const addPracticeCredits = () => {
         const amount = Number(grantAmount)
@@ -89,6 +110,30 @@ function Header() {
         return 'Adjustment'
     }
 
+    const handleSearchKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            setSearchOpen(false)
+            setActiveSearchIndex(0)
+            return
+        }
+        if (!searchResults.length) return
+        if (event.key === 'ArrowDown') {
+            event.preventDefault()
+            setSearchOpen(true)
+            setActiveSearchIndex(index => Math.min(index + 1, searchResults.length - 1))
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault()
+            setActiveSearchIndex(index => Math.max(index - 1, 0))
+        } else if (event.key === 'Enter') {
+            const next = searchResults[activeSearchIndex]
+            if (next?.path) {
+                setSearchQuery('')
+                setSearchOpen(false)
+                navigate(next.path)
+            }
+        }
+    }
+
     return (
         <header className="header">
             <div className="header-left">
@@ -99,14 +144,52 @@ function Header() {
             </div>
 
             <div className="header-center">
-                {!isPlaySurface && (
-                    <div className="search-input-wrapper">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="var(--text-secondary)" className="search-icon">
-                            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
-                        </svg>
-                        <input type="text" placeholder="Search simulators" className="search-input" />
-                    </div>
-                )}
+                <div
+                    className={`search-input-wrapper ${isPlaySurface ? 'is-game-search' : ''}`}
+                    ref={searchRef}
+                    data-header-search
+                >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="var(--text-secondary)" className="search-icon">
+                        <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                    </svg>
+                    <input
+                        type="text"
+                        placeholder="Search simulators"
+                        className="search-input"
+                        value={searchQuery}
+                        onChange={(event) => {
+                            setSearchQuery(event.target.value)
+                            setSearchOpen(true)
+                        }}
+                        onFocus={() => setSearchOpen(true)}
+                        onKeyDown={handleSearchKeyDown}
+                        aria-label="Search simulators"
+                        aria-expanded={searchOpen && searchQuery.trim().length > 0}
+                    />
+                    {searchOpen && searchQuery.trim().length > 0 && (
+                        <div className="header-search-results" data-header-search-results role="listbox">
+                            {searchResults.length ? searchResults.map((game, index) => (
+                                <Link
+                                    key={`${game.id}-${game.path}`}
+                                    to={game.path}
+                                    className={index === activeSearchIndex ? 'active' : ''}
+                                    role="option"
+                                    aria-selected={index === activeSearchIndex}
+                                    onMouseEnter={() => setActiveSearchIndex(index)}
+                                    onClick={() => {
+                                        setSearchQuery('')
+                                        setSearchOpen(false)
+                                    }}
+                                >
+                                    <span>{game.name}</span>
+                                    <small>{game.category || 'Simulator'}</small>
+                                </Link>
+                            )) : (
+                                <div className="header-search-empty">No simulators found</div>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="header-right" ref={dropdownRef}>

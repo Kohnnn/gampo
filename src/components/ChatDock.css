@@ -23,6 +23,13 @@
 .chat-dock.w-stats  { width: 400px; max-height: 78vh; }
 .chat-dock.w-progress { width: 400px; max-height: 82vh; }
 
+.chat-dock.game-safe {
+    top: 84px;
+    bottom: auto;
+    width: 400px;
+    max-height: min(46vh, 390px);
+}
+
 .chat-dock-fab {
     position: fixed;
     right: 16px;
@@ -452,6 +459,13 @@
         bottom: 8px;
         width: calc(100vw - 16px);
         max-height: min(54vh, 420px);
+    }
+
+    .chat-dock.game-safe {
+        top: auto;
+        bottom: 8px;
+        width: calc(100vw - 16px);
+        max-height: min(42vh, 340px);
     }
 }
 
