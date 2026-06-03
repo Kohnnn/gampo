@@ -7,7 +7,7 @@ import { formatCredits } from '../../../utils/simulationMath'
 export default function StatsOverlay({ stats, definition }) {
     if (!stats) return null
     const targetRtp = definition?.rtp != null ? `${(definition.rtp * 100).toFixed(1)}%` : '—'
-    const obs = stats.rtp != null ? `${(stats.rtp * 100).toFixed(1)}%` : '—'
+    const obs = stats.count >= 20 && stats.rtp != null ? `${(stats.rtp * 100).toFixed(1)}%` : 'Too few samples'
     const winRate = stats.count ? `${((stats.wins / stats.count) * 100).toFixed(1)}%` : '—'
     return (
         <div className="stats-overlay">
@@ -17,7 +17,7 @@ export default function StatsOverlay({ stats, definition }) {
                 <Card label="Profit" value={formatCredits(stats.profit)} cls={stats.profit >= 0 ? 'positive' : 'negative'} />
             </div>
             <div className="so-row">
-                <Card label="Observed RTP" value={obs} />
+                <Card label="Observed RTP" value={obs} title="Stabilizes after ~100 rounds" />
                 <Card label="Target RTP" value={targetRtp} />
                 <Card label="Best win" value={formatCredits(stats.biggestWin)} />
             </div>
@@ -39,9 +39,9 @@ export default function StatsOverlay({ stats, definition }) {
     )
 }
 
-function Card({ label, value, cls = '' }) {
+function Card({ label, value, cls = '', title = undefined }) {
     return (
-        <div className="so-card">
+        <div className="so-card" title={title}>
             <span>{label}</span>
             <strong className={cls}>{value}</strong>
         </div>

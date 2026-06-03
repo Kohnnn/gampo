@@ -752,6 +752,8 @@ input:focus-visible,
     color: var(--text-primary);
     font-size: 14px;
     font-weight: 950;
+    line-height: 1.12;
+    overflow-wrap: anywhere;
 }
 
 .so-card strong.positive { color: var(--accent-green); text-shadow: 0 0 12px rgba(0, 231, 1, 0.4); }

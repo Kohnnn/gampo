@@ -26,4 +26,11 @@ describe('ChatDock contract', () => {
         expect(source).toContain("event.key !== 'Escape'")
         expect(source).toContain("setState('minimized')")
     })
+
+    it('uses game-safe placement for Stats and Progress without changing locked width', () => {
+        expect(source).toContain('GAME_SAFE_PATHS')
+        expect(source).toContain("'game-safe'")
+        expect(css).toMatch(/\.chat-dock\.game-safe\s*\{[^}]*width:\s*400px/s)
+        expect(css).toMatch(/\.chat-dock\.game-safe\s*\{[^}]*max-height:\s*min\(46vh,\s*390px\)/s)
+    })
 })

@@ -299,6 +299,7 @@
     overflow: hidden;
     background: var(--sb-panel-2);
     border: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
 }
 
 .sb-top-match-main {
@@ -377,6 +378,8 @@
 
 .sb-top-match-odds {
     padding: 8px 14px 14px;
+    position: relative;
+    z-index: 2;
 }
 
 .sb-odds-button {

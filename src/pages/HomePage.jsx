@@ -235,25 +235,33 @@ export function GameGrid({ games = [] }) {
 
     return (
         <div className="casino-game-grid">
-            {games.map(game => (
-                <Link key={game.id} to={game.path} className="casino-game-card" style={{ '--accent': game.accent || '#00e701' }}>
-                    <div className="casino-game-art">
-                        {game.image ? <img src={game.image} alt="" /> : <span>{game.name.slice(0, 2)}</span>}
-                        <div className="casino-game-titlemark">
-                            <span>{game.category?.split(' ')[0] || 'Game'}</span>
-                            <strong>{game.name}</strong>
+            {games.map(game => {
+                const badges = [
+                    `RTP ${game.rtp ? `${(game.rtp * 100).toFixed(1)}%` : 'Lab'}`,
+                    game.volatility || 'Variable',
+                    game.hitFrequency || game.category || 'Practice',
+                ].filter(Boolean)
+                const visibleBadges = badges.slice(0, 2)
+                const hiddenCount = Math.max(0, badges.length - visibleBadges.length)
+                return (
+                    <Link key={game.id} to={game.path} className="casino-game-card" style={{ '--accent': game.accent || '#00e701' }}>
+                        <div className="casino-game-art">
+                            {game.image ? <img src={game.image} alt="" /> : <span>{game.name.slice(0, 2)}</span>}
+                            <div className="casino-game-titlemark">
+                                <span>{game.category?.split(' ')[0] || 'Game'}</span>
+                                <strong>{game.name}</strong>
+                            </div>
                         </div>
-                    </div>
-                    <div className="casino-game-body">
-                        <span>{game.provider || game.category || 'GamPo Lab'}</span>
-                        <div>
-                            <b>RTP {game.rtp ? `${(game.rtp * 100).toFixed(1)}%` : 'Lab'}</b>
-                            <b>{game.volatility || 'Variable'}</b>
-                            <b>{game.hitFrequency || game.category || 'Practice'}</b>
+                        <div className="casino-game-body">
+                            <span>{game.provider || game.category || 'GamPo Lab'}</span>
+                            <div className="casino-game-badges" title={badges.join(' · ')}>
+                                {visibleBadges.map(label => <b key={label}>{label}</b>)}
+                                {hiddenCount > 0 ? <b className="casino-game-more">+{hiddenCount}</b> : null}
+                            </div>
                         </div>
-                    </div>
-                </Link>
-            ))}
+                    </Link>
+                )
+            })}
         </div>
     )
 }

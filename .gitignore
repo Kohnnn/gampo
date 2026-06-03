@@ -2,6 +2,10 @@ node_modules
 dist
 output
 .DS_Store
+.agents
+GameTemplate
+example
+stake-clone
 .env
 .env.local
 .env.development.local
@@ -15,12 +19,12 @@ output
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+dev-server*.log
 preview*.log
 tmp-preview*.log
 zrok*.log
+vite.config.js.timestamp-*.mjs
 plinko-game-main.zip
-dev-server.err.log
-dev-server.out.log
 .agent
 .claude
 rainbetclone/_quarantine/

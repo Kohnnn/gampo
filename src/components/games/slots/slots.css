@@ -270,12 +270,9 @@
 .slot-stage-v2 {
     width: 100%;
     min-width: 0;
-    /* Wave 14: give the slot stage a real minimum so reels + controls + foot
-       always have room. The playfield's `overflow-y: auto` (Wave 14) handles
-       the scroll when the viewport is shorter than the natural stage height. */
-    min-height: 560px;
+    min-height: min(560px, calc(100dvh - 176px));
     display: grid;
-    grid-template-rows: auto minmax(280px, 1fr) auto auto;
+    grid-template-rows: auto minmax(220px, 1fr) auto auto;
     gap: 12px;
     padding: 14px;
     border-radius: 16px;
@@ -290,6 +287,28 @@
     color: var(--slot-text);
     position: relative;
     overflow: hidden;
+}
+
+.slot-stage-loader {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 12px;
+    background:
+        radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--slot-accent), transparent 72%), transparent 44%),
+        rgba(5, 12, 20, 0.86);
+    color: var(--slot-text);
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.slot-stage-v2.is-loading .slot-reel-frame-v2,
+.slot-stage-v2.is-loading .slot-controls-v2 {
+    opacity: 0.32;
 }
 
 .slot-stage-v2::before {
@@ -493,7 +512,7 @@
 .slot-reel-frame-v2 {
     width: 100%;
     height: 100%;
-    min-height: 320px;
+    min-height: clamp(220px, calc(var(--slot-rows, 4) * 76px), 320px);
     display: grid;
     border-radius: 16px;
     padding: 12px;
@@ -593,6 +612,11 @@
     border: 0;
     mix-blend-mode: normal;
     filter: drop-shadow(0 7px 10px rgba(0, 0, 0, 0.58));
+}
+
+.slot-template-miko-spirit .slot-cell img,
+.slot-template-ghostblade-strike .slot-cell img {
+    height: min(calc(100% - 12px), 86px);
 }
 
 .slot-cell strong {
@@ -1670,6 +1694,10 @@
 }
 
 @media (max-width: 760px) {
+    .slot-panel-spin {
+        order: -1;
+        width: 100%;
+    }
     .slot-stage-v2 {
         padding: 10px;
         gap: 8px;
@@ -2536,8 +2564,8 @@
 
 /* Wave 42: larger premium reel area and final themed symbol normalization. */
 .slot-stage-v2 {
-    min-height: 620px;
-    grid-template-rows: auto minmax(360px, 1fr) auto auto;
+    min-height: min(620px, calc(100dvh - 176px));
+    grid-template-rows: auto minmax(clamp(220px, calc(var(--slot-rows, 4) * 76px), 360px), 1fr) auto auto;
     gap: 12px;
     padding: 16px;
 }
@@ -2607,7 +2635,7 @@
 }
 
 .slot-reel-frame-v2 {
-    min-height: 390px;
+    min-height: clamp(220px, calc(var(--slot-rows, 4) * 78px), 390px);
     padding: 16px;
 }
 
@@ -2672,21 +2700,23 @@
 
 @media (max-width: 480px) {
     .slot-stage-v2 {
-        min-height: 560px;
-        grid-template-rows: auto minmax(250px, 1fr) auto auto;
-        padding: 10px;
-        gap: 8px;
+        min-height: 0;
+        height: clamp(334px, calc(100dvh - 214px), 430px);
+        grid-template-rows: auto minmax(154px, 1fr) auto;
+        padding: 8px;
+        gap: 6px;
     }
 
     .slot-reel-frame-v2 {
-        min-height: 250px;
-        padding: 8px;
+        min-height: 0;
+        height: 100%;
+        padding: 6px;
     }
 
     .slot-reel-grid,
     .slot-megaways-grid {
-        gap: 5px;
-        padding: 6px;
+        gap: 3px;
+        padding: 4px;
     }
 
     .slot-cell {
@@ -2694,9 +2724,9 @@
     }
 
     .slot-cell img {
-        width: min(98%, 72px);
-        height: min(calc(100% - 2px), 64px);
-        max-height: 64px;
+        width: min(98%, 58px);
+        height: min(calc(100% - 2px), 52px);
+        max-height: 52px;
     }
 }
 
@@ -2814,8 +2844,11 @@
 
 @media (max-width: 480px) {
     .slot-stage-v2 {
-        --slot-symbol-max-inline: 72px;
-        --slot-symbol-max-block: 64px;
+        --slot-symbol-max-inline: 58px;
+        --slot-symbol-max-block: 52px;
+        --slot-symbol-scale: 0.96;
+        --slot-rank-scale: 1.08;
+        --slot-feature-symbol-scale: 1;
     }
 
     .slot-template-river-catcher,

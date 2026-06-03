@@ -10,6 +10,36 @@ import './ChatDock.css'
 const STATE_KEY = 'gampo_chat_dock_state'
 const VALID = new Set(['open', 'minimized', 'closed'])
 const VALID_TABS = new Set(['chat', 'race', 'stats', 'progress'])
+const GAME_SAFE_PATHS = [
+    '/crash',
+    '/plinko',
+    '/mines',
+    '/dice',
+    '/limbo',
+    '/keno',
+    '/wheel',
+    '/roulette',
+    '/blackjack',
+    '/baccarat',
+    '/hilo',
+    '/sicbo',
+    '/videopoker',
+    '/war',
+    '/tower',
+    '/chickencross',
+    '/tarot',
+    '/cases',
+    '/poker',
+    '/sportsbook',
+    '/sports',
+    '/slots',
+    '/slots-lobby',
+    '/bars',
+    '/scarab-spin',
+    '/miko-spirit',
+    '/ghostblade-strike',
+    '/vault-rush',
+]
 
 function readInitialState() {
     try {
@@ -129,6 +159,11 @@ function ChatDock() {
         // doesn't visibly reposition the panel.
         return 'w-locked'
     }, [tab])
+    const gameSafeClass = state === 'open'
+        && ['stats', 'progress'].includes(tab)
+        && GAME_SAFE_PATHS.some(path => location.pathname.startsWith(path))
+        ? 'game-safe'
+        : ''
 
     if (state === 'closed') {
         return (
@@ -155,7 +190,7 @@ function ChatDock() {
     }
 
     return (
-        <aside className={`chat-dock ${widthClass}`}>
+        <aside className={`chat-dock ${widthClass} ${gameSafeClass}`.trim()}>
             <header className="chat-dock-header">
                 <div className="chat-dock-tabs">
                     <button

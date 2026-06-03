@@ -402,9 +402,11 @@ export default function RouletteGame() {
                         <ul className="rou-player-feed" aria-label="Simulated roulette players">
                             {simPlayers.map(p => (
                                 <li key={p.id} className={p.won === null ? 'pending' : p.won ? 'won' : 'lost'}>
-                                    <span>{p.name}</span>
-                                    <em>{p.label}</em>
-                                    <strong>{p.won === null ? `${p.bet} GC` : p.won ? `+${p.payout.toFixed(2)}` : `-${p.bet}`}</strong>
+                                    <span title={p.name}>{p.name}</span>
+                                    <em title={p.label}>{p.label}</em>
+                                    <strong title={p.won === null ? `${p.bet} GC` : p.won ? `+${p.payout.toFixed(2)} GC` : `-${p.bet} GC`}>
+                                        {p.won === null ? `${p.bet} GC` : p.won ? `+${p.payout.toFixed(2)}` : `-${p.bet}`}
+                                    </strong>
                                 </li>
                             ))}
                         </ul>
