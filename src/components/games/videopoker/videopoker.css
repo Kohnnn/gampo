@@ -229,8 +229,9 @@
     }
 
     .vp-paytable {
-        max-height: 170px;
+        max-height: min(260px, 34dvh);
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
         margin-top: 6px;
     }
 

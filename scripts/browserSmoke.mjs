@@ -284,6 +284,45 @@ async function evaluatePage(client, sessionId, route) {
       };
     });
   const action = controls.find(control => pattern.test(control.text));
+  const mobilePrimarySelector = [
+    '[data-mobile-hit-target="primary"]',
+    '[data-mobile-primary-action]',
+    '[data-slot-mobile-dock] [data-slot-action="spin"]',
+    '[data-poker-action="sit-down"]',
+    '[data-poker-action="fold"]',
+    '[data-poker-action="call"]',
+    '[data-poker-action="check"]',
+    '[data-poker-action="raise"]'
+  ].join(',');
+  const primaryTarget = viewportWidth < 768
+    ? [
+        '[data-mobile-hit-target="primary"]',
+        '[data-mobile-primary-action]',
+        '[data-slot-mobile-dock] [data-slot-action="spin"]',
+        '[data-poker-action="sit-down"]',
+        '[data-poker-action="fold"]',
+        '[data-poker-action="call"]',
+        '[data-poker-action="check"]',
+        '[data-poker-action="raise"]',
+      ]
+        .map(selector => Array.from(document.querySelectorAll(selector)).find(el => isVisible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true'))
+        .find(Boolean)
+    : null;
+  const mobileActionHit = (() => {
+    if (!primaryTarget) return { checked: false, blocked: false };
+    const rect = primaryTarget.getBoundingClientRect();
+    const x = Math.max(0, Math.min(viewportWidth - 1, rect.left + rect.width / 2));
+    const y = Math.max(0, Math.min(viewportHeight - 1, rect.top + rect.height / 2));
+    const top = document.elementFromPoint(x, y);
+    const clean = !!top && (top === primaryTarget || primaryTarget.contains(top) || top.closest?.(mobilePrimarySelector) === primaryTarget);
+    return {
+      checked: true,
+      blocked: !clean,
+      target: describe(primaryTarget),
+      top: top ? describe(top) : null,
+      point: { x: Math.round(x), y: Math.round(y) },
+    };
+  })();
   const titleEl = document.querySelector('h1, .game-badge, .game-title, [data-game-title]');
   const loadingBlocking = Boolean(document.querySelector('.core-stage.is-loading')) || /LOADING\\s+(LAB|STAGE)/i.test(document.body.innerText || '');
   return {
@@ -299,6 +338,7 @@ async function evaluatePage(client, sessionId, route) {
     keyActionVisible: Boolean(action),
     keyAction: action || null,
     loadingBlocking,
+    mobileActionHit,
   };
 })()`
     const result = await client.send('Runtime.evaluate', {
@@ -309,8 +349,173 @@ async function evaluatePage(client, sessionId, route) {
     return result.result?.value
 }
 
+async function runMobileInteraction(client, sessionId, route, viewport) {
+    if (viewport.width >= 768) return { status: 'skipped', reason: 'desktop viewport' }
+    const expression = `
+(async () => {
+  const route = ${JSON.stringify(route)};
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const visible = el => {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && rect.bottom >= 0 && rect.top <= innerHeight;
+  };
+  const describe = el => {
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return {
+      tag: el.tagName.toLowerCase(),
+      text: (el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || '').trim().replace(/\\s+/g, ' ').slice(0, 70),
+      className: typeof el.className === 'string' ? el.className.split(/\\s+/).slice(0, 4).join(' ') : '',
+      left: Math.round(rect.left),
+      top: Math.round(rect.top),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    };
+  };
+  const findTarget = selector => Array.from(document.querySelectorAll(selector))
+    .find(el => visible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true');
+  const clickTarget = selector => {
+    const el = findTarget(selector);
+    if (!el) return { clicked: false, missing: true, selector };
+    const rect = el.getBoundingClientRect();
+    const x = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
+    const y = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
+    const top = document.elementFromPoint(x, y);
+    const clean = !!top && (top === el || el.contains(top) || top.closest?.(selector) === el);
+    if (!clean) return { clicked: false, blocked: true, selector, target: describe(el), top: describe(top), point: { x: Math.round(x), y: Math.round(y) } };
+    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    el.click();
+    return { clicked: true, selector, target: describe(el) };
+  };
+  const primary = '[data-mobile-hit-target="primary"], [data-mobile-primary-action]';
+  const textIncludes = value => (document.body.innerText || '').toLowerCase().includes(value.toLowerCase());
+  const ok = (message, extra = {}) => ({ status: 'passed', message, ...extra });
+  const fail = (message, extra = {}) => ({ status: 'failed', message, ...extra });
+
+  if (['/vault-rush', '/river-catcher', '/bars', '/slots'].includes(route)) {
+    const click = clickTarget('[data-slot-mobile-dock] [data-slot-action="spin"]');
+    if (!click.clicked) return fail('slot spin target was not clickable', click);
+    await sleep(700);
+    const cells = document.querySelectorAll('.slot-reel-grid .slot-cell, .slot-reel-grid .slot-symbol-card').length;
+    const active = Boolean(document.querySelector('.slot-stage-v2.spinning, .slot-mobile-spin:disabled, .slot-result-banner'));
+    return cells > 0 && active ? ok('slot spin entered active state', { cells }) : fail('slot spin did not mutate visible state', { cells, active });
+  }
+
+  if (route === '/poker') {
+    const click = clickTarget('[data-poker-action="sit-down"]');
+    if (!click.clicked) return fail('poker sit-down target was not clickable', click);
+    await sleep(900);
+    const table = Boolean(document.querySelector('.poker-layout'));
+    const gto = Boolean(document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel="gto"]'));
+    const action = Boolean(document.querySelector('[data-poker-action="fold"], [data-poker-action="call"], [data-poker-action="check"], [data-poker-action="raise"]'));
+    return table && gto && action ? ok('poker seated with mobile GTO/actions') : fail('poker did not enter mobile table state', { table, gto, action });
+  }
+
+  if (route === '/baccarat') {
+    const chip = clickTarget('.bac-bet-cell.banker, .bac-bet-cell.player');
+    if (!chip.clicked) return fail('baccarat bet cell was not clickable', chip);
+    await sleep(150);
+    const stakeReady = Boolean(document.querySelector('.bac-ticket-chip')) || /banker|player/i.test(document.body.innerText || '');
+    const deal = clickTarget(primary);
+    if (!deal.clicked) return fail('baccarat deal target was not clickable', deal);
+    await sleep(900);
+    const road = Boolean(document.querySelector('.bac-road-cell.latest, .bac-road-cell'));
+    return stakeReady && road ? ok('baccarat bet/deal updated road') : fail('baccarat did not record visible result', { stakeReady, road });
+  }
+
+  if (route === '/blackjack') {
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('blackjack deal target was not clickable', click);
+    await sleep(700);
+    const cards = document.querySelectorAll('.bj-card, .gampo-card, .bj-hand-card').length;
+    const actions = Boolean(document.querySelector('.bj-actions button, [data-mobile-primary-action]'));
+    return cards > 0 && actions ? ok('blackjack dealt visible cards/actions', { cards }) : fail('blackjack did not expose cards/actions', { cards, actions });
+  }
+
+  if (route === '/videopoker') {
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('video poker deal target was not clickable', click);
+    await sleep(700);
+    const cards = document.querySelectorAll('.vp-card-slot, .vp-card').length;
+    const paytable = Boolean(document.querySelector('.vp-paytable-shell, .vp-paytable'));
+    return cards >= 5 && paytable ? ok('video poker dealt with paytable reachable', { cards }) : fail('video poker did not expose hand/paytable', { cards, paytable });
+  }
+
+  if (route === '/rps') {
+    clickTarget('.rps-stage-choices button:nth-child(2), .rps-choice:nth-child(2)');
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('rps play target was not clickable', click);
+    await sleep(650);
+    const settled = Boolean(document.querySelector('.rrs-chip')) || /win|loss|tie|paper/i.test(document.body.innerText || '');
+    return settled ? ok('rps selected choice settled') : fail('rps did not settle after selected choice');
+  }
+
+  if (route === '/coinflip') {
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('coin flip target was not clickable', click);
+    await sleep(1000);
+    const settled = Boolean(document.querySelector('.rrs-chip, .coinflip-stage.win-flash, .coinflip-stage.loss-flash')) || /win|loss/i.test(document.body.innerText || '');
+    return settled ? ok('coin flip settled visibly') : fail('coin flip did not settle visibly');
+  }
+
+  if (route === '/keno') {
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('keno draw target was not clickable', click);
+    await sleep(1000);
+    const drawn = Boolean(document.querySelector('.keno-grid .drawn, .rrs-chip'));
+    return drawn ? ok('keno draw started/settled visibly') : fail('keno did not draw visible numbers');
+  }
+
+  if (route === '/wheel') {
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('wheel spin target was not clickable', click);
+    await sleep(1000);
+    const active = Boolean(document.querySelector('.wheel-disc.spinning, .wheel-stage.win-flash, .wheel-stage.loss-flash, .rrs-chip')) || !/Last\\s+0(?:\\.00)?x/i.test(document.body.innerText || '');
+    return active ? ok('wheel spin mutated state') : fail('wheel spin did not mutate state');
+  }
+
+  if (route === '/hilo') {
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('hilo draw target was not clickable', click);
+    await sleep(700);
+    const cards = document.querySelectorAll('.hilo-card, .gampo-card').length;
+    const settled = Boolean(document.querySelector('.rrs-chip, .hilo-stage.win-flash, .hilo-stage.loss-flash'));
+    return cards >= 2 || settled ? ok('hi-lo draw updated visible cards') : fail('hi-lo did not update visible cards', { cards, settled });
+  }
+
+  if (route === '/crash') {
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('crash bet target was not clickable', click);
+    await sleep(650);
+    const active = Boolean(document.querySelector('.crash-stage.phase-betting, .crash-stage.phase-running, .crash-stage.phase-cashed, .crash-stage.phase-crashed')) || /BETTING OPEN|Live|BUST|CASH/i.test(document.body.innerText || '');
+    return active ? ok('crash entered round state') : fail('crash did not enter round state');
+  }
+
+  if (['/sicbo', '/roulette', '/dice', '/limbo', '/plinko', '/mines', '/dino'].includes(route)) {
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('primary target was not clickable', click);
+    await sleep(500);
+    return ok('primary target accepted pointer hit', click);
+  }
+
+  return { status: 'skipped', reason: 'no route interaction contract' };
+})()`
+    const result = await client.send('Runtime.evaluate', {
+        expression,
+        returnByValue: true,
+        awaitPromise: true,
+    }, sessionId)
+    return result.result?.value || { status: 'failed', message: 'interaction script returned no result' }
+}
+
 async function run() {
     const baseUrl = argValue('baseUrl', 'http://127.0.0.1:5173').replace(/\/$/, '')
+    const origin = new URL(baseUrl).origin
     const outDir = resolve(argValue('out', 'output/browser-smoke'))
     const label = argValue('label', new Date().toISOString().replace(/[:.]/g, '-'))
     const clean = process.argv.includes('--clean') || process.env.npm_config_clean === 'true'
@@ -361,12 +566,24 @@ async function run() {
             for (const route of routes) {
                 client.drainEvents(sessionId)
                 const url = `${baseUrl}${route}`
+                try {
+                    await client.send('Storage.clearDataForOrigin', {
+                        origin,
+                        storageTypes: 'local_storage,session_storage,indexeddb',
+                    }, sessionId)
+                } catch {
+                    // Older Chromium builds can reject Storage.clearDataForOrigin
+                    // before a target is fully warmed. The route still gets a hard
+                    // navigation below, so this is a best-effort isolation step.
+                }
                 await client.send('Page.navigate', { url }, sessionId)
                 await waitForLoad(client, sessionId)
                 await waitForReady(client, sessionId, readyTimeoutMs)
                 await sleep(settleMs)
                 const events = client.drainEvents(sessionId)
                 const metrics = await evaluatePage(client, sessionId, route)
+                const interaction = await runMobileInteraction(client, sessionId, route, viewport)
+                const interactionEvents = client.drainEvents(sessionId)
                 const screenshotName = `${viewport.width}x${viewport.height}-${routeSlug(route)}.png`
                 const screenshotPath = join(screenshotDir, screenshotName)
                 const shot = await client.send('Page.captureScreenshot', {
@@ -379,14 +596,24 @@ async function run() {
                     url,
                     viewport,
                     screenshot: screenshotPath,
-                    errors: collectErrors(events),
+                    errors: collectErrors([...events, ...interactionEvents]),
+                    interaction,
                     ...metrics,
                 })
-                console.log(`${viewport.width}x${viewport.height} ${route} overflow=${metrics.overflowDelta}px action=${metrics.keyActionVisible ? 'yes' : 'no'} errors=${collectErrors(events).length}`)
+                const blocked = metrics.mobileActionHit?.blocked ? ' blocked' : ''
+                console.log(`${viewport.width}x${viewport.height} ${route} overflow=${metrics.overflowDelta}px action=${metrics.keyActionVisible ? 'yes' : 'no'}${blocked} interaction=${interaction.status} errors=${collectErrors([...events, ...interactionEvents]).length}`)
             }
         }
 
-        const failures = results.filter(item => item.overflowX || item.loadingBlocking || item.brokenImages.length || item.errors.length || !item.keyActionVisible)
+        const failures = results.filter(item => (
+            item.overflowX
+            || item.loadingBlocking
+            || item.brokenImages.length
+            || item.errors.length
+            || !item.keyActionVisible
+            || item.mobileActionHit?.blocked
+            || item.interaction?.status === 'failed'
+        ))
         const report = {
             baseUrl,
             browser,
@@ -406,10 +633,10 @@ async function run() {
             `Total checks: ${results.length}`,
             `Failures: ${failures.length}`,
             '',
-            '| Viewport | Route | Overflow | Loading | Key Action | Broken Images | Errors | Screenshot |',
-            '| --- | --- | ---: | --- | --- | ---: | ---: | --- |',
+            '| Viewport | Route | Overflow | Loading | Key Action | Hit Test | Interaction | Broken Images | Errors | Screenshot |',
+            '| --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | --- |',
             ...results.map(item => (
-                `| ${item.viewport.width}x${item.viewport.height} | ${item.route} | ${item.overflowDelta}px | ${item.loadingBlocking ? 'yes' : 'no'} | ${item.keyActionVisible ? 'yes' : 'no'} | ${item.brokenImages.length} | ${item.errors.length} | ${item.screenshot.replaceAll('\\', '/')} |`
+                `| ${item.viewport.width}x${item.viewport.height} | ${item.route} | ${item.overflowDelta}px | ${item.loadingBlocking ? 'yes' : 'no'} | ${item.keyActionVisible ? 'yes' : 'no'} | ${item.mobileActionHit?.checked ? (item.mobileActionHit.blocked ? 'blocked' : 'clean') : 'n/a'} | ${item.interaction?.status || 'n/a'} | ${item.brokenImages.length} | ${item.errors.length} | ${item.screenshot.replaceAll('\\', '/')} |`
             )),
             '',
         ].join('\n'))

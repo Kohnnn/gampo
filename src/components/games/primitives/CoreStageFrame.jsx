@@ -22,6 +22,7 @@ export default function CoreStageFrame({
     children,
     className = '',
     backdrop,
+    mobileScrollable = false,
 }) {
     const style = {}
     if (aspect) style.aspectRatio = aspect
@@ -33,8 +34,14 @@ export default function CoreStageFrame({
     if (width) style.width = `${width}px`
     if (height) style.height = `${height}px`
     if (backdrop) style.backgroundImage = `url("${backdrop}")`
+    const classes = [
+        'core-stage',
+        loading ? 'is-loading' : '',
+        mobileScrollable ? 'core-stage-mobile-scroll' : '',
+        className,
+    ].filter(Boolean).join(' ')
     return (
-        <div className={`core-stage ${loading ? 'is-loading' : ''} ${className}`} style={style} data-game-stage>
+        <div className={classes} style={style} data-game-stage data-mobile-scroll-surface={mobileScrollable || undefined}>
             {loading ? (
                 <div className="core-stage-loading">
                     {loadingNode || <DefaultLoader />}

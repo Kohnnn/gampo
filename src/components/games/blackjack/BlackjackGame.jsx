@@ -504,7 +504,7 @@ export default function BlackjackGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="bj-stage-frame">
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="bj-stage-frame" mobileScrollable>
                 <div className="bj-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     {chipSlide ? (

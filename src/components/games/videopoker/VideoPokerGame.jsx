@@ -204,7 +204,7 @@ export default function VideoPokerGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="vp-stage-frame">
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="vp-stage-frame" mobileScrollable>
                 <div className="vp-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <div className="vp-row" data-mobile-critical-surface>

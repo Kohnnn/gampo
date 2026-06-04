@@ -1689,6 +1689,10 @@
 }
 .ph-clear:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.poker-mobile-gto-now {
+    display: none;
+}
+
 /* Wave 24/25: compact desktop fit pass for poker. */
 @media (min-width: 1200px) and (max-height: 920px) {
     .poker-page {
@@ -1751,6 +1755,105 @@
     .poker-lobby {
         margin: 14px auto calc(var(--mobile-nav-height, 64px) + 24px);
         padding: 18px 14px;
+        position: relative;
+        z-index: 3;
+    }
+
+    .poker-buyin {
+        position: relative;
+        z-index: 4;
+        pointer-events: auto;
+        touch-action: manipulation;
+    }
+
+    .poker-mobile-gto-now {
+        width: 100%;
+        display: grid;
+        gap: 8px;
+        margin: 0 0 10px;
+        padding: 10px;
+        border: 1px solid rgba(105, 179, 255, 0.26);
+        border-radius: 12px;
+        background:
+            radial-gradient(circle at 16% 0%, rgba(20, 117, 225, 0.16), transparent 52%),
+            linear-gradient(180deg, rgba(15, 33, 46, 0.96), rgba(7, 16, 24, 0.96));
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+    }
+
+    .poker-mobile-gto-now > div:first-child {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 2px 8px;
+        align-items: baseline;
+    }
+
+    .poker-mobile-gto-now span,
+    .poker-mobile-gto-now dt {
+        color: var(--text-muted);
+        font-size: 9px;
+        font-weight: 950;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .poker-mobile-gto-now strong {
+        min-width: 0;
+        color: var(--text-primary);
+        font-size: 18px;
+        font-weight: 950;
+        line-height: 1;
+    }
+
+    .poker-mobile-gto-now em {
+        color: #69b3ff;
+        font-size: 10px;
+        font-style: normal;
+        font-weight: 900;
+        text-transform: uppercase;
+    }
+
+    .poker-mobile-gto-bars {
+        height: 8px;
+        display: flex;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .poker-mobile-gto-bars i {
+        min-width: 0;
+        height: 100%;
+    }
+
+    .poker-mobile-gto-bars .raise { background: #ed4245; }
+    .poker-mobile-gto-bars .call { background: #00b428; }
+    .poker-mobile-gto-bars .fold { background: rgba(255, 255, 255, 0.28); }
+
+    .poker-mobile-gto-now dl {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        margin: 0;
+    }
+
+    .poker-mobile-gto-now dl div {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+        padding: 6px 8px;
+        border-radius: 9px;
+        background: rgba(0, 0, 0, 0.26);
+    }
+
+    .poker-mobile-gto-now dd {
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        color: var(--text-primary);
+        font-size: 11px;
+        font-weight: 950;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .poker-layout {
@@ -1845,6 +1948,8 @@
         height: auto;
         padding: 0 10px;
         font-size: 12px;
+        pointer-events: auto;
+        touch-action: manipulation;
     }
 
     .pk-raise-presets {

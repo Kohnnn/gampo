@@ -174,7 +174,7 @@ export default function KenoGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="keno-stage-frame">
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="keno-stage-frame" mobileScrollable>
                 <div className="keno-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim keno" />

@@ -53,7 +53,7 @@ export default function GameShell({
             </div>
             <div className="gs-layout">
                 <div className="gs-panel">{panel}</div>
-                <div className="gs-playfield" role="region" aria-label={playfieldLabel} tabIndex={0}>{children}</div>
+                <div className="gs-playfield" role="region" aria-label={playfieldLabel} tabIndex={0} data-mobile-scroll-surface>{children}</div>
                 <div className="gs-aside">{aside}</div>
             </div>
         </div>

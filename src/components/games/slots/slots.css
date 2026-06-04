@@ -2904,10 +2904,15 @@
 @media (max-width: 760px) {
     .slot-stage-v2 {
         min-height: 0;
-        height: clamp(320px, calc(100dvh - var(--mobile-safe-bottom, 138px) - 122px), 430px);
-        grid-template-rows: auto minmax(0, 1fr) auto;
+        height: auto;
+        max-height: none;
+        grid-template-rows: auto minmax(240px, 1fr);
         padding-bottom: 8px;
         overflow: visible;
+    }
+
+    .slot-reel-wrap {
+        min-height: clamp(240px, calc(100dvh - var(--mobile-safe-bottom, 138px) - 150px), 380px);
     }
 
     .slot-reel-wrap,
@@ -2930,7 +2935,7 @@
         left: 8px;
         right: 8px;
         bottom: calc(var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)));
-        z-index: 89;
+        z-index: 1400;
         min-height: var(--mobile-action-height, 74px);
         display: grid;
         grid-template-columns: minmax(0, 0.72fr) minmax(0, 0.72fr) 44px 44px minmax(112px, 1.15fr);
@@ -2944,6 +2949,7 @@
             radial-gradient(circle at 78% 0%, color-mix(in srgb, var(--slot-accent, #ffd166), transparent 70%), transparent 44%);
         box-shadow: 0 -16px 42px rgba(0, 0, 0, 0.66), 0 0 22px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 78%);
         backdrop-filter: blur(12px);
+        pointer-events: auto;
     }
 
     .slot-mobile-readout {
@@ -2987,6 +2993,39 @@
         border: 1px solid rgba(255, 255, 255, 0.1);
         font-weight: 950;
         cursor: pointer;
+        pointer-events: auto;
+        touch-action: manipulation;
+    }
+
+    .slot-result-banner {
+        left: 12px;
+        right: 12px;
+        top: auto;
+        bottom: 10px;
+        transform: none;
+        min-width: 0;
+        width: auto;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        place-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        background: linear-gradient(180deg, rgba(20, 32, 50, 0.88), rgba(8, 16, 28, 0.9));
+        backdrop-filter: blur(2px);
+    }
+
+    .slot-result-banner span {
+        font-size: 9px;
+    }
+
+    .slot-result-banner strong {
+        font-size: clamp(18px, 6vw, 26px);
+    }
+
+    .slot-result-banner em,
+    .slot-result-banner i.result-money {
+        font-size: 10px;
     }
 
     .slot-mobile-icon {

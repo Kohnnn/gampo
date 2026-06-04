@@ -458,13 +458,13 @@ export default function CrashGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={580} maxWidth={960} loading={!preloader.ready} className="crash-stage-frame">
+            <CoreStageFrame minHeight={580} maxWidth={960} loading={!preloader.ready} className="crash-stage-frame" mobileScrollable>
                 <div className={`crash-stage phase-${phase}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <div className="crash-mobile-targets" data-mobile-critical-surface>
                         <span>Auto cashout {target.toFixed(2)}×</span>
-                        <div>
-                            {TARGET_PRESETS.slice(0, 5).map(t => (
+                        <div className="crash-mobile-target-row">
+                            {TARGET_PRESETS.map(t => (
                                 <button key={t} type="button" className={target === t ? 'active' : ''} disabled={inRound} onClick={() => setTarget(t)}>
                                     {t}×
                                 </button>
