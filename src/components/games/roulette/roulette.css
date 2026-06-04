@@ -817,13 +817,14 @@
     }
 
     .rou-top-deck {
-        grid-template-columns: minmax(120px, 0.75fr) minmax(0, 1fr);
+        grid-template-columns: 1fr;
+        justify-items: center;
         align-items: center;
         gap: 8px;
     }
 
     .rou-wheel-area {
-        width: min(132px, 36vw);
+        width: min(180px, 48vw);
         justify-self: center;
     }
 
@@ -904,7 +905,7 @@
     }
 
     .rou-wheel-area {
-        width: min(120px, 34vw);
+        width: min(176px, 48vw);
     }
 
     .rou-cell {

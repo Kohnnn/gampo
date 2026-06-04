@@ -19,6 +19,9 @@ describe('poker layout CSS', () => {
 
     it('keeps mobile poker entry and action controls reachable', () => {
         expect(source).toContain('data-poker-action="sit-down"')
+        expect(source).toContain('data-mobile-hit-target="primary"')
+        expect(source).toContain('poker-mobile-gto-now')
+        expect(source).toContain('data-poker-mobile-panel="gto"')
         expect(source).toContain('enterPokerSession')
         expect(source).toContain('scrollIntoView')
         for (const action of ['fold', 'check', 'call', 'raise']) {
@@ -27,5 +30,6 @@ describe('poker layout CSS', () => {
         expect(css).toMatch(/@media \(max-width: 760px\)[\s\S]*\.pk-actions\s*\{[\s\S]*position:\s*sticky/s)
         expect(css).toContain('bottom: calc(var(--mobile-nav-height, 64px) + 8px)')
         expect(css).toContain('max-height: 260px')
+        expect(css).toContain('.poker-mobile-gto-now')
     })
 })

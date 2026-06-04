@@ -8,6 +8,7 @@
 //   - Auto-play loop integration via onPlay callback
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Play, Pause, ChevronsRight, Settings, Sliders, RotateCcw } from 'lucide-react'
 import { formatCredits } from '../../../utils/simulationMath'
 import { withTimeout } from '../../../utils/scheduling'
@@ -48,6 +49,7 @@ export default function BetPanel({
     const panelId = useId()
     const [tab, setTab] = useState('manual')
     const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
+    const [portalRoot, setPortalRoot] = useState(null)
     const [betAmount, setBetAmount] = useState(initialBet)
     // Auto state
     const [autoCount, setAutoCount] = useState(10)
@@ -160,6 +162,10 @@ export default function BetPanel({
 
     useEffect(() => () => { autoRunning.current = false }, [])
 
+    useEffect(() => {
+        setPortalRoot(document.body)
+    }, [])
+
     // Keyboard shortcuts. Disabled when typing in any input/textarea, when modifiers
     // (ctrl/cmd/alt) are held, and when an auto round is in progress to keep things safe.
     useEffect(() => {
@@ -235,8 +241,8 @@ export default function BetPanel({
     const playContent = isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>
     const mobilePlayContent = isAutoLive ? <><Pause size={16} /> Stop</> : <><Play size={16} /> {mobileButtonLabel}</>
 
-    return (
-        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`}>
+    const mobileDock = (
+        <div className={`bp-mobile-layer ${mobileControlsOpen ? 'mobile-open' : ''}`}>
             <div className="bp-mobile-dock" data-mobile-action-dock>
                 <button
                     type="button"
@@ -258,6 +264,7 @@ export default function BetPanel({
                     disabled={playDisabled}
                     onClick={handlePlay}
                     data-mobile-primary-action
+                    data-mobile-hit-target="primary"
                     {...playButtonProps}
                 >
                     {mobilePlayContent}
@@ -272,6 +279,12 @@ export default function BetPanel({
                     onClick={() => setMobileControlsOpen(false)}
                 />
             )}
+        </div>
+    )
+
+    return (
+        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`}>
+            {portalRoot ? createPortal(mobileDock, portalRoot) : mobileDock}
 
             <div className="bp-content" id={`${panelId}-mobile-controls`}>
                 <button

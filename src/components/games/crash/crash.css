@@ -427,10 +427,15 @@
         letter-spacing: 0.06em;
     }
 
-    .crash-mobile-targets div {
+    .crash-mobile-targets .crash-mobile-target-row {
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(58px, 1fr);
         gap: 5px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: thin;
+        mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
     }
 
     .crash-mobile-targets button {
@@ -448,7 +453,13 @@
         background: rgba(255, 122, 182, 0.16);
     }
 
-    .crash-screen { min-height: 154px; }
+    .crash-screen {
+        min-height: 176px;
+        padding-bottom: 16px;
+    }
+    .crash-chart-wrap {
+        min-height: 176px;
+    }
     .crash-deck {
         min-height: 0;
         gap: 8px;

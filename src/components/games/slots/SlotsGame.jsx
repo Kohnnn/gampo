@@ -1049,47 +1049,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                 </div>
 
-                <div className="slot-mobile-dock" data-slot-mobile-dock data-mobile-critical-surface>
-                    <div className="slot-mobile-readout">
-                        <span>Bet</span>
-                        <strong>{formatCredits(effectiveStake)}</strong>
-                    </div>
-                    <div className="slot-mobile-readout">
-                        <span>Win</span>
-                        <strong>{formatCredits(lastResult?.returnAmount || 0)}</strong>
-                    </div>
-                    <button
-                        type="button"
-                        className={turbo ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
-                        onClick={() => setTurbo(value => !value)}
-                        disabled={running}
-                        aria-label="Toggle turbo"
-                    >
-                        <Zap size={16} />
-                        <span>Quick</span>
-                    </button>
-                    <button
-                        type="button"
-                        className={autoplayActive || showAutoplayDrawer ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
-                        onClick={() => setShowAutoplayDrawer(v => !v)}
-                        disabled={running}
-                        aria-label="Autoplay"
-                    >
-                        <RotateCcw size={16} />
-                        <span>Auto</span>
-                    </button>
-                    <button
-                        type="button"
-                        className="slot-mobile-spin"
-                        onClick={triggerStageSpin}
-                        disabled={running || autoplayActive}
-                        data-slot-action="spin"
-                    >
-                        <Play size={18} />
-                        {running ? 'Spinning' : slotSpinLabel}
-                    </button>
-                </div>
-
                 {showIntro && (
                     <div className="slot-intro-overlay">
                         <Sparkles size={28} />
@@ -1344,6 +1303,53 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 <div className="slot-stage-foot">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 </div>
+            </div>
+
+            <div
+                className="slot-mobile-dock"
+                style={{ '--slot-accent': config.accent }}
+                data-slot-mobile-dock
+                data-mobile-critical-surface
+            >
+                <div className="slot-mobile-readout">
+                    <span>Bet</span>
+                    <strong>{formatCredits(effectiveStake)}</strong>
+                </div>
+                <div className="slot-mobile-readout">
+                    <span>Win</span>
+                    <strong>{formatCredits(lastResult?.returnAmount || 0)}</strong>
+                </div>
+                <button
+                    type="button"
+                    className={turbo ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
+                    onClick={() => setTurbo(value => !value)}
+                    disabled={running}
+                    aria-label="Toggle turbo"
+                >
+                    <Zap size={16} />
+                    <span>Quick</span>
+                </button>
+                <button
+                    type="button"
+                    className={autoplayActive || showAutoplayDrawer ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
+                    onClick={() => setShowAutoplayDrawer(v => !v)}
+                    disabled={running}
+                    aria-label="Autoplay"
+                >
+                    <RotateCcw size={16} />
+                    <span>Auto</span>
+                </button>
+                <button
+                    type="button"
+                    className="slot-mobile-spin"
+                    onClick={triggerStageSpin}
+                    disabled={running || autoplayActive}
+                    data-slot-action="spin"
+                    data-mobile-hit-target="primary"
+                >
+                    <Play size={18} />
+                    {running ? 'Spinning' : slotSpinLabel}
+                </button>
             </div>
 
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />

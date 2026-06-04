@@ -155,6 +155,7 @@
     }
 
     .coin3d-stage {
-        width: min(190px, 58vw);
+        width: min(176px, 52vw);
+        margin: -2px auto 4px;
     }
 }

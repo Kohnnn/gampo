@@ -212,7 +212,7 @@ export default function HiloGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="hilo-stage-frame">
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="hilo-stage-frame" mobileScrollable>
                 <div className={`hilo-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} />
                     <div className="hilo-cards" data-mobile-critical-surface>

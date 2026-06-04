@@ -141,6 +141,7 @@
 .sb-row.pairs { grid-template-columns: repeat(6, 1fr); }
 .sb-row.triples { grid-template-columns: repeat(7, 1fr); }
 .sb-row.even-money { grid-template-columns: repeat(4, 1fr); }
+.sb-row.combos { grid-template-columns: repeat(5, 1fr); }
 
 .sb-cell {
     background: linear-gradient(180deg, #0a4d2a, #053a1f);
@@ -210,6 +211,7 @@
         padding: 8px;
         gap: 6px;
         border-width: 2px;
+        max-height: none;
         overflow: visible;
     }
 
@@ -218,6 +220,7 @@
     .sb-row.pairs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .sb-row.triples { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sb-row.even-money { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sb-row.combos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
     .sb-cell {
         min-height: 36px;

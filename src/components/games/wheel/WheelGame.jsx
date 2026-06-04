@@ -204,7 +204,7 @@ export default function WheelGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="wheel-stage-frame">
+            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="wheel-stage-frame" mobileScrollable>
                 <div className={`wheel-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim wheel" />

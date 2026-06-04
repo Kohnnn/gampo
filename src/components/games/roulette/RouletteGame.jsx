@@ -303,7 +303,7 @@ export default function RouletteGame() {
                     initialBet={5}
                     runningRound={roundLocked}
                     actionLabel={`Spin (${formatCredits(totalStake)} on ${bets.length} bets)`}
-                    mobilePlayLabel={bets.length ? `Spin (${bets.length})` : 'Spin'}
+                    mobilePlayLabel="Spin"
                     onPlay={performPlay}
                     disableAuto={false}
                     lastBet={lastTotal}
@@ -489,10 +489,10 @@ export default function RouletteGame() {
                     </div>
                     <div className="rou-racetrack">
                         {[
-                            { type: 'voisins', label: 'Voisins du Zéro (17 nums)' },
-                            { type: 'tier', label: 'Tier (12 nums)' },
-                            { type: 'orphelins', label: 'Orphelins (8 nums)' },
-                            { type: 'zeroNeighbours', label: 'Zero Neighbours (7)' },
+                            { type: 'voisins', label: 'Voisins 17' },
+                            { type: 'tier', label: 'Tier 12' },
+                            { type: 'orphelins', label: 'Orphelins 8' },
+                            { type: 'zeroNeighbours', label: 'Zero 7' },
                         ].map(row => (
                             <div key={row.type}
                                 className={`rou-track-cell ${betTotal(row.type) ? 'has-bet' : ''}`}

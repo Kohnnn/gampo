@@ -518,6 +518,7 @@
     overflow-y: auto;
 }
 
+.bp-mobile-layer,
 .bp-mobile-dock,
 .bp-mobile-scrim,
 .bp-mobile-close {
@@ -2011,6 +2012,11 @@ input:focus-visible,
 /* === Mobile collapse: stacked layout with sticky bet panel at bottom === */
 
 @media (max-width: 720px) {
+    .main-content {
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
     .game-shell {
         padding: 8px;
         padding-bottom: calc(var(--mobile-safe-bottom, 0px) + 8px);
@@ -2061,13 +2067,23 @@ input:focus-visible,
         overflow: visible;
         padding: 0;
         gap: 0;
+        pointer-events: none;
+    }
+    .bp-panel > .bp-content,
+    .bp-panel > .bp-play,
+    .bp-panel > .bp-section {
+        pointer-events: auto;
+    }
+    .bp-mobile-layer {
+        display: contents;
+        pointer-events: none;
     }
     .bp-content {
         position: fixed;
         left: 8px;
         right: 8px;
         bottom: calc(var(--mobile-nav-height, 0px) + var(--mobile-action-height, 0px) + max(8px, env(safe-area-inset-bottom)));
-        z-index: 92;
+        z-index: 1410;
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -2091,10 +2107,11 @@ input:focus-visible,
     .bp-mobile-scrim {
         position: fixed;
         inset: 0;
-        z-index: 91;
+        z-index: 1390;
         display: block;
         border: 0;
         background: rgba(0, 0, 0, 0.46);
+        pointer-events: auto;
     }
     .bp-mobile-close {
         display: inline-flex;
@@ -2117,7 +2134,7 @@ input:focus-visible,
         left: 8px;
         right: 8px;
         bottom: calc(var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)));
-        z-index: 88;
+        z-index: 1400;
         min-height: var(--mobile-action-height, 74px);
         display: grid;
         grid-template-columns: auto minmax(0, 0.9fr) minmax(132px, 1.15fr);
@@ -2129,6 +2146,7 @@ input:focus-visible,
         background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(20, 39, 51, 0.98));
         box-shadow: 0 -14px 42px rgba(0, 0, 0, 0.62);
         backdrop-filter: blur(12px);
+        pointer-events: auto;
     }
     .bp-mobile-settings,
     .bp-mobile-play {
@@ -2136,6 +2154,8 @@ input:focus-visible,
         min-height: 52px;
         border-radius: 12px;
         cursor: pointer;
+        pointer-events: auto;
+        touch-action: manipulation;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -2208,6 +2228,14 @@ input:focus-visible,
     }
     .core-stage {
         min-height: clamp(280px, 42vh, 360px) !important;
+    }
+    .core-stage.core-stage-mobile-scroll {
+        overflow: visible;
+        min-height: auto !important;
+    }
+    .core-stage.core-stage-mobile-scroll .core-stage-body {
+        height: auto;
+        min-height: 0;
     }
     .sim-bet-strip {
         order: 8;
@@ -2591,13 +2619,25 @@ input:focus-visible,
 
 @media (max-width: 760px) {
     .core-stage {
-        min-height: min(var(--core-stage-min-height, 420px), calc(100dvh - 250px)) !important;
+        min-height: clamp(260px, 42dvh, 360px) !important;
     }
 }
 
-@media (max-height: 740px) {
+@media (max-height: 740px) and (min-width: 761px) {
     .core-stage {
         min-height: min(var(--core-stage-min-height, 420px), calc(100dvh - 210px)) !important;
+    }
+}
+
+@media (max-width: 760px) {
+    .core-stage.core-stage-mobile-scroll {
+        overflow: visible;
+        min-height: auto !important;
+    }
+
+    .core-stage.core-stage-mobile-scroll .core-stage-body {
+        height: auto;
+        min-height: 0;
     }
 }
 

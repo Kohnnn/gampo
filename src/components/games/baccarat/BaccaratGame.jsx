@@ -23,6 +23,7 @@ import {
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
 import { buildBigEyeBoy, buildBigRoad, buildCockroachPig, buildSmallRoad, latestBigRoadPosition, tailRoadColumns, tailRoadDots } from './roads'
+import { deriveBaccaratAutoBets } from './autoBets'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './baccarat.css'
@@ -130,6 +131,7 @@ export default function BaccaratGame() {
     const [lastChips, setLastChips] = useState({})
     const [lastTotal, setLastTotal] = useState(null)
     const [toast, setToast] = useState(null)
+    const [autoBetSource, setAutoBetSource] = useState('manual')
 
     const machine = useRoundMachine({})
 
@@ -144,15 +146,28 @@ export default function BaccaratGame() {
         setBets({ ...lastChips })
     }
 
-    const performPlay = ({ mode } = {}) => new Promise(resolve => {
+    const performPlay = ({ mode, betAmount } = {}) => new Promise(resolve => {
         let activeBets = bets
         let stake = totalStake
-        if (stake <= 0 && Object.keys(lastChips).length && (mode === 'auto' || mode === 'manual')) {
+        let source = 'manual'
+        if (mode === 'auto' && stake <= 0) {
+            const derived = deriveBaccaratAutoBets({ currentBets: bets, lastChips, outcomes, betAmount })
+            activeBets = derived.bets
+            source = derived.source === 'none' ? 'manual' : derived.source
+            stake = Object.values(activeBets).reduce((s, v) => s + (v || 0), 0)
+            if (stake > 0) setBets(activeBets)
+        } else if (stake <= 0 && Object.keys(lastChips).length && (mode === 'manual' || mode === 'strategy')) {
             activeBets = { ...lastChips }
+            source = 'last-manual'
             stake = Object.values(activeBets).reduce((s, v) => s + (v || 0), 0)
             setBets(activeBets)
         }
-        if (stake <= 0) { showToast('error', 'No bets', 'Place chips first'); resolve({ profit: 0 }); return }
+        setAutoBetSource(source)
+        if (stake <= 0) {
+            showToast('error', 'No bets', mode === 'auto' ? 'Select Banker or Player to seed Auto' : 'Place chips first')
+            resolve({ profit: 0 })
+            return
+        }
         if (!placeBet(stake, 'Baccarat')) { showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`); resolve({ profit: 0 }); return }
         setLastChips({ ...activeBets })
         setLastTotal(stake)
@@ -275,8 +290,11 @@ export default function BaccaratGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={620} maxWidth={960} loading={!preloader.ready} className="bac-stage-frame">
-                <div className={`bac-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+            <CoreStageFrame minHeight={620} maxWidth={960} loading={!preloader.ready} className="bac-stage-frame" mobileScrollable>
+                <div
+                    className={`bac-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}
+                    data-baccarat-auto-source={autoBetSource}
+                >
                     <RecentResultsStrip results={session.stats.lastResults} />
                     {!hand && totalStake <= 0 && (
                         <p className="bac-hint">Place chips on Banker / Player / Tie, then deal.</p>
