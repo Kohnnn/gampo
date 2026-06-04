@@ -242,7 +242,7 @@ export default function DiceGame() {
                         </div>
                         {lastWon && burstKey > 0 && <Particles key={burstKey} count={20} color="#00e701" />}
                     </div>
-                    <div className="dice-track">
+                    <div className="dice-track" data-mobile-critical-surface>
                         <div className="dice-rule">{Array.from({ length: 11 }, (_, i) => <span key={i} data-n={i * 10} style={{ left: `${i * 10}%` }} />)}</div>
                         <div className="dice-safe-zone" style={rollMode === 'under' ? { width: `${winChance}%` } : { left: `${100 - winChance}%`, width: `${winChance}%` }} />
                         <div className={`dice-marker ${lastWon === true ? 'won' : lastWon === false ? 'lost' : ''}`} style={{ left: `${lastRoll ?? 50}%` }}>

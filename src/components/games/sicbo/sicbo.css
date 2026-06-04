@@ -169,3 +169,59 @@
     font-weight: 700;
 }
 
+@media (max-width: 720px) {
+    .sb-stage {
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .sb-dice {
+        min-height: 92px;
+        gap: 12px;
+    }
+
+    .sb-cup-area {
+        min-height: 92px;
+    }
+
+    .sb-cup {
+        width: min(230px, 72vw);
+        height: 104px;
+    }
+
+    .sb-die {
+        width: 72px;
+        height: 72px;
+        border-radius: 12px;
+        font-size: 38px;
+    }
+
+    .sb-total {
+        font-size: 16px;
+    }
+
+    .sb-total strong {
+        font-size: 24px;
+    }
+
+    .sb-board {
+        max-width: none;
+        padding: 8px;
+        gap: 6px;
+        border-width: 2px;
+        overflow: visible;
+    }
+
+    .sb-row.totals { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .sb-row.singles,
+    .sb-row.pairs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .sb-row.triples { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sb-row.even-money { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .sb-cell {
+        min-height: 42px;
+        padding: 7px 4px;
+        font-size: 11px;
+        overflow-wrap: anywhere;
+    }
+}

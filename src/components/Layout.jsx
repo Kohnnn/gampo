@@ -5,6 +5,7 @@ import Sidebar from './Sidebar'
 import ChatDock from './ChatDock'
 import AchievementToast from './AchievementToast'
 import MissionToast from './MissionToast'
+import MobileBottomNav from './MobileBottomNav'
 
 const SIDEBAR_KEY = 'gampo_sidebar_open'
 
@@ -38,6 +39,7 @@ function Layout() {
                 </main>
             </div>
             <ChatDock />
+            <MobileBottomNav />
             <AchievementToast />
             <MissionToast />
         </div>

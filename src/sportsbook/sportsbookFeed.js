@@ -199,6 +199,7 @@ export async function loadSportsbookFeed() {
         leagues: mergeLeagues(synthetic.leagues, events),
         events,
         feedEvents,
+        feedSource: feedEvents.length > 0 ? 'live' : 'fallback',
         inSeason,
         errors: errors.filter(Boolean),
         quotas: { ...providerQuotas, ...getQuotaSnapshot() },

@@ -314,6 +314,18 @@
 }
 
 @media (max-width: 760px) {
+    .bac-stage {
+        align-items: stretch;
+        overflow: visible;
+    }
+
+    .bac-meta { order: 0; }
+    .bac-bets { order: 1; }
+    .bac-table { order: 2; }
+    .bac-round-status { order: 3; }
+    .bac-ticket-strip { order: 4; }
+    .bac-roads { order: 5; }
+
     .bac-round-status,
     .bac-table,
     .bac-roads {
@@ -331,7 +343,13 @@
 
 @media (max-width: 460px) {
     .bac-bets {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .bac-bet-cell {
+        min-height: 48px;
+        padding: 8px 6px;
+        font-size: 11px;
     }
 }
 
@@ -340,28 +358,13 @@
         overflow: visible;
     }
 
-    .gs-layout:has(.bac-stage-frame) > .gs-panel {
-        order: 1;
-        flex: 0 0 auto;
-        overflow: visible;
-    }
-
-    .gs-layout:has(.bac-stage-frame) > .gs-playfield {
-        order: 2;
-    }
-
-    .gs-layout:has(.bac-stage-frame) .bp-panel {
-        height: auto;
-        overflow: visible;
-    }
-
     .bac-stage-frame.core-stage {
-        min-height: 260px !important;
+        min-height: 420px !important;
     }
 
     .bac-stage {
-        max-height: 242px;
-        overflow-y: auto;
+        max-height: none;
+        overflow: visible;
         align-items: stretch;
         gap: 8px;
     }
@@ -370,9 +373,9 @@
         grid-template-columns: 1fr;
     }
 
-    .bac-ticket-strip,
     .bac-roads {
-        display: none;
+        max-height: 210px;
+        overflow: auto;
     }
 
     .bac-table {
@@ -390,5 +393,11 @@
 
     .bac-bets {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .bac-bets .bac-bet-cell:first-child,
+    .bac-bets .bac-bet-cell:nth-child(2),
+    .bac-bets .bac-bet-cell:nth-child(3) {
+        min-height: 54px;
     }
 }

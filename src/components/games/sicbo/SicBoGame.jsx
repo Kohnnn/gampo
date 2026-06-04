@@ -181,7 +181,7 @@ export default function SicBoGame() {
                 )}
                 <div className="sb-total">Total <strong>{dice.reduce((a, b) => a + b, 0)}</strong></div>
 
-                <div className="sb-board">
+                <div className="sb-board" data-mobile-critical-surface>
                     <div className="sb-row-label">Even-money / Odd-Even / Big-Small</div>
                     <div className="sb-row even-money">
                         {[

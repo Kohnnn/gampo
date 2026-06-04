@@ -570,7 +570,7 @@ export default function BlackjackGame() {
                             emptyHint={phase === 'idle' ? 'Pick decks · S17/H17 · then Deal' : null}
                         />
                     )}
-                    <div className="bj-actions">
+                    <div className="bj-actions" data-mobile-critical-surface>
                         <button className={`bj-primary-action ${hintAction === 'hit' ? 'recommended' : ''}`} disabled={phase !== 'playing' || activeHand.status !== 'active' || activeHand.isSplitAces} onClick={hit}>Hit</button>
                         <button className={`bj-primary-action ${hintAction === 'stand' ? 'recommended' : ''}`} disabled={phase !== 'playing' || activeHand.status !== 'active'} onClick={stand}>Stand</button>
                         <button disabled={phase !== 'playing' || !canSplitActive} onClick={split}>Split</button>

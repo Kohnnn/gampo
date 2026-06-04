@@ -86,7 +86,7 @@ function SportsbookShell() {
             setEvents(feed.events)
             setFeedErrors(feed.errors || [])
             setQuotas(feed.quotas || {})
-            setFeedLoaded(feed.feedEvents?.length > 0)
+            setFeedLoaded(feed.feedSource === 'live' || feed.feedEvents?.length > 0)
         })
         return () => { mounted = false }
     }, [])
@@ -117,6 +117,7 @@ function SportsbookShell() {
     const activeEvent = events.find(event => event.id === viewState.eventId) || null
     const visibleEvents = useMemo(() => filterEvents(events, viewState), [events, viewState])
     const totalQuotaRemaining = Object.values(quotas).reduce((sum, quota) => sum + (Number(quota?.remaining) || 0), 0)
+    const feedSource = feedLoaded ? 'live' : 'fallback'
     const betSlipStatus = deriveBetSlipStatus({ selections, stake, settings, placing, lastTicket: tickets[0] })
 
     const navigateSportsbook = (next) => {
@@ -148,7 +149,7 @@ function SportsbookShell() {
         setEvents(feed.events)
         setFeedErrors(feed.errors || [])
         setQuotas(feed.quotas || {})
-        setFeedLoaded(feed.feedEvents?.length > 0)
+        setFeedLoaded(feed.feedSource === 'live' || feed.feedEvents?.length > 0)
     }
 
     const placePracticeTicket = () => {
@@ -172,7 +173,7 @@ function SportsbookShell() {
     }
 
     return (
-        <div className="sb-page" data-sportsbook-view={viewState.view}>
+        <div className="sb-page" data-sportsbook-view={viewState.view} data-sportsbook-feed-source={feedSource}>
             <SportsRail
                 sports={sports}
                 view={viewState.view}
@@ -187,9 +188,9 @@ function SportsbookShell() {
                         <h1 id="sportsbook-heading">{titleForView(viewState, sports)}</h1>
                     </div>
                     <div className="sb-topbar-actions">
-                        {feedLoaded ? <small><Radio size={12} /> optional feed connected</small> : null}
+                        {feedLoaded ? <small><Radio size={12} /> optional feed connected</small> : <small>synthetic practice fallback</small>}
                         {feedErrors.length ? <small className="is-warning"><AlertTriangle size={12} /> {feedErrors[0]}</small> : null}
-                        {totalQuotaRemaining ? <small>Quota {totalQuotaRemaining}</small> : null}
+                        {totalQuotaRemaining ? <small>API quota {totalQuotaRemaining}</small> : null}
                         <button type="button" onClick={refreshFeed}><RefreshCcw size={15} /> Refresh</button>
                     </div>
                 </header>
@@ -286,10 +287,7 @@ function SportsbookShell() {
 
             <MobileSportsNav
                 selectionCount={selections.length}
-                onBrowse={() => navigateSportsbook({ view: 'home' })}
-                onSearch={() => setSearchOpen(true)}
                 onOpenBetSlip={() => setMobileSlipOpen(true)}
-                onCasino={() => navigate('/')}
             />
         </div>
     )

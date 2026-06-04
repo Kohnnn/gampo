@@ -76,6 +76,14 @@ export default function CoinFlipGame() {
         >
             <div className={`coinflip-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
+                <div className="coin-stage-choices" data-mobile-critical-surface>
+                    <button className={choice === 'head' ? 'active' : ''} disabled={flipping} onClick={() => setChoice('head')}>
+                        Heads
+                    </button>
+                    <button className={choice === 'tail' ? 'active' : ''} disabled={flipping} onClick={() => setChoice('tail')}>
+                        Tails
+                    </button>
+                </div>
                 <div className={`coin3d-stage ${flipping ? 'flipping' : ''}`}>
                     <div className="coin3d">
                         <div className="coin3d-face front"><Asset src={HEAD} fallback={<span style={{ fontSize: 48 }}>👑</span>} /></div>

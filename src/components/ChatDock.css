@@ -456,16 +456,24 @@
     .chat-dock.w-stats,
     .chat-dock.w-progress {
         right: 8px;
-        bottom: 8px;
+        bottom: calc(var(--mobile-nav-height, 64px) + max(10px, env(safe-area-inset-bottom)));
         width: calc(100vw - 16px);
         max-height: min(54vh, 420px);
     }
 
     .chat-dock.game-safe {
         top: auto;
-        bottom: 8px;
+        bottom: calc(var(--mobile-nav-height, 64px) + var(--mobile-action-height, 0px) + max(10px, env(safe-area-inset-bottom)));
         width: calc(100vw - 16px);
         max-height: min(42vh, 340px);
+    }
+
+    .chat-dock-fab {
+        display: none;
+    }
+
+    .chat-dock-mini {
+        display: none;
     }
 }
 

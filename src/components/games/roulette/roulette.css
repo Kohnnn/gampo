@@ -809,17 +809,20 @@
 
 @media (max-width: 480px) {
     .roulette-stage {
-        max-height: 190px;
-        overflow-y: auto;
+        max-height: none;
+        overflow: visible;
         align-items: stretch;
+        gap: 8px;
     }
 
     .rou-top-deck {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(120px, 0.75fr) minmax(0, 1fr);
+        align-items: center;
+        gap: 8px;
     }
 
     .rou-wheel-area {
-        width: min(220px, 70vw);
+        width: min(132px, 36vw);
         justify-self: center;
     }
 
@@ -830,39 +833,57 @@
     .rou-ticket-strip {
         display: none;
     }
+
+    .rou-recent-rail-col {
+        display: none;
+    }
+
+    .rou-recent-rail {
+        max-height: 66px;
+        overflow: hidden;
+    }
+
+    .rou-state-card {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .rou-state-card div {
+        padding: 7px 8px;
+    }
+
+    .rou-state-card div:nth-child(2) {
+        display: none;
+    }
+
+    .rou-board {
+        grid-template-columns: 30px repeat(13, minmax(18px, 1fr));
+        gap: 2px;
+        padding: 5px;
+    }
+
+    .rou-cell {
+        min-height: 34px;
+        font-size: 10px;
+    }
+
+    .rou-extra-row,
+    .rou-racetrack {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4px;
+    }
+
+    .rou-outside,
+    .rou-race-btn {
+        min-height: 38px;
+        padding: 5px;
+        font-size: 10px;
+    }
 }
 
 @media (max-width: 400px) {
     .gs-layout:has(.roulette-stage) {
         overflow: visible;
-    }
-
-    .gs-layout:has(.roulette-stage) > .gs-panel {
-        order: 1;
-        flex: 0 0 auto;
-        overflow: visible;
-    }
-
-    .gs-layout:has(.roulette-stage) > .gs-playfield {
-        order: 2;
-    }
-
-    .gs-layout:has(.roulette-stage) .bp-panel {
-        height: auto;
-        overflow: visible;
-        padding: 10px;
-        gap: 7px;
-    }
-
-    .gs-layout:has(.roulette-stage) .bp-section {
-        padding-top: 2px;
-        padding-bottom: 2px;
-        gap: 6px;
-    }
-
-    .gs-layout:has(.roulette-stage) .bp-bal-line,
-    .gs-layout:has(.roulette-stage) .rou-empty-hint {
-        display: none;
     }
 
     .gs-layout:has(.roulette-stage) .rou-controls {
@@ -881,10 +902,12 @@
         height: 40px;
     }
 
-    .gs-layout:has(.roulette-stage) .bp-play {
-        height: 48px;
-        min-height: 48px;
-        flex-basis: 48px;
+    .rou-wheel-area {
+        width: min(120px, 34vw);
+    }
+
+    .rou-cell {
+        min-height: 32px;
     }
 }
 

@@ -142,4 +142,24 @@ describe('free provider sportsbook adapters', () => {
         expect(event.marketGroups.map(group => group.id)).toEqual(['winner', 'spread', 'total'])
         expect(event.marketGroups[0].selections.map(selection => selection.decimalOdds)).toEqual([1.83, 2.1])
     })
+
+    it('preserves provider team display names exactly while normalizing internal sport ids', () => {
+        const event = normalizeSportsGameOddsEvent({
+            eventID: 'sgo-display',
+            sportID: 'BASKETBALL',
+            leagueID: 'NBA',
+            teams: {
+                home: { names: { long: 'Denver PEAKS 2026' } },
+                away: { names: { long: 'Miami-Tides FC' } },
+            },
+            status: { startsAt: '2026-05-26T20:00:00Z' },
+            odds: {},
+        })
+
+        expect(event.sportId).toBe('basketball')
+        expect(event.home).toBe('Denver PEAKS 2026')
+        expect(event.away).toBe('Miami-Tides FC')
+        expect(event.participants).toEqual(['Denver PEAKS 2026', 'Miami-Tides FC'])
+        expect(event.marketGroups[0].selections.map(selection => selection.label)).toEqual(['Denver PEAKS 2026', 'Miami-Tides FC'])
+    })
 })

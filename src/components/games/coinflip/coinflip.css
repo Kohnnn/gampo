@@ -9,6 +9,10 @@
     border-radius: 16px;
 }
 
+.coin-stage-choices {
+    display: none;
+}
+
 .coin3d-stage {
     perspective: 1200px;
     width: min(280px, 60vw);
@@ -119,3 +123,38 @@
     box-shadow: 0 0 18px rgba(109, 183, 255, 0.34);
 }
 
+@media (max-width: 720px) {
+    .coinflip-stage {
+        gap: 14px;
+        padding: 14px 6px;
+    }
+
+    .coin-stage-choices {
+        width: min(100%, 340px);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .coin-stage-choices button {
+        min-height: 44px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.28);
+        color: var(--text-secondary);
+        font-weight: 950;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .coin-stage-choices button.active {
+        border-color: var(--bet-marker);
+        background: var(--bet-marker-soft);
+        color: var(--bet-marker);
+        box-shadow: 0 0 16px rgba(109, 183, 255, 0.3);
+    }
+
+    .coin3d-stage {
+        width: min(250px, 72vw);
+    }
+}

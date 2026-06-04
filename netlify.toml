@@ -5,6 +5,15 @@
 [build.environment]
     NODE_VERSION = "20"
 
+[functions]
+    directory = "netlify/functions"
+    node_bundler = "esbuild"
+
+[[redirects]]
+    from = "/api/sportsbook/free-feed"
+    to = "/.netlify/functions/sportsbook-free-feed"
+    status = 200
+
 [[redirects]]
     from = "/*"
     to = "/index.html"

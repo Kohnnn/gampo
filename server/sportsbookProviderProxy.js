@@ -237,7 +237,7 @@ async function loadApiFootball(token) {
     }
 }
 
-async function loadProviderFeed(env) {
+export async function loadProviderFeed(env) {
     const now = Date.now()
     if (cachedFeed && now - cachedFeed.ts < CACHE_TTL_MS) return { ...cachedFeed.value, cached: true }
 

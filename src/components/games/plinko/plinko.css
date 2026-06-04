@@ -161,11 +161,29 @@
         padding: 5px 8px;
     }
     .plinko-canvas-wrap { padding: 8px 6px; gap: 5px; }
-    .plinko-bins { padding: 0 26px; }
-    .plinko-bin-chip { font-size: 9px; padding: 4px 0; }
+    .plinko-bins {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        width: auto;
+        padding: 0 10px;
+        gap: 2px;
+        z-index: 2;
+        pointer-events: none;
+    }
+    .plinko-bin-chip {
+        min-width: 0;
+        font-size: 8px;
+        line-height: 1;
+        padding: 4px 0;
+        overflow: hidden;
+        text-overflow: clip;
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.32) !important;
+    }
     .plinko-ball-grid { grid-template-columns: repeat(6, 1fr); }
     .plinko-ball-chip img { height: 20px; }
     .plinko-stage .sim-bet-strip { display: none; }
-    .plinko-canvas { height: clamp(116px, 22dvh, 190px); }
+    .plinko-canvas { height: clamp(170px, 30dvh, 240px); }
     .plinko-meta { padding: 8px 10px; font-size: 10px; }
 }

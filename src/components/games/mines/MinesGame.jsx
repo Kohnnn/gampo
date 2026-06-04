@@ -329,7 +329,7 @@ export default function MinesGame() {
                         <MultiplierBadge label="Current" value={currentMult} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="sm" />
                         <MultiplierBadge label="Next pick" value={nextMult} size="sm" />
                     </div>
-                    <div className="mines-grid">
+                    <div className="mines-grid" data-mobile-critical-surface>
                         {Array.from({ length: GRID }, (_, i) => {
                             const isRevealed = revealed.includes(i)
                             const isBomb = bombSet?.has(i)

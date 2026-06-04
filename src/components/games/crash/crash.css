@@ -6,6 +6,10 @@
     height: 100%;
 }
 
+.crash-mobile-targets {
+    display: none;
+}
+
 .crash-deck {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
@@ -399,7 +403,59 @@
 }
 
 @media (max-width: 720px) {
+    .crash-stage {
+        overflow: visible;
+        align-items: stretch;
+    }
+
+    .crash-mobile-targets {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+        padding: 8px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.24);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .crash-mobile-targets span {
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 950;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .crash-mobile-targets div {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 5px;
+    }
+
+    .crash-mobile-targets button {
+        min-height: 38px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.28);
+        color: var(--text-secondary);
+        font-weight: 950;
+    }
+
+    .crash-mobile-targets button.active {
+        border-color: #ff7ab6;
+        color: #ffd7ec;
+        background: rgba(255, 122, 182, 0.16);
+    }
+
     .crash-screen { min-height: 240px; }
+    .crash-deck {
+        min-height: 0;
+        gap: 8px;
+    }
+    .crash-side-rail {
+        max-height: 132px;
+        padding: 8px;
+    }
     .crash-mult-num { font-size: 64px; }
     .crash-rocket { width: 70px; }
     .crash-exhaust { width: 100px; }

@@ -33,4 +33,9 @@ describe('ChatDock contract', () => {
         expect(css).toMatch(/\.chat-dock\.game-safe\s*\{[^}]*width:\s*400px/s)
         expect(css).toMatch(/\.chat-dock\.game-safe\s*\{[^}]*max-height:\s*min\(46vh,\s*390px\)/s)
     })
+
+    it('keeps mobile chat behind global navigation instead of adding a second FAB', () => {
+        expect(css).toMatch(/\.chat-dock-fab\s*\{[^}]*display:\s*none/s)
+        expect(css).toContain('bottom: calc(var(--mobile-nav-height, 64px)')
+    })
 })

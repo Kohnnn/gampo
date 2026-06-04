@@ -178,7 +178,7 @@ export default function KenoGame() {
                 <div className="keno-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim keno" />
-                    <div className="keno-grid">
+                    <div className="keno-grid" data-mobile-critical-surface>
                         {Array.from({ length: 40 }, (_, i) => i + 1).map(n => {
                             const isSel = selected.includes(n)
                             const isDr = drawAnim.includes(n)

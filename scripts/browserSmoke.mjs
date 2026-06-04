@@ -76,6 +76,7 @@ const KEY_ACTIONS = {
     '/chickencross': /cross|cashout|bet|start|go/i,
     '/videopoker': /deal|draw|hold|bet/i,
     '/crash': /bet|cashout|start/i,
+    '/coinflip': /flip|heads|tails|bet|play/i,
 }
 
 function argValue(name, fallback) {

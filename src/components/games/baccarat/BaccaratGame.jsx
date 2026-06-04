@@ -328,7 +328,7 @@ export default function BaccaratGame() {
                         </div>
                     </div>
 
-                    <div className="bac-bets">
+                    <div className="bac-bets" data-mobile-critical-surface>
                         {[
                             { key: 'banker', label: 'Banker 1.95×', cls: 'banker' },
                             { key: 'player', label: 'Player 2×', cls: 'player' },
