@@ -317,6 +317,7 @@
     .bac-stage {
         align-items: stretch;
         overflow: visible;
+        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .bac-meta { order: 0; }

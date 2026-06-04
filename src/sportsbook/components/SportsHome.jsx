@@ -57,6 +57,9 @@ function SportsHome({ events, sports, leagues, selectedIds, onToggleSelection, o
                     )
                 })}
             </section>
+            <div className="sb-scroll-dots" aria-hidden="true">
+                {PROMO_CARDS.map(card => <span key={card.id} />)}
+            </div>
 
             <button type="button" className="sb-search-trigger" onClick={onOpenSearch}>
                 <Search size={20} />

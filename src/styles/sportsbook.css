@@ -175,6 +175,25 @@
     gap: 14px;
 }
 
+.sb-scroll-dots {
+    display: none;
+    justify-content: center;
+    gap: 5px;
+    margin: 8px 0 12px;
+}
+
+.sb-scroll-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(202, 228, 239, 0.34);
+}
+
+.sb-scroll-dots span:first-child {
+    width: 18px;
+    background: #cae4ef;
+}
+
 .sb-promo {
     min-height: 148px;
     display: grid;
@@ -1664,6 +1683,10 @@
         overflow-x: auto;
         scroll-snap-type: x mandatory;
         padding-bottom: 2px;
+    }
+
+    .sb-scroll-dots {
+        display: flex;
     }
 
     .sb-promo {

@@ -147,6 +147,7 @@ export default function PokerGame() {
     const lastPutInRef = useRef({})
     const thinkRafRef = useRef(null)
     const thinkStartRef = useRef(0)
+    const tableRef = useRef(null)
 
     useEffect(() => {
         let active = true
@@ -202,20 +203,20 @@ export default function PokerGame() {
         }
     }, [state])
 
-    const startSession = (selectedFormat = format) => {
-        if (balance < buyIn) {
-            showToast('error', `Need ${formatCredits(buyIn)}`, 'Add credits to sit down')
+    const enterPokerSession = (selectedFormat = format, selectedBuyIn = buyIn) => {
+        if (balance < selectedBuyIn) {
+            showToast('error', `Need ${formatCredits(selectedBuyIn)}`, 'Add credits to sit down')
             return
         }
-        if (!placeBet(buyIn, 'Poker buy-in')) return
+        if (!placeBet(selectedBuyIn, 'Poker buy-in')) return
         const blindLevel = selectedFormat === 'cash' ? cashGameLevel() : blindLevelForHand(1)
         const personas = samplePersonas()
         const seats = [
-            { id: 'you', name: 'you', stack: buyIn, isHuman: true },
-            ...personas.map(p => ({ id: p.id, name: p.name, stack: buyIn, avatar: p.avatar, persona: p, pokerStyle: p.pokerStyle })),
+            { id: 'you', name: 'you', stack: selectedBuyIn, isHuman: true },
+            ...personas.map(p => ({ id: p.id, name: p.name, stack: selectedBuyIn, avatar: p.avatar, persona: p, pokerStyle: p.pokerStyle })),
         ]
         const init = createInitialState({ players: seats, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante, buttonIndex: 4 })
-        initialBuyInRef.current = buyIn
+        initialBuyInRef.current = selectedBuyIn
         setFormat(selectedFormat)
         setState(startHand(init))
         setHandNumber(1)
@@ -227,6 +228,9 @@ export default function PokerGame() {
         setChipMotions([])
         setThinkProgress(0)
         playSound('deal')
+        window.requestAnimationFrame(() => {
+            tableRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+        })
     }
 
     // Wave 12: bot decision driver with time-bank progress bar.
@@ -509,12 +513,14 @@ export default function PokerGame() {
                     {/* Wave 12: format toggle */}
                     <div className="poker-format-toggle" role="tablist" aria-label="Format">
                         <button
+                            type="button"
                             role="tab"
                             aria-selected={format === 'sng'}
                             className={format === 'sng' ? 'active' : ''}
                             onClick={() => setFormat('sng')}
                         >Sit-and-go ({SNG_HAND_LIMIT}h)</button>
                         <button
+                            type="button"
                             role="tab"
                             aria-selected={format === 'cash'}
                             className={format === 'cash' ? 'active' : ''}
@@ -523,11 +529,19 @@ export default function PokerGame() {
                     </div>
                     <div className="poker-buyin-options">
                         {BUY_INS.map(amount => (
-                            <button key={amount} className={buyIn === amount ? 'active' : ''} disabled={balance < amount} onClick={() => setBuyIn(amount)}>{formatCredits(amount)}</button>
+                            <button type="button" key={amount} className={buyIn === amount ? 'active' : ''} disabled={balance < amount} onClick={() => setBuyIn(amount)}>{formatCredits(amount)}</button>
                         ))}
                     </div>
                     {sngComplete && <div className="pk-lobby-note">Last sit-and-go completed. Choose a stake to sit fresh.</div>}
-                    <button className="poker-buyin" disabled={balance < buyIn} onClick={() => startSession(format)}>Sit Down {formatCredits(buyIn)}</button>
+                    <button
+                        type="button"
+                        className="poker-buyin"
+                        disabled={balance < buyIn}
+                        onClick={() => enterPokerSession(format, buyIn)}
+                        data-poker-action="sit-down"
+                    >
+                        Sit Down {formatCredits(buyIn)}
+                    </button>
                 </div>
             )}
 
@@ -608,7 +622,7 @@ export default function PokerGame() {
                         </div>
                     )}
 
-                    <div className="poker-layout">
+                    <div className="poker-layout" ref={tableRef}>
                         <div className="poker-table">
                             <div className="pk-table-status" aria-label="Live poker table status">
                                 <div>
@@ -703,9 +717,9 @@ export default function PokerGame() {
                                             <strong>{isHumanTurn ? 'Choose fold, call/check, or size a raise.' : tableStateLabel}</strong>
                                         </div>
                                         {acts.map(a => {
-                                            if (a.type === 'fold') return <button key={a.type} className="pk-act fold" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'fold' })}>Fold</button>
-                                            if (a.type === 'check') return <button key={a.type} className="pk-act check" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'check' })}>Check</button>
-                                            if (a.type === 'call') return <button key={a.type} className="pk-act call" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'call' })}>Call {formatCredits(a.amount)}</button>
+                                            if (a.type === 'fold') return <button key={a.type} className="pk-act fold" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'fold' })} data-poker-action="fold">Fold</button>
+                                            if (a.type === 'check') return <button key={a.type} className="pk-act check" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'check' })} data-poker-action="check">Check</button>
+                                            if (a.type === 'call') return <button key={a.type} className="pk-act call" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'call' })} data-poker-action="call">Call {formatCredits(a.amount)}</button>
                                             if (a.type === 'raise') {
                                                 const r = a
                                                 return (
@@ -718,7 +732,7 @@ export default function PokerGame() {
                                                             <button onClick={() => setRaiseAmount(r.max)}>All-in</button>
                                                         </div>
                                                         <input type="range" min={r.min} max={r.max} value={raiseAmount ?? r.min} onChange={e => setRaiseAmount(Number(e.target.value))} />
-                                                        <button className="pk-act raise" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'raise', amount: raiseAmount ?? r.min })}>Raise to {formatCredits(raiseAmount ?? r.min)}</button>
+                                                        <button className="pk-act raise" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'raise', amount: raiseAmount ?? r.min })} data-poker-action="raise">Raise to {formatCredits(raiseAmount ?? r.min)}</button>
                                                     </div>
                                                 )
                                             }

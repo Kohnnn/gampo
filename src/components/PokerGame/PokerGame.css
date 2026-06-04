@@ -1740,3 +1740,157 @@
         font-size: 10px;
     }
 }
+
+/* Mobile QA v2: compact seated table with a reachable action bar. */
+@media (max-width: 760px) {
+    .poker-page {
+        padding: 8px 8px calc(var(--mobile-nav-height, 64px) + 18px);
+        scroll-padding-bottom: calc(var(--mobile-nav-height, 64px) + 88px);
+    }
+
+    .poker-lobby {
+        margin: 14px auto calc(var(--mobile-nav-height, 64px) + 24px);
+        padding: 18px 14px;
+    }
+
+    .poker-layout {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+        padding-bottom: calc(var(--mobile-nav-height, 64px) + 18px);
+    }
+
+    .poker-table {
+        padding: 8px;
+        overflow: visible;
+    }
+
+    .pk-table-status {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-bottom: 6px;
+    }
+
+    .pk-table-status div {
+        min-height: 34px;
+        padding: 5px 7px;
+    }
+
+    .poker-table-felt {
+        min-height: 348px;
+        height: auto;
+        aspect-ratio: 1 / 1.13;
+        border-width: 6px;
+        border-radius: 72px / 112px;
+    }
+
+    .pk-pot {
+        top: 43%;
+        font-size: 12px;
+        padding: 4px 9px;
+    }
+
+    .pk-board {
+        top: 38%;
+        gap: 3px;
+    }
+
+    .pk-card {
+        width: 28px;
+        height: 40px;
+        padding: 3px;
+    }
+
+    .pk-seat {
+        min-width: 54px;
+        max-width: 88px;
+        padding: 4px 5px;
+        border-radius: 10px;
+    }
+
+    .pk-avatar {
+        width: 26px;
+        height: 26px;
+    }
+
+    .pk-seat-info .pk-name,
+    .pk-seat-info .pk-stack {
+        font-size: 9px;
+    }
+
+    .pk-seat-cards .pk-card {
+        width: 17px;
+        height: 25px;
+    }
+
+    .pk-actions {
+        position: sticky;
+        bottom: calc(var(--mobile-nav-height, 64px) + 8px);
+        z-index: 36;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        margin-top: 8px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(7, 16, 24, 0.98));
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .pk-action-status,
+    .pk-raise {
+        grid-column: 1 / -1;
+    }
+
+    .pk-act {
+        min-height: 42px;
+        height: auto;
+        padding: 0 10px;
+        font-size: 12px;
+    }
+
+    .pk-raise-presets {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .pk-raise-presets button {
+        padding: 5px 4px;
+        font-size: 9px;
+    }
+
+    .poker-sidebar {
+        position: static;
+        max-height: 260px;
+        min-height: 0;
+    }
+
+    .poker-sidebar-body {
+        max-height: 210px;
+    }
+}
+
+@media (max-width: 420px) {
+    .poker-table-felt {
+        min-height: 318px;
+        border-radius: 58px / 96px;
+    }
+
+    .pk-info-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pk-info-cashout,
+    .pk-info-topup {
+        grid-column: span 2;
+    }
+
+    .pk-action-status strong {
+        font-size: 11px;
+    }
+
+    .pk-raise-presets button:nth-child(-n+2) {
+        display: none;
+    }
+
+    .pk-raise-presets {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}

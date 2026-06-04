@@ -173,6 +173,7 @@
     .sb-stage {
         align-items: stretch;
         gap: 10px;
+        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .sb-dice {
@@ -219,9 +220,13 @@
     .sb-row.even-money { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
     .sb-cell {
-        min-height: 42px;
-        padding: 7px 4px;
-        font-size: 11px;
+        min-height: 36px;
+        padding: 6px 3px;
+        font-size: 10px;
         overflow-wrap: anywhere;
+    }
+
+    .sb-cell .sb-payout {
+        font-size: 8px;
     }
 }

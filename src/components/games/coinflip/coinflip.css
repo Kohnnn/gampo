@@ -126,7 +126,7 @@
 @media (max-width: 720px) {
     .coinflip-stage {
         gap: 14px;
-        padding: 14px 6px;
+        padding: 14px 6px calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .coin-stage-choices {
@@ -155,6 +155,6 @@
     }
 
     .coin3d-stage {
-        width: min(250px, 72vw);
+        width: min(190px, 58vw);
     }
 }

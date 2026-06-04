@@ -270,6 +270,7 @@ export default function MinesGame() {
                     initialBet={5}
                     runningRound={false}
                     actionLabel="Place Bet"
+                    mobilePlayLabel={inRound && picks > 0 ? `Cash ${currentMult.toFixed(2)}x` : 'Bet'}
                     onPlay={performPlay}
                     autoChildren={
                         <div className="bp-section">

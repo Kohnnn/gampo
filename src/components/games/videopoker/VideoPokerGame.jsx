@@ -191,6 +191,7 @@ export default function VideoPokerGame() {
                     lastBet={lastBet}
                     playPhase={phase === 'draw' ? 'in-round' : null}
                     playLabel={phase === 'draw' ? 'Draw' : 'Deal'}
+                    mobilePlayLabel={phase === 'draw' ? 'Draw' : 'Deal'}
                     onPlayPhaseAction={draw}
                 >
                     <p className="bp-hint">Click cards to hold; Draw replaces unheld cards.</p>
@@ -206,13 +207,6 @@ export default function VideoPokerGame() {
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="vp-stage-frame">
                 <div className="vp-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="vp-paytable">
-                        {PAYTABLE.map(row => (
-                            <div key={row.key} className={`vp-paytable-row ${outcomeKey === row.key ? 'won' : ''}`}>
-                                <span>{row.key}</span><strong>{row.multiplier}×</strong>
-                            </div>
-                        ))}
-                    </div>
                     <div className="vp-row" data-mobile-critical-surface>
                         {phase === 'idle' && cards.length === 0 && (
                             <div className="vp-empty-overlay">Click Deal to start</div>
@@ -232,6 +226,16 @@ export default function VideoPokerGame() {
                             </button>
                         ))}
                     </div>
+                    <details className="vp-paytable-shell" open>
+                        <summary>Paytable</summary>
+                        <div className="vp-paytable">
+                            {PAYTABLE.map(row => (
+                                <div key={row.key} className={`vp-paytable-row ${outcomeKey === row.key ? 'won' : ''}`}>
+                                    <span>{row.key}</span><strong>{row.multiplier}×</strong>
+                                </div>
+                            ))}
+                        </div>
+                    </details>
                     {outcomeKey && burstKey > 0 && <Particles key={burstKey} count={14} color="#8ae66e" />}
                     <ActionLockOverlay active={false} />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />

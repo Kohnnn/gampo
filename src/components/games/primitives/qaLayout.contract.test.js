@@ -7,6 +7,8 @@ const betPanelSource = readFileSync(new URL('./BetPanel.jsx', import.meta.url), 
 const preloaderSource = readFileSync(new URL('../resources/useOriginalsPreloader.js', import.meta.url), 'utf8')
 const minesSource = readFileSync(new URL('../mines/MinesGame.jsx', import.meta.url), 'utf8')
 const minesCss = readFileSync(new URL('../mines/mines.css', import.meta.url), 'utf8')
+const slotsSource = readFileSync(new URL('../slots/SlotsGame.jsx', import.meta.url), 'utf8')
+const slotsCss = readFileSync(new URL('../slots/slots.css', import.meta.url), 'utf8')
 const plinkoCss = readFileSync(new URL('../plinko/plinko.css', import.meta.url), 'utf8')
 const plinkoSource = readFileSync(new URL('../plinko/PlinkoGame.jsx', import.meta.url), 'utf8')
 const plinkoEngineSource = readFileSync(new URL('../plinko/engine/PlinkoEngine.js', import.meta.url), 'utf8')
@@ -19,9 +21,12 @@ const baccaratSource = readFileSync(new URL('../baccarat/BaccaratGame.jsx', impo
 const blackjackSource = readFileSync(new URL('../blackjack/BlackjackGame.jsx', import.meta.url), 'utf8')
 const crashSource = readFileSync(new URL('../crash/CrashGame.jsx', import.meta.url), 'utf8')
 const coinflipSource = readFileSync(new URL('../coinflip/CoinFlipGame.jsx', import.meta.url), 'utf8')
+const rpsSource = readFileSync(new URL('../rps/RpsGame.jsx', import.meta.url), 'utf8')
 const sicboSource = readFileSync(new URL('../sicbo/SicBoGame.jsx', import.meta.url), 'utf8')
 const videopokerSource = readFileSync(new URL('../videopoker/VideoPokerGame.jsx', import.meta.url), 'utf8')
+const videopokerCss = readFileSync(new URL('../videopoker/videopoker.css', import.meta.url), 'utf8')
 const kenoSource = readFileSync(new URL('../keno/KenoGame.jsx', import.meta.url), 'utf8')
+const hiloSource = readFileSync(new URL('../hilo/HiloGame.jsx', import.meta.url), 'utf8')
 const diceSource = readFileSync(new URL('../dice/DiceGame.jsx', import.meta.url), 'utf8')
 const educationSource = readFileSync(new URL('../../EducationPanel.jsx', import.meta.url), 'utf8')
 const smokeSource = readFileSync(new URL('../../../../scripts/browserSmoke.mjs', import.meta.url), 'utf8')
@@ -47,7 +52,7 @@ describe('QA layout and loader contracts', () => {
         expect(plinkoEngineSource).toContain("this.canvas.style.width = ''")
         expect(plinkoEngineSource).toContain("this.canvas.style.height = ''")
         expect(minesCss).toMatch(/\.mines-grid\s*\{[^}]*aspect-ratio:\s*1 \/ 1/s)
-        expect(minesCss).toContain('width: min(100%, clamp(230px, calc(100dvh - 350px), 340px))')
+        expect(minesCss).toContain('width: min(100%, clamp(190px, calc(100dvh - 500px), 220px))')
         expect(limboCss).toContain('@media (max-height: 740px)')
         expect(limboCss).toContain('width: min(300px, 64vw, 40dvh)')
     })
@@ -55,10 +60,21 @@ describe('QA layout and loader contracts', () => {
     it('keeps mobile playfields before controls and exposes one shared action dock', () => {
         expect(betPanelSource).toContain('data-mobile-action-dock')
         expect(betPanelSource).toContain('data-mobile-primary-action')
+        expect(betPanelSource).toContain('mobilePlayLabel')
         expect(primitivesCss).toMatch(/\.gs-playfield\s*\{[^}]*order:\s*1/s)
         expect(primitivesCss).toMatch(/\.gs-panel\s*\{[^}]*order:\s*2/s)
+        expect(primitivesCss).toContain('bottom: calc(var(--mobile-safe-bottom, 138px) + 10px)')
         expect(rouletteCss).not.toMatch(/>\s*\.gs-panel\s*\{[\s\S]*order:\s*1;/)
         expect(baccaratCss).not.toMatch(/>\s*\.gs-panel\s*\{[\s\S]*order:\s*1;/)
+    })
+
+    it('keeps slot spin reachable with a slot-owned mobile dock', () => {
+        expect(slotsSource).toContain('data-slot-mobile-dock')
+        expect(slotsSource).toContain('data-slot-action="spin"')
+        expect(slotsCss).toContain('.slot-mobile-dock')
+        expect(slotsCss).toContain('position: fixed')
+        expect(slotsCss).toContain('bottom: calc(var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)))')
+        expect(slotsCss).toMatch(/@media \(max-width: 760px\)[\s\S]*\.slot-controls-v2\s*\{[\s\S]*display:\s*none/s)
     })
 
     it('marks audited mobile critical surfaces for browser smoke visibility checks', () => {
@@ -68,11 +84,13 @@ describe('QA layout and loader contracts', () => {
             blackjackSource,
             crashSource,
             coinflipSource,
+            rpsSource,
             minesSource,
             plinkoSource,
             sicboSource,
             videopokerSource,
             kenoSource,
+            hiloSource,
             diceSource,
         ]) {
             expect(source).toContain('data-mobile-critical-surface')
@@ -80,6 +98,8 @@ describe('QA layout and loader contracts', () => {
         expect(blackjackCss).toContain('position: sticky')
         expect(rouletteCss).not.toContain('max-height: 190px')
         expect(baccaratCss).not.toContain('max-height: 242px')
+        expect(videopokerCss).toContain('grid-template-columns: repeat(5, minmax(0, 1fr))')
+        expect(videopokerSource).toContain('vp-paytable-shell')
     })
 
     it('enables Mines auto mode with a safe cashout target', () => {

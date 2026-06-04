@@ -55,18 +55,19 @@
 @media (max-width: 640px) {
     .keno-stage {
         gap: 10px;
-        padding: 12px 6px;
+        padding: 12px 6px calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .keno-grid {
+        width: min(100%, 300px);
         grid-template-columns: repeat(8, minmax(0, 1fr));
-        gap: 5px;
+        gap: 3px;
     }
 
     .keno-grid button {
         border-width: 1px;
-        border-radius: 7px;
-        font-size: 12px;
+        border-radius: 5px;
+        font-size: 10px;
         min-width: 0;
     }
 }

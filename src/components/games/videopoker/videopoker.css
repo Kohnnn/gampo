@@ -18,6 +18,15 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
+.vp-paytable-shell {
+    width: 100%;
+    max-width: 440px;
+}
+
+.vp-paytable-shell summary {
+    display: none;
+}
+
 .vp-paytable-row {
     display: flex;
     justify-content: space-between;
@@ -151,30 +160,78 @@
     .vp-stage {
         align-items: stretch;
         gap: 12px;
-        padding: 12px 6px;
+        padding: 12px 6px calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .vp-row {
         order: 1;
-        gap: 6px;
-        padding-bottom: 22px;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 4px;
+        padding-bottom: 14px;
+        justify-items: center;
+        flex-wrap: nowrap;
     }
 
     .vp-card-slot {
+        width: 100%;
+        min-width: 0;
         padding: 2px;
         border-radius: 8px;
     }
 
-    .vp-card-slot .card-face,
-    .vp-card-slot .card-back {
-        transform: scale(0.86);
-        transform-origin: center;
+    .vp-card-slot .gampo-card {
+        width: min(100%, 52px);
+        min-height: 74px;
+        padding: 4px 5px;
+        border-radius: 7px;
+    }
+
+    .vp-card-slot .gampo-card-pip {
+        font-size: 26px;
+    }
+
+    .vp-card-slot .gampo-card-corner {
+        font-size: 11px;
+    }
+
+    .vp-paytable-shell {
+        order: 2;
+        width: 100%;
+        max-width: none;
+    }
+
+    .vp-paytable-shell summary {
+        min-height: 36px;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.28);
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        font-weight: 950;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        cursor: pointer;
+    }
+
+    .vp-paytable-shell summary::after {
+        content: '+';
+        color: var(--accent-green);
+        font-size: 16px;
+    }
+
+    .vp-paytable-shell[open] summary::after {
+        content: '-';
     }
 
     .vp-paytable {
-        order: 2;
         max-height: 170px;
         overflow-y: auto;
+        margin-top: 6px;
     }
 
     .vp-paytable-row {
@@ -184,5 +241,21 @@
 
     .vp-stage .rrs-strip {
         order: 0;
+    }
+}
+
+@media (max-width: 390px) {
+    .vp-row {
+        gap: 3px;
+    }
+
+    .vp-card-slot .gampo-card {
+        width: min(100%, 47px);
+        min-height: 66px;
+        padding: 3px 4px;
+    }
+
+    .vp-card-slot .gampo-card-pip {
+        font-size: 22px;
     }
 }
