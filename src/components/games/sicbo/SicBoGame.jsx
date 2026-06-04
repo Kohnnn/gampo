@@ -133,6 +133,7 @@ export default function SicBoGame() {
                     initialBet={5}
                     runningRound={running}
                     actionLabel={`Roll Dice (${formatCredits(totalStake)})`}
+                    mobilePlayLabel={totalStake > 0 ? `Roll ${formatCredits(totalStake)}` : 'Roll'}
                     onPlay={performPlay}
                     lastBet={lastTotal}
                 >

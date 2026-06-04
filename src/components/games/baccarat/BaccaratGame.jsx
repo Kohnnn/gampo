@@ -250,6 +250,7 @@ export default function BaccaratGame() {
                     initialBet={5}
                     runningRound={running}
                     actionLabel={`Deal Baccarat (${formatCredits(totalStake)})`}
+                    mobilePlayLabel={totalStake > 0 ? `Deal ${formatCredits(totalStake)}` : 'Deal'}
                     onPlay={performPlay}
                     lastBet={lastTotal}
                 >

@@ -406,6 +406,7 @@
     .crash-stage {
         overflow: visible;
         align-items: stretch;
+        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .crash-mobile-targets {
@@ -447,7 +448,7 @@
         background: rgba(255, 122, 182, 0.16);
     }
 
-    .crash-screen { min-height: 240px; }
+    .crash-screen { min-height: 154px; }
     .crash-deck {
         min-height: 0;
         gap: 8px;
@@ -456,7 +457,7 @@
         max-height: 132px;
         padding: 8px;
     }
-    .crash-mult-num { font-size: 64px; }
+    .crash-mult-num { font-size: 44px; }
     .crash-rocket { width: 70px; }
     .crash-exhaust { width: 100px; }
     .crash-explosion { width: 140px; }

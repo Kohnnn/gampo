@@ -303,6 +303,7 @@ export default function RouletteGame() {
                     initialBet={5}
                     runningRound={roundLocked}
                     actionLabel={`Spin (${formatCredits(totalStake)} on ${bets.length} bets)`}
+                    mobilePlayLabel={bets.length ? `Spin (${bets.length})` : 'Spin'}
                     onPlay={performPlay}
                     disableAuto={false}
                     lastBet={lastTotal}

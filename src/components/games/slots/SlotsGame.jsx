@@ -631,6 +631,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         if (grid.length === cellPositions.length && grid.every(Boolean)) return grid
         return makeInitialGrid(config)
     }, [cellPositions.length, config, grid])
+    const slotSpinLabel = canUseFreeSpin
+        ? `Free Spin (${freeSpins})`
+        : activeBuyTier
+            ? `Buy ${activeBuyTier.costMultiplier}x`
+            : 'Spin'
 
     useEffect(() => {
         if (typeof window === 'undefined' || typeof Image === 'undefined') {
@@ -749,9 +754,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         type="button"
                         onClick={() => performSpin({ source: 'panel', bet: betAmount, free: canUseFreeSpin, tierId: canUseFreeSpin ? null : bonusBuyTierId })}
                         disabled={running || autoplayActive}
+                        data-slot-action="spin"
                     >
                         <Play size={18} />
-                        {canUseFreeSpin ? `Free Spin (${freeSpins})` : activeBuyTier ? `Buy ${activeBuyTier.costMultiplier}×` : 'Spin'}
+                        {slotSpinLabel}
                     </button>
 
                     <div className="slot-panel-card">
@@ -1015,6 +1021,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         onClick={triggerStageSpin}
                         disabled={running || autoplayActive}
                         aria-label="Spin"
+                        data-slot-action="spin"
                     >
                         <span className="slot-control-spin-inner">
                             {running ? <RotateCcw size={28} /> : <Play size={28} />}
@@ -1040,6 +1047,47 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <small>Win</small>
                         <strong>{formatCredits(lastResult?.returnAmount || 0)}</strong>
                     </div>
+                </div>
+
+                <div className="slot-mobile-dock" data-slot-mobile-dock data-mobile-critical-surface>
+                    <div className="slot-mobile-readout">
+                        <span>Bet</span>
+                        <strong>{formatCredits(effectiveStake)}</strong>
+                    </div>
+                    <div className="slot-mobile-readout">
+                        <span>Win</span>
+                        <strong>{formatCredits(lastResult?.returnAmount || 0)}</strong>
+                    </div>
+                    <button
+                        type="button"
+                        className={turbo ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
+                        onClick={() => setTurbo(value => !value)}
+                        disabled={running}
+                        aria-label="Toggle turbo"
+                    >
+                        <Zap size={16} />
+                        <span>Quick</span>
+                    </button>
+                    <button
+                        type="button"
+                        className={autoplayActive || showAutoplayDrawer ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
+                        onClick={() => setShowAutoplayDrawer(v => !v)}
+                        disabled={running}
+                        aria-label="Autoplay"
+                    >
+                        <RotateCcw size={16} />
+                        <span>Auto</span>
+                    </button>
+                    <button
+                        type="button"
+                        className="slot-mobile-spin"
+                        onClick={triggerStageSpin}
+                        disabled={running || autoplayActive}
+                        data-slot-action="spin"
+                    >
+                        <Play size={18} />
+                        {running ? 'Spinning' : slotSpinLabel}
+                    </button>
                 </div>
 
                 {showIntro && (

@@ -75,7 +75,7 @@ export default function RpsGame() {
             accent="#ef476f"
             backdrop="/assets/games/backdrops/backdrop-neon-grid.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={phase === 'slamming'} actionLabel="Play Round" onPlay={performPlay} lastBet={lastBet}>
+                <BetPanel balance={balance} initialBet={5} runningRound={phase === 'slamming'} actionLabel="Play Round" mobilePlayLabel="Play" onPlay={performPlay} lastBet={lastBet}>
                     <div className="bp-section">
                         <label className="bp-label">Pick</label>
                         <div className="rps-choices">
@@ -94,6 +94,20 @@ export default function RpsGame() {
         >
             <div className={`rps-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
+                <div className="rps-stage-choices" data-mobile-critical-surface>
+                    {OPTIONS.map(o => (
+                        <button
+                            key={o.id}
+                            type="button"
+                            className={choice === o.id ? 'active' : ''}
+                            disabled={phase === 'slamming'}
+                            onClick={() => setChoice(o.id)}
+                        >
+                            <Asset src={o.img} fallback={<span>{o.emoji}</span>} />
+                            <strong>{o.label}</strong>
+                        </button>
+                    ))}
+                </div>
                 <div className={`rps-versus phase-${phase}`}>
                     <div className={`rps-side player ${phase === 'won' ? 'winner' : phase === 'lost' ? 'loser' : ''}`}>
                         <span>You</span>

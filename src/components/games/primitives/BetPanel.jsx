@@ -25,6 +25,7 @@ export default function BetPanel({
     onStop,
     runningRound,
     actionLabel = 'Play',
+    mobilePlayLabel = null,
     disableAuto = false,
     children, // game-specific controls injected into manual tab body
     afterPlayChildren, // optional lower-priority controls shown after the primary CTA
@@ -230,7 +231,9 @@ export default function BetPanel({
         ? playButtonLabel
         : formatCredits(effectiveBetAmount)
     const playDisabled = runningRound && !isAutoLive && !inRound
+    const mobileButtonLabel = mobilePlayLabel || playButtonLabel
     const playContent = isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>
+    const mobilePlayContent = isAutoLive ? <><Pause size={16} /> Stop</> : <><Play size={16} /> {mobileButtonLabel}</>
 
     return (
         <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`}>
@@ -257,7 +260,7 @@ export default function BetPanel({
                     data-mobile-primary-action
                     {...playButtonProps}
                 >
-                    {playContent}
+                    {mobilePlayContent}
                 </button>
             </div>
 

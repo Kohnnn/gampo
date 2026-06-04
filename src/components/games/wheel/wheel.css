@@ -91,8 +91,8 @@
 
 @media (max-width: 640px) {
     .wheel-stage {
-        gap: 12px;
-        padding: 12px 6px 16px;
+        gap: 8px;
+        padding: 12px 6px calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .wheel-stage .sim-bet-strip {
@@ -100,20 +100,20 @@
     }
 
     .wheel-pointer {
-        border-left-width: 18px;
-        border-right-width: 18px;
-        border-top-width: 30px;
-        margin-bottom: -8px;
+        border-left-width: 14px;
+        border-right-width: 14px;
+        border-top-width: 24px;
+        margin-bottom: -6px;
     }
 
     .wheel-disc {
-        width: min(300px, 72vw);
-        border-width: 12px;
+        width: min(152px, 42vw);
+        border-width: 8px;
     }
 
     .wheel-disc span {
-        inset: 18px;
-        font-size: 16px;
+        inset: 12px;
+        font-size: 12px;
     }
 
     .wheel-last {

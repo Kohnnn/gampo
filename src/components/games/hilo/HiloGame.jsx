@@ -175,6 +175,7 @@ export default function HiloGame() {
                     initialBet={5}
                     runningRound={flipping}
                     actionLabel="Draw Card"
+                    mobilePlayLabel="Draw"
                     onPlay={performPlay}
                     lastBet={lastBet}
                 >
@@ -214,7 +215,7 @@ export default function HiloGame() {
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="hilo-stage-frame">
                 <div className={`hilo-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} />
-                    <div className="hilo-cards">
+                    <div className="hilo-cards" data-mobile-critical-surface>
                         <CardFace rank={renderRank(currentCard.rank)} suit={currentCard.suit} size="lg" />
                         <span className="hilo-arrow">{direction === 'higher' ? '↑' : '↓'}</span>
                         {revealedFace && nextCard ? (

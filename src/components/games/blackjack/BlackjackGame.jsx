@@ -606,7 +606,7 @@ export default function BlackjackGame() {
 function Hand({ label, cards, hideHole = false, emptyHint = null, emptySlots = 2, active = false, status = null, wager = null }) {
     const isEmpty = cards.length === 0
     return (
-        <div className={`bj-hand ${active ? 'active' : ''} ${status ? `status-${String(status).toLowerCase()}` : ''}`}>
+        <div className={`bj-hand ${active ? 'active' : ''} ${status ? `status-${String(status).toLowerCase()}` : ''}`} data-mobile-critical-surface>
             <span className="bj-hand-label">
                 <span>{label}</span>
                 {status && <em>{status}</em>}

@@ -179,6 +179,7 @@ export default function WheelGame() {
                     initialBet={5}
                     runningRound={spinning}
                     actionLabel="Spin Wheel"
+                    mobilePlayLabel="Spin"
                     onPlay={performPlay}
                     lastBet={lastBet}
                 >

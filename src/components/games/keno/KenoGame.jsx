@@ -162,7 +162,7 @@ export default function KenoGame() {
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             variant="stake"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={drawing} actionLabel="Draw Keno" onPlay={performPlay} lastBet={lastBet}>
+                <BetPanel balance={balance} initialBet={5} runningRound={drawing} actionLabel="Draw Keno" mobilePlayLabel="Draw" onPlay={performPlay} lastBet={lastBet}>
                     <button className="bp-bet-btn" disabled={drawing} onClick={() => setSelected(sampleUniqueNumbers({ max: 40, count: 5, random: () => nextRoll('keno').roll }))}>Quick pick 5</button>
                     <div className="bp-bal-line"><span>Selected</span><strong>{selected.length}/10</strong></div>
                     {Number.isFinite(lastMultiplier) && lastMultiplier > 0 && (

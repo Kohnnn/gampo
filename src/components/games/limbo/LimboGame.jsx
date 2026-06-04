@@ -175,6 +175,7 @@ export default function LimboGame() {
                     initialBet={5}
                     runningRound={running}
                     actionLabel="Run Limbo"
+                    mobilePlayLabel="Run"
                     onPlay={performPlay}
                     lastBet={lastBet}
                 >

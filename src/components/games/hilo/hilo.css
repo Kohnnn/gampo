@@ -82,3 +82,33 @@
     text-shadow: 0 0 14px rgba(109, 183, 255, 0.6);
 }
 
+@media (max-width: 720px) {
+    .hilo-stage {
+        gap: 14px;
+        padding: 14px 6px calc(var(--mobile-action-height, 74px) + 18px);
+    }
+
+    .hilo-cards {
+        gap: 12px;
+    }
+
+    .hilo-cards .gampo-card {
+        width: 54px;
+        min-height: 76px;
+    }
+
+    .hilo-arrow {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 390px) {
+    .hilo-cards {
+        gap: 8px;
+    }
+
+    .hilo-cards .gampo-card {
+        width: 48px;
+        min-height: 68px;
+    }
+}

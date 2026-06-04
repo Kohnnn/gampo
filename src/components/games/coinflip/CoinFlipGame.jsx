@@ -57,7 +57,7 @@ export default function CoinFlipGame() {
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={flipping} actionLabel="Flip Coin" onPlay={performPlay} lastBet={lastBet}>
+                <BetPanel balance={balance} initialBet={5} runningRound={flipping} actionLabel="Flip Coin" mobilePlayLabel="Flip" onPlay={performPlay} lastBet={lastBet}>
                     <div className="bp-section">
                         <label className="bp-label">Pick</label>
                         <div className="coin-choices">

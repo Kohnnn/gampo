@@ -2895,3 +2895,141 @@
         --slot-symbol-scale: 1.28;
     }
 }
+
+/* Mobile QA v2: slot controls live outside the clipped reel surface. */
+.slot-mobile-dock {
+    display: none;
+}
+
+@media (max-width: 760px) {
+    .slot-stage-v2 {
+        min-height: 0;
+        height: clamp(320px, calc(100dvh - var(--mobile-safe-bottom, 138px) - 122px), 430px);
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        padding-bottom: 8px;
+        overflow: visible;
+    }
+
+    .slot-reel-wrap,
+    .slot-reel-frame-v2,
+    .slot-reel-grid,
+    .slot-megaways-grid {
+        min-height: 0;
+    }
+
+    .slot-controls-v2 {
+        display: none;
+    }
+
+    .slot-stage-foot {
+        display: none;
+    }
+
+    .slot-mobile-dock {
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        bottom: calc(var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)));
+        z-index: 89;
+        min-height: var(--mobile-action-height, 74px);
+        display: grid;
+        grid-template-columns: minmax(0, 0.72fr) minmax(0, 0.72fr) 44px 44px minmax(112px, 1.15fr);
+        gap: 7px;
+        align-items: center;
+        padding: 8px;
+        border: 1px solid color-mix(in srgb, var(--slot-accent, #ffd166), transparent 48%);
+        border-radius: 16px;
+        background:
+            linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(7, 16, 24, 0.98)),
+            radial-gradient(circle at 78% 0%, color-mix(in srgb, var(--slot-accent, #ffd166), transparent 70%), transparent 44%);
+        box-shadow: 0 -16px 42px rgba(0, 0, 0, 0.66), 0 0 22px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 78%);
+        backdrop-filter: blur(12px);
+    }
+
+    .slot-mobile-readout {
+        min-width: 0;
+        display: grid;
+        gap: 2px;
+        padding: 7px 8px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .slot-mobile-readout span,
+    .slot-mobile-icon span {
+        color: var(--text-muted);
+        font-size: 9px;
+        font-weight: 950;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+    }
+
+    .slot-mobile-readout strong {
+        min-width: 0;
+        overflow: hidden;
+        color: var(--text-primary);
+        font-size: 12px;
+        font-weight: 950;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .slot-mobile-icon,
+    .slot-mobile-spin {
+        appearance: none;
+        min-height: 52px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-weight: 950;
+        cursor: pointer;
+    }
+
+    .slot-mobile-icon {
+        flex-direction: column;
+        background: rgba(0, 0, 0, 0.26);
+        color: var(--text-secondary);
+    }
+
+    .slot-mobile-icon.active {
+        color: var(--slot-accent, #ffd166);
+        border-color: color-mix(in srgb, var(--slot-accent, #ffd166), transparent 28%);
+        background: color-mix(in srgb, var(--slot-accent, #ffd166), transparent 86%);
+    }
+
+    .slot-mobile-spin {
+        border: 0;
+        background: linear-gradient(180deg, var(--slot-accent, #ffd166), #f0a93b);
+        color: #111;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 12px;
+        box-shadow: 0 0 22px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 52%);
+    }
+
+    .slot-mobile-icon:disabled,
+    .slot-mobile-spin:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+}
+
+@media (max-width: 420px) {
+    .slot-mobile-dock {
+        grid-template-columns: minmax(0, 0.72fr) minmax(0, 0.72fr) 42px minmax(104px, 1fr);
+    }
+
+    .slot-mobile-dock .slot-mobile-icon:nth-of-type(2) {
+        display: none;
+    }
+
+    .slot-mobile-spin {
+        font-size: 11px;
+        letter-spacing: 0.03em;
+    }
+}

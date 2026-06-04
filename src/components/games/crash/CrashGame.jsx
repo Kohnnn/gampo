@@ -414,6 +414,7 @@ export default function CrashGame() {
                     initialBet={5}
                     runningRound={false}
                     actionLabel="Place Bet"
+                    mobilePlayLabel={inRound ? `Cash ${multiplier.toFixed(2)}x` : 'Bet'}
                     onPlay={performPlay}
                     lastBet={lastBet}
                     playPhase={inRound ? 'in-round' : null}

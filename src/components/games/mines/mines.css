@@ -155,7 +155,10 @@
 .gampo-reduce-motion .mines-cell.hit .mines-face-front { animation: none; }
 
 @media (max-width: 720px) {
-    .mines-stage { gap: 8px; }
+    .mines-stage {
+        gap: 8px;
+        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
+    }
     .mines-stage .rrs-strip {
         min-height: 30px;
         margin-bottom: 0;
@@ -163,10 +166,10 @@
     }
     .mines-multiplier-row { display: none; }
     .mines-grid {
-        width: min(100%, clamp(230px, calc(100dvh - 350px), 340px));
+        width: min(100%, clamp(190px, calc(100dvh - 500px), 220px));
         min-width: 0;
         padding: 8px;
-        gap: 5px;
+        gap: 4px;
     }
     .mines-art { width: 60%; height: 60%; }
 }
