@@ -146,3 +146,43 @@
 .gampo-reduce-motion .vp-card-slot.hold-pulse {
     animation: none;
 }
+
+@media (max-width: 720px) {
+    .vp-stage {
+        align-items: stretch;
+        gap: 12px;
+        padding: 12px 6px;
+    }
+
+    .vp-row {
+        order: 1;
+        gap: 6px;
+        padding-bottom: 22px;
+    }
+
+    .vp-card-slot {
+        padding: 2px;
+        border-radius: 8px;
+    }
+
+    .vp-card-slot .card-face,
+    .vp-card-slot .card-back {
+        transform: scale(0.86);
+        transform-origin: center;
+    }
+
+    .vp-paytable {
+        order: 2;
+        max-height: 170px;
+        overflow-y: auto;
+    }
+
+    .vp-paytable-row {
+        padding: 7px 10px;
+        font-size: 11px;
+    }
+
+    .vp-stage .rrs-strip {
+        order: 0;
+    }
+}

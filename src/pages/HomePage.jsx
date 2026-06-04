@@ -256,7 +256,7 @@ export function GameGrid({ games = [] }) {
                             <span>{game.provider || game.category || 'GamPo Lab'}</span>
                             <div className="casino-game-badges" title={badges.join(' · ')}>
                                 {visibleBadges.map(label => <b key={label}>{label}</b>)}
-                                {hiddenCount > 0 ? <b className="casino-game-more">+{hiddenCount}</b> : null}
+                                {hiddenCount > 0 ? <b className="casino-game-more">More {hiddenCount}</b> : null}
                             </div>
                         </div>
                     </Link>

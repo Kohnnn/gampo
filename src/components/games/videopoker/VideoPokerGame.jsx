@@ -213,7 +213,7 @@ export default function VideoPokerGame() {
                             </div>
                         ))}
                     </div>
-                    <div className="vp-row">
+                    <div className="vp-row" data-mobile-critical-surface>
                         {phase === 'idle' && cards.length === 0 && (
                             <div className="vp-empty-overlay">Click Deal to start</div>
                         )}

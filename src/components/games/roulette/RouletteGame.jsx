@@ -430,7 +430,7 @@ export default function RouletteGame() {
                     </div>
                 </div>
 
-                <div className="rou-board" aria-label="Roulette betting table">
+                <div className="rou-board" aria-label="Roulette betting table" data-mobile-critical-surface>
                     <div className={cellClassName(0, 'zero')} data-bet={cellBet(0) || ''}
                         data-cover={cellCoverage(0)?.coverCount || ''}
                         data-cover-label={cellCoverLabel(cellCoverage(0))}

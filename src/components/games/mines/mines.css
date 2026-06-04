@@ -163,7 +163,7 @@
     }
     .mines-multiplier-row { display: none; }
     .mines-grid {
-        width: min(100%, clamp(170px, calc(100dvh - 455px), 230px));
+        width: min(100%, clamp(230px, calc(100dvh - 350px), 340px));
         min-width: 0;
         padding: 8px;
         gap: 5px;

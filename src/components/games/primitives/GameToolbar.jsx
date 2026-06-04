@@ -107,6 +107,18 @@ export default function GameToolbar({ helpHref, definition }) {
             aria-label="Game tools menu"
             style={{ top: pos.top, left: pos.left }}
         >
+            <button type="button" className="gt-popover-item gt-popover-mobile-item" role="menuitem" onClick={toggleMute}>
+                {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                <span>{muted ? 'Unmute' : 'Mute'}</span>
+            </button>
+            <button type="button" className="gt-popover-item gt-popover-mobile-item" role="menuitem" onClick={() => setReduceMotion(v => !v)}>
+                {reduceMotion ? <EyeOff size={14} /> : <Eye size={14} />}
+                <span>{reduceMotion ? 'Enable motion' : 'Reduce motion'}</span>
+            </button>
+            <button type="button" className="gt-popover-item gt-popover-mobile-item" role="menuitem" onClick={toggleFullscreen}>
+                {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                <span>{fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}</span>
+            </button>
             <button type="button" className="gt-popover-item" role="menuitem" onClick={openFairness}>
                 <Shield size={14} />
                 <span>Provably fair</span>

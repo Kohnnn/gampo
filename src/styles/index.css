@@ -49,6 +49,10 @@
 
     --transition-fast: 0.15s ease;
     --transition-normal: 0.3s ease;
+
+    --mobile-nav-height: 0px;
+    --mobile-action-height: 0px;
+    --mobile-safe-bottom: 0px;
 }
 
 /* ===== Reset & Base ===== */
@@ -761,6 +765,10 @@ body {
     flex-direction: column;
     flex: 1;
     overflow: hidden;
+}
+
+.mobile-bottom-nav {
+    display: none;
 }
 
 /* ===== Sidebar ===== */
@@ -1717,6 +1725,12 @@ body {
 }
 
 @media (max-width: 768px) {
+    :root {
+        --mobile-nav-height: 64px;
+        --mobile-action-height: 74px;
+        --mobile-safe-bottom: calc(var(--mobile-nav-height) + var(--mobile-action-height) + max(8px, env(safe-area-inset-bottom)));
+    }
+
     .header {
         padding: 0 12px;
     }
@@ -1731,6 +1745,59 @@ body {
 
     .betting-panel {
         width: 100%;
+    }
+
+    .main-content {
+        padding-bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
+    }
+
+    .mobile-bottom-nav {
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        bottom: max(6px, env(safe-area-inset-bottom));
+        z-index: 86;
+        min-height: calc(var(--mobile-nav-height) - 8px);
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 4px;
+        padding: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(20, 39, 51, 0.98));
+        box-shadow: 0 -12px 38px rgba(0, 0, 0, 0.55);
+        backdrop-filter: blur(14px);
+    }
+
+    .mobile-bottom-nav a,
+    .mobile-bottom-nav button {
+        appearance: none;
+        min-width: 0;
+        min-height: 48px;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        color: var(--text-secondary);
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        font: inherit;
+        font-size: 10px;
+        font-weight: 900;
+        text-decoration: none;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+    }
+
+    .mobile-bottom-nav a.active {
+        background: rgba(0, 231, 1, 0.12);
+        color: var(--accent-green);
+    }
+
+    .mobile-bottom-nav svg {
+        flex: 0 0 auto;
     }
 
     .multiplier-value {

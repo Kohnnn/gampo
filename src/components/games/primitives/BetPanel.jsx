@@ -46,6 +46,7 @@ export default function BetPanel({
 }) {
     const panelId = useId()
     const [tab, setTab] = useState('manual')
+    const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
     const [betAmount, setBetAmount] = useState(initialBet)
     // Auto state
     const [autoCount, setAutoCount] = useState(10)
@@ -220,19 +221,75 @@ export default function BetPanel({
         if (isAutoLive) return 'Stop Autobet'
         return tab === 'auto' ? 'Start Autobet' : (playLabel || actionLabel)
     })()
+    const dockSummary = inRound
+        ? 'Round action'
+        : hasFixedBet
+            ? 'Fixed stake'
+            : `${tab.charAt(0).toUpperCase()}${tab.slice(1)} stake`
+    const dockValue = inRound
+        ? playButtonLabel
+        : formatCredits(effectiveBetAmount)
+    const playDisabled = runningRound && !isAutoLive && !inRound
+    const playContent = isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>
 
     return (
-        <div className="bp-panel">
-            <div className="bp-tabs">
+        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`}>
+            <div className="bp-mobile-dock" data-mobile-action-dock>
+                <button
+                    type="button"
+                    className="bp-mobile-settings"
+                    onClick={() => setMobileControlsOpen(true)}
+                    aria-expanded={mobileControlsOpen}
+                    aria-controls={`${panelId}-mobile-controls`}
+                >
+                    <Settings size={16} />
+                    <span>Settings</span>
+                </button>
+                <div className="bp-mobile-summary">
+                    <span>{dockSummary}</span>
+                    <strong>{dockValue}</strong>
+                </div>
+                <button
+                    type="button"
+                    className={`bp-mobile-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''} ${inRound ? 'in-round' : ''}`}
+                    disabled={playDisabled}
+                    onClick={handlePlay}
+                    data-mobile-primary-action
+                    {...playButtonProps}
+                >
+                    {playContent}
+                </button>
+            </div>
+
+            {mobileControlsOpen && (
+                <button
+                    type="button"
+                    className="bp-mobile-scrim"
+                    aria-label="Close betting controls"
+                    onClick={() => setMobileControlsOpen(false)}
+                />
+            )}
+
+            <div className="bp-content" id={`${panelId}-mobile-controls`}>
+                <button
+                    type="button"
+                    className="bp-mobile-close"
+                    aria-label="Close betting controls"
+                    onClick={() => setMobileControlsOpen(false)}
+                >
+                    Close
+                </button>
+
+                <div className="bp-tabs">
                 {TABS.filter(t => t !== 'auto' || !disableAuto).map(t => (
                     <button key={t} className={`bp-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
                         {t === 'manual' ? <ChevronsRight size={14} /> : t === 'auto' ? <Settings size={14} /> : <Sliders size={14} />}
                         <span>{t}</span>
                     </button>
                 ))}
-            </div>
+                </div>
 
-            <div className="bp-section">
+                <div className="bp-section">
                 <label className="bp-label" htmlFor={`${panelId}-bet-amount`}>{betLabel}</label>
                 <div className="bp-bet-row">
                     <input id={`${panelId}-bet-amount`} type="number" className="bp-bet-input" min={minBet} max={maxBet} step={0.5}
@@ -260,12 +317,12 @@ export default function BetPanel({
                     <span>Balance</span>
                     <strong>{formatCredits(balance || 0)}</strong>
                 </div>
-            </div>
+                </div>
 
-            {tab === 'manual' && children && <div className="bp-section">{children}</div>}
+                {tab === 'manual' && children && <div className="bp-section">{children}</div>}
 
-            {tab === 'auto' && (
-                <>
+                {tab === 'auto' && (
+                    <>
                     <div className="bp-section">
                         <label className="bp-label" htmlFor={`${panelId}-auto-count`}>Number of Bets</label>
                         <div className="bp-row">
@@ -302,11 +359,11 @@ export default function BetPanel({
                         <input id={`${panelId}-stop-big-win`} className="bp-bet-input" type="number" placeholder="0 = off" value={stopBigWin} onChange={e => setStopBigWin(e.target.value)} />
                     </div>
                     {autoChildren}
-                </>
-            )}
+                    </>
+                )}
 
-            {tab === 'strategy' && (
-                <div className="bp-section">
+                {tab === 'strategy' && (
+                    <div className="bp-section">
                     <label className="bp-label">Strategy</label>
                     <div className="bp-row">
                         {['flat', 'martingale', 'reverse'].map(s => (
@@ -314,17 +371,18 @@ export default function BetPanel({
                         ))}
                     </div>
                     <p className="bp-hint">Strategy is educational only. Negative EV applies the same as manual play.</p>
-                </div>
-            )}
+                    </div>
+                )}
 
-            <button className={`bp-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''} ${inRound ? 'in-round' : ''}`}
-                disabled={runningRound && !isAutoLive && !inRound}
-                onClick={handlePlay}
-                {...playButtonProps}
-            >
-                {isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>}
-            </button>
-            {afterPlayChildren}
+                <button className={`bp-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''} ${inRound ? 'in-round' : ''}`}
+                    disabled={playDisabled}
+                    onClick={handlePlay}
+                    {...playButtonProps}
+                >
+                    {playContent}
+                </button>
+                {afterPlayChildren}
+            </div>
         </div>
     )
 }

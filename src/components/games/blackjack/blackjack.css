@@ -347,10 +347,31 @@
 .gampo-reduce-motion .bj-chip-slide { animation: none; }
 
 @media (max-width: 720px) {
+    .bj-stage {
+        align-items: stretch;
+        overflow: visible;
+    }
+
     .bj-table-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .bj-card { width: 48px; height: 68px; }
-    .bj-actions { grid-template-columns: repeat(2, 1fr); }
+    .bj-actions {
+        position: sticky;
+        top: 4px;
+        z-index: 8;
+        order: 2;
+        grid-template-columns: repeat(2, 1fr);
+        padding: 7px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        background: linear-gradient(180deg, rgba(15, 33, 46, 0.96), rgba(20, 39, 51, 0.96));
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.38);
+    }
     .bj-hand-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .bj-table-status { order: 1; }
+    .bj-hand-tabs { order: 3; }
+    .bj-hand { order: 4; }
+    .bj-hint { order: 5; }
+    .bj-meta { order: 6; }
 }
 
 @media (max-width: 480px) {

@@ -345,7 +345,7 @@ export default function PlinkoGame() {
                 <div className="plinko-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim drops" />
-                    <div className="plinko-canvas-wrap">
+                    <div className="plinko-canvas-wrap" data-mobile-critical-surface>
                         <canvas ref={canvasRef} className="plinko-canvas" />
                         {payouts && binColors && (
                             <div className="plinko-bins" style={{ '--bins': payouts.length }}>
