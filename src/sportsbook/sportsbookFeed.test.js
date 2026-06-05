@@ -59,4 +59,58 @@ describe('fetchFreeProviderFeed', () => {
         expect(netlifyToml).toContain('from = "/api/sportsbook/free-feed"')
         expect(netlifyFunction).toContain('loadProviderFeed(process.env)')
     })
+
+    it('uses only live feed events (no synthetic Practice teams) when a feed is available', async () => {
+        const payload = {
+            generatedAt: new Date().toISOString(),
+            sources: { pandascore: { configured: true, eventCount: 2 } },
+            quotas: {},
+            errors: [],
+            pandascore: {
+                matches: [
+                    {
+                        id: 9001,
+                        status: 'running',
+                        begin_at: new Date().toISOString(),
+                        videogame: { slug: 'cs-go', name: 'CS2' },
+                        league: { name: 'Real Major League' },
+                        opponents: [
+                            { opponent: { name: 'Team Falcon' } },
+                            { opponent: { name: 'Team Spirit Real' } },
+                        ],
+                    },
+                    {
+                        id: 9002,
+                        status: 'not_started',
+                        begin_at: new Date(Date.now() + 3600_000).toISOString(),
+                        videogame: { slug: 'dota2', name: 'Dota 2' },
+                        league: { name: 'Real Arena' },
+                        opponents: [
+                            { opponent: { name: 'Squad Alpha' } },
+                            { opponent: { name: 'Squad Omega' } },
+                        ],
+                    },
+                ],
+            },
+        }
+        globalThis.fetch = vi.fn(async (url) => {
+            if (String(url).includes('/api/sportsbook/free-feed')) {
+                return { ok: true, status: 200, json: async () => payload }
+            }
+            // odds-api + in-season calls return empty.
+            return { ok: true, status: 200, json: async () => [] }
+        })
+
+        const feed = await loadSportsbookFeed()
+
+        expect(feed.feedSource).toBe('live')
+        expect(feed.events.length).toBeGreaterThan(0)
+        // No synthetic source and no "Practice" teams should survive.
+        expect(feed.events.every(event => event.source !== 'synthetic')).toBe(true)
+        const blob = feed.events.map(e => `${e.home} ${e.away}`).join(' ')
+        expect(blob).not.toMatch(/Practice|Harbor United|River City/i)
+        // Live events get curation tags so the home shelves render real teams.
+        expect(feed.events.some(event => event.tags?.includes('top'))).toBe(true)
+        expect(feed.events.some(event => event.tags?.includes('popular'))).toBe(true)
+    })
 })

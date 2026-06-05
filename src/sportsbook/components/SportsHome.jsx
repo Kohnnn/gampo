@@ -35,9 +35,30 @@ function TopMatchCard({ event, selectedIds, onToggleSelection, onOpenEvent }) {
     )
 }
 
-function SportsHome({ events, sports, leagues, selectedIds, onToggleSelection, onOpenEvent, onOpenSearch, onNavigate }) {
+function SportsHome({ events, sports, leagues, feedSource = 'fallback', selectedIds, onToggleSelection, onOpenEvent, onOpenSearch, onNavigate }) {
     const topMatches = events.filter(event => event.tags?.includes('top')).slice(0, 3)
     const popularEvents = events.filter(event => event.tags?.includes('popular')).slice(0, 6)
+    const isLive = feedSource === 'live'
+
+    // Outrights: only the synthetic fallback ships hardcoded "Practice XI"
+    // futures. With a live feed we derive a real "title contenders" board from
+    // the shortest-priced moneyline favourites across live events instead.
+    const liveOutrights = (() => {
+        if (!isLive) return []
+        const rows = []
+        for (const event of events) {
+            const market = event.marketGroups?.[0]
+            for (const selection of market?.selections || []) {
+                if (selection.side === 'draw') continue
+                if (!(selection.decimalOdds > 1)) continue
+                rows.push([selection.label, selection.decimalOdds, event.id])
+            }
+        }
+        return rows.sort((a, b) => a[1] - b[1]).slice(0, 8)
+    })()
+    const showOutrights = isLive ? liveOutrights.length > 0 : OUTRIGHTS.length > 0
+    const outrightRows = isLive ? liveOutrights : OUTRIGHTS.map(([label, odds]) => [label, odds, null])
+    const outrightTitle = isLive ? 'Title Contenders - Live Favourites' : 'World Cup Winner - 2026'
 
     return (
         <div className="sb-home">
@@ -91,20 +112,26 @@ function SportsHome({ events, sports, leagues, selectedIds, onToggleSelection, o
                 </div>
             </section>
 
-            <section className="sb-outrights">
-                <div className="sb-section-title">
-                    <Trophy size={18} />
-                    <h2>World Cup Winner - 2026</h2>
-                </div>
-                <div className="sb-outright-grid">
-                    {OUTRIGHTS.map(([label, odds]) => (
-                        <button key={label} type="button">
-                            <span>{label}</span>
-                            <strong>{Number(odds).toFixed(2)}</strong>
-                        </button>
-                    ))}
-                </div>
-            </section>
+            {showOutrights && (
+                <section className="sb-outrights">
+                    <div className="sb-section-title">
+                        <Trophy size={18} />
+                        <h2>{outrightTitle}</h2>
+                    </div>
+                    <div className="sb-outright-grid">
+                        {outrightRows.map(([label, odds, eventId]) => (
+                            <button
+                                key={`${label}-${odds}`}
+                                type="button"
+                                onClick={eventId ? () => onOpenEvent(eventId) : undefined}
+                            >
+                                <span>{label}</span>
+                                <strong>{Number(odds).toFixed(2)}</strong>
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            )}
 
             <section className="sb-top-sports">
                 <div className="sb-section-title">
