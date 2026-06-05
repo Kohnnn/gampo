@@ -396,3 +396,19 @@ User feedback after the v4 deploy raised seven items. Tackled across five tracks
 - `npm test -- --run` green at 265 tests across 60 files (+8 xpLevels).
 - `npm run build` clean (pre-existing empty-chunk/large-row warnings only).
 - Browser smoke at 492×820 and 375×667 across `/`, `/poker`, `/slots`, `/blackjack`, `/roulette`, `/baccarat`, `/sportsbook`, `/missions`, `/vip`: 0 overflow, 0 console errors; `interaction=passed` on all gameplay routes. (`/vip` reports `action=no` — a dashboard with no play CTA the harness expects; benign.)
+
+## Sportsbook Live-Feed Only (2026-06-05)
+
+Follow-up to Track E: with the provider tokens set, the feed was connected but the curated home shelves still showed synthetic blueprint teams (Harbor United, "Practice XI" outrights) because only synthetic events carried the `top`/`popular` curation tags.
+
+### Changes
+- `sportsbookFeed.js`: when any real provider returns events, the feed now uses **only** live events (synthetic is a pure offline/no-token fallback). Added `curateLiveEvents()` which ranks real events by live-status + popularity and assigns `top` / `popular` / `starting-soon` tags so the home shelves render real teams. Bumped the feed cap 40→60 and switched sports/leagues bases to live when a feed exists.
+- `SportsHome.jsx`: accepts `feedSource`; the hardcoded "World Cup Winner — Practice XI" outrights are replaced (when live) by a derived "Title Contenders — Live Favourites" board built from the shortest-priced real moneyline favourites, each clickable to open the event. Synthetic outrights only render in fallback.
+- `sportsbookData.js`: promo-card copy de-"simulated"/"synthetic".
+- `SportsbookShell.jsx`: passes `feedSource` into `SportsHome`.
+- `sportsbookFeed.test.js`: new test mocks a live PandaScore payload and asserts no `synthetic` source and no `Practice`/blueprint team names survive, and that live events receive `top`/`popular` curation tags.
+
+### Verification
+- `npm test -- --run` green at 266 tests across 60 files (+1 live-feed test).
+- `npm run build` clean.
+- Deployed to production and confirmed live: Top Matches / Popular Events / Title Contenders all show real MLB + CS2 teams (Miami Marlins, Tampa Bay Rays, QUAZAR, ReThink, NY Yankees…); header reads "optional feed connected · API quota 2460". Zero "Harbor United" / "River City" / "Practice XI" anywhere. Synthetic fallback still intact when no tokens/network.
