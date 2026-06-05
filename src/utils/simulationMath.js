@@ -125,20 +125,59 @@ export function rouletteMultiplier(betType, selectedNumber, resultNumber) {
     return 0
 }
 
-export function kenoPayout(picks, hits) {
-    const tables = {
-        1: [0, 3.8],
-        2: [0, 0, 12],
-        3: [0, 0, 2, 43],
-        4: [0, 0, 1, 5, 120],
-        5: [0, 0, 0, 2, 15, 800],
-        6: [0, 0, 0, 1, 6, 80, 1600],
-        7: [0, 0, 0, 1, 3, 12, 250, 5000],
-        8: [0, 0, 0, 0, 2, 8, 80, 1000, 10000],
-        9: [0, 0, 0, 0, 1, 5, 25, 200, 4000, 20000],
-        10: [0, 0, 0, 0, 0, 2, 15, 80, 500, 10000, 50000],
+// Keno: engine draws 10 of 40 balls. The old paytable was tuned for an
+// 80-ball/20-draw game, so realized RTP was ~61%. We keep the *shape* (which
+// hit counts pay) but scale each pick-row so realized RTP == KENO_RTP under the
+// true hypergeometric distribution for N=40, drawn=10.
+const KENO_RTP = 0.92
+const KENO_N = 40
+const KENO_DRAWN = 10
+
+// Hypergeometric P(hits | picks): C(picks,h)·C(N-picks, drawn-h)/C(N, drawn).
+function logFactorial(n) {
+    let acc = 0
+    for (let i = 2; i <= n; i += 1) acc += Math.log(i)
+    return acc
+}
+function logChoose(n, k) {
+    if (k < 0 || k > n) return -Infinity
+    return logFactorial(n) - logFactorial(k) - logFactorial(n - k)
+}
+function kenoHitProb(picks, hits) {
+    const num = logChoose(picks, hits) + logChoose(KENO_N - picks, KENO_DRAWN - hits)
+    const den = logChoose(KENO_N, KENO_DRAWN)
+    const v = Math.exp(num - den)
+    return Number.isFinite(v) ? v : 0
+}
+
+const KENO_SHAPE = {
+    1: [0, 3.8],
+    2: [0, 0, 12],
+    3: [0, 0, 2, 43],
+    4: [0, 0, 1, 5, 120],
+    5: [0, 0, 0, 2, 15, 800],
+    6: [0, 0, 0, 1, 6, 80, 1600],
+    7: [0, 0, 0, 1, 3, 12, 250, 5000],
+    8: [0, 0, 0, 0, 2, 8, 80, 1000, 10000],
+    9: [0, 0, 0, 0, 1, 5, 25, 200, 4000, 20000],
+    10: [0, 0, 0, 0, 0, 2, 15, 80, 500, 10000, 50000],
+}
+
+// Pre-scale each pick row so Σ P(h)·payout(h) == KENO_RTP.
+const KENO_TABLES = (() => {
+    const out = {}
+    for (let picks = 1; picks <= 10; picks += 1) {
+        const shape = KENO_SHAPE[picks]
+        let rawRtp = 0
+        for (let h = 0; h < shape.length; h += 1) rawRtp += kenoHitProb(picks, h) * shape[h]
+        const scale = rawRtp > 0 ? KENO_RTP / rawRtp : 1
+        out[picks] = shape.map(v => round2(v * scale))
     }
-    const table = tables[clamp(Number(picks) || 1, 1, 10)]
+    return out
+})()
+
+export function kenoPayout(picks, hits) {
+    const table = KENO_TABLES[clamp(Number(picks) || 1, 1, 10)]
     return table?.[clamp(Number(hits) || 0, 0, table.length - 1)] || 0
 }
 

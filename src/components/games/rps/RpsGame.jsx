@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
+import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
@@ -30,7 +31,11 @@ export default function RpsGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
-    const payout = 2.91
+    // RTP-lock: P(win)=P(push)=1/3. A push refunds the stake (EV-neutral 1/3),
+    // so RTP = payout/3 + 1/3. Solving for 97% RTP → payout = 1.91 (was 2.91,
+    // which combined with the push refund gave a player-favourable 130% RTP).
+    const RPS_RTP = 0.97
+    const payout = round2((isFunMode() ? RPS_RTP * FUN_PAYOUT_BOOST : RPS_RTP) * 3 - 1)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'RPS')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }

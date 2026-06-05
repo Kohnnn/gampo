@@ -31,10 +31,15 @@ describe('simulation math helpers', () => {
         expect(rouletteMultiplier('even', null, 0)).toBe(0)
     })
 
-    it('handles keno hit tables', () => {
+    it('handles keno hit tables (calibrated for 40-ball/10-draw, 92% RTP)', () => {
+        // No-hit always pays zero.
         expect(kenoPayout(5, 0)).toBe(0)
-        expect(kenoPayout(5, 5)).toBe(800)
-        expect(kenoPayout(10, 8)).toBe(500)
+        // Jackpot hits pay a large positive multiplier (exact value is scaled to
+        // lock RTP, so assert ordering + positivity rather than a magic number).
+        expect(kenoPayout(5, 5)).toBeGreaterThan(kenoPayout(5, 4))
+        expect(kenoPayout(5, 5)).toBeGreaterThan(100)
+        expect(kenoPayout(10, 10)).toBeGreaterThan(kenoPayout(10, 8))
+        expect(kenoPayout(10, 8)).toBeGreaterThan(0)
     })
 
     it('scores blackjack hands with soft aces', () => {

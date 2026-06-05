@@ -32,8 +32,11 @@ import EducationPanel from '../../EducationPanel'
 import './pump.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
-const STEP_RAMP = 1.18
 const STEP_BUST_CHANCE = 0.12
+// RTP-lock the growth: per-step EV = survival × ramp must equal the target RTP
+// so every pump carries the house edge (was a flat 1.18 → 103.8%/step, +EV).
+const PUMP_RTP = 0.96
+const STEP_RAMP = Number(((PUMP_RTP) / (1 - STEP_BUST_CHANCE)).toFixed(4))
 const MAX_PUMPS = 10
 const BASE_SIZE = 128
 

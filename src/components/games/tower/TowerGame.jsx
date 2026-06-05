@@ -27,10 +27,14 @@ import EducationPanel from '../../EducationPanel'
 import './tower.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
+// Growth is RTP-locked: per-step EV = safe × growth = TOWER_RTP, so each climb
+// carries the house edge regardless of preset (was fixed growth → easy 100.3%
+// player-favourable, hard 85.3% too stingy).
+const TOWER_RTP = 0.96
 const PRESETS = {
-    easy: { safe: 0.85, growth: 1.18, label: 'Easy' },
-    medium: { safe: 0.7, growth: 1.28, label: 'Medium' },
-    hard: { safe: 0.55, growth: 1.55, label: 'Hard' },
+    easy: { safe: 0.85, growth: Number((TOWER_RTP / 0.85).toFixed(4)), label: 'Easy' },
+    medium: { safe: 0.7, growth: Number((TOWER_RTP / 0.7).toFixed(4)), label: 'Medium' },
+    hard: { safe: 0.55, growth: Number((TOWER_RTP / 0.55).toFixed(4)), label: 'Hard' },
 }
 
 const HEIGHT = 8
