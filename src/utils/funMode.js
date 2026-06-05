@@ -13,6 +13,7 @@
 // Provider. Persisted to localStorage `gampo_fun_mode`.
 
 import { clamp, round2 } from './simulationMath'
+import { useEffect, useState } from 'react'
 
 const FUN_KEY = 'gampo_fun_mode'
 
@@ -76,4 +77,11 @@ export function rtpLockedMultiplier(winProbability, rtp) {
     const p = clamp(Number(winProbability) || 0, 0.0001, 1)
     const targetRtp = funMode ? Number(rtp) * FUN_PAYOUT_BOOST : Number(rtp)
     return round2(targetRtp / p)
+}
+
+// React hook for components that want to read/toggle Fun Mode reactively.
+export function useFunMode() {
+    const [on, setOn] = useState(funMode)
+    useEffect(() => subscribeFunMode(() => setOn(funMode)), [])
+    return [on, setFunMode]
 }
