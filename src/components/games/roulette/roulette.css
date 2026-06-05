@@ -191,24 +191,27 @@
     border-radius: 50%;
     pointer-events: none;
     z-index: 5;
-    transition: transform 3.2s cubic-bezier(0.05, 0.86, 0.2, 1),
-                --ball-radius 3.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+    transition: transform 3.2s cubic-bezier(0.05, 0.86, 0.2, 1);
 }
 
 .rou-ball {
     position: absolute;
-    top: 50%;
+    /* Anchor relative to the full-wheel track: top:50% is the hub, minus the
+       radius pushes the ball out to the rim. Percentages here resolve against
+       the track (= wheel) height, so the ball actually orbits the rim instead
+       of sitting near the hub (the old translateY(%) resolved vs the 14px ball). */
+    top: calc(50% - var(--ball-radius, 46%));
     left: 50%;
     width: 14px;
     height: 14px;
     border-radius: 50%;
     margin: -7px 0 0 -7px;
-    transform: translateY(calc(-1 * var(--ball-radius)));
     background: radial-gradient(circle at 30% 30%, #ffffff 0%, #f4f4f4 50%, #c8c8c8 100%);
     box-shadow:
         0 4px 12px rgba(0, 0, 0, 0.8),
         inset 0 -2px 4px rgba(0, 0, 0, 0.25);
-    transition: transform 3.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+    /* Animate the inward spiral by transitioning `top` as JS shrinks the radius. */
+    transition: top 3.2s cubic-bezier(0.4, 0.0, 0.2, 1);
 }
 
 .rou-ball.spinning {
@@ -227,13 +230,13 @@
 }
 
 @keyframes rouBallRattle {
-    from { transform: translateY(calc(-1 * var(--ball-radius))) scale(1); }
-    to { transform: translateY(calc(-1 * var(--ball-radius) + 2px)) scale(0.95); }
+    from { transform: scale(1); }
+    to { transform: scale(0.9) translateY(1px); }
 }
 
 @keyframes rouBallDropBounce {
-    from { transform: translateY(calc(-1 * var(--ball-radius) + 1px)) scale(1); }
-    to { transform: translateY(calc(-1 * var(--ball-radius) + 5px)) scale(0.9); }
+    from { transform: scale(1) translateY(0); }
+    to { transform: scale(0.88) translateY(3px); }
 }
 
 .rou-recent-rail-col,

@@ -53,6 +53,11 @@ export default function BetPanel({
     // we can nudge first-time users toward game setup (chips, decks, rules).
     const [mobileOpenedOnce, setMobileOpenedOnce] = useState(false)
     const [portalRoot, setPortalRoot] = useState(null)
+    // The mobile dock is portaled to <body>, so the game's --accent (set on
+    // .game-shell) does not cascade to it and the play button rendered with a
+    // transparent background. Capture the accent at mount and re-apply it inline.
+    const [dockAccent, setDockAccent] = useState(null)
+    const panelRef = useRef(null)
     const [betAmount, setBetAmount] = useState(initialBet)
     // Auto state
     const [autoCount, setAutoCount] = useState(10)
@@ -169,6 +174,15 @@ export default function BetPanel({
         setPortalRoot(document.body)
     }, [])
 
+    // Resolve the game accent from the nearest .game-shell (or :root fallback)
+    // so the portaled mobile dock can re-apply it inline.
+    useEffect(() => {
+        const shell = panelRef.current?.closest('.game-shell')
+        const source = shell || document.documentElement
+        const accent = getComputedStyle(source).getPropertyValue('--accent').trim()
+        if (accent) setDockAccent(accent)
+    }, [])
+
     // Keyboard shortcuts. Disabled when typing in any input/textarea, when modifiers
     // (ctrl/cmd/alt) are held, and when an auto round is in progress to keep things safe.
     useEffect(() => {
@@ -256,7 +270,10 @@ export default function BetPanel({
     }
 
     const mobileDock = (
-        <div className={`bp-mobile-layer ${mobileControlsOpen ? 'mobile-open' : ''}`}>
+        <div
+            className={`bp-mobile-layer ${mobileControlsOpen ? 'mobile-open' : ''}`}
+            style={dockAccent ? { '--accent': dockAccent } : undefined}
+        >
             <div className="bp-mobile-dock" data-mobile-action-dock>
                 <button
                     type="button"
@@ -310,7 +327,7 @@ export default function BetPanel({
     )
 
     return (
-        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`}>
+        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`} ref={panelRef}>
             {portalRoot ? createPortal(mobileDock, portalRoot) : mobileDock}
 
             <div className="bp-content" id={`${panelId}-mobile-controls`}>
