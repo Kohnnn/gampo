@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Volume2, VolumeX, ZapOff, Zap } from 'lucide-react'
+import { Volume2, VolumeX, ZapOff, Zap, Sparkles } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { useAudio } from '../audio/AudioProvider'
 import { useReduceMotion } from './fx'
+import { useFunMode } from '../utils/funMode'
 import { fullGameCatalog } from '../data/casinoCatalog'
 import { searchGames } from '../utils/gameSearch'
 
@@ -56,6 +57,7 @@ function Header() {
     } = useCredits()
     const { muted, toggle: toggleMute } = useAudio()
     const [reduceMotion, setReduceMotion] = useReduceMotion()
+    const [funMode, setFunMode] = useFunMode()
     const [showCredits, setShowCredits] = useState(false)
     const [grantAmount, setGrantAmount] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
@@ -199,6 +201,17 @@ function Header() {
                     </button>
                     <button className="header-toggle" onClick={() => setReduceMotion(v => !v)} aria-label={reduceMotion ? 'Enable motion' : 'Reduce motion'}>
                         {reduceMotion ? <ZapOff size={16} /> : <Zap size={16} />}
+                    </button>
+                    <button
+                        className={`header-toggle header-funmode ${funMode ? 'is-on' : ''}`}
+                        onClick={() => setFunMode(!funMode)}
+                        aria-pressed={funMode}
+                        title={funMode
+                            ? 'Fun Mode ON — odds boosted for free play (not real casino math). Tap to turn off.'
+                            : 'Fun Mode — boost your odds in free play (entertainment only, not real casino math).'}
+                        aria-label={funMode ? 'Turn Fun Mode off' : 'Turn Fun Mode on'}
+                    >
+                        <Sparkles size={16} />
                     </button>
                 </div>
                 <div className="header-credits">

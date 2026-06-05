@@ -19,6 +19,7 @@ import EducationPanel from '../../EducationPanel'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { getFeatureContract } from '../../../data/slotFeatureContracts'
 import { recordFeatureEvent } from '../../../hooks/useProgress'
+import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import {
     SLOT_TEMPLATES,
     getBuyTiers,
@@ -471,7 +472,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
 
             clearTimers()
-            const result = resolveSlotSpin(config, { bonusBuy: usedBonusBuy, buyTier: tier, freeSpin: usedFreeSpin, stickyWilds })
+            // Fun Mode (free-play only) inflates the calibrated scalar so wins
+            // land bigger/more often. Off by default; never a real-casino mode.
+            const funScalar = isFunMode() ? (config.rtpScalar ?? 1) * FUN_PAYOUT_BOOST : undefined
+            const result = resolveSlotSpin(config, { bonusBuy: usedBonusBuy, buyTier: tier, freeSpin: usedFreeSpin, stickyWilds, ...(funScalar != null ? { rtpScalar: funScalar } : {}) })
             const cols = config.layout.cols
             const totalSettleDelay = turbo ? 180 : 360
             const baseStop = turbo ? 80 : 200
