@@ -11,6 +11,7 @@ import {
     resolveSlotSpin,
     getBuyTiers,
 } from './slotFactory'
+import { SLOT_FEATURE_CONTRACTS, getFeatureContract } from '../../../data/slotFeatureContracts'
 
 const slotsGameSource = readFileSync(new URL('./SlotsGame.jsx', import.meta.url), 'utf8')
 const slotsCssSource = readFileSync(new URL('./slots.css', import.meta.url), 'utf8')
@@ -34,6 +35,25 @@ beforeEach(() => {
             configurable: true,
         })
     }
+})
+
+describe('slot feature contracts', () => {
+    it('every template has a feature contract describing its distinct mechanics', () => {
+        for (const t of SLOT_TEMPLATES) {
+            const contract = getFeatureContract(t.id)
+            expect(contract, `${t.id} missing feature contract`).toBeTruthy()
+            expect(contract.summary, `${t.id} contract missing summary`).toBeTruthy()
+            expect(Array.isArray(contract.mechanics) && contract.mechanics.length > 0, `${t.id} contract has no mechanics`).toBe(true)
+            for (const m of contract.mechanics) {
+                expect(m.name, `${t.id} mechanic missing name`).toBeTruthy()
+                expect(m.detail, `${t.id} mechanic missing detail`).toBeTruthy()
+            }
+        }
+    })
+
+    it('contract count matches template count (no orphans)', () => {
+        expect(Object.keys(SLOT_FEATURE_CONTRACTS).length).toBe(SLOT_TEMPLATES.length)
+    })
 })
 
 describe('slotFactory layout helpers', () => {
