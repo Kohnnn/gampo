@@ -4,6 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
+import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { nextRoll } from '../../../utils/fairRng'
 import {
     BetPanel,
@@ -65,7 +66,12 @@ export default function HiloGame() {
     const [revealedFace, setRevealedFace] = useState(false)
 
     const winChance = direction === 'higher' ? (13 - currentCard.rank) / 13 : (currentCard.rank - 1) / 13
-    const payout = winChance > 0 ? Math.max(1.01, 0.96 / winChance) : 0
+    // RTP-lock incl. the tie refund. P(tie)=1/13 refunds the stake (EV 1/13),
+    // so total RTP = winChance·payout + 1/13. Solve for the target so a tie
+    // no longer pushes RTP over 100%. payout = (rtp − 1/13)/winChance.
+    const HILO_RTP = 0.96
+    const hiloTargetRtp = (isFunMode() ? HILO_RTP * FUN_PAYOUT_BOOST : HILO_RTP) - (1 / 13)
+    const payout = winChance > 0 ? Math.max(1.01, hiloTargetRtp / winChance) : 0
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return

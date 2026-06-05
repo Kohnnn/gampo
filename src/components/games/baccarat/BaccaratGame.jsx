@@ -189,8 +189,11 @@ export default function BaccaratGame() {
         const totalCards = next.player.length + next.banker.length
 
         const payouts = {
-            banker: outcome === 'B' ? 1.95 : 0,
-            player: outcome === 'P' ? 2 : 0,
+            // On a tie, Banker/Player bets PUSH (refund stake = 1x) per standard
+            // baccarat rules. Previously a tie returned 0, dropping banker RTP
+            // from ~98.9% to ~89%.
+            banker: outcome === 'B' ? 1.95 : outcome === 'T' ? 1 : 0,
+            player: outcome === 'P' ? 2 : outcome === 'T' ? 1 : 0,
             tie: outcome === 'T' ? 9 : 0,
             pair_p: playerPair ? 12 : 0,
             pair_b: bankerPair ? 12 : 0,

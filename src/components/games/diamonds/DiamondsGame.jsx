@@ -10,7 +10,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { nextRoll } from '../../../utils/fairRng'
 import {
     BetPanel,
@@ -45,18 +46,53 @@ const GEMS = [
     { sym: '🟡', label: 'Citrine', weight: 8 },
 ]
 
-// Payout per match-count, weighted to keep RTP near 0.96.
-//   2 match -> 1.10x
-//   3 match -> 2.20x
-//   4 match -> 12.0x
-//   5 match -> 80.0x  (Diamond)
-function payoutFor(matchCount, gemIndex) {
+// Raw payout shape per match-count (relative). Calibrated below so realized
+// RTP equals DIAMONDS_RTP — previously these raw values gave ~258% RTP because
+// a near-certain 2-match paid 1.1x.
+function rawPayoutFor(matchCount, gemIndex) {
     if (matchCount < 2) return 0
     const gemBonus = (5 - gemIndex) * 0.5 // Diamond +2.5, Citrine +0
     if (matchCount === 5) return 80 + gemBonus * 4
     if (matchCount === 4) return 12 + gemBonus * 2
     if (matchCount === 3) return 2.2 + gemBonus * 0.4
     return 1.1 + gemBonus * 0.1
+}
+
+const DIAMONDS_RTP = 0.96
+const GEM_WEIGHTS = [1, 2, 3, 4, 6, 8]
+
+// One-time Monte-Carlo calibration: measure the mean return of the raw shape
+// and derive a single scalar that locks RTP to the target. Deterministic via a
+// seeded RNG so the scalar is stable across loads.
+const DIAMONDS_SCALE = (() => {
+    const total = GEM_WEIGHTS.reduce((s, w) => s + w, 0)
+    let seed = 0x9e3779b9
+    const rng = () => {
+        seed = (Math.imul(seed ^ (seed >>> 15), seed | 1) >>> 0)
+        seed ^= seed + Math.imul(seed ^ (seed >>> 7), seed | 61)
+        return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296
+    }
+    const draw = () => {
+        const r = rng() * total
+        let acc = 0
+        for (let i = 0; i < GEM_WEIGHTS.length; i += 1) { acc += GEM_WEIGHTS[i]; if (r < acc) return i }
+        return GEM_WEIGHTS.length - 1
+    }
+    const N = 200000
+    let sum = 0
+    for (let n = 0; n < N; n += 1) {
+        const counts = new Array(GEM_WEIGHTS.length).fill(0)
+        for (let d = 0; d < 5; d += 1) counts[draw()] += 1
+        let bestIdx = -1, bestCount = 0
+        counts.forEach((c, i) => { if (c > bestCount) { bestCount = c; bestIdx = i } })
+        sum += rawPayoutFor(bestCount, bestIdx === -1 ? GEM_WEIGHTS.length - 1 : bestIdx)
+    }
+    const meanReturn = sum / N
+    return meanReturn > 0 ? DIAMONDS_RTP / meanReturn : 1
+})()
+
+function payoutFor(matchCount, gemIndex, funBoost = 1) {
+    return round2(rawPayoutFor(matchCount, gemIndex) * DIAMONDS_SCALE * funBoost)
 }
 
 function pickGem() {
@@ -145,7 +181,7 @@ export default function DiamondsGame() {
                 bestIdx = i
             }
         })
-        const multiplier = payoutFor(bestCount, bestIdx === -1 ? GEMS.length - 1 : bestIdx)
+        const multiplier = payoutFor(bestCount, bestIdx === -1 ? GEMS.length - 1 : bestIdx, isFunMode() ? FUN_PAYOUT_BOOST : 1)
         const won = multiplier > 0
         const returnAmount = won ? betAmount * multiplier : 0
         const profit = returnAmount - betAmount

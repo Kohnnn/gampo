@@ -15,6 +15,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
+import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import {
     BetPanel,
     BigWinOverlay,
@@ -37,19 +38,56 @@ import { useGameBgm } from '../../../audio/useBgm'
 
 const GRID = 9
 const REVEAL_MS = 580
-const HOUSE_EDGE = 0.04
+const MOLES_RTP = 0.96
 
-// Hypergeometric expected hits = picks * moles / GRID. Pay scales with
-// the gap between actual hits and average expected hits, with a small
-// premium for full sweeps. Net house edge ~4%.
-function payoutFor(hits, picks, moles) {
+// Raw payout shape (relative). The lift/sweep terms make this NOT
+// probability-locked, so realized RTP drifted to 96%–144% depending on config.
+// We calibrate a per-config scalar by simulation so realized RTP == MOLES_RTP.
+function rawPayoutFor(hits, picks, moles) {
     if (picks <= 0 || hits <= 0) return 0
     const expected = (picks * moles) / GRID
     const lift = hits / Math.max(0.01, expected)
     const sweepBonus = hits === picks ? 1.5 : 1
     const baseCount = picks
-    const raw = lift * sweepBonus * (1 + (hits - 1) * 0.3 / Math.max(1, baseCount))
-    return Number((raw * (1 - HOUSE_EDGE)).toFixed(3))
+    return lift * sweepBonus * (1 + (hits - 1) * 0.3 / Math.max(1, baseCount))
+}
+
+// Memoized calibration: mean raw return for a (picks, moles) config under fair
+// hypergeometric placement, so scale = RTP / meanRawReturn.
+const moleScaleCache = new Map()
+function moleScale(picks, moles) {
+    const key = `${picks}:${moles}`
+    if (moleScaleCache.has(key)) return moleScaleCache.get(key)
+    let seed = 0x1234567 ^ (picks * 131 + moles * 17)
+    const rng = () => {
+        seed = (Math.imul(seed ^ (seed >>> 15), seed | 1) >>> 0)
+        seed ^= seed + Math.imul(seed ^ (seed >>> 7), seed | 61)
+        return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296
+    }
+    const N = 120000
+    let sum = 0
+    for (let n = 0; n < N; n += 1) {
+        // place `moles` on GRID, pick `picks` distinct cells, count hits
+        const moleSet = new Set()
+        while (moleSet.size < moles) moleSet.add(Math.floor(rng() * GRID))
+        const cells = Array.from({ length: GRID }, (_, i) => i)
+        let hits = 0
+        for (let p = 0; p < picks; p += 1) {
+            const idx = Math.floor(rng() * cells.length)
+            const cell = cells.splice(idx, 1)[0]
+            if (moleSet.has(cell)) hits += 1
+        }
+        sum += rawPayoutFor(hits, picks, moles)
+    }
+    const mean = sum / N
+    const scale = mean > 0 ? MOLES_RTP / mean : 1
+    moleScaleCache.set(key, scale)
+    return scale
+}
+
+function payoutFor(hits, picks, moles, funBoost = 1) {
+    if (picks <= 0 || hits <= 0) return 0
+    return Number((rawPayoutFor(hits, picks, moles) * moleScale(picks, moles) * funBoost).toFixed(3))
 }
 
 function placeMoles(count) {
@@ -105,7 +143,7 @@ export default function MolesGame() {
 
         const placed = placeMoles(moleCount)
         const hits = picks.filter(p => placed.has(p)).length
-        const multiplier = payoutFor(hits, picks.length, moleCount)
+        const multiplier = payoutFor(hits, picks.length, moleCount, isFunMode() ? FUN_PAYOUT_BOOST : 1)
         const won = multiplier > 0
         const returnAmount = won ? betAmount * multiplier : 0
         const profit = returnAmount - betAmount

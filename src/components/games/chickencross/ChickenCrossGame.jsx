@@ -27,10 +27,13 @@ import EducationPanel from '../../EducationPanel'
 import './chickencross.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
+// RTP-locked growth: per-step EV = safe × growth = CHICKEN_RTP (was fixed
+// growth → easy 100.3% player-favourable, hard 89.9% too stingy).
+const CHICKEN_RTP = 0.98
 const PRESETS = {
-    easy: { safe: 0.85, growth: 1.18, label: 'Easy' },
-    medium: { safe: 0.72, growth: 1.32, label: 'Medium' },
-    hard: { safe: 0.58, growth: 1.55, label: 'Hard' },
+    easy: { safe: 0.85, growth: Number((CHICKEN_RTP / 0.85).toFixed(4)), label: 'Easy' },
+    medium: { safe: 0.72, growth: Number((CHICKEN_RTP / 0.72).toFixed(4)), label: 'Medium' },
+    hard: { safe: 0.58, growth: Number((CHICKEN_RTP / 0.58).toFixed(4)), label: 'Hard' },
 }
 const LANES = 12
 

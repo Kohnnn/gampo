@@ -3,8 +3,9 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
+import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import {
     BetPanel,
     BigWinOverlay,
@@ -38,10 +39,25 @@ import { useGameBgm } from '../../../audio/useBgm'
 const SPIN_DURATION_MS = 2200
 const TICK_COUNT = 8
 
-const wheelPresets = {
+const WHEEL_RTP = 0.96
+
+// Relative segment shapes (the "feel" of each risk preset). These are
+// normalized at runtime so the mean payout equals WHEEL_RTP — i.e. the wheel
+// always carries a real house edge regardless of the shape. Previously these
+// raw arrays averaged 1.08–3.50 (108%–350% RTP, player-favourable).
+const wheelShapes = {
     low: [0, 1.2, 1.2, 1.5, 0, 2, 1.2, 1.5, 0, 2, 1.2, 3],
     medium: [0, 0, 1.5, 0, 2, 0, 3, 0, 1.5, 0, 5, 0],
     high: [0, 0, 0, 2, 0, 0, 5, 0, 0, 10, 0, 25],
+}
+
+// Scale a shape so its mean equals the target RTP (or a Fun-Mode-boosted RTP).
+function normalizeWheel(shape, funBoosted) {
+    const mean = shape.reduce((sum, v) => sum + v, 0) / shape.length
+    if (mean <= 0) return shape.map(() => 0)
+    const targetRtp = funBoosted ? WHEEL_RTP * FUN_PAYOUT_BOOST : WHEEL_RTP
+    const scale = targetRtp / mean
+    return shape.map(v => (v > 0 ? round2(v * scale) : 0))
 }
 
 export default function WheelGame() {
@@ -64,7 +80,7 @@ export default function WheelGame() {
     const [toast, setToast] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('wheel', { count: 9, cap: 10 }))
     const simSeqRef = useRef(0)
-    const segments = wheelPresets[risk]
+    const segments = normalizeWheel(wheelShapes[risk], isFunMode())
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return
