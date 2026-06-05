@@ -247,18 +247,19 @@ export const SLOT_FEATURE_CONTRACTS = {
         buyBonus: 'Spirit (80x), Ronin (180x + 2x persistent).',
     },
     'iron-fist': {
-        summary: 'Hacksaw-style multiplier wheel slot. Trigger 3+ gongs to spin for 5x to 100x.',
+        summary: 'Hacksaw-style multiplier wheel slot. Trigger 3+ gongs to spin for 2x to 30x.',
         mechanics: [
-            { name: 'Multiplier wheel', detail: '3+ gongs spin a 5/10/25/50/100x wheel. Wheel weights bias toward 5x and 10x; 100x is rare.' },
-            { name: 'Ways pays', detail: 'Pays anywhere a matching symbol appears in 3+ adjacent columns.' },
+            { name: 'Multiplier wheel', detail: '3+ gongs spin a 2/4/8/15/30x wheel. Wheel weights bias toward 2x and 4x; 30x is rare. The wheel multiplier applies across the free-spin session.' },
+            { name: 'Ways pays', detail: 'Pays anywhere a matching symbol appears in 3+ adjacent columns left-to-right across the 5×4 grid.' },
             { name: 'Dark win overlay', detail: 'Big wins fade the reels so the wheel value pops.' },
         ],
-        bonusEntry: '3+ gong scatters.',
+        bonusEntry: '3+ gong scatters trigger the wheel + 6 free spins.',
         bonusFlow: [
-            'Wheel spin reveals the multiplier.',
-            'Multiplier applies to 6 free spins.',
+            'Wheel spin reveals the session multiplier (2x–30x).',
+            'Multiplier applies to all 6 free spins.',
+            'Re-triggering during the session re-spins the wheel.',
         ],
-        volatility: 'Very high volatility.',
+        volatility: 'Very high volatility — the wheel multiplier drives rare but large sessions. RTP locked to 94%.',
         buyBonus: 'Bell (70x), Knockout (180x + 3x persistent).',
     },
     'coop-cluck': {
@@ -311,16 +312,16 @@ export const SLOT_FEATURE_CONTRACTS = {
     'gummy-drops': {
         summary: 'Sweet 8×8 cluster slot with an explosive multiplier orb.',
         mechanics: [
-            { name: 'Cluster pays', detail: '6+ touching symbols on an 8×8 grid form a cluster.' },
-            { name: 'Cascade ladder', detail: 'Each cascade bumps a 1x → 2x → 4x → 8x → 16x → 32x ladder.' },
-            { name: 'Persistent multiplier', detail: 'Bonus seeds the multiplier at 1x and grows on each cascade.' },
+            { name: 'Cluster pays', detail: '6+ touching symbols on an 8×8 (64-cell) grid form a cluster; bigger clusters pay more.' },
+            { name: 'Cascade ladder', detail: 'Winning clusters clear and new candy tumbles in. Each cascade bumps a 1x → 2x → 3x → 5x → 8x → 12x multiplier ladder (capped to keep the swing fair).' },
+            { name: 'Persistent multiplier', detail: 'During the bonus the ladder seeds at 1x and persists across free spins.' },
         ],
-        bonusEntry: '5+ lollipop scatters.',
+        bonusEntry: '5+ lollipop scatters award 12 free spins.',
         bonusFlow: [
-            '12 free spins.',
-            'Multiplier ladder persists across the bonus.',
+            '12 free spins with a persistent cascade ladder.',
+            'Ladder carries across spins for escalating chains.',
         ],
-        volatility: 'Very high volatility — the swing is huge.',
+        volatility: 'Very high volatility — long dry spells then big cascade chains. RTP locked to 94%.',
         buyBonus: 'Sweet (100x), Sugar Rush (250x + 2x persistent).',
     },
 }

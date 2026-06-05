@@ -59,4 +59,42 @@ Correct pattern already in Snakes/Slide: `multiplier = fairMultiplier * (1 - hou
 Ship + deploy after each track. Gate: vitest + build + browser smoke (492/375).
 
 ## Progress
-- (in progress)
+
+### Track 2 — UI (shipped + deployed)
+- Mobile action button color: bet dock is portaled to `<body>`, so `--accent` didn't cascade and the play button rendered transparent. BetPanel now resolves the accent from the nearest `.game-shell` at mount and re-applies it inline on `.bp-mobile-layer`. Verified: button bg is now the game accent gradient.
+- Roulette ball orbit: was transitioning an unregistered `--ball-radius` and `translateY(46%)` resolved vs the 14px ball (stuck near hub). Now anchored via `top: calc(50% - var(--ball-radius))` and transitions `top` so the ball actually spirals the rim.
+
+### Track 1a — Non-slot RTP locks (shipped + deployed)
+Added `src/utils/funMode.js` (RTP-lock helpers + Fun Mode). Fixed 10 games to realistic house-edge RTP, verified by `scripts/verifyOddsRtp.mjs`:
+- Wheel: segment shapes normalized to mean = 96% (was 108–350%).
+- RPS: payout 2.91→1.91 so push refund nets 97% (was 130%).
+- Hi-Lo: tie refund folded into the RTP lock → 96% (was 104%).
+- Diamonds: Monte-Carlo payout scalar → 96% (was 258%).
+- Pump: per-step ramp RTP-locked to 0.96/survival (was +EV every pump).
+- Tower / Chicken Cross: growth = rtp/safe per preset (was fixed growth, easy preset >100%).
+- Moles: per-config sim scalar → 96% (was 96–144%).
+- Keno: paytable recalibrated for the real 40-ball/10-draw engine → 92% (was ~61%).
+- Baccarat: tie now PUSHES banker/player (was a loss) → banker 98.9%.
+
+### Track 1b — Slot RTP auto-calibration (shipped + deployed)
+- `resolveSlotSpin` multiplies the final multiplier by a per-template `rtpScalar`.
+- `scripts/calibrateSlots.mjs` simulates full base+free-spin sessions (fast injected RNG via `__setSlotCalibrationRng`, capped sessions), averages over 3 seeds, and writes `slotRtpScalars.js` with `scalar = target / measuredRawRtp`.
+- `scripts/verifySlotRtp.mjs` confirms convergence; `slotRtp.test.js` is the CI gate (no player-favourable mean; stable templates within ±6pp).
+- Tamed two fat-tail templates at source: iron-fist wheel 100x→30x, gummy cascade ladder 32x→12x. 19/20 within tolerance; iron-fist documented as the one ultra-high-variance template (mean locked at 94%, wide finite-sample band).
+- `scripts/extResolve.mjs`: Node ESM loader hook so sim scripts resolve the app's extensionless imports.
+
+### Fun Mode (shipped + deployed)
+- Header sparkles toggle (off by default), persisted `gampo_fun_mode`. Free-play entertainment booster: win-prob ×1.35, payouts ×1.15, RTP-locked games lift to ~110%. Wired into all fixed non-slot games + the slot scalar. Clearly labelled "not real casino math."
+
+### Track 4 — Single-player progression (committed)
+- `src/data/rewards.js` + `src/hooks/useRewards.js`: one-time starter pack (Free / +5k / +25k), once-per-day daily claim (+500), and per-level claimable rewards (scales with level, x5/x10 milestones). Credits granted via CreditContext.
+- Rewards section added to ProgressPanel with claim buttons; reset scope added. Free play stays the default.
+
+### Track 3 — Slot mechanical distinctness + feature contracts (committed)
+- All 20 templates already use distinct evaluation modes (ways/lines/cluster/megaways/pay-anywhere) + distinct features (coin meter, multiplier wheel, hold-and-respin, cascade ladder, expanding/sticky wilds, mystery reveal, money collect, multiplier zones).
+- Every template now has a detailed feature contract (mechanics with name+detail, bonus entry/flow, volatility, buy options) surfaced in the in-game "Feature contract" panel with derived RTP/volatility/grid/max-win + paytable. Updated iron-fist/gummy contracts to the tamed multipliers. `slotFactory.test.js` now asserts contract coverage for all 20.
+
+### Verification
+- `npm test -- --run`: 275 tests across 62 files green.
+- `npm run build`: clean.
+- Offline RTP sims: `node --loader ./scripts/extResolve.mjs scripts/verifySlotRtp.mjs` (slots) and `node scripts/verifyOddsRtp.mjs` (non-slot).

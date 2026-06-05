@@ -202,7 +202,7 @@ export default function WheelGame() {
                     <div className="bp-section">
                         <label className="bp-label">Risk</label>
                         <div className="bp-row">
-                            {Object.keys(wheelPresets).map(r => (
+                            {Object.keys(wheelShapes).map(r => (
                                 <button key={r} className={`bp-bet-btn ${risk === r ? 'active' : ''}`} onClick={() => !spinning && setRisk(r)}>{r}</button>
                             ))}
                         </div>
