@@ -250,6 +250,128 @@ export const ACHIEVEMENTS = [
         target: 500000,
         evaluate: stats => stats.totalWagered,
     },
+
+    // ---- Win streaks (extended) ----
+    {
+        id: 'streak-25',
+        group: 'streak',
+        tier: 'platinum',
+        name: 'Unstoppable',
+        detail: '25 wins in a row on a single game. Ride the variance.',
+        icon: 'flame',
+        target: 25,
+        evaluate: stats => stats.bestWinStreak,
+    },
+
+    // ---- Resilience (loss-streak survival as a teaching moment) ----
+    {
+        id: 'downswing-10',
+        group: 'streak',
+        tier: 'silver',
+        name: 'Downswing survivor',
+        detail: 'Weather a 10-loss streak. Variance cuts both ways — bankroll management matters.',
+        icon: 'flame',
+        target: 10,
+        evaluate: stats => stats.bestLossStreak,
+    },
+
+    // ---- Net profit milestones ----
+    {
+        id: 'profit-1k',
+        group: 'wins',
+        tier: 'silver',
+        name: 'In the green',
+        detail: 'Reach +1,000 practice credits in lifetime net profit.',
+        icon: 'trophy',
+        target: 1000,
+        evaluate: stats => stats.bestProfit,
+    },
+    {
+        id: 'profit-25k',
+        group: 'wins',
+        tier: 'gold',
+        name: 'Session run-up',
+        detail: 'Reach +25,000 practice credits in lifetime net profit.',
+        icon: 'trophy',
+        target: 25000,
+        evaluate: stats => stats.bestProfit,
+    },
+
+    // ---- Single-hit highlights ----
+    {
+        id: 'single-win-1k',
+        group: 'features',
+        tier: 'silver',
+        name: 'Big hit',
+        detail: 'Win 1,000+ practice credits on a single round.',
+        icon: 'sparkles',
+        target: 1000,
+        evaluate: stats => stats.biggestSingleWin,
+    },
+    {
+        id: 'single-win-10k',
+        group: 'features',
+        tier: 'platinum',
+        name: 'Jackpot moment',
+        detail: 'Win 10,000+ practice credits on a single round.',
+        icon: 'sparkles',
+        target: 10000,
+        evaluate: stats => stats.biggestSingleWin,
+    },
+    {
+        id: 'mult-1000',
+        group: 'features',
+        tier: 'platinum',
+        name: 'Four-figure multiplier',
+        detail: 'Land a single round at 1000x or higher. The very top of the paytable.',
+        icon: 'sparkles',
+        target: 1000,
+        evaluate: stats => stats.bestMultiplier,
+    },
+
+    // ---- Game variety (extended) ----
+    {
+        id: 'games-40',
+        group: 'features',
+        tier: 'platinum',
+        name: 'Completionist',
+        detail: 'Settle a round in 40 different games. You have seen the whole lobby.',
+        icon: 'compass',
+        target: 40,
+        evaluate: stats => stats.uniqueGames.length,
+    },
+
+    // ---- Slot bonus engagement ----
+    {
+        id: 'bonus-first',
+        group: 'bonus',
+        tier: 'bronze',
+        name: 'Bonus unlocked',
+        detail: 'Trigger your first slot bonus feature (free spins, wheel, hold & respin...).',
+        icon: 'gift',
+        target: 1,
+        evaluate: stats => stats.bonusRoundsTriggered,
+    },
+    {
+        id: 'bonus-25',
+        group: 'bonus',
+        tier: 'silver',
+        name: 'Feature hunter',
+        detail: 'Trigger 25 slot bonus features across any templates.',
+        icon: 'gift',
+        target: 25,
+        evaluate: stats => stats.bonusRoundsTriggered,
+    },
+    {
+        id: 'freespins-100',
+        group: 'bonus',
+        tier: 'gold',
+        name: 'Free spin farmer',
+        detail: 'Accumulate 100 awarded free spins across all slots.',
+        icon: 'sparkles',
+        target: 100,
+        evaluate: stats => stats.freeSpinsAwarded,
+    },
 ]
 
 export const ACHIEVEMENT_GROUPS = {
@@ -257,8 +379,9 @@ export const ACHIEVEMENT_GROUPS = {
     wins: { label: 'Wins', sort: 2 },
     streak: { label: 'Streaks', sort: 3 },
     features: { label: 'Features', sort: 4 },
-    cases: { label: 'Cases', sort: 5 },
-    volume: { label: 'Volume', sort: 6 },
+    bonus: { label: 'Bonus Rounds', sort: 5 },
+    cases: { label: 'Cases', sort: 6 },
+    volume: { label: 'Volume', sort: 7 },
 }
 
 export function evaluateAchievements(stats) {

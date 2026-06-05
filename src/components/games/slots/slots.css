@@ -710,8 +710,30 @@
 }
 
 @keyframes slotReelMotion {
-    from { transform: translateY(-8px) scaleY(0.96); }
-    to { transform: translateY(8px) scaleY(1.04); }
+    from { transform: translateY(-10px) scaleY(0.94); }
+    to { transform: translateY(10px) scaleY(1.06); }
+}
+
+/* Reel-stop landing bounce: while the stage is still spinning, any cell that
+   has already settled (not .spinning, not .winning) plays a short overshoot
+   bounce — giving each column a tactile "thunk" as it lands, like a real reel. */
+.phase-spinning .slot-cell:not(.spinning):not(.winning),
+.phase-stage-spin .slot-cell:not(.spinning):not(.winning) {
+    animation: slotCellLand 0.34s cubic-bezier(0.18, 1.3, 0.4, 1) both;
+}
+
+@keyframes slotCellLand {
+    0% { transform: translateY(-14px) scaleY(1.12); filter: brightness(1.18); }
+    55% { transform: translateY(3px) scaleY(0.95); }
+    78% { transform: translateY(-1px) scaleY(1.02); }
+    100% { transform: translateY(0) scaleY(1); filter: brightness(1); }
+}
+
+:root.gampo-reduce-motion .phase-spinning .slot-cell:not(.spinning):not(.winning),
+:root.gampo-reduce-motion .phase-stage-spin .slot-cell:not(.spinning):not(.winning),
+.gampo-reduce-motion .phase-spinning .slot-cell:not(.spinning):not(.winning),
+.gampo-reduce-motion .phase-stage-spin .slot-cell:not(.spinning):not(.winning) {
+    animation: none;
 }
 
 .slot-cell.winning {
@@ -2389,6 +2411,76 @@
 
 /* === Wave 32: deeper feature-contract panel === */
 .slot-feature-contract { display: flex; flex-direction: column; gap: 10px; }
+
+.slot-contract-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+.slot-contract-stats span {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.slot-contract-stats small {
+    font-size: 8.5px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slot-text-dim, #9fb0c0);
+}
+.slot-contract-stats strong {
+    font-size: 13px;
+    font-weight: 950;
+    color: color-mix(in srgb, var(--slot-accent), white 30%);
+}
+
+.slot-paytable-list {
+    list-style: none !important;
+    margin: 0;
+    padding: 0 !important;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+}
+.slot-paytable-list li {
+    display: flex !important;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 7px;
+    border-radius: 7px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.slot-paytable-list li img,
+.slot-paytable-list li svg {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+.slot-paytable-list li span {
+    flex: 1;
+    min-width: 0;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--slot-text-dim, #c2cdd9);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.slot-paytable-list li em {
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 950;
+    color: color-mix(in srgb, var(--slot-accent), white 30%);
+    font-variant-numeric: tabular-nums;
+}
+
 .slot-contract-block { margin-top: 4px; }
 .slot-contract-block h4 {
     margin: 0 0 4px;
@@ -2910,6 +3002,24 @@
         grid-template-rows: auto minmax(240px, 1fr);
         padding-bottom: 8px;
         overflow: visible;
+    }
+
+    /* Slots panel reflows as a normal scrollable card below the reels on
+       mobile (it is not a portaled BetPanel dock). The fixed slot-mobile-dock
+       still owns the primary Spin; this block holds template/bet/buy options. */
+    .slot-panel-v2 {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+        max-width: 100%;
+        padding: 0 0 calc(var(--mobile-action-height, 74px) + 18px);
+        overflow: visible;
+    }
+
+    .slot-panel-v2 .slot-panel-card {
+        width: 100%;
+        box-sizing: border-box;
     }
 
     .slot-reel-wrap {

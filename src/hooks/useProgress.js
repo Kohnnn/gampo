@@ -44,10 +44,17 @@ const DEFAULT_STATS = {
     bestMultiplier: 0,
     bestWinStreak: 0,
     currentWinStreak: 0,
+    bestLossStreak: 0,
+    currentLossStreak: 0,
+    bestProfit: 0,
+    biggestSingleWin: 0,
     lastGameId: null,
     uniqueGames: [],
     casesTotalDrops: 0,
     casesRareDrops: 0,
+    // Slot-feature engagement: bumped via recordFeatureEvent.
+    bonusRoundsTriggered: 0,
+    freeSpinsAwarded: 0,
 }
 
 const listeners = new Set()
@@ -113,6 +120,9 @@ export function recordRound({ gameId, profit = 0, betAmount = 0, multiplier = 0 
     if (!gameId) return
     const won = profit > 0
     const lost = profit < 0
+    const nextWinStreak = won ? stats.currentWinStreak + 1 : 0
+    const nextLossStreak = lost ? stats.currentLossStreak + 1 : 0
+    const nextProfit = stats.totalProfit + (Number(profit) || 0)
     stats = {
         ...stats,
         totalRounds: stats.totalRounds + 1,
@@ -120,14 +130,32 @@ export function recordRound({ gameId, profit = 0, betAmount = 0, multiplier = 0 
         totalLosses: stats.totalLosses + (lost ? 1 : 0),
         totalPushes: stats.totalPushes + (!won && !lost ? 1 : 0),
         totalWagered: stats.totalWagered + (Number(betAmount) || 0),
-        totalProfit: stats.totalProfit + (Number(profit) || 0),
+        totalProfit: nextProfit,
+        bestProfit: Math.max(stats.bestProfit, nextProfit),
+        biggestSingleWin: Math.max(stats.biggestSingleWin, won ? profit : 0),
         bestMultiplier: Math.max(stats.bestMultiplier, Number(multiplier) || 0),
-        currentWinStreak: won ? stats.currentWinStreak + 1 : 0,
-        bestWinStreak: Math.max(stats.bestWinStreak, won ? stats.currentWinStreak + 1 : 0),
+        currentWinStreak: nextWinStreak,
+        bestWinStreak: Math.max(stats.bestWinStreak, nextWinStreak),
+        currentLossStreak: nextLossStreak,
+        bestLossStreak: Math.max(stats.bestLossStreak, nextLossStreak),
         lastGameId: gameId,
         uniqueGames: stats.uniqueGames.includes(gameId)
             ? stats.uniqueGames
             : [...stats.uniqueGames, gameId],
+    }
+    writeStats()
+    checkUnlocks()
+    notify()
+}
+
+// Slot/feature engagement counter. Games call this when a bonus feature
+// triggers (free spins, hold & respin, wheel, etc.) so feature-focused
+// achievements can unlock independently of raw round counts.
+export function recordFeatureEvent({ type = 'bonus', freeSpins = 0 } = {}) {
+    stats = {
+        ...stats,
+        bonusRoundsTriggered: stats.bonusRoundsTriggered + 1,
+        freeSpinsAwarded: stats.freeSpinsAwarded + (Number(freeSpins) || 0),
     }
     writeStats()
     checkUnlocks()

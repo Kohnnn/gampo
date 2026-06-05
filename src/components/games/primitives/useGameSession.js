@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { recordPnl } from '../../../hooks/useGlobalPnl'
 import { recordRound as recordProgressRound } from '../../../hooks/useProgress'
 import { recordMissionRound } from '../../../hooks/useMissions'
+import { recordXpRound } from '../../../hooks/useXp'
 
 const HISTORY_LIMIT = 200
 const mirroredIds = new Set()
@@ -58,6 +59,14 @@ export default function useGameSession(gameId) {
                 })
                 // Wave 25: also feed the missions/VIP system on every settled round.
                 recordMissionRound({
+                    gameId,
+                    profit: entry.profit,
+                    betAmount: entry.betAmount,
+                    multiplier: entry.multiplier,
+                })
+                // XP/level layer: award XP for every settled round (base +
+                // wager/win/multiplier bonuses + new-game / daily-first bonuses).
+                recordXpRound({
                     gameId,
                     profit: entry.profit,
                     betAmount: entry.betAmount,

@@ -156,6 +156,24 @@
     background: linear-gradient(90deg, #ad7cff, #ff7ab6);
 }
 
+/* Level-up toast uses the rank accent passed via --rank-accent. */
+.ach-toast.ach-toast-levelup {
+    border-color: color-mix(in srgb, var(--rank-accent, #ffd166), transparent 35%);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 34px color-mix(in srgb, var(--rank-accent, #ffd166), transparent 55%);
+}
+.ach-toast.ach-toast-levelup .ach-toast-icon {
+    background: color-mix(in srgb, var(--rank-accent, #ffd166), transparent 80%);
+    border-color: color-mix(in srgb, var(--rank-accent, #ffd166), transparent 45%);
+    color: var(--rank-accent, #ffd166);
+    box-shadow: 0 0 22px -2px color-mix(in srgb, var(--rank-accent, #ffd166), transparent 45%);
+}
+.ach-toast.ach-toast-levelup .ach-toast-body small {
+    color: var(--rank-accent, #ffd166);
+}
+.ach-toast.ach-toast-levelup .ach-toast-bar i {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--rank-accent, #ffd166), #ffffff 20%), var(--rank-accent, #ffd166));
+}
+
 @media (max-width: 480px) {
     .ach-toast {
         top: 8px;

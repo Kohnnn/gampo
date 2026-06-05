@@ -2037,6 +2037,11 @@ input:focus-visible,
         display: flex !important;
         flex-direction: column !important;
         gap: 8px;
+        /* QA: must be visible (not hidden) on mobile so overflowing game
+           content extends the scrollable .game-shell instead of being clipped.
+           This was the root cause of "cannot scroll" across games. */
+        overflow: visible !important;
+        max-width: 100%;
     }
     .gs-aside {
         order: 3;
@@ -2046,6 +2051,7 @@ input:focus-visible,
         order: 1;
         padding: 8px;
         overflow: visible;
+        min-height: 0;
     }
     .gs-panel {
         order: 2;
@@ -2059,6 +2065,14 @@ input:focus-visible,
         border: 0;
         border-radius: 0;
         box-shadow: none;
+    }
+    /* Slots passes a real in-flow panel (.slot-panel-v2) instead of BetPanel,
+       so it must keep natural height and flow below the reels (scrollable),
+       rather than collapsing to height:0 like the portaled BetPanel docks. */
+    .gs-panel:has(.slot-panel-v2) {
+        height: auto;
+        overflow: visible;
+        pointer-events: auto;
     }
     .bp-panel {
         height: 0;

@@ -104,10 +104,18 @@ function PokerCard({ card, hidden }) {
     if (!card) return <div className="pk-card empty">--</div>
     if (hidden) return <div className="pk-card hidden"><div className="pk-card-back" /></div>
     const r = card[0]; const s = card[1]
+    const glyph = suitGlyph(s)
     return (
         <div className={`pk-card ${suitClass(s)}`}>
-            <span className="pk-rank">{rankPretty(r)}</span>
-            <span className="pk-suit">{suitGlyph(s)}</span>
+            <span className="pk-corner pk-corner-tl">
+                <span className="pk-rank">{rankPretty(r)}</span>
+                <span className="pk-suit">{glyph}</span>
+            </span>
+            <span className="pk-pip" aria-hidden="true">{glyph}</span>
+            <span className="pk-corner pk-corner-br">
+                <span className="pk-rank">{rankPretty(r)}</span>
+                <span className="pk-suit">{glyph}</span>
+            </span>
         </div>
     )
 }
@@ -698,7 +706,7 @@ export default function PokerGame() {
                                 <div className="pk-seats">
                                     {state.players.map((p, i) => (
                                         <div key={p.id}
-                                            className={`pk-seat seat-${i} ${p.status} ${i === state.toAct ? 'on-turn' : ''} ${i === state.buttonIndex ? 'has-button' : ''}`}>
+                                            className={`pk-seat seat-${i} ${p.status} ${p.isHuman ? 'is-human' : ''} ${i === state.toAct ? 'on-turn' : ''} ${i === state.buttonIndex ? 'has-button' : ''}`}>
                                             {p.avatar ? <img className="pk-avatar" src={p.avatar} alt="" /> : <div className="pk-avatar pk-you">YOU</div>}
                                             <div className="pk-seat-info">
                                                 <span className="pk-name">{p.name}</span>

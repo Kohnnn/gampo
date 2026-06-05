@@ -36,6 +36,8 @@ const DEFAULT_PERIOD = {
     bestMultiplier: 0,
     bestStreak: 0,
     currentStreak: 0,
+    netProfit: 0,
+    bestSingleWin: 0,
     uniqueGames: [],
 }
 
@@ -135,6 +137,8 @@ function bumpPeriod(period, gameId, profit, betAmount, multiplier) {
         bestMultiplier: Math.max(period.bestMultiplier, Number(multiplier) || 0),
         currentStreak: won ? period.currentStreak + 1 : 0,
         bestStreak: Math.max(period.bestStreak, won ? period.currentStreak + 1 : 0),
+        netProfit: (period.netProfit || 0) + (Number(profit) || 0),
+        bestSingleWin: Math.max(period.bestSingleWin || 0, won ? profit : 0),
         uniqueGames: period.uniqueGames.includes(gameId)
             ? period.uniqueGames
             : [...period.uniqueGames, gameId],
