@@ -807,7 +807,12 @@
     }
 }
 
-@media (max-width: 480px) {
+/* Jump affordance: only meaningful on mobile where the felt sits below the fold. */
+.rou-bet-jump {
+    display: none;
+}
+
+@media (max-width: 760px) {
     .roulette-stage {
         max-height: none;
         overflow: visible;
@@ -843,6 +848,49 @@
     .rou-recent-rail {
         max-height: 66px;
         overflow: hidden;
+    }
+
+    /* Persistent "scroll to the felt" affordance so the bet table is discoverable. */
+    .rou-bet-jump {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 2px 0 0;
+        padding: 10px 14px;
+        border-radius: 12px;
+        border: 1px solid color-mix(in srgb, var(--accent), transparent 40%);
+        background: linear-gradient(180deg, rgba(159, 37, 42, 0.22), rgba(159, 37, 42, 0.08));
+        color: #ffe6a8;
+        font-weight: 950;
+        letter-spacing: 0.04em;
+        text-decoration: none;
+        text-transform: uppercase;
+        font-size: 11px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32);
+    }
+
+    .rou-bet-jump strong {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        color: #fff;
+        font-size: 12px;
+        animation: rouBetJumpNudge 1.8s ease-in-out infinite;
+    }
+
+    @keyframes rouBetJumpNudge {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(2px); }
+    }
+
+    :root.gampo-reduce-motion .rou-bet-jump strong,
+    .gampo-reduce-motion .rou-bet-jump strong {
+        animation: none;
+    }
+
+    .rou-board {
+        scroll-margin-top: 12px;
     }
 
     .rou-state-card {

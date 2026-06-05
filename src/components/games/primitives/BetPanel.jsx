@@ -49,6 +49,9 @@ export default function BetPanel({
     const panelId = useId()
     const [tab, setTab] = useState('manual')
     const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
+    // Tracks whether the mobile betting sheet has been opened at least once so
+    // we can nudge first-time users toward game setup (chips, decks, rules).
+    const [mobileOpenedOnce, setMobileOpenedOnce] = useState(false)
     const [portalRoot, setPortalRoot] = useState(null)
     const [betAmount, setBetAmount] = useState(initialBet)
     // Auto state
@@ -241,18 +244,31 @@ export default function BetPanel({
     const playContent = isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>
     const mobilePlayContent = isAutoLive ? <><Pause size={16} /> Stop</> : <><Play size={16} /> {mobileButtonLabel}</>
 
+    // Game-specific setup controls (chips, decks, rules) live in the manual tab
+    // body. When they exist we surface a clearer "Bet & options" affordance and
+    // a one-time hint so mobile users discover the settings sheet.
+    const hasSetupControls = Boolean(children)
+    const settingsLabel = hasSetupControls ? 'Bet & options' : 'Bet settings'
+    const showSetupNudge = hasSetupControls && !mobileControlsOpen && !mobileOpenedOnce && !inRound
+    const openMobileControls = () => {
+        setMobileControlsOpen(true)
+        setMobileOpenedOnce(true)
+    }
+
     const mobileDock = (
         <div className={`bp-mobile-layer ${mobileControlsOpen ? 'mobile-open' : ''}`}>
             <div className="bp-mobile-dock" data-mobile-action-dock>
                 <button
                     type="button"
-                    className="bp-mobile-settings"
-                    onClick={() => setMobileControlsOpen(true)}
+                    className={`bp-mobile-settings ${showSetupNudge ? 'nudge' : ''}`}
+                    onClick={openMobileControls}
                     aria-expanded={mobileControlsOpen}
                     aria-controls={`${panelId}-mobile-controls`}
+                    aria-label={settingsLabel}
+                    data-mobile-settings-toggle
                 >
                     <Settings size={16} />
-                    <span>Settings</span>
+                    <span>{settingsLabel}</span>
                 </button>
                 <div className="bp-mobile-summary">
                     <span>{dockSummary}</span>
@@ -270,6 +286,17 @@ export default function BetPanel({
                     {mobilePlayContent}
                 </button>
             </div>
+
+            {showSetupNudge && (
+                <button
+                    type="button"
+                    className="bp-mobile-setup-hint"
+                    onClick={openMobileControls}
+                    data-mobile-setup-hint
+                >
+                    Set bet &amp; options ↑
+                </button>
+            )}
 
             {mobileControlsOpen && (
                 <button

@@ -333,3 +333,32 @@ Fourth audit (`docs/evaluationreport.md` v4) plus three user concerns — Plinko
 - Replaced generated Tarot SVG cards with the supplied monochrome Major Arcana PNG pack under `public/assets/tarot/monochrome`, keeping the 22-card 96% RTP model and pixel-art card presentation.
 - Added targeted tests for Cases settlement summaries/guard, Roulette coverage, Blackjack split rules, Baccarat road tail/latest/tie behavior, and Tarot asset path mapping.
 - Verification: `npm test -- --run` is green at 193 tests across 44 files; `npm run build` passes with the existing empty `phaser`/`matter` chunks and large `rows-*` chunk warnings. Browser smoke `cardfix-after-final` checked `/cases`, `/roulette`, `/blackjack`, `/baccarat`, and `/tarot` at 375x667, 480x800, 1024x768, and 1610x870 with no horizontal overflow, no console errors, no broken images, and key actions visible. Interaction checks covered 5-row Cases skip, Roulette straight+advanced spin, repeated Baccarat road latest markers, Tarot PNG reveal, and Blackjack deal UI with Split visible.
+
+## QA v4 Mobile Audit Response (2026-06-05)
+
+External "QA Update Report v4" (June 5) flagged P0 hit-box failures (all footer DEAL/SPIN/DRAW buttons dead), split slot reels, and a non-functional Poker Sit Down. **Cross-checked every claim against the live deploy and source; the P0 claims are false positives against the shipped build.**
+
+### Root-cause finding: report tested against a misread of a current build
+- Confirmed the live Netlify deploy entry bundle (`index-5RedBb1Q.js`) is byte-identical to the local `dist/` built from HEAD `bb250ae4` — the deploy is current, not stale.
+- The recommended fix (mount the footer via `React.createPortal()` at `document.body`) was already shipped in a prior wave (`BetPanel.jsx` `createPortal(mobileDock, document.body)`, `primitives.css` dock at `z-index: 1400`).
+- Live interaction tests disproved the P0s: Blackjack DEAL dealt a hand (balance 1000→995, footer flipped to Stand); `elementFromPoint` at the button's visual center returns the button itself (no hit-box offset); Poker Sit Down was merely **disabled by the balance gate** (GC 995 < GC 1,000 min buy-in) — topping up enabled it and seating worked; Slots renders a clean single 5×4 grid with no overflow.
+
+### Real issues found and fixed
+- **Roulette bet-table discoverability (M2) + wheel crop (M3)**: the mobile compaction (shrink wheel to 180px, hide live/feed/ticket side panels) only triggered at `max-width: 480px`, but the layout went single-column at `720px`. At the report's ~492px the full-size wheel + 3 stacked panels pushed the felt to y≈1301 (below the fold). Aligned the compaction block to `max-width: 760px` (board now at y≈551, within fold) and added a persistent `.rou-bet-jump` "Place your bets · Tap the felt ↓" anchor to `#roulette-bet-board` with `scroll-margin-top` and a reduced-motion fallback.
+- **Slots duplicate Spin (new)**: phones showed two visible spins — the in-flow `slot-panel-spin` (promoted with `order:-1`) competing with the fixed `slot-mobile-dock` spin. Hid `slot-panel-spin` at `≤760px` so the fixed dock owns the single primary CTA; the side panel keeps template/bet/buy controls.
+- **Footer action-dock clarity (user-requested centerpiece) + selector discoverability (M1/M6)**: the dock Settings gear was icon-only (`font-size:0`, hidden label), so users didn't realize it opened bet amount + game options (chips/decks/rules). `BetPanel` now labels it **"Bet & options"** (or "Bet settings" when a game has no extra controls), shows a one-time `.bp-mobile-setup-hint` "Set bet & options ↑" nudge + pulse when setup controls exist and the sheet hasn't been opened, and exposes `data-mobile-settings-toggle` / `data-mobile-setup-hint`. Opening the sheet reveals the deck/chip/rule selectors the report mistook for "missing".
+- M4/M5/M7 (Sic Bo / Video Poker padding, paytable scroll, dead space) were already addressed in prior waves (`padding-bottom: calc(var(--mobile-action-height,74px)+18px)`, `vp-paytable-shell` `max-height + overflow-y:auto`); M3 is further improved by the roulette breakpoint change.
+
+### Files modified
+- `src/components/games/primitives/BetPanel.jsx` — labeled "Bet & options" mobile settings button, first-time setup nudge, `openMobileControls` helper, new data hooks.
+- `src/components/games/primitives/primitives.css` — settings button shows its label (column layout), `.bp-mobile-settings.nudge` pulse, `.bp-mobile-setup-hint` pill, reduced-motion fallbacks, 390px dock retune.
+- `src/components/games/roulette/RouletteGame.jsx` — `.rou-bet-jump` affordance + `#roulette-bet-board` anchor id.
+- `src/components/games/roulette/roulette.css` — compaction breakpoint 480→760px, jump affordance styles, board `scroll-margin-top`.
+- `src/components/games/slots/slots.css` — hide in-flow `slot-panel-spin` at ≤760px.
+- `src/components/games/slots/slotFactory.test.js` — updated the mobile-spin contract to assert the single fixed-dock CTA.
+
+### Verification
+- `npm test -- --run` green at 257 tests across 59 files (updated 1 slot contract test to the corrected single-CTA behavior).
+- `npm run build` clean (37.7s) with only the pre-existing empty `phaser`/`matter` chunk + large `rows-*` warnings.
+- Browser smoke against the production preview at **492x820** and **375x667** across `/`, `/roulette`, `/slots`, `/blackjack`, `/baccarat`, `/videopoker`, `/sicbo`: all 14 route×viewport combos `overflow=0px action=yes interaction=passed errors=0`. The `interaction=passed` mobile hit-test (CTA fires at its visual center) is direct automated evidence against the report's B1 hit-box theory.
+- Manual playwright confirmations on the fresh build: roulette board lifted 1301→551px + bet-on-17 + portal Spin; slots single visible Spin with passing hit-test; blackjack "Bet & options" sheet opens to reveal deck/S17-H17 selectors.
