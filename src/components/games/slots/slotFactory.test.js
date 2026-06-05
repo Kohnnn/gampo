@@ -69,9 +69,12 @@ describe('slotFactory layout helpers', () => {
         expect(slotsGameSource).toContain('data-route-fallback="loading"')
     })
 
-    it('keeps the mobile panel spin CTA promoted above secondary controls', () => {
+    it('hides the in-flow panel spin on mobile so the fixed dock owns the single CTA', () => {
+        // On phones the slot-mobile-dock provides the primary Spin. The in-flow
+        // slot-panel-spin is hidden to avoid two competing spin buttons.
         expect(slotsCssSource).toContain('.slot-panel-spin')
-        expect(slotsCssSource).toContain('order: -1')
+        expect(slotsCssSource).toMatch(/@media \(max-width: 760px\)[\s\S]*\.slot-panel-spin\s*\{[\s\S]*display:\s*none/)
+        expect(slotsCssSource).toContain('.slot-mobile-spin')
     })
 
     it('uses uniform rows for non-megaways layouts', () => {

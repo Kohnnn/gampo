@@ -355,6 +355,10 @@ export default function RouletteGame() {
                         <strong>{result === null ? '—' : `${result} ${colorOf(result)}`}</strong>
                     </div>
                 </div>
+                <a className="rou-bet-jump" href="#roulette-bet-board" aria-label="Jump to the roulette betting table">
+                    <span>Place your bets</span>
+                    <strong>Tap the felt ↓</strong>
+                </a>
                 <div className="rou-top-deck">
                     <div className={`rou-wheel-area spin-phase-${spinPhase}`} ref={wheelAreaRef} style={{ '--ball-radius': ballRadius }}>
                         <div
@@ -431,7 +435,7 @@ export default function RouletteGame() {
                     </div>
                 </div>
 
-                <div className="rou-board" aria-label="Roulette betting table" data-mobile-critical-surface>
+                <div className="rou-board" id="roulette-bet-board" aria-label="Roulette betting table" data-mobile-critical-surface>
                     <div className={cellClassName(0, 'zero')} data-bet={cellBet(0) || ''}
                         data-cover={cellCoverage(0)?.coverCount || ''}
                         data-cover-label={cellCoverLabel(cellCoverage(0))}

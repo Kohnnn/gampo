@@ -1695,8 +1695,9 @@
 
 @media (max-width: 760px) {
     .slot-panel-spin {
-        order: -1;
-        width: 100%;
+        /* The fixed slot-mobile-dock owns the primary Spin on phones.
+           Hiding this in-flow duplicate keeps a single, unambiguous CTA. */
+        display: none;
     }
     .slot-stage-v2 {
         padding: 10px;
