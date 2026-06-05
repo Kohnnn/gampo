@@ -200,6 +200,7 @@ function SportsbookShell() {
                         events={events}
                         sports={sports}
                         leagues={leagues}
+                        feedSource={feedSource}
                         selectedIds={selectedIds}
                         onToggleSelection={handleToggleSelection}
                         onOpenEvent={openEvent}

@@ -163,6 +163,30 @@ function uniqueEvents(events) {
     })
 }
 
+// Assign home-screen curation tags to live feed events. Live providers don't
+// carry GamPo's `top`/`popular`/`starting-soon` tags, so the Sports Home
+// shelves would render empty (or fall back to synthetic). We rank real events
+// by popularity + live status so the headline rows show real teams only.
+function curateLiveEvents(events) {
+    const now = Date.now()
+    const ranked = [...events].sort((a, b) => {
+        const liveDelta = (b.status === 'live' ? 1 : 0) - (a.status === 'live' ? 1 : 0)
+        if (liveDelta) return liveDelta
+        return (b.popularity || 0) - (a.popularity || 0)
+    })
+    return ranked.map((event, index) => {
+        const tags = new Set(event.tags || [])
+        if (event.status === 'live') tags.add('live')
+        if (index < 3) tags.add('top')
+        if (index < 9) tags.add('popular')
+        if (event.status === 'prematch') {
+            const startMs = new Date(event.startsAt).getTime()
+            if (Number.isFinite(startMs) && startMs - now < 6 * 60 * 60 * 1000) tags.add('starting-soon')
+        }
+        return { ...event, tags: [...tags] }
+    })
+}
+
 export async function loadSportsbookFeed() {
     const synthetic = buildSyntheticSportsbookData()
     const errors = []
@@ -188,18 +212,25 @@ export async function loadSportsbookFeed() {
             ...(us.data || []).map(event => normalizeOddsApiEvent(event, 'us')),
             ...(uk.data || []).map(event => normalizeOddsApiEvent(event, 'uk')),
         ].filter(Boolean)
-        feedEvents = uniqueEvents(events).slice(0, 40)
+        feedEvents = uniqueEvents(events).slice(0, 60)
     } catch (error) {
         errors.push(error?.message || String(error))
     }
 
-    const events = [...feedEvents, ...synthetic.events]
+    // When real provider events are available, show ONLY real events so no
+    // simulated "Practice" teams or synthetic fixtures leak into the lobby.
+    // Synthetic data is a pure offline fallback (no tokens / network failure).
+    const hasLiveFeed = feedEvents.length > 0
+    const curatedFeed = hasLiveFeed ? curateLiveEvents(feedEvents) : []
+    const events = hasLiveFeed ? curatedFeed : synthetic.events
+    const baseSports = hasLiveFeed ? SPORTS : synthetic.sports
+    const baseLeagues = hasLiveFeed ? [] : synthetic.leagues
     return {
-        sports: mergeSports(synthetic.sports, events),
-        leagues: mergeLeagues(synthetic.leagues, events),
+        sports: mergeSports(baseSports, events),
+        leagues: mergeLeagues(baseLeagues, events),
         events,
         feedEvents,
-        feedSource: feedEvents.length > 0 ? 'live' : 'fallback',
+        feedSource: hasLiveFeed ? 'live' : 'fallback',
         inSeason,
         errors: errors.filter(Boolean),
         quotas: { ...providerQuotas, ...getQuotaSnapshot() },
