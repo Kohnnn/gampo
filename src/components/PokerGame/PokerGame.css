@@ -540,22 +540,41 @@
 }
 
 .pk-card {
+    position: relative;
     width: 56px;
     height: 80px;
     border-radius: 8px;
     background: linear-gradient(160deg, #ffffff, #e3eaf1);
     color: #0f212e;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px;
+    display: block;
+    padding: 5px;
     box-shadow:
         0 8px 16px rgba(0, 0, 0, 0.4),
         inset 0 2px 4px rgba(255, 255, 255, 0.6);
     font-weight: 950;
-    font-size: 16px;
     border: 2px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.pk-corner {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 0.9;
+    z-index: 2;
+}
+.pk-corner-tl { top: 4px; left: 5px; }
+.pk-corner-br { bottom: 4px; right: 5px; transform: rotate(180deg); }
+.pk-pip {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 34px;
+    line-height: 1;
+    opacity: 0.92;
+    z-index: 1;
 }
 
 @keyframes pkCardDeal {
@@ -593,15 +612,18 @@
 
 .pk-card.red { color: #c93237; }
 .pk-card.empty {
+    display: grid;
+    place-items: center;
     background: rgba(0, 0, 0, 0.3);
     color: rgba(255, 255, 255, 0.2);
-    align-items: center;
-    justify-content: center;
     border-style: dashed;
+    font-size: 16px;
 }
 .pk-card.hidden {
     background: linear-gradient(135deg, #0a1d28, #18415c);
     border-color: rgba(0, 231, 1, 0.3);
+    display: grid;
+    place-items: center;
 }
 .pk-card-back {
     width: 80%; height: 80%;
@@ -623,8 +645,8 @@
     font-weight: 950;
     text-shadow: 0 0 8px rgba(0, 231, 1, 0.6);
 }
-.pk-rank { font-size: 18px; align-self: flex-start; line-height: 1; }
-.pk-suit { font-size: 26px; align-self: flex-end; line-height: 1; }
+.pk-rank { font-size: 15px; line-height: 1; }
+.pk-suit { font-size: 13px; line-height: 1; }
 
 .pk-seats { position: absolute; inset: 0; pointer-events: none; }
 
@@ -1893,13 +1915,13 @@
 
     .pk-board {
         top: 38%;
-        gap: 3px;
+        gap: 4px;
     }
 
     .pk-card {
-        width: 28px;
-        height: 40px;
-        padding: 3px;
+        width: 38px;
+        height: 54px;
+        padding: 4px;
     }
 
     .pk-seat {
@@ -1920,9 +1942,24 @@
     }
 
     .pk-seat-cards .pk-card {
-        width: 17px;
-        height: 25px;
+        width: 26px;
+        height: 38px;
     }
+
+    /* Hero's own hole cards stay large and legible — this is the player's
+       primary information, so it must never shrink to an unreadable chip. */
+    .pk-seat.is-human {
+        min-width: 88px;
+        max-width: 132px;
+    }
+
+    .pk-seat.is-human .pk-seat-cards .pk-card {
+        width: 46px;
+        height: 66px;
+    }
+
+    .pk-seat.is-human .pk-seat-cards .pk-rank { font-size: 17px; }
+    .pk-seat.is-human .pk-seat-cards .pk-suit { font-size: 22px; }
 
     .pk-actions {
         position: sticky;

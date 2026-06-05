@@ -28,6 +28,7 @@ import { useCredits } from '../context/CreditContext'
 import { formatCredits } from '../utils/simulationMath'
 import { useMissions } from '../hooks/useMissions'
 import { useProgress } from '../hooks/useProgress'
+import { useXp } from '../hooks/useXp'
 import { ACHIEVEMENT_GROUPS } from '../data/achievements'
 import { MISSION_PERIODS, VIP_TIERS, vipTierFor } from '../data/missions'
 
@@ -49,14 +50,21 @@ const MISSION_ROUTES = {
     'daily-wins-3': '/dice',
     'daily-multi-5': '/limbo',
     'daily-3-games': '/',
+    'daily-profit-50': '/blackjack',
+    'daily-wagered-250': '/slots',
     'weekly-spins-100': '/originals',
     'weekly-wagered-1000': '/slots',
     'weekly-streak-5': '/mines',
     'weekly-multi-25': '/wheel',
+    'weekly-5-games': '/',
+    'weekly-bigwin-500': '/crash',
     'lifetime-spins-1000': '/originals',
     'lifetime-wagered-10000': '/slots-lobby',
     'lifetime-multi-100': '/crash',
     'lifetime-games-15': '/',
+    'lifetime-games-40': '/',
+    'lifetime-wagered-100000': '/slots-lobby',
+    'lifetime-multi-500': '/limbo',
 }
 
 function missionRouteFor(mission) {
@@ -84,6 +92,7 @@ function formatMissionValue(value) {
 export default function ProgressPanel() {
     const progress = useProgress()
     const missions = useMissions()
+    const xp = useXp()
     const { resetBalance } = useCredits()
     const [confirming, setConfirming] = useState(null)
 
@@ -130,6 +139,12 @@ export default function ProgressPanel() {
             action: missions.reset,
         },
         {
+            id: 'xp',
+            label: 'XP / Level',
+            detail: 'Resets your level, rank, and total XP to zero.',
+            action: xp.reset,
+        },
+        {
             id: 'vip',
             label: 'VIP',
             detail: 'Wipes lifetime mission volume and VIP tier progress.',
@@ -167,6 +182,26 @@ export default function ProgressPanel() {
                     <span><small>VIP</small><strong>{currentVip.label}</strong></span>
                 </div>
             </header>
+
+            <section className="prog-xp">
+                <div className="prog-xp-head">
+                    <span className="prog-xp-rank">
+                        {(() => { const RankIcon = ICONS[xp.rank.current.icon] || Award; return <RankIcon size={15} /> })()}
+                        <strong>Lvl {xp.level}</strong>
+                        <em>{xp.rank.current.label}</em>
+                    </span>
+                    <span className="prog-xp-count">
+                        {xp.atMax ? 'MAX' : `${Math.round(xp.intoLevel)} / ${Math.round(xp.span)} XP`}
+                    </span>
+                </div>
+                <div className="prog-xp-track" role="progressbar" aria-valuenow={Math.round(xp.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+                    <span className="prog-xp-fill" style={{ width: `${Math.round(xp.progress * 100)}%`, '--rank-accent': xp.rank.current.accent }} />
+                </div>
+                <div className="prog-xp-foot">
+                    <span>{xp.totalXp.toLocaleString()} XP total</span>
+                    {xp.rank.next && !xp.atMax && <span>Next: {xp.rank.next.label} · Lvl {xp.rank.next.minLevel}</span>}
+                </div>
+            </section>
 
             {summary.recent.length > 0 && (
                 <section className="prog-section">

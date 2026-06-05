@@ -56,6 +56,26 @@ export const MISSIONS = [
         reward: { credits: 8 },
         evaluate: stats => stats.daily.uniqueGames,
     },
+    {
+        id: 'daily-profit-50',
+        name: 'Green day',
+        detail: 'Finish today up at least +50 net practice credits.',
+        period: 'daily',
+        icon: 'trophy',
+        target: 50,
+        reward: { credits: 15 },
+        evaluate: stats => Math.max(0, stats.daily.netProfit || 0),
+    },
+    {
+        id: 'daily-wagered-250',
+        name: 'Daily volume',
+        detail: 'Wager 250 practice credits today.',
+        period: 'daily',
+        icon: 'coins',
+        target: 250,
+        reward: { credits: 10 },
+        evaluate: stats => stats.daily.wagered,
+    },
 
     // ---- Weekly ----
     {
@@ -98,6 +118,26 @@ export const MISSIONS = [
         reward: { credits: 120 },
         evaluate: stats => stats.weekly.bestMultiplier,
     },
+    {
+        id: 'weekly-5-games',
+        name: 'Variety week',
+        detail: 'Play 5 different games this week.',
+        period: 'weekly',
+        icon: 'compass',
+        target: 5,
+        reward: { credits: 70 },
+        evaluate: stats => stats.weekly.uniqueGames,
+    },
+    {
+        id: 'weekly-bigwin-500',
+        name: 'Weekly highlight',
+        detail: 'Win 500+ practice credits on a single round this week.',
+        period: 'weekly',
+        icon: 'trophy',
+        target: 500,
+        reward: { credits: 140 },
+        evaluate: stats => stats.weekly.bestSingleWin,
+    },
 
     // ---- Lifetime ----
     {
@@ -139,6 +179,36 @@ export const MISSIONS = [
         target: 15,
         reward: { credits: 200 },
         evaluate: stats => stats.lifetime.uniqueGames,
+    },
+    {
+        id: 'lifetime-games-40',
+        name: 'Seen it all',
+        detail: 'Play 40 different games across the whole lobby.',
+        period: 'lifetime',
+        icon: 'compass',
+        target: 40,
+        reward: { credits: 600 },
+        evaluate: stats => stats.lifetime.uniqueGames,
+    },
+    {
+        id: 'lifetime-wagered-100000',
+        name: 'Six-figure volume',
+        detail: 'Wager 100,000 credits all-time.',
+        period: 'lifetime',
+        icon: 'coins',
+        target: 100000,
+        reward: { credits: 1500 },
+        evaluate: stats => stats.lifetime.wagered,
+    },
+    {
+        id: 'lifetime-multi-500',
+        name: 'Top of the paytable',
+        detail: 'Land a 500x+ multiplier ever.',
+        period: 'lifetime',
+        icon: 'sparkles',
+        target: 500,
+        reward: { credits: 1000 },
+        evaluate: stats => stats.lifetime.bestMultiplier,
     },
 ]
 

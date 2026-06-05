@@ -362,3 +362,37 @@ External "QA Update Report v4" (June 5) flagged P0 hit-box failures (all footer 
 - `npm run build` clean (37.7s) with only the pre-existing empty `phaser`/`matter` chunk + large `rows-*` warnings.
 - Browser smoke against the production preview at **492x820** and **375x667** across `/`, `/roulette`, `/slots`, `/blackjack`, `/baccarat`, `/videopoker`, `/sicbo`: all 14 route×viewport combos `overflow=0px action=yes interaction=passed errors=0`. The `interaction=passed` mobile hit-test (CTA fires at its visual center) is direct automated evidence against the report's B1 hit-box theory.
 - Manual playwright confirmations on the fresh build: roulette board lifted 1301→551px + bet-on-17 + portal Spin; slots single visible Spin with passing hit-test; blackjack "Bet & options" sheet opens to reveal deck/S17-H17 selectors.
+
+## Multi-Track Gameplay + Progression Overhaul (2026-06-05)
+
+User feedback after the v4 deploy raised seven items. Tackled across five tracks (A scroll → B poker → E sportsbook env → D progression → C slots).
+
+### Track A — Universal mobile scroll fix (fixes "UX stuck", "can't scroll", "slots play button mid-screen")
+- Root cause: `.gs-layout { overflow: hidden }` (`primitives.css`) was never reset on mobile, so any game whose content exceeded the flex height was clipped instead of scrolling. Slots was worst because it passes a real in-flow `.slot-panel-v2` (not a portaled BetPanel) that has no mobile bottom-sheet treatment, so it spilled out of the `height:0` `.gs-panel`.
+- Fix: `@media (max-width:720px)` now sets `.gs-layout { overflow: visible !important }` so overflowing content extends the scrollable `.game-shell`. Added `.gs-panel:has(.slot-panel-v2) { height:auto }` and a slots `@media(max-width:760px)` block that reflows `.slot-panel-v2` as a normal scrollable card below the reels (template/bet/buy), leaving the fixed `slot-mobile-dock` as the single Spin CTA.
+- Verified: `.game-shell` becomes the scroller (`scrollH 1412 > clientH 615`), single visible Spin, no horizontal overflow at 447/492/375.
+
+### Track B — Poker card overhaul (fixes "no live poker cards")
+- Cards always rendered from engine state but mobile CSS shrank hero hole cards to 17×25px and board to 28×40px — illegible, read as "missing".
+- Rebuilt `PokerCard` with a corner (rank+suit) + center pip layout (real-card fidelity). Marked the human seat `is-human`; enlarged hero hole cards to 46×66px and board to 38×54px on mobile, kept the existing deal animation.
+- Verified live: hero `46×66`, board `38×54`, corner+pip present.
+
+### Track E — Sportsbook real feed (fixes "fake team names")
+- Diagnosis: production Netlify only had `NODE_VERSION`; none of the four provider tokens were set, so the live feed never activated and only the synthetic `EVENT_BLUEPRINTS` showed.
+- Set production env vars from `.env.local`: `SportsGameOdds_token`, `pandascore_token`, plus valid-named aliases `ODDS_API_IO_TOKEN` and `API_FOOTBALL_TOKEN` (hyphenated key names are rejected by Netlify; the proxy already accepts these uppercase aliases). Live events prepend synthetic ones; `feedSource` flips to `live` when any provider returns events.
+
+### Track D — XP / level system + expanded achievements & missions (fixes "improve single-player, add achievements/quests")
+- New `src/data/xpLevels.js`: 100-level quadratic curve, 9 cosmetic rank tiers (Rookie → Mythic), and a pure `xpForRound` award model (base + wager/win/multiplier bonuses + one-time new-game / daily-first bonuses). Covered by `xpLevels.test.js` (8 tests).
+- New `src/hooks/useXp.js`: singleton + listener hook mirroring `useProgress`, persisted to `gampo_xp_state`, fed from `useGameSession.record` alongside the existing PnL/progress/missions calls. Emits `recentLevelUp` (flags rank-ups).
+- Achievements: +14 new (extended streaks, loss-streak resilience, net-profit milestones, single-hit highlights, 1000× multiplier, 40-game completionist, and a new `bonus` group for slot-feature engagement). Added stat counters to `useProgress` (`bestLossStreak`, `bestProfit`, `biggestSingleWin`, `bonusRoundsTriggered`, `freeSpinsAwarded`) plus a `recordFeatureEvent` hook wired into the slot free-spin trigger.
+- Missions: +9 new across daily/weekly/lifetime (profit/volume/variety/big-win), with `netProfit`/`bestSingleWin` added to the period tracker and new route mappings.
+- UI: XP bar (level, rank, progress, total) in `ProgressPanel`; level-up variant of `AchievementToast` using the rank accent; XP reset scope.
+
+### Track C — Slot mechanics/animation + feature-contract fidelity (fixes "improve slot animations/bonus, reinforce gameplay")
+- Reel-stop landing bounce: settled cells during spin phases play a `slotCellLand` overshoot keyframe (tactile per-column "thunk"), with reduced-motion fallback. Strengthened base reel motion.
+- Feature contract panel now shows a stats grid (RTP / volatility / grid / indicative max win derived from top symbol pay × feature ceiling) and a derived 5-of-a-kind paytable (top 6 symbols with art + multipliers) pulled live from each template config — applies to all 20 templates.
+
+### Verification
+- `npm test -- --run` green at 265 tests across 60 files (+8 xpLevels).
+- `npm run build` clean (pre-existing empty-chunk/large-row warnings only).
+- Browser smoke at 492×820 and 375×667 across `/`, `/poker`, `/slots`, `/blackjack`, `/roulette`, `/baccarat`, `/sportsbook`, `/missions`, `/vip`: 0 overflow, 0 console errors; `interaction=passed` on all gameplay routes. (`/vip` reports `action=no` — a dashboard with no play CTA the harness expects; benign.)

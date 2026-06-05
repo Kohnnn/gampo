@@ -18,6 +18,7 @@ import {
 import EducationPanel from '../../EducationPanel'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { getFeatureContract } from '../../../data/slotFeatureContracts'
+import { recordFeatureEvent } from '../../../hooks/useProgress'
 import {
     SLOT_TEMPLATES,
     getBuyTiers,
@@ -370,6 +371,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const freeSpinEvent = result.featureEvents.find(item => item.type === 'free-spins')
         if (freeSpinEvent?.freeSpins) {
             slotSfx.play('bonusEnter', { volume: 0.92 })
+            // Progression: count a bonus trigger (only on the initial entry, not
+            // retriggers) plus the free spins awarded for achievement tracking.
+            recordFeatureEvent({
+                type: freeSpinSession ? 'retrigger' : 'free-spins',
+                freeSpins: freeSpinEvent.freeSpins,
+            })
             if (freeSpinSession && freeSpinEvent.indexes?.length) {
                 const flyers = buildRetriggerFlyers({
                     indexes: freeSpinEvent.indexes,
@@ -766,9 +773,29 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         </button>
                         {showInfo && (() => {
                             const contract = getFeatureContract(config.id)
+                            const paytable = [...(config.symbols || [])]
+                                .filter(s => (s.type || 'pay') !== 'scatter' && Number(s.payout) > 0)
+                                .sort((a, b) => (b.payout || 0) - (a.payout || 0))
+                                .slice(0, 6)
+                            // Indicative max win: top symbol pay scaled by the template's
+                            // feature ceiling (multiplier wheel / persistent mult / cascade
+                            // all raise the realistic top end). Educational estimate only.
+                            const topPay = paytable[0]?.payout || 0
+                            const featureFactor = config.features?.multiplierWheel ? 60
+                                : config.features?.persistentMultiplier ? 50
+                                : config.features?.cascade ? 40
+                                : config.features?.holdAndRespin ? 30
+                                : 20
+                            const maxWin = topPay > 0 ? Math.round(topPay * featureFactor) : 0
                             return (
                                 <div className="slot-feature-contract">
                                     <p className="slot-panel-note">{contract?.summary || config.featureText}</p>
+                                    <div className="slot-contract-stats">
+                                        <span><small>RTP</small><strong>{Math.round(config.rtpTarget * 100)}%</strong></span>
+                                        <span><small>Volatility</small><strong>{config.volatility}</strong></span>
+                                        <span><small>Grid</small><strong>{config.layout.cols}×{config.layout.rows}</strong></span>
+                                        <span><small>Max win</small><strong>{maxWin ? `~${maxWin.toLocaleString()}×` : '—'}</strong></span>
+                                    </div>
                                     <div className="slot-tag-row">
                                         <span>{paylineMode}</span>
                                         <span>{config.volatility}</span>
@@ -781,6 +808,20 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                         {config.features?.multiplierWheel && <span>Wheel</span>}
                                         {config.features?.stackedWildReel && <span>Stacked wilds</span>}
                                     </div>
+                                    {paytable.length > 0 && (
+                                        <div className="slot-contract-block">
+                                            <h4>Paytable (5-of-a-kind)</h4>
+                                            <ul className="slot-paytable-list">
+                                                {paytable.map(s => (
+                                                    <li key={s.id}>
+                                                        <Asset src={s.asset} alt={s.label} fallback={<strong>{s.label}</strong>} />
+                                                        <span>{s.label}</span>
+                                                        <em>{s.payout}×</em>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                     {contract?.mechanics && (
                                         <div className="slot-contract-block">
                                             <h4>Mechanics</h4>
