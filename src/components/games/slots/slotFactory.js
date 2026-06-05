@@ -1,5 +1,6 @@
 import { pickWeighted, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
+import { SLOT_RTP_SCALARS } from './slotRtpScalars'
 
 const classic = '/assets/games/slots/classic'
 const cyber = '/assets/games/slots/cyber'
@@ -540,12 +541,12 @@ export const SLOT_TEMPLATES = [
         volatility: 'Very high',
         layout: { rows: 4, cols: 5, evaluation: 'ways' },
         backdrop: '/assets/games/backdrops/backdrop-parchment.png',
-        featureText: 'Hacksaw-style multiplier wheel feature gate. Trigger 3+ gongs to spin a 5x to 100x multiplier.',
+        featureText: 'Hacksaw-style multiplier wheel feature gate. Trigger 3+ gongs to spin a 2x to 30x multiplier.',
         controls: { buyBonus: true, turbo: true, auto: true },
         features: {
             scatter: { symbolId: 'gong', trigger: 3, awardFreeSpins: 6, pay: 1.4 },
             anticipation: { scatterMin: 2 },
-            multiplierWheel: { values: [5, 10, 25, 50, 100], weights: [40, 30, 18, 9, 3] },
+            multiplierWheel: { values: [2, 4, 8, 15, 30], weights: [44, 30, 16, 8, 2] },
             darkWinOverlay: true,
             buyBonus: {
                 costMultiplier: 70,
@@ -702,7 +703,7 @@ export const SLOT_TEMPLATES = [
             scatter: { symbolId: 'lollipop', trigger: 5, awardFreeSpins: 12, pay: 1.5 },
             anticipation: { scatterMin: 4 },
             clusterMin: 6,
-            cascade: { tumbleMultiplierLadder: [1, 2, 4, 8, 16, 32] },
+            cascade: { tumbleMultiplierLadder: [1, 2, 3, 5, 8, 12] },
             persistentMultiplier: 1,
             buyBonus: {
                 costMultiplier: 100,
@@ -725,6 +726,13 @@ export const SLOT_TEMPLATES = [
         ],
     },
 ]
+
+// Attach the calibrated per-template RTP scalar (see scripts/calibrateSlots.mjs)
+// so resolveSlotSpin converges each template to its rtpTarget. Templates without
+// a scalar default to 1 (no change).
+for (const template of SLOT_TEMPLATES) {
+    template.rtpScalar = SLOT_RTP_SCALARS[template.id] ?? 1
+}
 
 export function getSlotTemplate(id) {
     const base = SLOT_TEMPLATES.find(template => template.id === id) || SLOT_TEMPLATES[0]
@@ -892,16 +900,26 @@ export function randomVisualSymbol(config) {
     return config.symbols[Math.floor(Math.random() * config.symbols.length)] || config.symbols[0]
 }
 
-function roll(config, channel) {
+// Calibration/sim seam: when set, ALL slot rolls use this fast RNG instead of
+// the async-HMAC nextRoll. Production never sets this (stays null).
+let calibrationRng = null
+export function __setSlotCalibrationRng(fn) { calibrationRng = typeof fn === 'function' ? fn : null }
+
+function roll(config, channel, rng) {
+    // Calibration/tests can inject a fast deterministic RNG via `rng` (or the
+    // module-level calibrationRng), bypassing the async-HMAC-backed nextRoll
+    // (which is far too slow for large sims).
+    if (typeof rng === 'function') return rng()
+    if (calibrationRng) return calibrationRng()
     return nextRoll(`slots:${config.id}:${channel}`).roll
 }
 
-function pickSymbol(config, index, bonusBuy) {
+function pickSymbol(config, index, bonusBuy, rng) {
     const boosted = config.symbols.map(item => {
         if (!bonusBuy || item.type !== 'scatter') return item
         return { ...item, weight: item.weight + 18 }
     })
-    return pickWeighted(boosted, () => roll(config, `cell:${index}`))
+    return pickWeighted(boosted, () => roll(config, `cell:${index}`, rng))
 }
 
 function forceGuaranteedScatters(cells, config, count) {
@@ -1278,7 +1296,8 @@ export function resolveSlotSpin(config, options = {}) {
     const buyTier = options.buyTier || null
     const stickyWilds = Array.isArray(options.stickyWilds) ? options.stickyWilds : []
     const total = getCellCount(config)
-    let cells = Array.from({ length: total }, (_, index) => pickSymbol(config, index, bonusBuy))
+    const rng = typeof options.rng === 'function' ? options.rng : null
+    let cells = Array.from({ length: total }, (_, index) => pickSymbol(config, index, bonusBuy, rng))
 
     // Buy tier guaranteed scatters
     if (bonusBuy) {
@@ -1431,6 +1450,15 @@ export function resolveSlotSpin(config, options = {}) {
         .filter(index => index >= 0)
 
     multiplier = round2(multiplier)
+    // RTP calibration: scale the raw multiplier by the per-template scalar so
+    // realized RTP converges to config.rtpTarget. The scalar is precomputed by
+    // scripts/calibrateSlots.mjs and stored on config.rtpScalar (defaults to 1
+    // if absent). `options.rtpScalar` lets the calibration harness measure the
+    // RAW multiplier (scalar = 1) without recursion. Fun Mode multiplies it.
+    const rtpScalar = options.rtpScalar != null
+        ? options.rtpScalar
+        : (Number(config.rtpScalar) > 0 ? config.rtpScalar : 1)
+    if (rtpScalar !== 1) multiplier = round2(multiplier * rtpScalar)
     return {
         cells,
         wins,
