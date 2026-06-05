@@ -29,6 +29,8 @@ import { formatCredits } from '../utils/simulationMath'
 import { useMissions } from '../hooks/useMissions'
 import { useProgress } from '../hooks/useProgress'
 import { useXp } from '../hooks/useXp'
+import { useRewards } from '../hooks/useRewards'
+import { STARTER_PACKS, DAILY_CLAIM_CREDITS } from '../data/rewards'
 import { ACHIEVEMENT_GROUPS } from '../data/achievements'
 import { MISSION_PERIODS, VIP_TIERS, vipTierFor } from '../data/missions'
 
@@ -93,8 +95,33 @@ export default function ProgressPanel() {
     const progress = useProgress()
     const missions = useMissions()
     const xp = useXp()
-    const { resetBalance } = useCredits()
+    const rewards = useRewards()
+    const { resetBalance, grantPracticeCredits, showToast } = useCredits()
     const [confirming, setConfirming] = useState(null)
+
+    const pendingLevels = rewards.pendingLevelRewards(xp.level)
+
+    const handleStarterPack = (id) => {
+        const credits = rewards.chooseStarterPack(id)
+        if (credits > 0) {
+            grantPracticeCredits(credits)
+            showToast?.('win', 'Starter pack claimed', `+GC ${credits.toLocaleString()}`)
+        }
+    }
+    const handleDailyClaim = () => {
+        const credits = rewards.claimDaily()
+        if (credits > 0) {
+            grantPracticeCredits(credits)
+            showToast?.('win', 'Daily reward', `+GC ${credits.toLocaleString()}`)
+        }
+    }
+    const handleLevelClaim = () => {
+        const credits = rewards.claimLevelRewards(xp.level)
+        if (credits > 0) {
+            grantPracticeCredits(credits)
+            showToast?.('win', 'Level rewards claimed', `+GC ${credits.toLocaleString()}`)
+        }
+    }
 
     const grouped = useMemo(() => {
         const map = {}
@@ -143,6 +170,12 @@ export default function ProgressPanel() {
             label: 'XP / Level',
             detail: 'Resets your level, rank, and total XP to zero.',
             action: xp.reset,
+        },
+        {
+            id: 'rewards',
+            label: 'Rewards',
+            detail: 'Resets starter pack, daily, and level reward claims.',
+            action: rewards.reset,
         },
         {
             id: 'vip',
@@ -200,6 +233,53 @@ export default function ProgressPanel() {
                 <div className="prog-xp-foot">
                     <span>{xp.totalXp.toLocaleString()} XP total</span>
                     {xp.rank.next && !xp.atMax && <span>Next: {xp.rank.next.label} · Lvl {xp.rank.next.minLevel}</span>}
+                </div>
+            </section>
+
+            <section className="prog-section prog-rewards">
+                <header><Gift size={13} /> Rewards</header>
+                {!rewards.starterPackChosen && (
+                    <div className="prog-starter">
+                        <p className="prog-rewards-hint">One-time starter pack — free play stays default.</p>
+                        <div className="prog-starter-grid">
+                            {STARTER_PACKS.map(pack => {
+                                const PackIcon = ICONS[pack.icon] || Gift
+                                return (
+                                    <button
+                                        key={pack.id}
+                                        type="button"
+                                        className="prog-starter-card"
+                                        onClick={() => handleStarterPack(pack.id)}
+                                        title={pack.detail}
+                                    >
+                                        <PackIcon size={16} />
+                                        <strong>{pack.label}</strong>
+                                        <em>{pack.credits > 0 ? `+GC ${pack.credits.toLocaleString()}` : 'Free'}</em>
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )}
+                <div className="prog-reward-claims">
+                    <button
+                        type="button"
+                        className="prog-claim-btn"
+                        onClick={handleDailyClaim}
+                        disabled={!rewards.canClaimDaily}
+                    >
+                        <span>Daily reward</span>
+                        <strong>{rewards.canClaimDaily ? `+GC ${DAILY_CLAIM_CREDITS}` : 'Claimed'}</strong>
+                    </button>
+                    <button
+                        type="button"
+                        className="prog-claim-btn"
+                        onClick={handleLevelClaim}
+                        disabled={pendingLevels.count === 0}
+                    >
+                        <span>Level rewards{pendingLevels.count ? ` (${pendingLevels.count})` : ''}</span>
+                        <strong>{pendingLevels.count ? `+GC ${pendingLevels.total.toLocaleString()}` : 'Up to date'}</strong>
+                    </button>
                 </div>
             </section>
 

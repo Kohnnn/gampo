@@ -597,6 +597,61 @@
     letter-spacing: 0.04em;
 }
 
+.prog-rewards-hint {
+    margin: 0 0 8px;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+.prog-starter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.prog-starter-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, transform 0.1s;
+}
+.prog-starter-card:hover {
+    border-color: #ffd166;
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+.prog-starter-card strong { font-size: 10px; text-align: center; line-height: 1.1; }
+.prog-starter-card em { font-style: normal; font-size: 11px; font-weight: 950; color: #ffd166; }
+
+.prog-reward-claims {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+.prog-claim-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 9px 11px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--accent-green, #00e701), transparent 55%);
+    background: color-mix(in srgb, var(--accent-green, #00e701), transparent 88%);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.15s;
+}
+.prog-claim-btn span { font-size: 10px; font-weight: 800; color: var(--text-secondary); }
+.prog-claim-btn strong { font-size: 12px; font-weight: 950; color: var(--accent-green, #00e701); }
+.prog-claim-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.prog-claim-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .prog-ring {
     --pct: 0;
     width: 76px;
