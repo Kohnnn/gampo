@@ -17,6 +17,12 @@
     --accent-red: #ed4245;
     --accent-purple: #9c27b0;
 
+    /* Global fallback for the per-game accent. GameShell sets `--accent` on
+       `.game-shell`, but the mobile action dock is portaled to <body> and so
+       does not inherit it. Defining a sane default here guarantees the mobile
+       CTA always renders a valid gradient fill instead of going transparent. */
+    --accent: #00e701;
+
     --text-primary: #ffffff;
     --text-secondary: #b1bad3;
     --text-muted: #5f6368;

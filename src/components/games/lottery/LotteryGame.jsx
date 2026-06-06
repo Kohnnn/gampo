@@ -10,7 +10,11 @@ import EducationPanel from '../../EducationPanel'
 import './lottery.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
-const TABLE = [0, 0, 1, 8, 120, 5000]
+// Prize table indexed by hits (pick-5, draw-5 from 36). Calibrated so the
+// expected return is ~0.90 RTP under the true hypergeometric hit distribution
+// (P(2)=0.1192, P(3)=0.0123, P(4)=4.1e-4, P(5)=3e-6). The previous table
+// [0,0,1,8,120,5000] only returned ~28% — far below the stated 90%.
+const TABLE = [0, 0, 4, 25, 250, 5000]
 
 export default function LotteryGame() {
     useGameBgm('lottery', 'idle')

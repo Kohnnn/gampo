@@ -20,11 +20,18 @@ import DinoEngine from './engine/DinoEngine'
 import './dino.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
+// Growth per preset is locked to TARGET_RTP / safe so each surviving step has
+// an expected value of exactly TARGET_RTP (no preset is ever +EV). Previously
+// `easy` used a fixed growth of 1.18 against safe 0.86 → 1.0148 per step, i.e.
+// player-favorable and uncapped — optimal play was "never cash out".
+// TARGET_RTP matches Dino's advertised 99% (gameDefinitions: rtp 0.99).
+const TARGET_RTP = 0.99
+const lockGrowth = safe => Number((TARGET_RTP / safe).toFixed(4))
 const PRESETS = {
-    easy:    { safe: 0.86, growth: 1.18, label: 'Easy',    speed: 240 },
-    medium:  { safe: 0.72, growth: 1.32, label: 'Medium',  speed: 290 },
-    hard:    { safe: 0.58, growth: 1.55, label: 'Hard',    speed: 340 },
-    extreme: { safe: 0.42, growth: 2.00, label: 'Extreme', speed: 400 },
+    easy:    { safe: 0.86, growth: lockGrowth(0.86), label: 'Easy',    speed: 240 },
+    medium:  { safe: 0.72, growth: lockGrowth(0.72), label: 'Medium',  speed: 290 },
+    hard:    { safe: 0.58, growth: lockGrowth(0.58), label: 'Hard',    speed: 340 },
+    extreme: { safe: 0.42, growth: lockGrowth(0.42), label: 'Extreme', speed: 400 },
 }
 
 export default function DinoGame() {

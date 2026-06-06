@@ -175,12 +175,24 @@ export default function BetPanel({
     }, [])
 
     // Resolve the game accent from the nearest .game-shell (or :root fallback)
-    // so the portaled mobile dock can re-apply it inline.
+    // so the portaled mobile dock can re-apply it inline. The shell's inline
+    // --accent may not be committed on the first frame, so retry across a few
+    // animation frames until a non-empty value resolves.
     useEffect(() => {
-        const shell = panelRef.current?.closest('.game-shell')
-        const source = shell || document.documentElement
-        const accent = getComputedStyle(source).getPropertyValue('--accent').trim()
-        if (accent) setDockAccent(accent)
+        let raf = null
+        let attempts = 0
+        const resolve = () => {
+            const shell = panelRef.current?.closest('.game-shell')
+            const source = shell || document.documentElement
+            const accent = getComputedStyle(source).getPropertyValue('--accent').trim()
+            if (accent) {
+                setDockAccent(accent)
+                return
+            }
+            if (attempts++ < 8) raf = requestAnimationFrame(resolve)
+        }
+        resolve()
+        return () => { if (raf) cancelAnimationFrame(raf) }
     }, [])
 
     // Keyboard shortcuts. Disabled when typing in any input/textarea, when modifiers
