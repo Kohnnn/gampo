@@ -3272,6 +3272,175 @@
     100% { opacity: 0; transform: scale(1.02); }
 }
 
+/* ===== Bespoke per-theme bonus-entry cinematics ===== */
+/* A short, themed intro that plays as a free-spin session (or vault burst)
+   opens. Five motion families share one markup; each family choreographs the
+   veil, gates, sweep, and core differently. Accent is themed per template via
+   an inline `--slot-accent`. */
+.slot-bonus-cine {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    pointer-events: none;
+    border-radius: inherit;
+}
+.slot-bonus-cine-veil {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--slot-accent, #ffd166), transparent 50%), transparent 62%),
+        rgba(4, 6, 12, 0.62);
+    opacity: 0;
+    animation: slotCineVeil var(--cine-ms, 1.5s) ease-out forwards;
+}
+.slot-bonus-cine-gate {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 52%;
+    background: linear-gradient(180deg, rgba(10, 12, 20, 0.96), rgba(2, 3, 8, 0.98));
+    border-color: color-mix(in srgb, var(--slot-accent, #ffd166), transparent 30%);
+    opacity: 0;
+}
+.slot-bonus-cine-gate-left { left: 0; border-right: 2px solid; }
+.slot-bonus-cine-gate-right { right: 0; border-left: 2px solid; }
+.slot-bonus-cine-sweep {
+    position: absolute;
+    inset: -20% -40%;
+    background: linear-gradient(115deg, transparent 42%, color-mix(in srgb, var(--slot-accent, #ffd166), transparent 25%) 50%, transparent 58%);
+    opacity: 0;
+    transform: translateX(-120%);
+}
+.slot-bonus-cine-core {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    text-align: center;
+    padding: 0 18px;
+    opacity: 0;
+    animation: slotCineCore var(--cine-ms, 1.5s) cubic-bezier(0.18, 0.9, 0.2, 1) forwards;
+}
+.slot-bonus-cine-glyph {
+    font-size: clamp(40px, 14vw, 88px);
+    line-height: 1;
+    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 30%));
+}
+.slot-bonus-cine-eyebrow {
+    font-size: clamp(11px, 3.2vw, 15px);
+    font-weight: 800;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--slot-accent, #ffd166), white 30%);
+}
+.slot-bonus-cine-title {
+    font-size: clamp(28px, 10vw, 60px);
+    font-weight: 950;
+    letter-spacing: 0.02em;
+    color: #fff;
+    text-transform: uppercase;
+    text-shadow: 0 0 26px var(--slot-accent, #ffd166), 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+.slot-bonus-cine-caption {
+    font-size: clamp(12px, 3.6vw, 17px);
+    font-style: normal;
+    color: rgba(245, 247, 255, 0.84);
+}
+.slot-bonus-cine-spins {
+    margin-top: 6px;
+    font-size: clamp(12px, 3.4vw, 16px);
+    font-weight: 800;
+    font-style: normal;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--slot-accent, #ffd166);
+}
+
+/* Family: open — two gates split apart to reveal the core. */
+.slot-bonus-cine.cine-open .slot-bonus-cine-gate { opacity: 1; }
+.slot-bonus-cine.cine-open .slot-bonus-cine-gate-left { animation: slotCineGateL var(--cine-ms, 1.5s) cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+.slot-bonus-cine.cine-open .slot-bonus-cine-gate-right { animation: slotCineGateR var(--cine-ms, 1.5s) cubic-bezier(0.5, 0, 0.2, 1) forwards; }
+
+/* Family: rise — the core ignites and lifts from below. */
+.slot-bonus-cine.cine-rise .slot-bonus-cine-core { animation: slotCineRise var(--cine-ms, 1.5s) cubic-bezier(0.16, 0.84, 0.24, 1) forwards; }
+
+/* Family: slash — a diagonal blade sweep wipes across the stage. */
+.slot-bonus-cine.cine-slash .slot-bonus-cine-sweep { animation: slotCineSlash var(--cine-ms, 1.5s) cubic-bezier(0.7, 0, 0.3, 1) forwards; }
+.slot-bonus-cine.cine-slash .slot-bonus-cine-core { animation: slotCineSlashCore var(--cine-ms, 1.5s) cubic-bezier(0.2, 0.9, 0.2, 1) forwards; }
+
+/* Family: burst — radial shockwave punch. */
+.slot-bonus-cine.cine-burst .slot-bonus-cine-core { animation: slotCineBurst var(--cine-ms, 1.5s) cubic-bezier(0.2, 1.2, 0.3, 1) forwards; }
+.slot-bonus-cine.cine-burst .slot-bonus-cine-veil { animation: slotCineBurstVeil var(--cine-ms, 1.5s) ease-out forwards; }
+
+/* Family: drift — soft particles + gentle settle. */
+.slot-bonus-cine.cine-drift .slot-bonus-cine-core { animation: slotCineDrift var(--cine-ms, 1.5s) ease-out forwards; }
+
+@keyframes slotCineVeil {
+    0% { opacity: 0; }
+    18% { opacity: 1; }
+    78% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@keyframes slotCineBurstVeil {
+    0% { opacity: 0; transform: scale(0.7); }
+    14% { opacity: 1; transform: scale(1.04); }
+    78% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; }
+}
+@keyframes slotCineCore {
+    0% { opacity: 0; }
+    16% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@keyframes slotCineGateL {
+    0% { transform: translateX(0); }
+    24% { transform: translateX(0); }
+    72% { transform: translateX(-102%); }
+    100% { transform: translateX(-102%); opacity: 0; }
+}
+@keyframes slotCineGateR {
+    0% { transform: translateX(0); }
+    24% { transform: translateX(0); }
+    72% { transform: translateX(102%); }
+    100% { transform: translateX(102%); opacity: 0; }
+}
+@keyframes slotCineRise {
+    0% { opacity: 0; transform: translateY(46%) scale(0.86); filter: brightness(1.8); }
+    40% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-8%); }
+}
+@keyframes slotCineSlash {
+    0% { opacity: 0; transform: translateX(-120%); }
+    30% { opacity: 1; }
+    55% { opacity: 1; transform: translateX(120%); }
+    100% { opacity: 0; transform: translateX(120%); }
+}
+@keyframes slotCineSlashCore {
+    0% { opacity: 0; transform: translateX(-14%) skewX(-8deg); }
+    46% { opacity: 1; transform: translateX(0) skewX(0); }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+}
+@keyframes slotCineBurst {
+    0% { opacity: 0; transform: scale(0.4); }
+    24% { opacity: 1; transform: scale(1.12); }
+    40% { transform: scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: scale(1.04); }
+}
+@keyframes slotCineDrift {
+    0% { opacity: 0; transform: translateY(18%) scale(0.94); }
+    34% { opacity: 1; transform: translateY(0) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-6%); }
+}
+
 :root.gampo-reduce-motion .slot-cell.wild-column,
 :root.gampo-reduce-motion .slot-megaways-col.wild-column,
 :root.gampo-reduce-motion .slot-pill.slot-pill-persist.is-ramping strong,
@@ -3281,4 +3450,21 @@
 .gampo-reduce-motion .slot-pill.slot-pill-persist.is-ramping strong,
 .gampo-reduce-motion .slot-event-flash {
     animation-duration: 0.001ms;
+}
+
+:root.gampo-reduce-motion .slot-bonus-cine *,
+.gampo-reduce-motion .slot-bonus-cine * {
+    animation-duration: 0.001ms !important;
+}
+:root.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-core,
+.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-core {
+    opacity: 1;
+}
+:root.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-gate,
+.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-gate,
+:root.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-veil,
+.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-veil,
+:root.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-sweep,
+.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-sweep {
+    display: none;
 }
