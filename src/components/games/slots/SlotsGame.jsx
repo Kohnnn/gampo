@@ -41,8 +41,14 @@ import './slots.css'
 
 const FEATURE_LABELS = {
     'coin-meter': 'Coin meter',
+    'coin-meter-fill': 'Vault burst',
     'free-spins': 'Free spins',
     wilds: 'Wild pulse',
+    'expanding-wilds': 'Expanding wild',
+    'stacked-wild': 'Wild reel',
+    'scarab-respin': 'Scarab respin',
+    jackpot: 'Jackpot',
+    'persistent-multiplier': 'Persistent ×',
     cascade: 'Cascade',
     'money-collect': 'Money collect',
     mystery: 'Mystery',
@@ -121,6 +127,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [anticipating, setAnticipating] = useState(false)
     const [mysteryReveal, setMysteryReveal] = useState(null)
     const [persistentMultiplier, setPersistentMultiplier] = useState(0)
+    const [persistRamp, setPersistRamp] = useState(false)
+    const [eventFlash, setEventFlash] = useState(null)
     const [showInfo, setShowInfo] = useState(false)
     // Wave 9: sticky wild lock during free-spin sessions and feature cinematics
     const [stickyWilds, setStickyWilds] = useState([])
@@ -324,6 +332,20 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
         // Wave 9: surface wheel + hold cinematic state
         const revealTrigger = Date.now()
+        // Phase C: jackpot / vault-burst full-stage flash + persistent ramp pulse.
+        const jackpotEvent = result.featureEvents.find(item => item.type === 'jackpot')
+        const burstEvent = result.featureEvents.find(item => item.type === 'coin-meter-fill')
+        if (jackpotEvent) {
+            setEventFlash({ trigger: revealTrigger, label: 'JACKPOT' })
+            slotSfx.play('bigwin', { volume: 0.95 })
+        } else if (burstEvent) {
+            setEventFlash({ trigger: revealTrigger, label: 'VAULT BURST' })
+            slotSfx.play('bonusEnter', { volume: 0.9 })
+        }
+        if (result.featureEvents.some(item => item.type === 'persistent-multiplier')) {
+            setPersistRamp(true)
+            timers.current.push(window.setTimeout(() => setPersistRamp(false), 520))
+        }
         const wheelEvent = result.featureEvents.find(item => item.type === 'multiplier-wheel')
         if (wheelEvent) {
             setWheelReveal({ trigger: revealTrigger, value: wheelEvent.value })
@@ -525,6 +547,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setStoppedColumnState(0)
             setMysteryReveal(null)
             setRetriggerFlyers([])
+            setEventFlash(null)
             setAnticipating(false)
             playSound('tick')
             slotSfx.play('spinStart', { volume: 0.85 })
@@ -659,6 +682,18 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         if (grid.length === cellPositions.length && grid.every(Boolean)) return grid
         return makeInitialGrid(config)
     }, [cellPositions.length, config, grid])
+
+    // Columns that became full wild this round (expanding / stacked-wild reels)
+    // so the reel renderer can glow them.
+    const wildColumns = useMemo(() => {
+        const cols = new Set()
+        for (const ev of lastResult?.featureEvents || []) {
+            if ((ev.type === 'expanding-wilds' || ev.type === 'stacked-wild') && Array.isArray(ev.columns)) {
+                ev.columns.forEach(c => cols.add(c))
+            }
+        }
+        return cols
+    }, [lastResult])
     const slotSpinLabel = canUseFreeSpin
         ? `Free Spin (${freeSpins})`
         : activeBuyTier
@@ -919,7 +954,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             </div>
                         )}
                         {persistentMultiplier > 0 && (
-                            <div className="slot-pill slot-pill-mult">
+                            <div className={`slot-pill slot-pill-mult slot-pill-persist ${persistRamp ? 'is-ramping' : ''}`}>
                                 <TrendingUp size={14} />
                                 <strong>{persistentMultiplier}×</strong>
                                 <small>persistent</small>
@@ -954,7 +989,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     for (let c = 0; c < col; c += 1) cursor += getColumnRows(config, c)
                                     for (let r = 0; r < colRows; r += 1) cellsInCol.push({ index: cursor + r })
                                     return (
-                                        <div key={`col-${col}`} className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''}`}>
+                                        <div key={`col-${col}`} className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''} ${!running && wildColumns.has(col) ? 'wild-column' : ''}`}>
                                             {cellsInCol.map(({ index }) => {
                                                 const item = displayGrid[index] || config.symbols?.[0]
                                                 const spinning = running && col >= stoppedCols
@@ -994,7 +1029,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     return (
                                         <div
                                             key={`${index}-${item.id}`}
-                                            className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''}`}
+                                            className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''} ${!spinning && wildColumns.has(col) ? 'wild-column' : ''}`}
                                             style={{ animationDelay: `${col * 45}ms` }}
                                         >
                                             <Asset src={item.asset} alt={item.label} fallback={<strong>{item.label}</strong>} />
@@ -1117,6 +1152,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <h3>{config.title}</h3>
                         <p>{config.featureText}</p>
                         <button type="button" onClick={() => setShowIntro(false)}>Spin it</button>
+                    </div>
+                )}
+
+                {eventFlash && !running && (
+                    <div className="slot-event-flash" key={`flash-${eventFlash.trigger}`} aria-hidden="true">
+                        <strong>{eventFlash.label}</strong>
                     </div>
                 )}
 
