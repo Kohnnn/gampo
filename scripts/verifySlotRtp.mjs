@@ -37,22 +37,33 @@ for (const config of SLOT_TEMPLATES) {
     // Different seed than calibration to avoid overfitting to one stream.
     const rng = makeRng(0xc0ffee ^ hashId(config.id))
     __setSlotCalibrationRng(rng)
-    // Full base round incl. free-spin session (zero-cost respins + retriggers),
-    // capped exactly like the calibration harness.
+    // Full base round incl. free-spin session, persistent multiplier + coin-meter
+    // burst — matches the calibration harness and live SlotsGame behaviour.
     const MAX_FS = 20
+    const award = config.features?.scatter?.awardFreeSpins || 0
+    const hasPersistent = Boolean(config.features?.persistentMultiplier)
+    const cap = config.features?.persistentMultiplierCap || 10
     let sum = 0
     for (let i = 0; i < SPINS; i += 1) {
         let total = 0
-        const base = resolveSlotSpin(config)
+        const base = resolveSlotSpin(config, { persistentMultiplier: 1 })
         total += base.multiplier
-        const award = config.features?.scatter?.awardFreeSpins || 0
         let fs = base.triggeredFreeSpins ? award : 0
+        if (!fs) {
+            const burst = base.featureEvents?.find(e => e.type === 'coin-meter-fill')
+            if (burst) fs = burst.freeSpins || 0
+        }
         let played = 0
+        let persistent = 1
         while (fs > 0 && played < MAX_FS) {
             fs -= 1; played += 1
-            const spin = resolveSlotSpin(config)
+            const spin = resolveSlotSpin(config, { persistentMultiplier: persistent })
             total += spin.multiplier
-            if (spin.triggeredFreeSpins && played + fs < MAX_FS) fs += award
+            if (hasPersistent && spin.cascadeSteps > 0) persistent = Math.min(cap, persistent + 1)
+            if (spin.triggeredFreeSpins && played + fs < MAX_FS) {
+                fs += award
+                if (hasPersistent) persistent = Math.min(cap, persistent + 1)
+            }
         }
         sum += total
     }
