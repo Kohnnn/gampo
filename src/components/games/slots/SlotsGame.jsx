@@ -37,6 +37,7 @@ import {
     buildRetriggerFlyers,
     buildSlotFeatureDemoState,
 } from './slotsMotion'
+import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
 import './slots.css'
 
 const FEATURE_LABELS = {
@@ -129,6 +130,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [persistentMultiplier, setPersistentMultiplier] = useState(0)
     const [persistRamp, setPersistRamp] = useState(false)
     const [eventFlash, setEventFlash] = useState(null)
+    const [bonusCine, setBonusCine] = useState(null)
     const [showInfo, setShowInfo] = useState(false)
     // Wave 9: sticky wild lock during free-spin sessions and feature cinematics
     const [stickyWilds, setStickyWilds] = useState([])
@@ -341,6 +343,19 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         } else if (burstEvent) {
             setEventFlash({ trigger: revealTrigger, label: 'VAULT BURST' })
             slotSfx.play('bonusEnter', { volume: 0.9 })
+            // Bespoke bonus-entry cinematic for the vault-style burst entry.
+            const burstFs = result.featureEvents.find(item => item.type === 'free-spins')?.freeSpins || 0
+            setBonusCine({
+                trigger: revealTrigger,
+                ...getBonusCinematic(config.id, {
+                    kind: 'coin-meter-fill',
+                    freeSpins: burstFs,
+                    accent: config.accent,
+                }),
+            })
+            timers.current.push(window.setTimeout(() => {
+                setBonusCine(current => (current && current.trigger === revealTrigger ? null : current))
+            }, BONUS_CINEMATIC_MS))
         }
         if (result.featureEvents.some(item => item.type === 'persistent-multiplier')) {
             setPersistRamp(true)
@@ -396,6 +411,21 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const freeSpinEvent = result.featureEvents.find(item => item.type === 'free-spins')
         if (freeSpinEvent?.freeSpins) {
             slotSfx.play('bonusEnter', { volume: 0.92 })
+            // Bespoke bonus-entry cinematic on the initial bonus open (not on
+            // retriggers, and not when the vault-burst path already played it).
+            if (!freeSpinSession && !burstEvent) {
+                setBonusCine({
+                    trigger: revealTrigger,
+                    ...getBonusCinematic(config.id, {
+                        kind: 'free-spins',
+                        freeSpins: freeSpinEvent.freeSpins,
+                        accent: config.accent,
+                    }),
+                })
+                timers.current.push(window.setTimeout(() => {
+                    setBonusCine(current => (current && current.trigger === revealTrigger ? null : current))
+                }, BONUS_CINEMATIC_MS))
+            }
             // Progression: count a bonus trigger (only on the initial entry, not
             // retriggers) plus the free spins awarded for achievement tracking.
             recordFeatureEvent({
@@ -1152,6 +1182,27 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <h3>{config.title}</h3>
                         <p>{config.featureText}</p>
                         <button type="button" onClick={() => setShowIntro(false)}>Spin it</button>
+                    </div>
+                )}
+
+                {bonusCine && !running && (
+                    <div
+                        className={`slot-bonus-cine cine-${bonusCine.family}`}
+                        key={`cine-${bonusCine.trigger}`}
+                        style={bonusCine.accent ? { '--slot-accent': bonusCine.accent } : undefined}
+                        aria-hidden="true"
+                    >
+                        <div className="slot-bonus-cine-veil" />
+                        <div className="slot-bonus-cine-gate slot-bonus-cine-gate-left" />
+                        <div className="slot-bonus-cine-gate slot-bonus-cine-gate-right" />
+                        <div className="slot-bonus-cine-sweep" />
+                        <div className="slot-bonus-cine-core">
+                            <span className="slot-bonus-cine-glyph">{bonusCine.glyph}</span>
+                            <span className="slot-bonus-cine-eyebrow">{bonusCine.eyebrow}</span>
+                            <strong className="slot-bonus-cine-title">{bonusCine.title}</strong>
+                            <em className="slot-bonus-cine-caption">{bonusCine.caption}</em>
+                            <i className="slot-bonus-cine-spins">{bonusCine.spinsLabel}</i>
+                        </div>
                     </div>
                 )}
 
