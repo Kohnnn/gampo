@@ -59,6 +59,7 @@ export const featuredCollections = [
         description: 'Synthetic fixtures with fair odds, vig, overround and ticket settlement.',
         path: '/sportsbook',
         accent: '#58a6ff',
+        image: '/images/covers/generated/sports.svg',
     },
 ]
 

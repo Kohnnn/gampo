@@ -38,12 +38,15 @@ import { useGameBgm } from '../../../audio/useBgm'
 const REVEAL_DELAY_MS = 380
 const PAGE_COUNT = 3
 
-// Weights chosen so the round expected value lands near 0.96 RTP after
-// edge: Sun 38%, Moon 26%, Star 14%, Skull 22%. Sun and Moon add their
+// Symbol values are calibrated so OPTIMAL play (cash out whenever the current
+// accumulated multiple beats the expected value of reading on) returns 0.96
+// RTP. Weights: Sun 38%, Moon 26%, Star 14%, Skull 22%. Sun and Moon add their
 // face value; Skull busts the round; Star doubles the next page only.
+// (Previously Sun 1.4 / Moon 2.2 made optimal play ~226% RTP — every reachable
+// state was +EV. Values were solved via a cash-out DP against the 0.96 target.)
 const SYMBOLS = [
-    { id: 'sun', icon: '☀️', name: 'Sun', value: 1.4, weight: 38 },
-    { id: 'moon', icon: '🌙', name: 'Moon', value: 2.2, weight: 26 },
+    { id: 'sun', icon: '☀️', name: 'Sun', value: 0.6, weight: 38 },
+    { id: 'moon', icon: '🌙', name: 'Moon', value: 0.93, weight: 26 },
     { id: 'star', icon: '⭐', name: 'Star', value: 0, weight: 14 },
     { id: 'skull', icon: '💀', name: 'Skull', value: 0, weight: 22 },
 ]

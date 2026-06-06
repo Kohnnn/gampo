@@ -20,8 +20,12 @@ const FUN_KEY = 'gampo_fun_mode'
 // How much Fun Mode tilts the math. Win probability is multiplied by
 // FUN_WIN_BOOST (capped below 1.0 so a near-certain game stays valid) and
 // payouts get a smaller bump. Tuned for "noticeably luckier" not "always win".
-export const FUN_WIN_BOOST = 1.35
-export const FUN_PAYOUT_BOOST = 1.15
+// The payout boost is deliberately small and the effective RTP is capped at
+// FUN_MAX_RTP so Fun Mode never turns into a runaway money printer — it nudges
+// odds toward break-even, it does not guarantee profit.
+export const FUN_WIN_BOOST = 1.25
+export const FUN_PAYOUT_BOOST = 1.06
+export const FUN_MAX_RTP = 1.0
 
 const listeners = new Set()
 let funMode = readFunMode()
@@ -75,7 +79,7 @@ export function funPayout(multiplier) {
 // inflating the effective RTP (so the locked payout grows) in free play.
 export function rtpLockedMultiplier(winProbability, rtp) {
     const p = clamp(Number(winProbability) || 0, 0.0001, 1)
-    const targetRtp = funMode ? Number(rtp) * FUN_PAYOUT_BOOST : Number(rtp)
+    const targetRtp = funMode ? Math.min(FUN_MAX_RTP, Number(rtp) * FUN_PAYOUT_BOOST) : Number(rtp)
     return round2(targetRtp / p)
 }
 

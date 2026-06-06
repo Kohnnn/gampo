@@ -69,6 +69,61 @@ for (const picks of [1, 3, 5, 8, 10]) {
     results.push([`keno-${picks}`, ret / 200000])
 }
 
+// Drill — multipliers locked to TARGET_RTP / cumulative-survival, so the
+// cash-out EV at every depth is ~0.96. Simulate a "drill to bedrock" greedy
+// player (the previously-exploitable strategy) to confirm it no longer wins.
+{
+    const TARGET = 0.96
+    const bust = [0.06, 0.10, 0.14, 0.18, 0.22, 0.26, 0.32, 0.38]
+    let survival = 1
+    const mult = bust.map(b => { survival *= (1 - b); return Math.round((TARGET / survival) * 100) / 100 })
+    let ret = 0
+    for (let i = 0; i < N; i++) {
+        let depth = 0
+        let alive = true
+        while (alive && depth < bust.length) {
+            if (rng() < bust[depth]) { alive = false; break }
+            depth++
+        }
+        ret += alive ? mult[depth - 1] : 0 // cash out at deepest reached (bedrock-greedy)
+    }
+    results.push(['drill-greedy', ret / N])
+}
+
+// Dino — growth locked to TARGET_RTP / safe per preset, so the EV of each
+// surviving step is exactly TARGET_RTP (~0.99, Dino's advertised RTP). Measure
+// that per-step invariant directly. (A multi-step commit naturally compounds
+// the edge, e.g. 0.99^n, so it is NOT a valid "too easy/low" signal.)
+{
+    const TARGET = 0.99
+    const presets = { easy: 0.86, medium: 0.72, hard: 0.58, extreme: 0.42 }
+    for (const [name, safe] of Object.entries(presets)) {
+        const growth = Number((TARGET / safe).toFixed(4))
+        let ret = 0
+        for (let i = 0; i < N; i++) {
+            ret += rng() < safe ? growth : 0 // single-step EV
+        }
+        results.push([`dino-${name}`, ret / N])
+    }
+}
+
+// Lottery — pick-5 draw-5 of 36, calibrated prize table. EV should be ~0.90.
+{
+    const TABLE = [0, 0, 4, 25, 250, 5000]
+    let ret = 0
+    for (let i = 0; i < N; i++) {
+        const pool = Array.from({ length: 36 }, (_, k) => k + 1)
+        for (let j = pool.length - 1; j > 0; j--) { const t = Math.floor(rng() * (j + 1)); [pool[j], pool[t]] = [pool[t], pool[j]] }
+        const drawn = new Set(pool.slice(0, 5))
+        const sel = new Set()
+        while (sel.size < 5) sel.add(1 + Math.floor(rng() * 36))
+        let hits = 0
+        sel.forEach(n => { if (drawn.has(n)) hits++ })
+        ret += TABLE[hits]
+    }
+    results.push(['lottery', ret / N])
+}
+
 console.log('Game           RTP')
 for (const [name, rtp] of results) {
     const pct = (rtp * 100).toFixed(1)

@@ -44,20 +44,26 @@ import EducationPanel from '../../EducationPanel'
 import './drill.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
-// 8-layer shaft. Multipliers are baked at design time so the layer
-// labels and rewards are stable. Bust chance climbs roughly linearly,
-// keeping the cumulative survival product near a 96% RTP target across
-// the full descent.
-const LAYERS = [
-    { name: 'Topsoil', multiplier: 1.10, bustChance: 0.06 },
-    { name: 'Clay', multiplier: 1.30, bustChance: 0.10 },
-    { name: 'Sandstone', multiplier: 1.65, bustChance: 0.14 },
-    { name: 'Granite', multiplier: 2.20, bustChance: 0.18 },
-    { name: 'Iron Vein', multiplier: 3.20, bustChance: 0.22 },
-    { name: 'Crystal Layer', multiplier: 4.80, bustChance: 0.26 },
-    { name: 'Magma Pocket', multiplier: 8.00, bustChance: 0.32 },
-    { name: 'Bedrock Core', multiplier: 18.0, bustChance: 0.38 },
-]
+// 8-layer shaft. To keep the game honest, each layer's multiplier is locked to
+// the RTP target divided by the cumulative survival probability of reaching
+// (and surviving) that layer: mult_i = TARGET_RTP / Prod(1 - bustChance_k).
+// That makes the cash-out EV exactly TARGET_RTP at every depth, so no layer is
+// ever +EV. (Previously these multipliers were hand-baked and every stopping
+// point paid >100% — drilling to Bedrock returned ~261%.)
+const TARGET_RTP = 0.96
+const DRILL_BUST_CHANCES = [0.06, 0.10, 0.14, 0.18, 0.22, 0.26, 0.32, 0.38]
+const DRILL_NAMES = ['Topsoil', 'Clay', 'Sandstone', 'Granite', 'Iron Vein', 'Crystal Layer', 'Magma Pocket', 'Bedrock Core']
+const LAYERS = (() => {
+    let survival = 1
+    return DRILL_BUST_CHANCES.map((bustChance, index) => {
+        survival *= (1 - bustChance)
+        return {
+            name: DRILL_NAMES[index],
+            multiplier: Math.round((TARGET_RTP / survival) * 100) / 100,
+            bustChance,
+        }
+    })
+})()
 
 export default function DrillGame() {
     useGameBgm('drill', 'idle')
