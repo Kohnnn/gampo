@@ -665,8 +665,12 @@
 
 @media (prefers-reduced-motion: reduce) {
     .slot-cell.type-scatter { animation: none; }
+    .slot-cell.spinning { animation-duration: 0.3s; filter: brightness(1.08); }
+    .slot-cell.spinning::before { display: none; }
 }
 .gampo-reduce-motion .slot-cell.type-scatter { animation: none; }
+.gampo-reduce-motion .slot-cell.spinning { animation-duration: 0.3s; filter: brightness(1.08); }
+.gampo-reduce-motion .slot-cell.spinning::before { display: none; }
 
 .slot-cell.type-wild {
     border-color: color-mix(in srgb, var(--slot-accent), white 24%);
@@ -705,13 +709,36 @@
 }
 
 .slot-cell.spinning {
-    animation: slotReelMotion 0.16s linear infinite;
-    filter: blur(0.4px) brightness(1.08);
+    animation: slotReelMotion 0.09s linear infinite;
+    filter: blur(1.4px) brightness(1.1);
 }
 
+.slot-cell.spinning .slot-cell em,
+.slot-cell.spinning .money-chip {
+    opacity: 0;
+}
+
+/* Vertical reel scroll: symbols streak downward with motion blur, reading as a
+   spinning physical reel rather than a static jiggle. Purely cosmetic — the
+   outcome is already decided by resolveSlotSpin. */
 @keyframes slotReelMotion {
-    from { transform: translateY(-10px) scaleY(0.94); }
-    to { transform: translateY(10px) scaleY(1.06); }
+    0% { transform: translateY(-58%) scaleY(1.16); }
+    100% { transform: translateY(58%) scaleY(1.16); }
+}
+
+/* A blurred "reel window" look: while spinning, repurpose the idle-shine
+   ::before into vertical speed lines (overrides the diagonal shine sweep). */
+.slot-cell.spinning::before {
+    background: repeating-linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.06) 0,
+        rgba(255, 255, 255, 0.06) 2px,
+        transparent 2px,
+        transparent 9px
+    );
+    transform: none;
+    animation: none;
+    opacity: 0.5;
 }
 
 /* Reel-stop landing bounce: while the stage is still spinning, any cell that
