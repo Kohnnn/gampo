@@ -145,11 +145,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const autoplayPendingRef = useRef(false)
     const stopsRef = useRef(advancedStops)
     const buyTierIdRef = useRef(null)
+    const persistentMultiplierRef = useRef(0)
     const reelFrameRef = useRef(null)
     const templateResetRef = useRef(startTemplate.id)
 
     useEffect(() => { stopsRef.current = advancedStops }, [advancedStops])
     useEffect(() => { buyTierIdRef.current = bonusBuyTierId }, [bonusBuyTierId])
+    useEffect(() => { persistentMultiplierRef.current = persistentMultiplier }, [persistentMultiplier])
 
     // Wave 10: when the free-spin counter drops to 0 mid-session, emit the end banner
     // and reset the session. This fires after finishRound has decremented freeSpins.
@@ -415,6 +417,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
         }
 
+        // During a free-spin session, each cascade chain bumps the persistent
+        // multiplier by 1 (capped) — the classic escalating-bonus feel.
+        if (config.features?.persistentMultiplier && usedFreeSpin && result.cascadeSteps > 0) {
+            const cap = config.features?.persistentMultiplierCap || 10
+            setPersistentMultiplier(value => Math.min(cap, Math.max(1, value) + 1))
+        }
+
         const coinTarget = config.features?.coinMeter?.target || 0
         if (coinTarget && result.coinHits) {
             setCoinMeter(value => Math.min(coinTarget, value + result.coinHits))
@@ -475,7 +484,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             // Fun Mode (free-play only) inflates the calibrated scalar so wins
             // land bigger/more often. Off by default; never a real-casino mode.
             const funScalar = isFunMode() ? (config.rtpScalar ?? 1) * FUN_PAYOUT_BOOST : undefined
-            const result = resolveSlotSpin(config, { bonusBuy: usedBonusBuy, buyTier: tier, freeSpin: usedFreeSpin, stickyWilds, ...(funScalar != null ? { rtpScalar: funScalar } : {}) })
+            const result = resolveSlotSpin(config, {
+                bonusBuy: usedBonusBuy,
+                buyTier: tier,
+                freeSpin: usedFreeSpin,
+                stickyWilds,
+                // Persistent multiplier only applies during a free-spin session.
+                persistentMultiplier: usedFreeSpin ? Math.max(1, persistentMultiplierRef.current) : 1,
+                ...(funScalar != null ? { rtpScalar: funScalar } : {}),
+            })
             const cols = config.layout.cols
             const totalSettleDelay = turbo ? 180 : 360
             const baseStop = turbo ? 80 : 200

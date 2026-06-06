@@ -38,7 +38,7 @@ export const SLOT_TEMPLATES = [
         featureText: 'Collect 30 coin symbols to fill the vault meter.',
         controls: { buyBonus: true, turbo: true, auto: true },
         features: {
-            coinMeter: { target: 30, symbolId: 'coin', pay: 0.32 },
+            coinMeter: { target: 30, symbolId: 'coin', pay: 0.32, fillTrigger: 5, burstFreeSpins: 6 },
             scatter: { symbolId: 'bonus', trigger: 3, awardFreeSpins: 6, pay: 1.2 },
             buyBonus: {
                 costMultiplier: 45,
@@ -234,7 +234,7 @@ export const SLOT_TEMPLATES = [
         featureText: 'Classic 3-reel bars and sevens. Triple sevens land the headline payout.',
         controls: { buyBonus: false, turbo: true, auto: true },
         features: {
-            classicThreeReel: { jackpotSymbolId: 'seven', jackpotMultiplier: 60 },
+            classicThreeReel: { jackpotSymbolId: 'seven', jackpotMultiplier: 30 },
         },
         symbols: [
             symbol('seven', '7', `${classic}/slot-classic-7.png`, 4, 12),
@@ -583,7 +583,7 @@ export const SLOT_TEMPLATES = [
             scatter: { symbolId: 'basket', trigger: 4, awardFreeSpins: 8, pay: 1.2 },
             anticipation: { scatterMin: 3 },
             clusterMin: 5,
-            coinMeter: { target: 30, symbolId: 'egg', pay: 0.32 },
+            coinMeter: { target: 30, symbolId: 'egg', pay: 0.32, fillTrigger: 6, burstFreeSpins: 4 },
             buyBonus: {
                 costMultiplier: 80,
                 guaranteedScatters: 4,
@@ -958,6 +958,72 @@ function applyMysteryReveal(cells, config) {
     return { cells: next, mysteryReveal: reveal }
 }
 
+// ---- wild transforms (expanding / stacked reels) ----
+
+// Column cell-index ranges, handling megaways variable column heights.
+function columnIndexRanges(config) {
+    const { cols } = config.layout
+    const ranges = []
+    let offset = 0
+    for (let col = 0; col < cols; col += 1) {
+        const colRows = getColumnRows(config, col)
+        ranges.push({ col, start: offset, rows: colRows })
+        offset += colRows
+    }
+    return ranges
+}
+
+// expandingWilds: any column that contains at least one wild becomes a full wild
+// column before evaluation (classic expanding-wild mechanic). Returns the new
+// cells plus the columns that expanded (for presentation).
+function applyExpandingWilds(cells, config) {
+    if (!config.features?.expandingWilds) return { cells, expandedColumns: [] }
+    const wildSymbol = config.symbols.find(item => item.type === 'wild')
+    if (!wildSymbol) return { cells, expandedColumns: [] }
+    const next = [...cells]
+    const expandedColumns = []
+    for (const { col, start, rows } of columnIndexRanges(config)) {
+        let hasWild = false
+        for (let r = 0; r < rows; r += 1) {
+            if (next[start + r]?.type === 'wild') { hasWild = true; break }
+        }
+        if (hasWild) {
+            for (let r = 0; r < rows; r += 1) next[start + r] = wildSymbol
+            expandedColumns.push(col)
+        }
+    }
+    return { cells: next, expandedColumns }
+}
+
+// stackedWildReel: a column with >= minStack wilds becomes a full wild reel and
+// flags a lineBoost applied to wins that use it. Returns new cells + stacked
+// columns + the lineBoost factor.
+function applyStackedWildReels(cells, config) {
+    const cfg = config.features?.stackedWildReel
+    if (!cfg) return { cells, stackedColumns: [], lineBoost: 1 }
+    const wildSymbol = config.symbols.find(item => item.id === cfg.wildSymbolId)
+        || config.symbols.find(item => item.type === 'wild')
+    if (!wildSymbol) return { cells, stackedColumns: [], lineBoost: 1 }
+    const minStack = cfg.minStack || 3
+    const next = [...cells]
+    const stackedColumns = []
+    for (const { col, start, rows } of columnIndexRanges(config)) {
+        let wilds = 0
+        for (let r = 0; r < rows; r += 1) {
+            if (next[start + r]?.type === 'wild') wilds += 1
+        }
+        if (wilds >= minStack) {
+            for (let r = 0; r < rows; r += 1) next[start + r] = wildSymbol
+            stackedColumns.push(col)
+        }
+    }
+    return {
+        cells: next,
+        stackedColumns,
+        lineBoost: stackedColumns.length ? (cfg.lineBoost || 1) : 1,
+    }
+}
+
 // ---- evaluation modes ----
 
 function evaluateLines(cells, config) {
@@ -1259,7 +1325,7 @@ function resolveMoneyValues(cells, config) {
 
 // ---- cascade tumble ----
 
-function cascadeTumble(cells, config, baseWins, baseIndexes) {
+function cascadeTumble(cells, config, baseWins, baseIndexes, rng) {
     const ladder = config.features?.cascade?.tumbleMultiplierLadder
     if (!ladder || !baseWins.length) return { cells, cascadedWins: baseWins, cascadeSteps: 0 }
     let working = [...cells]
@@ -1270,7 +1336,7 @@ function cascadeTumble(cells, config, baseWins, baseIndexes) {
         // Replace winning cells with new picks; for cluster/pay-anywhere we rebuild positions.
         working = working.map((item, index) => {
             if (!lastIndexes.has(index)) return item
-            const replaced = pickSymbol(config, index + step * 1009, false)
+            const replaced = pickSymbol(config, index + step * 1009, false, rng)
             return replaced
         })
         const next = evaluateBaseWins(working, config)
@@ -1315,6 +1381,34 @@ export function resolveSlotSpin(config, options = {}) {
         }
     }
 
+    // Expanding wilds: a column containing a wild becomes a full wild column.
+    const { cells: expandedCells, expandedColumns } = applyExpandingWilds(cells, config)
+    cells = expandedCells
+
+    // Stacked wild reels: a column with >= minStack wilds becomes a full wild
+    // reel and applies a lineBoost to wins that include it.
+    const { cells: stackedCells, stackedColumns, lineBoost } = applyStackedWildReels(cells, config)
+    cells = stackedCells
+
+    // Scarab respin: when >= triggerCount scarab wilds land, lock them and run a
+    // respin where the locked cells stay wild. The lockBoost scales the respin
+    // wins. Modelled as a single bonus respin folded into this spin's result.
+    const scarabCfg = config.features?.scarabRespin
+    let scarabRespun = false
+    if (scarabCfg) {
+        const wildIdxs = cells
+            .map((item, index) => item.type === 'wild' ? index : -1)
+            .filter(i => i >= 0)
+        if (wildIdxs.length >= (scarabCfg.triggerCount || 3)) {
+            scarabRespun = true
+            const wildSymbol = config.symbols.find(item => item.type === 'wild')
+            // Respin: re-pick every non-locked cell; locked scarabs stay wild.
+            cells = cells.map((item, index) => (
+                wildIdxs.includes(index) ? wildSymbol : pickSymbol(config, index + 7919, false, rng)
+            ))
+        }
+    }
+
     // Mystery reveal pre-evaluate
     const { cells: revealedCells, mysteryReveal } = applyMysteryReveal(cells, config)
     cells = revealedCells
@@ -1327,10 +1421,10 @@ export function resolveSlotSpin(config, options = {}) {
     let { wins } = baseEval
     let winningIndexes = new Set(baseEval.winningIndexes)
 
-    // Cascade tumble (cluster/pay-anywhere only)
+    // Cascade tumble (cluster / pay-anywhere / megaways).
     let cascadeSteps = 0
-    if (config.features?.cascade && (config.layout.evaluation === 'cluster' || config.layout.evaluation === 'pay-anywhere')) {
-        const cascadeResult = cascadeTumble(cells, config, wins, winningIndexes)
+    if (config.features?.cascade && (config.layout.evaluation === 'cluster' || config.layout.evaluation === 'pay-anywhere' || config.layout.evaluation === 'megaways')) {
+        const cascadeResult = cascadeTumble(cells, config, wins, winningIndexes, rng)
         cells = cascadeResult.cells
         wins = cascadeResult.cascadedWins
         cascadeSteps = cascadeResult.cascadeSteps
@@ -1340,8 +1434,28 @@ export function resolveSlotSpin(config, options = {}) {
     const { wins: zonedWins, zoneHits } = applyMultiplierZones(wins, config)
     wins = zonedWins
 
+    // Stacked-wild line boost: scale wins when a full wild reel formed.
+    if (lineBoost > 1) {
+        wins = wins.map(win => ({ ...win, multiplier: round2(win.multiplier * lineBoost) }))
+    }
+
+    // Scarab respin lock boost: reward the locked-wild respin.
+    if (scarabRespun && (scarabCfg?.lockBoost || 1) > 1) {
+        wins = wins.map(win => ({ ...win, multiplier: round2(win.multiplier * scarabCfg.lockBoost) }))
+    }
+
     let multiplier = wins.reduce((sum, item) => sum + item.multiplier, 0)
     const featureEvents = []
+
+    if (expandedColumns.length) {
+        featureEvents.push({ type: 'expanding-wilds', label: `Expanding wild × ${expandedColumns.length}`, columns: expandedColumns })
+    }
+    if (stackedColumns.length) {
+        featureEvents.push({ type: 'stacked-wild', label: `Wild reel × ${stackedColumns.length}`, columns: stackedColumns, lineBoost })
+    }
+    if (scarabRespun) {
+        featureEvents.push({ type: 'scarab-respin', label: 'Scarab lock & respin' })
+    }
 
     if (zoneHits > 0) {
         featureEvents.push({
@@ -1413,6 +1527,7 @@ export function resolveSlotSpin(config, options = {}) {
 
     const coinMeter = config.features?.coinMeter
     let coinHits = 0
+    let coinMeterFilled = false
     if (coinMeter) {
         cells.forEach((item, index) => {
             if (item.id === coinMeter.symbolId) {
@@ -1423,6 +1538,28 @@ export function resolveSlotSpin(config, options = {}) {
         if (coinHits) {
             multiplier += round2(coinHits * coinMeter.pay)
             featureEvents.push({ type: 'coin-meter', label: `Collected ${coinHits}`, coinHits })
+        }
+        // Meter fill: when this spin's coins reach the per-spin fill trigger, the
+        // vault/barn cracks open for a free-spins burst. (The running meter is
+        // tracked by the UI; here we award when enough coins land at once.)
+        const fillTrigger = coinMeter.fillTrigger || Math.max(4, Math.round((coinMeter.target || 30) * 0.2))
+        if (coinHits >= fillTrigger && !triggeredFreeSpins) {
+            coinMeterFilled = true
+            triggeredFreeSpins = true
+            const burst = coinMeter.burstFreeSpins || 5
+            featureEvents.push({
+                type: 'coin-meter-fill',
+                label: `Vault burst · ${burst} free spins`,
+                freeSpins: burst,
+            })
+            featureEvents.push({
+                type: 'free-spins',
+                label: `${burst} Free Spins`,
+                freeSpins: burst,
+                indexes: [],
+                persistentMultiplier: config.features?.persistentMultiplier || 0,
+                source: 'coin-meter',
+            })
         }
     }
 
@@ -1440,8 +1577,27 @@ export function resolveSlotSpin(config, options = {}) {
         featureEvents.push({ type: 'cascade', label: `${cascadeSteps + 1}x cascade chain`, steps: cascadeSteps })
     }
 
-    if (config.features?.expandingWilds && cells.some(item => item.type === 'wild')) {
-        featureEvents.push({ type: 'wilds', label: 'Wild column pulse' })
+    // Classic 3-reel jackpot: all paying cells identical to the jackpot symbol
+    // pays jackpotMultiplier (e.g. triple sevens on Bars). Replaces the line
+    // ladder for that specific symbol so the headline jackpot actually lands.
+    const classic = config.features?.classicThreeReel
+    if (classic?.jackpotSymbolId && classic?.jackpotMultiplier) {
+        const payCells = cells.filter(isPaySymbol)
+        if (payCells.length && payCells.every(item => item.id === classic.jackpotSymbolId)) {
+            multiplier += classic.jackpotMultiplier
+            cells.forEach((_, index) => winningIndexes.add(index))
+            featureEvents.push({ type: 'jackpot', label: `JACKPOT ${classic.jackpotMultiplier}x`, multiplier: classic.jackpotMultiplier })
+        }
+    }
+
+    // Persistent multiplier: during a free-spin session the running multiplier
+    // (grown by retriggers/cascades, capped) scales the whole spin return.
+    // options.persistentMultiplier is threaded in by SlotsGame for free spins.
+    const persistCap = config.features?.persistentMultiplierCap || 10
+    const activePersistent = Math.min(persistCap, Math.max(1, Number(options.persistentMultiplier) || 1))
+    if (config.features?.persistentMultiplier && activePersistent > 1) {
+        multiplier = round2(multiplier * activePersistent)
+        featureEvents.push({ type: 'persistent-multiplier', label: `${activePersistent}x persistent`, value: activePersistent })
     }
 
     // New wild positions surfaced for sticky-wild lock tracking by the UI.

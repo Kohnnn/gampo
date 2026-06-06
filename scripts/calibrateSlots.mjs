@@ -47,20 +47,30 @@ function makeRng(seed) {
 // loop (and matches how real slots cap retriggers).
 const MAX_FREE_SPINS_PER_SESSION = 20
 function simulateRound(config, scalar) {
-    const opts = { rtpScalar: scalar }
-    let total = 0
-    const base = resolveSlotSpin(config, opts)
-    total += base.multiplier
+    const hasPersistent = Boolean(config.features?.persistentMultiplier)
+    const cap = config.features?.persistentMultiplierCap || 10
     const award = config.features?.scatter?.awardFreeSpins || 0
+    let total = 0
+    // Base spin (no persistent multiplier outside free spins).
+    const base = resolveSlotSpin(config, { rtpScalar: scalar, persistentMultiplier: 1 })
+    total += base.multiplier
+    // A coin-meter burst can also open a session (free-spins event with source).
     let freeSpins = base.triggeredFreeSpins ? award : 0
+    if (!freeSpins) {
+        const burst = base.featureEvents?.find(e => e.type === 'coin-meter-fill')
+        if (burst) freeSpins = burst.freeSpins || 0
+    }
     let played = 0
+    let persistent = hasPersistent ? 1 : 1
     while (freeSpins > 0 && played < MAX_FREE_SPINS_PER_SESSION) {
         freeSpins -= 1
         played += 1
-        const fs = resolveSlotSpin(config, opts)
+        const fs = resolveSlotSpin(config, { rtpScalar: scalar, persistentMultiplier: persistent })
         total += fs.multiplier
+        if (hasPersistent && fs.cascadeSteps > 0) persistent = Math.min(cap, persistent + 1)
         if (fs.triggeredFreeSpins && played + freeSpins < MAX_FREE_SPINS_PER_SESSION) {
             freeSpins += award
+            if (hasPersistent) persistent = Math.min(cap, persistent + 1)
         }
     }
     return total
