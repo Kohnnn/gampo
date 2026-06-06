@@ -3210,3 +3210,75 @@
         letter-spacing: 0.03em;
     }
 }
+
+/* ===== Phase C: wired-mechanic presentation ===== */
+
+/* Expanding / stacked wild reel glow — a column that turned fully wild this
+   round pulses with the accent so the player sees the reel "go wild". */
+.slot-cell.wild-column {
+    border-color: color-mix(in srgb, var(--slot-accent, #ffd166), white 18%);
+    box-shadow:
+        0 0 18px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 45%),
+        inset 0 0 22px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 60%);
+    animation: slotWildColumn 0.9s ease-in-out;
+    z-index: 2;
+}
+.slot-megaways-col.wild-column {
+    border-radius: 12px;
+    box-shadow: 0 0 18px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 45%);
+    animation: slotWildColumn 0.9s ease-in-out;
+}
+@keyframes slotWildColumn {
+    0% { filter: brightness(1.6) saturate(1.4); transform: scaleY(1.06); }
+    100% { filter: brightness(1) saturate(1); transform: scaleY(1); }
+}
+
+/* Persistent-multiplier ramp badge in the pill row. */
+.slot-pill.slot-pill-persist {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--slot-accent, #ffd166), transparent 70%), rgba(0,0,0,0.35));
+    border-color: color-mix(in srgb, var(--slot-accent, #ffd166), transparent 40%);
+}
+.slot-pill.slot-pill-persist.is-ramping strong {
+    animation: slotPersistRamp 0.5s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+@keyframes slotPersistRamp {
+    0% { transform: scale(1.6); color: #fff; text-shadow: 0 0 14px var(--slot-accent, #ffd166); }
+    100% { transform: scale(1); }
+}
+
+/* Jackpot / vault-burst banner — a brief full-stage flash. */
+.slot-event-flash {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--slot-accent, #ffd166), transparent 55%), transparent 70%);
+    animation: slotEventFlash 1.1s ease-out forwards;
+}
+.slot-event-flash strong {
+    font-size: clamp(26px, 9vw, 64px);
+    font-weight: 950;
+    letter-spacing: 0.04em;
+    color: #fff;
+    text-shadow: 0 0 24px var(--slot-accent, #ffd166), 0 4px 12px rgba(0, 0, 0, 0.6);
+    text-transform: uppercase;
+}
+@keyframes slotEventFlash {
+    0% { opacity: 0; transform: scale(0.7); }
+    20% { opacity: 1; transform: scale(1.05); }
+    70% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.02); }
+}
+
+:root.gampo-reduce-motion .slot-cell.wild-column,
+:root.gampo-reduce-motion .slot-megaways-col.wild-column,
+:root.gampo-reduce-motion .slot-pill.slot-pill-persist.is-ramping strong,
+:root.gampo-reduce-motion .slot-event-flash,
+.gampo-reduce-motion .slot-cell.wild-column,
+.gampo-reduce-motion .slot-megaways-col.wild-column,
+.gampo-reduce-motion .slot-pill.slot-pill-persist.is-ramping strong,
+.gampo-reduce-motion .slot-event-flash {
+    animation-duration: 0.001ms;
+}
