@@ -7,6 +7,7 @@ import AchievementToast from './AchievementToast'
 import MissionToast from './MissionToast'
 import MobileBottomNav from './MobileBottomNav'
 import SessionGuardBanner from './SessionGuardBanner'
+import WelcomeModal from './WelcomeModal'
 import { useMenuBgm } from '../audio/useBgm'
 import { playSample } from '../audio/audioContext'
 import { useSettings } from '../hooks/useSettings'
@@ -77,6 +78,7 @@ function Layout() {
             <AchievementToast />
             <MissionToast />
             <SessionGuardBanner />
+            <WelcomeModal />
         </div>
     )
 }
