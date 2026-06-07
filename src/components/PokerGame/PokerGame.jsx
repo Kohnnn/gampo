@@ -568,6 +568,7 @@ export default function PokerGame() {
                         onClick={() => enterPokerSession(format, buyIn)}
                         data-poker-action="sit-down"
                         data-mobile-hit-target="primary"
+                        data-ux-primary-action
                     >
                         Sit Down {formatCredits(buyIn)}
                     </button>
@@ -662,6 +663,11 @@ export default function PokerGame() {
                                 <i className="raise" style={{ width: `${gtoNow.raise}%` }} />
                                 <i className="call" style={{ width: `${gtoNow.call}%` }} />
                                 <i className="fold" style={{ width: `${gtoNow.fold}%` }} />
+                            </div>
+                            <div className="poker-mobile-gto-mix" aria-hidden="true">
+                                <span className="raise">R {gtoNow.raise}%</span>
+                                <span className="call">C {gtoNow.call}%</span>
+                                <span className="fold">F {gtoNow.fold}%</span>
                             </div>
                             <dl>
                                 <div><dt>Hand</dt><dd>{heroCards}</dd></div>
@@ -766,9 +772,9 @@ export default function PokerGame() {
                                             <strong>{isHumanTurn ? 'Choose fold, call/check, or size a raise.' : tableStateLabel}</strong>
                                         </div>
                                         {acts.map(a => {
-                                            if (a.type === 'fold') return <button key={a.type} className="pk-act fold" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'fold' })} data-poker-action="fold">Fold</button>
-                                            if (a.type === 'check') return <button key={a.type} className="pk-act check" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'check' })} data-poker-action="check">Check</button>
-                                            if (a.type === 'call') return <button key={a.type} className="pk-act call" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'call' })} data-poker-action="call">Call {formatCredits(a.amount)}</button>
+                                            if (a.type === 'fold') return <button key={a.type} className="pk-act fold" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'fold' })} data-poker-action="fold" data-ux-primary-action>Fold</button>
+                                            if (a.type === 'check') return <button key={a.type} className="pk-act check" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'check' })} data-poker-action="check" data-ux-primary-action>Check</button>
+                                            if (a.type === 'call') return <button key={a.type} className="pk-act call" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'call' })} data-poker-action="call" data-ux-primary-action>Call {formatCredits(a.amount)}</button>
                                             if (a.type === 'raise') {
                                                 const r = a
                                                 return (
@@ -781,7 +787,7 @@ export default function PokerGame() {
                                                             <button onClick={() => setRaiseAmount(r.max)}>All-in</button>
                                                         </div>
                                                         <input type="range" min={r.min} max={r.max} value={raiseAmount ?? r.min} onChange={e => setRaiseAmount(Number(e.target.value))} />
-                                                        <button className="pk-act raise" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'raise', amount: raiseAmount ?? r.min })} data-poker-action="raise">Raise to {formatCredits(raiseAmount ?? r.min)}</button>
+                                                        <button className="pk-act raise" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'raise', amount: raiseAmount ?? r.min })} data-poker-action="raise" data-ux-primary-action>Raise to {formatCredits(raiseAmount ?? r.min)}</button>
                                                     </div>
                                                 )
                                             }
