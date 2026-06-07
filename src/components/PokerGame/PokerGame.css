@@ -1851,6 +1851,16 @@
     .poker-mobile-gto-bars .call { background: #00b428; }
     .poker-mobile-gto-bars .fold { background: rgba(255, 255, 255, 0.28); }
 
+    .poker-mobile-gto-mix {
+        display: flex;
+        gap: 10px;
+        font-size: 10px;
+        font-weight: 900;
+    }
+    .poker-mobile-gto-mix .raise { color: #ff7a7c; }
+    .poker-mobile-gto-mix .call { color: #38d56a; }
+    .poker-mobile-gto-mix .fold { color: rgba(255, 255, 255, 0.6); }
+
     .poker-mobile-gto-now dl {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2028,11 +2038,166 @@
         font-size: 11px;
     }
 
-    .pk-raise-presets button:nth-child(-n+2) {
-        display: none;
-    }
-
+    /* Keep ALL raise presets reachable on the narrowest phones — previously the
+       first two (½ pot, ¾ pot) were hidden, removing key bet sizings. Wrap them
+       into a 3-column grid instead so every sizing stays one tap away. */
     .pk-raise-presets {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+    .pk-raise-presets button:nth-child(-n+2) {
+        display: inline-flex;
+    }
 }
+
+/* ============================================================
+   Phase 4: Live Poker mobile flow rebuild (<= 760px)
+   The desktop felt positions 6 seats absolutely on a fixed oval. On phones
+   that oval shrinks but never re-lays-out, so seats overlap, cards become
+   unreadable chips, and the board collides with players. This block replaces
+   the absolute oval with a reflowing vertical stack:
+       opponents rail (grid)  ->  pot + board  ->  hero seat  ->  actions
+   It only applies on small screens; desktop is untouched.
+   ============================================================ */
+@media (max-width: 760px) {
+    /* Dissolve the oval: the felt becomes a normal vertical flow container. */
+    .poker-table-felt {
+        aspect-ratio: auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 14px 12px 16px;
+        border-radius: 22px;
+        border-width: 4px;
+        overflow: visible;
+    }
+
+    /* Seats container stops being an absolute overlay and flows inline. Using
+       display:contents lets the seats themselves become direct flex items of
+       the felt so we can order them around the board. */
+    .pk-seats {
+        position: static;
+        inset: auto;
+        display: contents;
+    }
+
+    /* All seats reset to in-flow cards in an opponents rail. */
+    .pk-seat,
+    .seat-0, .seat-1, .seat-2, .seat-3, .seat-4, .seat-5 {
+        position: relative;
+        left: auto; right: auto; top: auto; bottom: auto;
+        transform: none;
+    }
+
+    /* Opponents (seats 1-5) form a responsive grid above the board. */
+    .pk-seats {
+        /* placeholder so the selector list above stays valid */
+    }
+    .poker-table-felt .pk-seat:not(.is-human) {
+        order: 1;
+        flex: 0 0 auto;
+        min-width: 0;
+        max-width: none;
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+        padding: 6px 9px;
+        border-radius: 12px;
+    }
+
+    /* Wrap the five opponent cards into a tidy auto-fit grid. We can't add a
+       wrapper element without touching JSX, so we let them sit in the felt
+       flex column but cap their height and let the row layout read cleanly. */
+    .poker-table-felt {
+        /* opponents stack; board + hero get their own orders below */
+    }
+
+    .pk-pot {
+        position: static;
+        order: 2;
+        transform: none;
+        align-self: center;
+        font-size: 13px;
+        padding: 5px 14px;
+    }
+
+    .pk-board {
+        position: static;
+        order: 2;
+        transform: none;
+        align-self: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+    }
+
+    .poker-table-felt .pk-seat.is-human {
+        order: 3;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 14px;
+        margin-top: 2px;
+    }
+
+    /* Opponent avatars/cards: legible but compact, laid horizontally. */
+    .pk-seat:not(.is-human) .pk-avatar { width: 30px; height: 30px; }
+    .pk-seat:not(.is-human) .pk-seat-info {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 8px;
+        flex: 1;
+    }
+    .pk-seat:not(.is-human) .pk-seat-cards { margin-left: auto; }
+    .pk-seat:not(.is-human) .pk-seat-cards .pk-card { width: 24px; height: 34px; }
+
+    /* Hero row: big readable hole cards on the right, name/stack left. */
+    .pk-seat.is-human .pk-seat-info {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 10px;
+        flex: 1;
+    }
+    .pk-seat.is-human .pk-seat-cards { margin-left: auto; display: flex; gap: 6px; }
+    .pk-seat.is-human .pk-seat-cards .pk-card { width: 50px; height: 72px; }
+    .pk-seat.is-human .pk-seat-cards .pk-rank { font-size: 18px; }
+    .pk-seat.is-human .pk-seat-cards .pk-suit { font-size: 24px; }
+
+    /* Board cards readable on phones. */
+    .poker-table-felt .pk-card { width: 42px; height: 60px; }
+
+    /* The dealer button + bet pills sit inline, no longer floating off-oval. */
+    .pk-button-chip { position: static; margin-left: 4px; }
+    .pk-think-ring { display: none; }
+    .pk-speech { position: static; margin-top: 4px; }
+    .pk-chip-motion { display: none; }
+
+    /* Bigger tap targets across action controls. */
+    .pk-act { min-height: 46px; }
+    .pk-raise-presets button { min-height: 34px; }
+
+    /* GTO sidebar gets real room instead of a 210px squeeze. */
+    .poker-sidebar { max-height: none; }
+    .poker-sidebar-body { max-height: none; }
+    .gto-grid-wrap { max-height: none; }
+
+    /* GTO 13x13 grid: give cells a tappable minimum and let the grid scroll
+       horizontally rather than crushing 13 columns into ~24px each. */
+    .gto-grid-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .gto-grid { min-width: 380px; }
+    .gto-cell { width: 30px; height: 30px; }
+    .gto-cell-label { font-size: 9px; }
+    .gto-context { position: static; }
+}
+
