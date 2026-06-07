@@ -25,6 +25,7 @@
 
 import { useEffect, useState } from 'react'
 import { MISSIONS, evaluateMissions } from '../data/missions'
+import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const STATE_KEY = 'gampo_missions_period_state'
 const COMPLETED_KEY = 'gampo_missions_completed'
@@ -62,20 +63,14 @@ let completed = readCompleted()
 let recentComplete = null
 
 function readState() {
-    try {
-        const raw = localStorage.getItem(STATE_KEY)
-        if (!raw) return defaultState()
-        const parsed = JSON.parse(raw)
-        if (!parsed || typeof parsed !== 'object') return defaultState()
-        return {
-            dayKey: parsed.dayKey || dayKey(),
-            weekKey: parsed.weekKey || weekKey(),
-            daily: { ...DEFAULT_PERIOD, ...(parsed.daily || {}), uniqueGames: Array.isArray(parsed.daily?.uniqueGames) ? parsed.daily.uniqueGames : [] },
-            weekly: { ...DEFAULT_PERIOD, ...(parsed.weekly || {}), uniqueGames: Array.isArray(parsed.weekly?.uniqueGames) ? parsed.weekly.uniqueGames : [] },
-            lifetime: { ...DEFAULT_PERIOD, ...(parsed.lifetime || {}), uniqueGames: Array.isArray(parsed.lifetime?.uniqueGames) ? parsed.lifetime.uniqueGames : [] },
-        }
-    } catch {
-        return defaultState()
+    const parsed = readJson(STATE_KEY, null)
+    if (!parsed || typeof parsed !== 'object') return defaultState()
+    return {
+        dayKey: parsed.dayKey || dayKey(),
+        weekKey: parsed.weekKey || weekKey(),
+        daily: { ...DEFAULT_PERIOD, ...(parsed.daily || {}), uniqueGames: Array.isArray(parsed.daily?.uniqueGames) ? parsed.daily.uniqueGames : [] },
+        weekly: { ...DEFAULT_PERIOD, ...(parsed.weekly || {}), uniqueGames: Array.isArray(parsed.weekly?.uniqueGames) ? parsed.weekly.uniqueGames : [] },
+        lifetime: { ...DEFAULT_PERIOD, ...(parsed.lifetime || {}), uniqueGames: Array.isArray(parsed.lifetime?.uniqueGames) ? parsed.lifetime.uniqueGames : [] },
     }
 }
 
@@ -90,22 +85,16 @@ function defaultState() {
 }
 
 function readCompleted() {
-    try {
-        const raw = localStorage.getItem(COMPLETED_KEY)
-        if (!raw) return {}
-        const parsed = JSON.parse(raw)
-        return parsed && typeof parsed === 'object' ? parsed : {}
-    } catch {
-        return {}
-    }
+    const parsed = readJson(COMPLETED_KEY, {})
+    return parsed && typeof parsed === 'object' ? parsed : {}
 }
 
 function writeState() {
-    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)) } catch { /* ignore */ }
+    writeJson(STATE_KEY, state)
 }
 
 function writeCompleted() {
-    try { localStorage.setItem(COMPLETED_KEY, JSON.stringify(completed)) } catch { /* ignore */ }
+    writeJson(COMPLETED_KEY, completed)
 }
 
 function notify() {
@@ -195,10 +184,8 @@ export function resetMissions() {
     state = defaultState()
     completed = {}
     recentComplete = null
-    try {
-        localStorage.removeItem(STATE_KEY)
-        localStorage.removeItem(COMPLETED_KEY)
-    } catch { /* ignore */ }
+    removeKey(STATE_KEY)
+    removeKey(COMPLETED_KEY)
     notify()
 }
 

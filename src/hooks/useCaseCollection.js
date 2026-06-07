@@ -20,6 +20,7 @@
 // keys carry the v2 dataset so older drops show as ‘legacy’ if migrated.
 
 import { useEffect, useState } from 'react'
+import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const DROPS_KEY = 'gampo_cases_drops_v2'
 const POKEDEX_KEY = 'gampo_cases_pokedex'
@@ -46,39 +47,24 @@ function normalizeDrop(entry, index) {
 }
 
 function readDrops() {
-    try {
-        const raw = localStorage.getItem(DROPS_KEY)
-        if (!raw) return []
-        const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed.map(normalizeDrop) : []
-    } catch {
-        return []
-    }
+    const parsed = readJson(DROPS_KEY, [])
+    return Array.isArray(parsed) ? parsed.map(normalizeDrop) : []
 }
 
 function readPokedex() {
-    try {
-        const raw = localStorage.getItem(POKEDEX_KEY)
-        if (!raw) return {}
-        const parsed = JSON.parse(raw)
-        return parsed && typeof parsed === 'object' ? parsed : {}
-    } catch {
-        return {}
-    }
+    const parsed = readJson(POKEDEX_KEY, {})
+    return parsed && typeof parsed === 'object' ? parsed : {}
 }
 
 function writeDrops() {
-    try {
-        const trimmed = drops.slice(0, DROPS_LIMIT)
-        localStorage.setItem(DROPS_KEY, JSON.stringify(trimmed))
+    const trimmed = drops.slice(0, DROPS_LIMIT)
+    if (writeJson(DROPS_KEY, trimmed)) {
         drops = trimmed
-    } catch { /* quota / private mode */ }
+    }
 }
 
 function writePokedex() {
-    try {
-        localStorage.setItem(POKEDEX_KEY, JSON.stringify(pokedex))
-    } catch { /* ignore */ }
+    writeJson(POKEDEX_KEY, pokedex)
 }
 
 function notify() {
@@ -223,10 +209,8 @@ export function importInventory(payload) {
 export function resetCases() {
     drops = []
     pokedex = {}
-    try {
-        localStorage.removeItem(DROPS_KEY)
-        localStorage.removeItem(POKEDEX_KEY)
-    } catch { /* ignore */ }
+    removeKey(DROPS_KEY)
+    removeKey(POKEDEX_KEY)
     notify()
 }
 
