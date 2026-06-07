@@ -23,21 +23,31 @@ Production: https://gampo-educational-simulator.netlify.app
 Each batch: implement → unit tests → `vitest run` → build → commit. Deploy + prod verify at the end.
 
 - [x] B0. Investigate infra (subagent inventory complete).
-- [ ] B1. Reinforce backlog
-  - [ ] B1a. Shared `src/utils/storage.js` (read/write/remove helpers) — adopt incrementally, no risky mass refactor.
-  - [ ] B1b. Shared `<GameTitleBar>` extraction OR documented decision to defer (Poker/Sportsbook).
-  - [ ] B1c. Mobile dock primitive consolidation OR documented decision.
-  - [ ] B1d. Breakpoint custom-media note (already unified to 768px in prior commit).
-- [ ] B2. Lower-effort + high-impact
-  - [ ] B2a. Settings context + Settings panel (theme accent / density / reduce-motion / fun-mode in one place).
-  - [ ] B2b. Density/compact mode (`data-density` on shell + CSS).
-  - [ ] B2c. Generalized EV coach surface reused across games (from gameDefinitions metadata).
-  - [ ] B2d. Session insight dashboard (realized vs theoretical RTP, variance, streaks, "real-stakes" framing).
-- [ ] B3. Strategy Sandbox (headless N-round simulation + bankroll distribution chart).
-- [ ] B4. Accessibility pass (ARIA, focus order on portaled sheet, contrast, reduced-motion coverage).
-- [ ] B5. Achievements expansion + learning-tied achievements.
-- [ ] B6. Local save/restore (export/import JSON snapshot of all `gampo_*` keys).
-- [ ] B7. Full verify (vitest + build + prod smoke + UX benchmark + bet-sheet check), commit, push, merge origin/main, deploy, verify live.
+- [x] B1. Reinforce backlog
+  - [x] B1a. Shared `src/utils/storage.js` (read/write/remove helpers) — adopted by useSettings/useLocalSave.
+  - [~] B1b. Shared `<GameTitleBar>` — DEFERRED (rationale below).
+  - [~] B1c. Mobile dock primitive consolidation — DEFERRED (rationale below).
+  - [x] B1d. Breakpoint unified to 768px in prior commit (`b0769caa`).
+- [x] B2. Lower-effort + high-impact
+  - [x] B2a. Settings hook + Settings page (accent / density / reduce-motion).
+  - [x] B2b. Density/compact mode (`data-density` on `<html>` + CSS).
+  - [x] B2c. Generalized EV coach util (`evCoach.js`).
+  - [x] B2d. Session insight dashboard (`/insights`).
+- [x] B3. Strategy Sandbox (`/sandbox`, headless sim + histogram).
+- [x] B4. Accessibility pass (audit script + fixes).
+- [x] B5. Achievements expansion (learning group + learning events).
+- [x] B6. Local save/restore (`useLocalSave`, Settings export/import).
+- [ ] B7. Full verify, commit, push, merge origin/main, deploy, verify live.
+
+## Deferral rationale (B1b / B1c)
+Both are pure code-dedup refactors of surfaces (Poker titlebar, the three mobile docks)
+that were *just* stabilized and verified in commit `b0769caa` (bet-sheet fix, breakpoint
+unification, z-index tokenization). Extracting a shared `<GameTitleBar>` or a single dock
+primitive would re-touch that verified markup for cosmetic gain with real regression risk,
+right before a deploy carrying high-value new features. Decision: ship the features now;
+schedule B1b/B1c as an isolated refactor PR with its own verification cycle. The shared
+z-index tokens + 768px breakpoint already give the docks a consistent contract; only the
+markup remains duplicated.
 
 ## Progress log
 - 2026-06-07: Inventory complete. Confirmed plinko `rows-*` chunks already lazy (bundle item largely moot). Doc created. Starting B1.
