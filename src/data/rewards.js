@@ -33,6 +33,12 @@ export const STARTER_PACKS = [
 
 export const DAILY_CLAIM_CREDITS = 500
 
+// Opt-in single-player progression pack. A fixed GC 1,000 top-up the player can
+// grant whenever they want to "make their way up" — free play (default GC 1,000
+// sandbox) is never disturbed. Repeatable; the claim count is tracked so the UI
+// can show progression. Never real money.
+export const PROGRESS_PACK_CREDITS = 1000
+
 // Credits granted for reaching a level. Scales gently; milestone levels pay more.
 export function levelRewardCredits(level) {
     const lvl = Math.max(1, Math.floor(level))

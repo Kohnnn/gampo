@@ -30,7 +30,7 @@ import { useMissions } from '../hooks/useMissions'
 import { useProgress } from '../hooks/useProgress'
 import { useXp } from '../hooks/useXp'
 import { useRewards } from '../hooks/useRewards'
-import { STARTER_PACKS, DAILY_CLAIM_CREDITS } from '../data/rewards'
+import { STARTER_PACKS, DAILY_CLAIM_CREDITS, PROGRESS_PACK_CREDITS } from '../data/rewards'
 import { ACHIEVEMENT_GROUPS } from '../data/achievements'
 import { MISSION_PERIODS, VIP_TIERS, vipTierFor } from '../data/missions'
 
@@ -120,6 +120,13 @@ export default function ProgressPanel() {
         if (credits > 0) {
             grantPracticeCredits(credits)
             showToast?.('win', 'Level rewards claimed', `+GC ${credits.toLocaleString()}`)
+        }
+    }
+    const handleProgressPack = () => {
+        const credits = rewards.takeProgressPack()
+        if (credits > 0) {
+            grantPracticeCredits(credits)
+            showToast?.('win', 'Progress pack', `+GC ${credits.toLocaleString()}`)
         }
     }
 
@@ -280,6 +287,17 @@ export default function ProgressPanel() {
                         <span>Level rewards{pendingLevels.count ? ` (${pendingLevels.count})` : ''}</span>
                         <strong>{pendingLevels.count ? `+GC ${pendingLevels.total.toLocaleString()}` : 'Up to date'}</strong>
                     </button>
+                </div>
+                <div className="prog-progress-pack">
+                    <button
+                        type="button"
+                        className="prog-claim-btn prog-progress-pack-btn"
+                        onClick={handleProgressPack}
+                    >
+                        <span>Progress pack{rewards.progressPacks ? ` ×${rewards.progressPacks}` : ''}</span>
+                        <strong>+GC {PROGRESS_PACK_CREDITS.toLocaleString()}</strong>
+                    </button>
+                    <p className="prog-rewards-hint">Opt-in top-up to climb the stakes. Free play stays the default — take it only when you want to progress.</p>
                 </div>
             </section>
 

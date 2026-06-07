@@ -5,7 +5,7 @@
 // has been claimed and exposes claimable amounts.
 
 import { useEffect, useState } from 'react'
-import { DAILY_CLAIM_CREDITS, STARTER_PACKS, levelRewardCredits } from '../data/rewards'
+import { DAILY_CLAIM_CREDITS, PROGRESS_PACK_CREDITS, STARTER_PACKS, levelRewardCredits } from '../data/rewards'
 
 const KEY = 'gampo_rewards'
 
@@ -13,6 +13,7 @@ const DEFAULT_STATE = {
     starterPackId: null,   // null = not yet chosen
     lastDailyClaim: null,  // YYYY-MM-DD
     claimedLevels: [],     // levels whose reward has been claimed
+    progressPacks: 0,      // count of opt-in +1000 GC progression packs taken
 }
 
 const listeners = new Set()
@@ -32,6 +33,7 @@ function readState() {
             ...DEFAULT_STATE,
             ...parsed,
             claimedLevels: Array.isArray(parsed.claimedLevels) ? parsed.claimedLevels : [],
+            progressPacks: Number.isFinite(parsed.progressPacks) ? parsed.progressPacks : 0,
         }
     } catch {
         return { ...DEFAULT_STATE }
@@ -99,6 +101,15 @@ export function pendingLevelRewards(currentLevel) {
     return { total, count }
 }
 
+// Take an opt-in progression pack (+1000 GC). Repeatable; free play is never
+// disturbed. Returns the credits to grant.
+export function takeProgressPack() {
+    state = { ...state, progressPacks: (state.progressPacks || 0) + 1 }
+    write()
+    notify()
+    return PROGRESS_PACK_CREDITS
+}
+
 export function resetRewards() {
     state = { ...DEFAULT_STATE }
     try { localStorage.removeItem(KEY) } catch { /* ignore */ }
@@ -118,10 +129,12 @@ export function useRewards() {
         canClaimDaily: canClaimDaily(),
         lastDailyClaim: state.lastDailyClaim,
         claimedLevels: state.claimedLevels,
+        progressPacks: state.progressPacks || 0,
         chooseStarterPack,
         claimDaily,
         claimLevelRewards,
         pendingLevelRewards,
+        takeProgressPack,
         reset: resetRewards,
     }
 }
