@@ -4,15 +4,17 @@ import { SLOT_TEMPLATES, resolveSlotSpin, __setSlotCalibrationRng } from '../src
 
 const SPINS = Number(process.env.SLOT_VER_SPINS) || 200000
 // High-variance slots (wheels, big clusters, megaways, single-payline jackpots)
-// legitimately swing in finite samples even when the mean RTP is locked. Use a
-// wider band for these; the scalar still pins the true long-run mean.
-const BASE_TOL = 0.03
-const HIGH_VOL_TOL = 0.07
+// legitimately swing in finite samples even when the mean RTP is locked. The
+// verify gate now averages multiple seeds for the heaviest titles (see below),
+// which sharply reduces estimator noise — so the tolerance bands are tighter
+// than before. The scalar still pins the true long-run mean.
+const BASE_TOL = 0.02
+const HIGH_VOL_TOL = 0.04
 const HIGH_VAR_IDS = new Set(['bars']) // single-payline jackpot tail
-const EXTREME_VAR_IDS = new Set(['iron-fist']) // multiplier-wheel fat tail
+const EXTREME_VAR_IDS = new Set(['iron-fist', 'gummy-drops']) // multiplier/cluster fat tail
 function tolFor(config) {
     const v = String(config.volatility || '').toLowerCase()
-    if (EXTREME_VAR_IDS.has(config.id)) return 0.10
+    if (EXTREME_VAR_IDS.has(config.id)) return 0.05
     if (HIGH_VAR_IDS.has(config.id) || v.includes('very') || v.includes('extreme')) return HIGH_VOL_TOL
     return BASE_TOL
 }
@@ -34,40 +36,53 @@ function hashId(id) {
 let allPass = true
 console.log('id'.padEnd(20), 'target', 'realRTP', 'verdict')
 for (const config of SLOT_TEMPLATES) {
-    // Different seed than calibration to avoid overfitting to one stream.
-    const rng = makeRng(0xc0ffee ^ hashId(config.id))
-    __setSlotCalibrationRng(rng)
-    // Full base round incl. free-spin session, persistent multiplier + coin-meter
-    // burst — matches the calibration harness and live SlotsGame behaviour.
+    // Extreme-variance titles (huge cluster boards, persistent multipliers) have
+    // a tail so heavy that a single stream is a poor RTP estimator even at large
+    // N. Average several independent seeds for these — matching how calibration
+    // pins the mean — so the gate measures the locked mean, not stream noise.
+    const v = String(config.volatility || '').toLowerCase()
+    const heavy = config.id === 'gummy-drops' || config.id === 'iron-fist'
+        || config.id === 'dust-rail' || config.id === 'gates-ascent'
+        || config.id === 'storm-banner' || config.id === 'ghostblade-strike'
+        || v.includes('very') || v.includes('extreme') || v.includes('high')
+    const seeds = heavy
+        ? [0xc0ffee, 0x1234abcd, 0x9e3779b9, 0x51ed270b, 0xfeedface]
+        : [0xc0ffee]
     const MAX_FS = 20
     const award = config.features?.scatter?.awardFreeSpins || 0
     const hasPersistent = Boolean(config.features?.persistentMultiplier)
     const cap = config.features?.persistentMultiplierCap || 10
-    let sum = 0
-    for (let i = 0; i < SPINS; i += 1) {
-        let total = 0
-        const base = resolveSlotSpin(config, { persistentMultiplier: 1 })
-        total += base.multiplier
-        let fs = base.triggeredFreeSpins ? award : 0
-        if (!fs) {
-            const burst = base.featureEvents?.find(e => e.type === 'coin-meter-fill')
-            if (burst) fs = burst.freeSpins || 0
-        }
-        let played = 0
-        let persistent = 1
-        while (fs > 0 && played < MAX_FS) {
-            fs -= 1; played += 1
-            const spin = resolveSlotSpin(config, { persistentMultiplier: persistent })
-            total += spin.multiplier
-            if (hasPersistent && spin.cascadeSteps > 0) persistent = Math.min(cap, persistent + 1)
-            if (spin.triggeredFreeSpins && played + fs < MAX_FS) {
-                fs += award
-                if (hasPersistent) persistent = Math.min(cap, persistent + 1)
+    let grand = 0
+    for (const seed of seeds) {
+        const rng = makeRng(seed ^ hashId(config.id))
+        __setSlotCalibrationRng(rng)
+        let sum = 0
+        for (let i = 0; i < SPINS; i += 1) {
+            let total = 0
+            const base = resolveSlotSpin(config, { persistentMultiplier: 1 })
+            total += base.multiplier
+            let fs = base.triggeredFreeSpins ? award : 0
+            if (!fs) {
+                const burst = base.featureEvents?.find(e => e.type === 'coin-meter-fill')
+                if (burst) fs = burst.freeSpins || 0
             }
+            let played = 0
+            let persistent = 1
+            while (fs > 0 && played < MAX_FS) {
+                fs -= 1; played += 1
+                const spin = resolveSlotSpin(config, { persistentMultiplier: persistent })
+                total += spin.multiplier
+                if (hasPersistent && spin.cascadeSteps > 0) persistent = Math.min(cap, persistent + 1)
+                if (spin.triggeredFreeSpins && played + fs < MAX_FS) {
+                    fs += award
+                    if (hasPersistent) persistent = Math.min(cap, persistent + 1)
+                }
+            }
+            sum += total
         }
-        sum += total
+        grand += sum / SPINS
     }
-    const realRtp = sum / SPINS
+    const realRtp = grand / seeds.length
     const target = config.rtpTarget || 0.96
     const pass = Math.abs(realRtp - target) <= tolFor(config)
     if (!pass) allPass = false
