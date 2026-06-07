@@ -3227,6 +3227,7 @@
     }
 
     .game-shell:has(.cases-stage-frame) .gs-aside {
+        display: block;
         order: 1;
         flex: 0 0 auto;
         position: sticky;
@@ -3235,6 +3236,7 @@
         height: auto;
         overflow: visible;
         max-height: none;
+        padding: 6px;
     }
 
     .game-shell:has(.cases-stage-frame) .gs-aside > * {
@@ -3251,6 +3253,7 @@
 
     .cases-right-panel {
         grid-template-columns: 1fr;
+        gap: 0;
     }
 
     .cases-switcher-card,
@@ -3260,8 +3263,8 @@
 
     .cases-control-primary {
         display: grid;
-        gap: 8px;
-        padding: 9px;
+        gap: 7px;
+        padding: 8px;
     }
 
     .cases-right-selected {
@@ -3296,6 +3299,7 @@
     .cases-right-cta {
         order: 5;
         margin-top: 0;
+        min-height: 48px;
     }
 
     .cases-quick-auto {
@@ -3311,6 +3315,7 @@
     .cases-auto-status {
         order: 8;
         margin-top: 0;
+        display: none;
     }
 
     .cases-side-actions {
@@ -3445,4 +3450,56 @@
     pointer-events: none;
     opacity: 0.95;
     text-shadow: 0 0 6px rgba(0, 0, 0, 0.85);
+}
+
+/* Desktop streamline: Cases keeps the unified three-pane game shell on
+   desktop widths even when the shared shell would normally collapse the aside
+   below the playfield. */
+@media (min-width: 1181px) {
+    .game-shell:has(.cases-stage-frame) {
+        height: 100%;
+        max-height: 100%;
+        overflow: hidden;
+    }
+
+    .game-shell:has(.cases-stage-frame) .gs-layout {
+        grid-template-columns: minmax(210px, 240px) minmax(0, 1fr) minmax(300px, 340px) !important;
+        align-items: stretch;
+        overflow: hidden;
+    }
+
+    .game-shell:has(.cases-stage-frame) .gs-panel {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .game-shell:has(.cases-stage-frame) .gs-playfield {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .game-shell:has(.cases-stage-frame) .gs-aside {
+        grid-column: 3;
+        grid-row: 1;
+        display: flex;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+
+    .game-shell:has(.cases-stage-frame) .gs-aside > * {
+        min-width: 0;
+        flex: initial;
+    }
+
+    .game-shell:has(.cases-stage-frame) .cases-right-panel {
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: none;
+    }
+
+    .game-shell:has(.cases-stage-frame) .cases-side-stats {
+        grid-column: auto;
+    }
 }

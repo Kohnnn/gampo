@@ -46,7 +46,7 @@ function BetSlip({ selections, tickets, stake, mode, settings, balance, placing,
     const hasSameGame = selections.some((selection, index) => selections.findIndex(other => other.eventId === selection.eventId) !== index)
 
     return (
-        <aside className="sb-betslip">
+        <aside className="sb-betslip" data-ux-surface="controls">
             <header className="sb-slip-header">
                 <div>
                     <Ticket size={18} />
@@ -144,7 +144,7 @@ function BetSlip({ selections, tickets, stake, mode, settings, balance, placing,
                     <Trash2 size={15} />
                     Clear Bets
                 </button>
-                <button type="button" className="sb-place-btn" onClick={onPlace} disabled={!validation.valid || placing}>
+                <button type="button" className="sb-place-btn" onClick={onPlace} disabled={!validation.valid || placing} data-ux-primary-action>
                     {placing ? 'Placing...' : 'Place Practice Bet'}
                 </button>
             </div>

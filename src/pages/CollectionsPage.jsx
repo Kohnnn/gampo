@@ -138,20 +138,20 @@ export default function CollectionsPage() {
     const shownItems = filteredItems.slice(0, 72)
 
     return (
-        <div className="collections-page" data-collections-view={view}>
-            <header className="collections-hero">
+        <div className="collections-page" data-collections-view={view} data-ux-surface="stage">
+            <header className="collections-hero" data-ux-surface="stage">
                 <div>
                     <span>CS2 simulator catalog</span>
                     <h1>Cases & Items Browse</h1>
                     <p>Search the local GamPo case manifest and item catalog. Practice credits only; no real items or market actions.</p>
                 </div>
-                <div className="collections-tabs" role="group" aria-label="Browse mode">
+                <div className="collections-tabs" role="group" aria-label="Browse mode" data-ux-surface="controls">
                     <button type="button" className={view === 'cases' ? 'active' : ''} onClick={() => setView('cases')}>Cases</button>
                     <button type="button" className={view === 'items' ? 'active' : ''} onClick={() => setView('items')}>Items</button>
                 </div>
             </header>
 
-            <section className="collections-searchbar" aria-label="Catalog search">
+            <section className="collections-searchbar" aria-label="Catalog search" data-ux-surface="controls">
                 <input
                     value={query}
                     onChange={e => setQuery(e.target.value)}
@@ -178,7 +178,7 @@ export default function CollectionsPage() {
                 </select>
             </section>
 
-            <nav className="collections-category-rail" aria-label="Catalog categories">
+            <nav className="collections-category-rail" aria-label="Catalog categories" data-ux-surface="controls">
                 {(view === 'cases' ? CASE_FILTERS : ITEM_FILTERS).map(option => (
                     <button
                         key={option.value}
@@ -191,8 +191,8 @@ export default function CollectionsPage() {
                 ))}
             </nav>
 
-            <div className="collections-browser">
-                <main className="collections-results">
+            <div className="collections-browser" data-ux-surface="stage">
+                <main className="collections-results" data-ux-surface="stage">
                     {view === 'cases' && (
                         <>
                             <div className="collections-count">{cases ? `${filteredCases.length} cases` : 'Loading cases...'}</div>
@@ -204,7 +204,7 @@ export default function CollectionsPage() {
                                     const volatility = caseVolatilityScore(c).label
                                     const best = caseRarePreview(c, 3)
                                     return (
-                                        <article key={c.id} className={`collections-case-card ${selectedCase?.id === c.id ? 'active' : ''}`} onClick={() => setSelectedCaseId(c.id)}>
+                                        <article key={c.id} className={`collections-case-card ${selectedCase?.id === c.id ? 'active' : ''}`} onClick={() => setSelectedCaseId(c.id)} data-ux-surface="card">
                                             <strong>{formatCredits(c.openPriceGc || 0)}</strong>
                                             <img src={c.image} alt={c.name} loading="lazy" />
                                             <h2>{c.name}</h2>
@@ -218,7 +218,7 @@ export default function CollectionsPage() {
                                             </div>
                                             <footer>
                                                 <em>EV {formatCredits(ev)}</em>
-                                                <Link to={`/cases?caseId=${encodeURIComponent(c.id)}`}>Open</Link>
+                                                <Link to={`/cases?caseId=${encodeURIComponent(c.id)}`} data-ux-primary-action>Open</Link>
                                             </footer>
                                         </article>
                                     )
@@ -236,7 +236,7 @@ export default function CollectionsPage() {
                                 {shownItems.map(item => {
                                     const range = itemRange(item, priceByName)
                                     return (
-                                        <article key={item.id} className={`collections-item-card ${selectedItem?.id === item.id ? 'active' : ''}`} style={{ '--rarity': item.rarity?.color || '#ffd166' }} onClick={() => setSelectedItemId(item.id)}>
+                                        <article key={item.id} className={`collections-item-card ${selectedItem?.id === item.id ? 'active' : ''}`} style={{ '--rarity': item.rarity?.color || '#ffd166' }} onClick={() => setSelectedItemId(item.id)} data-ux-surface="card">
                                             <strong>{formatCredits(range.low)} - {formatCredits(range.high)}</strong>
                                             <img src={item.image} alt={item.name} loading="lazy" />
                                             <h2>{item.name}</h2>
@@ -253,7 +253,7 @@ export default function CollectionsPage() {
                     )}
                 </main>
 
-                <aside className="collections-detail" aria-label="Selected catalog details">
+                <aside className="collections-detail" aria-label="Selected catalog details" data-ux-surface="aside">
                     {view === 'cases' && selectedCase && (
                         <>
                             <img className="collections-detail-hero" src={selectedCase.image} alt="" loading="lazy" />
@@ -265,7 +265,7 @@ export default function CollectionsPage() {
                                 <b><small>EV</small>{formatCredits(caseExpectedValueGc(selectedCase))}</b>
                                 <b><small>Volatility</small>{caseVolatilityScore(selectedCase).label.replace(' volatility', '')}</b>
                             </div>
-                            <Link className="collections-open-link" to={`/cases?caseId=${encodeURIComponent(selectedCase.id)}`}>Open in Cases</Link>
+                            <Link className="collections-open-link" to={`/cases?caseId=${encodeURIComponent(selectedCase.id)}`} data-ux-primary-action>Open in Cases</Link>
                             <div className="collections-drop-list">
                                 {[...(selectedCase.items || [])]
                                     .sort((a, b) => (Number(b.valueGc || b.multiplier) || 0) - (Number(a.valueGc || a.multiplier) || 0))

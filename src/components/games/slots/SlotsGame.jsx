@@ -868,6 +868,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         onClick={() => performSpin({ source: 'panel', bet: betAmount, free: canUseFreeSpin, tierId: canUseFreeSpin ? null : bonusBuyTierId })}
                         disabled={running || autoplayActive}
                         data-slot-action="spin"
+                        data-ux-primary-action
                     >
                         <Play size={18} />
                         {slotSpinLabel}
@@ -1169,6 +1170,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         disabled={running || autoplayActive}
                         aria-label="Spin"
                         data-slot-action="spin"
+                        data-ux-primary-action
                     >
                         <span className="slot-control-spin-inner">
                             {running ? <RotateCcw size={28} /> : <Play size={28} />}
@@ -1492,6 +1494,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 style={{ '--slot-accent': config.accent }}
                 data-slot-mobile-dock
                 data-mobile-critical-surface
+                data-ux-surface="dock"
             >
                 <div className="slot-mobile-readout">
                     <span>Bet</span>
@@ -1528,6 +1531,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     disabled={running || autoplayActive}
                     data-slot-action="spin"
                     data-mobile-hit-target="primary"
+                    data-ux-primary-action
                 >
                     <Play size={18} />
                     {running ? 'Spinning' : slotSpinLabel}

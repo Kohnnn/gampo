@@ -286,7 +286,7 @@ export default function BetPanel({
             className={`bp-mobile-layer ${mobileControlsOpen ? 'mobile-open' : ''}`}
             style={dockAccent ? { '--accent': dockAccent } : undefined}
         >
-            <div className="bp-mobile-dock" data-mobile-action-dock>
+            <div className="bp-mobile-dock" data-mobile-action-dock data-ux-surface="dock">
                 <button
                     type="button"
                     className={`bp-mobile-settings ${showSetupNudge ? 'nudge' : ''}`}
@@ -310,6 +310,7 @@ export default function BetPanel({
                     onClick={handlePlay}
                     data-mobile-primary-action
                     data-mobile-hit-target="primary"
+                    data-ux-primary-action
                     {...playButtonProps}
                 >
                     {mobilePlayContent}
@@ -339,7 +340,7 @@ export default function BetPanel({
     )
 
     return (
-        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`} ref={panelRef}>
+        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`} ref={panelRef} data-ux-surface="controls">
             {portalRoot ? createPortal(mobileDock, portalRoot) : mobileDock}
 
             <div className="bp-content" id={`${panelId}-mobile-controls`}>
@@ -449,6 +450,7 @@ export default function BetPanel({
                 <button className={`bp-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''} ${inRound ? 'in-round' : ''}`}
                     disabled={playDisabled}
                     onClick={handlePlay}
+                    data-ux-primary-action
                     {...playButtonProps}
                 >
                     {playContent}

@@ -292,7 +292,7 @@ function CaseRightPanel({
         .filter(c => !caseQuery || c.name.toLowerCase().includes(caseQuery) || (c.type || '').toLowerCase().includes(caseQuery))
         .slice(0, 8)
     return (
-        <aside className="cases-right-panel" data-case-panel="commands" aria-label="Cases controls and stats">
+        <aside className="cases-right-panel" data-case-panel="commands" data-ux-surface="controls" aria-label="Cases controls and stats">
             <section className="cases-control-card cases-control-primary">
                 <header className="cases-right-selected">
                     {activeCase && <img src={activeCase.image} alt="" loading="lazy" />}
@@ -367,6 +367,7 @@ function CaseRightPanel({
                     type="button"
                     className="cases-right-cta"
                     data-game-action={results.length > 0 ? 'case-open-again' : 'case-open'}
+                    data-ux-primary-action
                     onClick={() => performPlay({ betAmount: casePrice })}
                     disabled={running || !activeCase || balance < totalStake}
                 >

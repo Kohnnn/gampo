@@ -82,14 +82,14 @@ function HomePage() {
     }, [])
 
     return (
-        <div className="casino-page">
-            <section className="casino-hero">
-                <div className="casino-hero-copy">
+        <div className="casino-page" data-ux-surface="stage">
+            <section className="casino-hero" data-ux-surface="stage">
+                <div className="casino-hero-copy" data-ux-surface="stage">
                     <span className="casino-kicker">Practice casino lab</span>
                     <h1>GamPo</h1>
                     <p>Fake-credit originals, arcade classics, slots catalogue, live-table simulations, sportsbook odds and risk education in one app.</p>
                     <div className="casino-actions">
-                        <button className="casino-action primary" onClick={() => grantPracticeCredits(500)}>
+                        <button className="casino-action primary" onClick={() => grantPracticeCredits(500)} data-ux-primary-action>
                             <Plus size={16} />
                             Add 500 GC
                         </button>
@@ -126,9 +126,9 @@ function HomePage() {
                 </div>
             </section>
 
-            <section className="casino-strip">
+            <section className="casino-strip" data-ux-surface="card">
                 {featuredCollections.map(collection => (
-                    <Link key={collection.id} to={collection.path} className="collection-tile" style={{ '--accent': collection.accent }}>
+                    <Link key={collection.id} to={collection.path} className="collection-tile" style={{ '--accent': collection.accent }} data-ux-surface="card">
                         <span>{collection.title}</span>
                         <p>{collection.description}</p>
                     </Link>
@@ -147,7 +147,7 @@ function HomePage() {
             <CategoryRow icon={<Dices size={16} />} title="Arcade Classics" link="/originals" games={arcadeRow} />
             <CategoryRow icon={<Coins size={16} />} title="Slots" link="/slots-lobby" games={slotsRow} />
 
-            <section className="casino-workspace">
+            <section className="casino-workspace" data-ux-surface="stage">
                 <main>
                     <div className="casino-toolbar">
                         <div className="casino-search">
@@ -202,14 +202,14 @@ function HomePage() {
 function CategoryRow({ icon, title, link, games }) {
     if (!games || games.length === 0) return null
     return (
-        <section className="category-row">
+        <section className="category-row" data-ux-surface="card">
             <header>
                 <h2>{icon}{title}</h2>
                 <Link to={link}>View all</Link>
             </header>
             <div className="category-scroll">
                 {games.map(game => (
-                    <Link key={game.id} to={game.path} className="category-card" style={{ '--accent': game.accent || '#00e701' }}>
+                    <Link key={game.id} to={game.path} className="category-card" style={{ '--accent': game.accent || '#00e701' }} data-ux-surface="card">
                         <div className="category-art">
                             {game.image ? <img src={game.image} alt="" loading="lazy" decoding="async" width="320" height="320" /> : <span>{game.name.slice(0, 2)}</span>}
                             <i className="category-glow" />
@@ -234,7 +234,7 @@ export function GameGrid({ games = [] }) {
     }
 
     return (
-        <div className="casino-game-grid">
+        <div className="casino-game-grid" data-ux-surface="card">
             {games.map(game => {
                 const badges = [
                     `RTP ${game.rtp ? `${(game.rtp * 100).toFixed(1)}%` : 'Lab'}`,
@@ -244,7 +244,7 @@ export function GameGrid({ games = [] }) {
                 const visibleBadges = badges.slice(0, 2)
                 const hiddenCount = Math.max(0, badges.length - visibleBadges.length)
                 return (
-                    <Link key={game.id} to={game.path} className="casino-game-card" style={{ '--accent': game.accent || '#00e701' }}>
+                    <Link key={game.id} to={game.path} className="casino-game-card" style={{ '--accent': game.accent || '#00e701' }} data-ux-surface="card">
                         <div className="casino-game-art">
                             {game.image ? <img src={game.image} alt="" loading="lazy" decoding="async" width="320" height="320" /> : <span>{game.name.slice(0, 2)}</span>}
                             <div className="casino-game-titlemark">

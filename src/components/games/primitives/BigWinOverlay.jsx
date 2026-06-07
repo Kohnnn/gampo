@@ -72,7 +72,7 @@ export default function BigWinOverlay({ profit, multiplier, trigger, threshold =
     const particleCount = tier === 'mega' ? 48 : tier === 'huge' ? 32 : 24
 
     return (
-        <div className={`bigwin-overlay tier-${tier}`} aria-live="polite" onClick={() => setVisible(false)}>
+        <div className={`bigwin-overlay tier-${tier}`} aria-live="polite" onClick={() => setVisible(false)} data-ux-surface="toast">
             <div className="bigwin-rays" />
             <div className="bigwin-shockwave" />
             <div className="bigwin-content">
