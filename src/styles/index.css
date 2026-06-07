@@ -25,7 +25,9 @@
 
     --text-primary: #ffffff;
     --text-secondary: #b1bad3;
-    --text-muted: #5f6368;
+    /* WCAG AA: 5.2:1 on --bg-primary (#1a2c38), 6.6:1 on darker panels.
+       Was #5f6368 (~2.4:1) which failed AA for small/secondary text. */
+    --text-muted: #909cb0;
 
     --border-color: #2f4553;
 

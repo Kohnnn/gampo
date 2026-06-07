@@ -797,7 +797,7 @@ input:focus-visible,
     font-weight: 950;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: var(--text-muted, #6f829a);
+    color: var(--text-muted, #909cb0);
 }
 
 .so-coach-note {
