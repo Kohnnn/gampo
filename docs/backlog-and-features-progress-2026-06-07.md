@@ -89,7 +89,12 @@ markup remains duplicated.
 1. B1b shared `<GameTitleBar>` — extract Poker/Sportsbook titlebars into one primitive (isolated PR + verify).
 2. B1c single mobile dock primitive — unify `bp-mobile-dock` / `slot-mobile-dock` / `sb-mobile-slip-pill` markup behind one component (z-index/breakpoint contract already shared).
 3. Migrate the remaining hooks (`useProgress`, `useXp`, `useMissions`, `useGlobalPnl`, `useRewards`, `useCaseCollection`) onto `src/utils/storage.js` to delete duplicated read/write boilerplate.
-4. EV coach UI surface — `evCoach.js` util is built + tested but not yet rendered in-game; add a compact panel to `StatsOverlay`/aside so the theoretical-vs-observed verdict shows live.
+4. [DONE] EV coach UI surface — now rendered in `StatsOverlay` (all 36 games) via `evCoach.js`.
 5. Slots/Cases onto `BetPanel` — unify autoplay/stop-conditions/keyboard shortcuts.
-6. Responsible-play guardrails (opt-in loss/time limits, tilt nudge) — strong educational follow-on to Session Insights.
+6. [DONE] Responsible-play guardrails — `useSessionGuard` + `SessionGuardBanner` + Settings limits card.
 7. Contrast audit with a real axe/contrast tool — current a11y audit covers names/labels/focus/errors, not WCAG contrast ratios.
+
+## Follow-on shipped (post-features, 2026-06-07)
+- EV coach in every game (reinforce #4): `StatsOverlay` now renders a theoretical-vs-observed verdict + plain-language note via the tested `evCoach.js`, reaching all 36 games through the shared aside. Test extended (3 pass).
+- Responsible-play guardrails (reinforce #6): `useSessionGuard` (+test, 8 pass) — opt-in loss/wager/round/time limits + tilt (chasing) detection, fed from `useGameSession.record`. Surfaced via `SessionGuardBanner` (mounted in Layout) and a limits card in `/settings`. Informational only; nothing blocked.
+- Verify: full suite PASS (340), build OK, local a11y PASS, bet-sheet PASS, ux=100 on sampled routes.

@@ -1,14 +1,16 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Settings as SettingsIcon, Palette, Maximize2, Eye, Download, Upload, RotateCcw, Volume2 } from 'lucide-react'
+import { Settings as SettingsIcon, Palette, Maximize2, Eye, Download, Upload, RotateCcw, Volume2, ShieldCheck } from 'lucide-react'
 import { useSettings } from '../hooks/useSettings'
 import { useLocalSave } from '../hooks/useLocalSave'
+import { useSessionGuard } from '../hooks/useSessionGuard'
 import { useReduceMotion } from '../components/fx'
 import '../styles/settings.css'
 
 export default function SettingsPage() {
     const settings = useSettings()
     const { exportSave, importSave, keyCount } = useLocalSave()
+    const guard = useSessionGuard()
     const [, setReduceMotionFx] = useReduceMotion()
     const fileRef = useRef(null)
     const [notice, setNotice] = useState(null)
@@ -114,6 +116,52 @@ export default function SettingsPage() {
                     <p className="settings-help">
                         <Volume2 size={13} style={{ verticalAlign: '-2px' }} /> Audio volume lives in the in-game audio menu.
                     </p>
+                </section>
+
+                <section className="settings-card" data-ux-surface="controls">
+                    <h2><ShieldCheck size={16} /> Responsible play (optional)</h2>
+                    <p className="settings-help">
+                        Set limits for a play session. These are educational nudges — practice credits
+                        only, nothing is ever blocked. A gentle banner appears when you approach a limit
+                        or start chasing losses.
+                    </p>
+                    <label className="settings-switch">
+                        <input
+                            type="checkbox"
+                            checked={guard.limits.enabled}
+                            onChange={e => guard.setSessionLimits({ enabled: e.target.checked })}
+                        />
+                        <span className="settings-switch-track" aria-hidden="true"><span className="settings-switch-thumb" /></span>
+                        <span className="settings-switch-label">
+                            <strong>Enable session limits</strong>
+                            <small>Track loss, budget, rounds, and time for the current sitting.</small>
+                        </span>
+                    </label>
+                    {guard.limits.enabled && (
+                        <div className="settings-limit-grid">
+                            <label className="settings-field">
+                                <span>Loss limit (GC)</span>
+                                <input type="number" min="0" value={guard.limits.lossLimit} onChange={e => guard.setSessionLimits({ lossLimit: e.target.value })} placeholder="0 = off" />
+                            </label>
+                            <label className="settings-field">
+                                <span>Wager budget (GC)</span>
+                                <input type="number" min="0" value={guard.limits.wagerLimit} onChange={e => guard.setSessionLimits({ wagerLimit: e.target.value })} placeholder="0 = off" />
+                            </label>
+                            <label className="settings-field">
+                                <span>Round limit</span>
+                                <input type="number" min="0" value={guard.limits.roundLimit} onChange={e => guard.setSessionLimits({ roundLimit: e.target.value })} placeholder="0 = off" />
+                            </label>
+                            <label className="settings-field">
+                                <span>Time limit (min)</span>
+                                <input type="number" min="0" value={guard.limits.minutesLimit} onChange={e => guard.setSessionLimits({ minutesLimit: e.target.value })} placeholder="0 = off" />
+                            </label>
+                        </div>
+                    )}
+                    {guard.limits.enabled && (
+                        <button type="button" className="settings-reset" onClick={() => guard.resetSessionGuard()}>
+                            <RotateCcw size={13} /> Reset this session's counters
+                        </button>
+                    )}
                 </section>
 
                 <section className="settings-card" data-ux-surface="controls">
