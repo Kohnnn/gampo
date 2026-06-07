@@ -4,6 +4,7 @@ import { Settings as SettingsIcon, Palette, Maximize2, Eye, Download, Upload, Ro
 import { useSettings } from '../hooks/useSettings'
 import { useLocalSave } from '../hooks/useLocalSave'
 import { useSessionGuard } from '../hooks/useSessionGuard'
+import { useOnboarding } from '../hooks/useOnboarding'
 import { useReduceMotion } from '../components/fx'
 import '../styles/settings.css'
 
@@ -11,6 +12,7 @@ export default function SettingsPage() {
     const settings = useSettings()
     const { exportSave, importSave, keyCount } = useLocalSave()
     const guard = useSessionGuard()
+    const onboarding = useOnboarding()
     const [, setReduceMotionFx] = useReduceMotion()
     const fileRef = useRef(null)
     const [notice, setNotice] = useState(null)
@@ -116,6 +118,13 @@ export default function SettingsPage() {
                     <p className="settings-help">
                         <Volume2 size={13} style={{ verticalAlign: '-2px' }} /> Audio volume lives in the in-game audio menu.
                     </p>
+                    <button
+                        type="button"
+                        className="settings-reset"
+                        onClick={() => { onboarding.resetOnboarding(); setNotice({ tone: 'ok', text: 'Welcome intro will show on your next page load.' }) }}
+                    >
+                        <RotateCcw size={13} /> Replay welcome intro
+                    </button>
                 </section>
 
                 <section className="settings-card" data-ux-surface="controls">

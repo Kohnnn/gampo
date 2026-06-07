@@ -119,3 +119,7 @@ markup remains duplicated.
 7. Strategy Sandbox compare mode: opt-in head-to-head of two strategies on the same seed, side-by-side result blocks + comparative lesson. Run CTA made sticky on mobile to stay hit-testable.
 8. Insights variance band: `rtpConfidenceBand()` (+tests) shows the 95% range around wager-weighted theoretical RTP for the player's sample size, quantifying "running hot/cold".
 - Verify: full suite PASS (358), build OK, contrast PASS, a11y PASS, bet-sheet PASS, sandbox-compare functional check OK (2 blocks), ux=100 on all sampled routes/viewports.
+
+## Follow-on shipped (first-visit onboarding, 2026-06-07)
+- Brainstorm "guided onboarding" DONE: `useOnboarding` hook (+test, 4 pass, storage-util backed) tracks first-visit state; `WelcomeModal` (+test) frames GamPo as a math simulator (real odds, negative EV by design, practice credits / no cashout). Mounted in `Layout`; shown once, dismiss on CTA/Escape/backdrop, focus-trapped `role="dialog"`. "Replay welcome intro" added to Settings.
+- Verify: full suite PASS (365), build OK, welcome functional check OK (shown→dismissed→persisted→not reshown), a11y PASS, contrast PASS with modal present.
