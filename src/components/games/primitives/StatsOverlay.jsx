@@ -1,14 +1,17 @@
 // Stats overlay for any game. Reads from useGameSession's stats and renders
 // total bets, wagered, returned, profit, observed RTP, win rate, biggest hit,
-// streaks, and a tiny last-N visual strip.
+// streaks, a tiny last-N visual strip, and an EV coach verdict (theoretical vs
+// observed return) so every game teaches the math, not just poker.
 
 import { formatCredits } from '../../../utils/simulationMath'
+import { buildEvCoach, EV_VERDICT_LABELS } from '../../../utils/evCoach'
 
 export default function StatsOverlay({ stats, definition }) {
     if (!stats) return null
     const targetRtp = definition?.rtp != null ? `${(definition.rtp * 100).toFixed(1)}%` : '—'
     const obs = stats.count >= 20 && stats.rtp != null ? `${(stats.rtp * 100).toFixed(1)}%` : 'Too few samples'
     const winRate = stats.count ? `${((stats.wins / stats.count) * 100).toFixed(1)}%` : '—'
+    const coach = buildEvCoach(definition || {}, stats)
     return (
         <div className="stats-overlay">
             <div className="so-row">
@@ -25,6 +28,10 @@ export default function StatsOverlay({ stats, definition }) {
                 <Card label="Win streak" value={stats.streakWin} />
                 <Card label="Loss streak" value={stats.streakLoss} />
                 <Card label="Wagered" value={formatCredits(stats.wagered)} />
+            </div>
+            <div className={`so-coach so-coach-${coach.verdict}`} data-ev-verdict={coach.verdict}>
+                <span className="so-coach-tag">EV coach · {EV_VERDICT_LABELS[coach.verdict]}</span>
+                <p className="so-coach-note">{coach.note}</p>
             </div>
             <div className="so-strip" aria-label="Last results">
                 {stats.lastResults && stats.lastResults.length === 0 ? (

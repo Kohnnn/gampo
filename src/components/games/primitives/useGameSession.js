@@ -6,6 +6,7 @@ import { recordPnl } from '../../../hooks/useGlobalPnl'
 import { recordRound as recordProgressRound } from '../../../hooks/useProgress'
 import { recordMissionRound } from '../../../hooks/useMissions'
 import { recordXpRound } from '../../../hooks/useXp'
+import { recordGuardRound } from '../../../hooks/useSessionGuard'
 
 const HISTORY_LIMIT = 200
 const mirroredIds = new Set()
@@ -71,6 +72,12 @@ export default function useGameSession(gameId) {
                     profit: entry.profit,
                     betAmount: entry.betAmount,
                     multiplier: entry.multiplier,
+                })
+                // Responsible-play guard: track live session totals + tilt so
+                // opt-in limits can nudge the player. Informational only.
+                recordGuardRound({
+                    profit: entry.profit,
+                    betAmount: entry.betAmount,
                 })
             }
         } catch { /* ignore */ }

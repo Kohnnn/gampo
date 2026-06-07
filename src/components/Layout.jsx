@@ -6,6 +6,7 @@ import ChatDock from './ChatDock'
 import AchievementToast from './AchievementToast'
 import MissionToast from './MissionToast'
 import MobileBottomNav from './MobileBottomNav'
+import SessionGuardBanner from './SessionGuardBanner'
 import { useMenuBgm } from '../audio/useBgm'
 import { playSample } from '../audio/audioContext'
 import { useSettings } from '../hooks/useSettings'
@@ -75,6 +76,7 @@ function Layout() {
             <MobileBottomNav />
             <AchievementToast />
             <MissionToast />
+            <SessionGuardBanner />
         </div>
     )
 }

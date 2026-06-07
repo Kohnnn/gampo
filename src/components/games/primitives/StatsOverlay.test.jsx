@@ -29,4 +29,18 @@ describe('StatsOverlay', () => {
         expect(html).toContain('112.0%')
         expect(html).not.toContain('Too few samples')
     })
+
+    it('renders an EV coach verdict block', () => {
+        const cold = renderToStaticMarkup(
+            <StatsOverlay
+                stats={{ ...makeStats(50, 0.8), wagered: 500, returned: 400, profit: -100 }}
+                definition={{ rtp: 0.96 }}
+            />,
+        )
+        expect(cold).toContain('EV coach')
+        expect(cold).toContain('Running cold')
+
+        const small = renderToStaticMarkup(<StatsOverlay stats={makeStats(5)} definition={{ rtp: 0.96 }} />)
+        expect(small).toContain('Gathering data')
+    })
 })

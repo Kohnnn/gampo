@@ -1,0 +1,64 @@
+.guard-banner {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(var(--mobile-nav-height, 0px) + var(--mobile-action-height, 0px) + max(12px, env(safe-area-inset-bottom)) + 12px);
+    z-index: var(--z-toast, 1600);
+    width: min(440px, calc(100vw - 24px));
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 13px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(20, 39, 51, 0.98));
+    box-shadow: 0 14px 42px rgba(0, 0, 0, 0.5);
+    animation: guardIn 220ms ease;
+}
+
+@keyframes guardIn {
+    from { opacity: 0; transform: translate(-50%, 10px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+:root.gampo-reduce-motion .guard-banner { animation: none; }
+
+.guard-icon {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--accent-yellow, #ffc24b);
+}
+
+.guard-banner.guard-exceeded .guard-icon { color: var(--accent-red, #ff5562); }
+
+.guard-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.guard-body strong { color: var(--text-primary, #fff); font-size: 13px; font-weight: 950; }
+.guard-body span { color: var(--text-secondary, #9fb2c8); font-size: 12px; font-weight: 700; }
+.guard-body small { color: var(--text-muted, #6f829a); font-size: 10.5px; }
+
+.guard-dismiss {
+    appearance: none;
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary, #9fb2c8);
+    cursor: pointer;
+}
+.guard-dismiss:focus-visible { outline: 2px solid var(--accent, #00e701); outline-offset: 2px; }
+
+.guard-banner.guard-exceeded { border-color: color-mix(in srgb, var(--accent-red, #ff5562), transparent 55%); }
+.guard-banner.guard-warn { border-color: color-mix(in srgb, var(--accent-yellow, #ffc24b), transparent 60%); }
+
+@media (max-width: 768px) {
+    .guard-banner { bottom: calc(var(--mobile-nav-height, 64px) + var(--mobile-action-height, 74px) + max(8px, env(safe-area-inset-bottom)) + 8px); }
+}
