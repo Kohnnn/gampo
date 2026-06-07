@@ -635,6 +635,18 @@ async function run() {
         await client.send('Runtime.enable', {}, sessionId)
         await client.send('Log.enable', {}, sessionId)
 
+        // Pre-seed first-visit onboarding as already seen so the one-time
+        // WelcomeModal doesn't gate every route during steady-state benchmarking
+        // (the modal is verified separately). Runs before any page script on
+        // each fresh navigation, surviving the per-route storage clear.
+        try {
+            await client.send('Page.addScriptToEvaluateOnNewDocument', {
+                source: "try { localStorage.setItem('gampo_onboarding_v1', JSON.stringify({ seen: true, seenAt: new Date().toISOString() })); } catch (e) {}",
+            }, sessionId)
+        } catch {
+            // Older Chromium may reject; harness still works, modal may show.
+        }
+
         const results = []
         for (const viewport of viewports) {
             await client.send('Emulation.setDeviceMetricsOverride', {
