@@ -131,6 +131,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [persistRamp, setPersistRamp] = useState(false)
     const [eventFlash, setEventFlash] = useState(null)
     const [bonusCine, setBonusCine] = useState(null)
+    const [nearMiss, setNearMiss] = useState(null)
     const [showInfo, setShowInfo] = useState(false)
     // Wave 9: sticky wild lock during free-spin sessions and feature cinematics
     const [stickyWilds, setStickyWilds] = useState([])
@@ -332,6 +333,24 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setMysteryReveal(result.mysteryReveal || null)
         setRetriggerFlyers([])
 
+        // "Truly slots" tension: near-miss framing. When the bonus scatter lands
+        // exactly one short of its trigger count and no bonus fired, flash a
+        // "bonus just missed" callout — the classic so-close moment that makes a
+        // miss still feel eventful. Purely cosmetic; no effect on math.
+        const scatterCfg = config.features?.scatter
+        const triggeredBonus = result.triggeredFreeSpins
+            || result.featureEvents.some(item => item.type === 'free-spins' || item.type === 'coin-meter-fill')
+        if (scatterCfg?.symbolId && scatterCfg.trigger > 1 && !triggeredBonus) {
+            const scatterHits = result.cells.reduce((n, cell) => n + (cell?.id === scatterCfg.symbolId ? 1 : 0), 0)
+            if (scatterHits === scatterCfg.trigger - 1) {
+                setNearMiss({ trigger: Date.now(), hits: scatterHits, need: scatterCfg.trigger })
+                slotSfx.play('anticipation', { volume: 0.5 })
+            } else {
+                setNearMiss(null)
+            }
+        } else {
+            setNearMiss(null)
+        }
         // Wave 9: surface wheel + hold cinematic state
         const revealTrigger = Date.now()
         // Phase C: jackpot / vault-burst full-stage flash + persistent ramp pulse.
@@ -578,6 +597,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setMysteryReveal(null)
             setRetriggerFlyers([])
             setEventFlash(null)
+            setNearMiss(null)
             setAnticipating(false)
             playSound('tick')
             slotSfx.play('spinStart', { volume: 0.85 })
@@ -1209,6 +1229,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 {eventFlash && !running && (
                     <div className="slot-event-flash" key={`flash-${eventFlash.trigger}`} aria-hidden="true">
                         <strong>{eventFlash.label}</strong>
+                    </div>
+                )}
+
+                {nearMiss && !running && (
+                    <div className="slot-near-miss" key={`near-${nearMiss.trigger}`} aria-hidden="true">
+                        <span>So close</span>
+                        <strong>{nearMiss.hits} / {nearMiss.need}</strong>
+                        <em>bonus just missed</em>
                     </div>
                 )}
 

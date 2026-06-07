@@ -3272,6 +3272,51 @@
     100% { opacity: 0; transform: scale(1.02); }
 }
 
+/* Near-miss "so close" callout — the bonus scatter landed one short. A quick
+   amber pulse that makes a non-winning spin still feel eventful. */
+.slot-near-miss {
+    position: absolute;
+    top: 14%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 26;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    padding: 10px 22px;
+    border-radius: 14px;
+    background: linear-gradient(160deg, rgba(28, 18, 4, 0.92), rgba(12, 8, 2, 0.92));
+    border: 1px solid color-mix(in srgb, var(--warn, #ffcf5a), transparent 40%);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 24px color-mix(in srgb, var(--warn, #ffcf5a), transparent 62%);
+    pointer-events: none;
+    animation: slotNearMiss 1.6s ease-out forwards;
+}
+.slot-near-miss span {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--warn, #ffcf5a), white 18%);
+}
+.slot-near-miss strong {
+    font-size: clamp(22px, 6vw, 32px);
+    font-weight: 950;
+    color: #fff;
+    text-shadow: 0 0 16px var(--warn, #ffcf5a);
+}
+.slot-near-miss em {
+    font-size: 11px;
+    font-style: normal;
+    letter-spacing: 0.08em;
+    color: rgba(245, 240, 225, 0.78);
+}
+@keyframes slotNearMiss {
+    0% { opacity: 0; transform: translate(-50%, -10px) scale(0.9); }
+    16% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -6px) scale(0.98); }
+}
+
 /* ===== Bespoke per-theme bonus-entry cinematics ===== */
 /* A short, themed intro that plays as a free-spin session (or vault burst)
    opens. Five motion families share one markup; each family choreographs the
@@ -3467,4 +3512,10 @@
 :root.gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-sweep,
 .gampo-reduce-motion .slot-bonus-cine .slot-bonus-cine-sweep {
     display: none;
+}
+
+:root.gampo-reduce-motion .slot-near-miss,
+.gampo-reduce-motion .slot-near-miss {
+    animation-duration: 0.001ms;
+    opacity: 1;
 }

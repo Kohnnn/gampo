@@ -546,7 +546,7 @@ export const SLOT_TEMPLATES = [
         features: {
             scatter: { symbolId: 'gong', trigger: 3, awardFreeSpins: 6, pay: 1.4 },
             anticipation: { scatterMin: 2 },
-            multiplierWheel: { values: [2, 4, 8, 15, 30], weights: [44, 30, 16, 8, 2] },
+            multiplierWheel: { values: [2, 3, 5, 10, 20], weights: [46, 30, 16, 6, 2] },
             darkWinOverlay: true,
             buyBonus: {
                 costMultiplier: 70,
@@ -703,8 +703,12 @@ export const SLOT_TEMPLATES = [
             scatter: { symbolId: 'lollipop', trigger: 5, awardFreeSpins: 12, pay: 1.5 },
             anticipation: { scatterMin: 4 },
             clusterMin: 6,
-            cascade: { tumbleMultiplierLadder: [1, 2, 3, 5, 8, 12] },
+            cascade: { tumbleMultiplierLadder: [1, 2, 3, 4, 6, 8] },
             persistentMultiplier: 1,
+            // Max-win cap (player-facing multiplier). Bounds the 8x8 cluster +
+            // cascade + persistent-multiplier fat tail so the displayed RTP is
+            // actually experienced and verifiable.
+            maxWinMultiplier: 5000,
             buyBonus: {
                 costMultiplier: 100,
                 guaranteedScatters: 5,
@@ -1615,6 +1619,13 @@ export function resolveSlotSpin(config, options = {}) {
         ? options.rtpScalar
         : (Number(config.rtpScalar) > 0 ? config.rtpScalar : 1)
     if (rtpScalar !== 1) multiplier = round2(multiplier * rtpScalar)
+    // Max-win cap: real slots bound a single round's return (e.g. "max win
+    // 5000x"). This clips the pathological fat tail on high-variance titles so
+    // the experienced RTP converges to target far faster, without touching the
+    // mean for typical rounds. The cap is applied to the calibration harness too
+    // (no options.rtpScalar override) so calibration sees the same bounded math.
+    const maxWin = Number(config.features?.maxWinMultiplier) || 0
+    if (maxWin > 0 && multiplier > maxWin) multiplier = maxWin
     return {
         cells,
         wins,
