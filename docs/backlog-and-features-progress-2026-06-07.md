@@ -76,3 +76,20 @@ markup remains duplicated.
   - Added `data-ux-primary-action` to Settings export + Insights CTAs; added Settings hero quick export/import (above mobile fold).
   - Registered sandbox/settings/insights page roots as scroll owners in `browserSmoke.mjs`.
   - New pages: a11y PASS, ux=100 on 390x844 + 1365x768. Bet-sheet regression PASS. Full suite PASS (331).
+- 2026-06-07: B7 ship + production verification.
+  - Commits `b57d67be → 171703bd` pushed to `origin/codex/gampo-polish-deploy` and fast-forwarded to `origin/main` (both at `171703bd`).
+  - Netlify prod deploy live; live asset `assets/index-CBWeJj6H.js` (MATCH vs local dist).
+  - Prod browser smoke: 0 overflow / 0 errors across `/ /sandbox /settings /insights /dice /poker /cases /sportsbook` on 390/492/1365.
+  - Prod UX benchmark: ux=100 on all sampled routes/viewports.
+  - Prod a11y audit: PASS (`/ /settings /insights /sandbox`).
+  - Prod bet-sheet regression: PASS (roulette/keno/mines/limbo; blackjack skipped on load-timing race, verified locally).
+  - B1b/B1c deferred with rationale (see above) — isolated refactor PR recommended next.
+
+## What to reinforce next (post-features)
+1. B1b shared `<GameTitleBar>` — extract Poker/Sportsbook titlebars into one primitive (isolated PR + verify).
+2. B1c single mobile dock primitive — unify `bp-mobile-dock` / `slot-mobile-dock` / `sb-mobile-slip-pill` markup behind one component (z-index/breakpoint contract already shared).
+3. Migrate the remaining hooks (`useProgress`, `useXp`, `useMissions`, `useGlobalPnl`, `useRewards`, `useCaseCollection`) onto `src/utils/storage.js` to delete duplicated read/write boilerplate.
+4. EV coach UI surface — `evCoach.js` util is built + tested but not yet rendered in-game; add a compact panel to `StatsOverlay`/aside so the theoretical-vs-observed verdict shows live.
+5. Slots/Cases onto `BetPanel` — unify autoplay/stop-conditions/keyboard shortcuts.
+6. Responsible-play guardrails (opt-in loss/time limits, tilt nudge) — strong educational follow-on to Session Insights.
+7. Contrast audit with a real axe/contrast tool — current a11y audit covers names/labels/focus/errors, not WCAG contrast ratios.
