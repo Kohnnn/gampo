@@ -60,3 +60,9 @@ Each batch: implement → unit tests → `vitest run` → build → commit. Depl
   - `GameToolbar.openOdds` now fires `recordLearningEvent('odds')`.
   - Sidebar nav: Strategy Sandbox + Session Insights under Progress, Settings under Account.
   - Build OK; full suite PASS (331).
+- 2026-06-07: Accessibility pass (B4) + benchmark polish:
+  - `scripts/auditA11y.mjs` (+`npm run audit:a11y`) — checks unnamed buttons/links, unlabeled form controls, focusable primary, sandbox-runs, console errors.
+  - Audited `/settings /insights /sandbox` + lobby/games: fixed HomePage search input missing `aria-label`.
+  - Added `data-ux-primary-action` to Settings export + Insights CTAs; added Settings hero quick export/import (above mobile fold).
+  - Registered sandbox/settings/insights page roots as scroll owners in `browserSmoke.mjs`.
+  - New pages: a11y PASS, ux=100 on 390x844 + 1365x768. Bet-sheet regression PASS. Full suite PASS (331).

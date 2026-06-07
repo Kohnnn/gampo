@@ -152,7 +152,7 @@ function HomePage() {
                     <div className="casino-toolbar">
                         <div className="casino-search">
                             <Search size={17} />
-                            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search games, volatility, provider" />
+                            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search games, volatility, provider" aria-label="Search games" />
                         </div>
                         <div className="casino-filters">
                             {filters.map(item => (

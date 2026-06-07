@@ -11,6 +11,7 @@
         "smoke:browser": "node scripts/browserSmoke.mjs",
         "ux:benchmark": "node scripts/browserSmoke.mjs --mode=ux --out=output/ux-benchmark",
         "verify:betsheet": "node scripts/verifyBetSheet.mjs",
+        "audit:a11y": "node scripts/auditA11y.mjs",
         "gen:assets": "node scripts/genAssets.js"
     },
     "dependencies": {
