@@ -55,6 +55,10 @@ const DEFAULT_STATS = {
     // Slot-feature engagement: bumped via recordFeatureEvent.
     bonusRoundsTriggered: 0,
     freeSpinsAwarded: 0,
+    // Learning engagement: bumped via recordLearningEvent (odds lab opened,
+    // strategy sandbox runs). Drives the "learning" achievement group.
+    oddsViewed: 0,
+    sandboxRuns: 0,
 }
 
 const listeners = new Set()
@@ -162,6 +166,22 @@ export function recordFeatureEvent({ type = 'bonus', freeSpins = 0 } = {}) {
     notify()
 }
 
+// Learning engagement counter. Surfaces that teach the math (Odds & RTP lab,
+// Strategy Sandbox) call this so the "learning" achievement group can unlock
+// independently of round outcomes. `kind` is 'odds' | 'sandbox'.
+export function recordLearningEvent(kind) {
+    if (kind === 'odds') {
+        stats = { ...stats, oddsViewed: stats.oddsViewed + 1 }
+    } else if (kind === 'sandbox') {
+        stats = { ...stats, sandboxRuns: stats.sandboxRuns + 1 }
+    } else {
+        return
+    }
+    writeStats()
+    checkUnlocks()
+    notify()
+}
+
 export function recordCaseDrop(pick = {}) {
     const isRare = RARE_RARITIES.has(pick.rarity)
     stats = {
@@ -220,6 +240,7 @@ export function useProgress() {
         recentUnlock,
         recordRound,
         recordCaseDrop,
+        recordLearningEvent,
         dismissUnlock,
         reset: resetProgress,
     }

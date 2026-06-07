@@ -1,7 +1,7 @@
 // useProgress tests — verify stat tracking, unlock detection, and reset.
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { recordRound, recordCaseDrop, resetProgress, useProgress, dismissUnlock } from './useProgress'
+import { recordRound, recordCaseDrop, recordLearningEvent, resetProgress, useProgress, dismissUnlock } from './useProgress'
 
 beforeEach(() => {
     const store = new Map()
@@ -79,5 +79,17 @@ describe('useProgress', () => {
         expect(stats.uniqueGames.length).toBe(3)
         const unlocked = JSON.parse(globalThis.localStorage.getItem('gampo_progress_unlocked'))
         expect(unlocked['games-3']).toBeTypeOf('number')
+    })
+
+    it('counts learning events and unlocks learning achievements', () => {
+        recordLearningEvent('odds')
+        recordLearningEvent('sandbox')
+        recordLearningEvent('bogus') // ignored
+        const stats = JSON.parse(globalThis.localStorage.getItem('gampo_progress_stats'))
+        expect(stats.oddsViewed).toBe(1)
+        expect(stats.sandboxRuns).toBe(1)
+        const unlocked = JSON.parse(globalThis.localStorage.getItem('gampo_progress_unlocked'))
+        expect(unlocked['learn-odds-first']).toBeTypeOf('number')
+        expect(unlocked['learn-sandbox-first']).toBeTypeOf('number')
     })
 })
