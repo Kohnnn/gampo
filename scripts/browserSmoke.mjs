@@ -58,6 +58,8 @@ const KEY_ACTIONS = {
     '/sports': /add|bet slip|odds|search|events|ticket|sports home|top matches/i,
     '/sportsbook': /add|bet slip|odds|search|events|ticket|sports home|top matches/i,
     '/sportsbook/soccer': /add|bet slip|odds|search|events|ticket|soccer|winner/i,
+    '/learn': /practice games|risk academy|probability|originals/i,
+    '/vip': /practice games|vip|tier|originals/i,
     '/risk-academy': /practice games|risk|academy|originals/i,
     '/vip-lab': /practice games|vip|tier|originals/i,
     '/slot-factory': /spin|bet|buy|auto|play/i,
@@ -101,6 +103,12 @@ function parseViewportArg(raw) {
         }
         return { width, height }
     })
+}
+
+function uxStatus(value) {
+    if (value === true) return 'yes'
+    if (value === false) return 'no'
+    return 'n/a'
 }
 
 function sleep(ms) {
@@ -207,14 +215,17 @@ async function waitForReady(client, sessionId, timeoutMs = 8000) {
             expression: `document.readyState === 'complete'
               && !!document.querySelector('#root')
               && document.querySelector('#root').children.length > 0
+              && (!!document.querySelector('[data-ux-surface], .app-layout, .game-shell, .casino-page, .sb-page')
+                || (document.body.innerText || '').trim().length > 20)
               && !document.querySelector('.route-fallback')
               && !document.querySelector('.core-stage.is-loading')
               && !/LOADING\\s+(LAB|STAGE)/i.test(document.body.innerText || '')`,
             returnByValue: true,
         }, sessionId)
-        if (result.result?.value) return
+        if (result.result?.value) return true
         await sleep(120)
     }
+    return false
 }
 
 function collectErrors(events) {
@@ -283,6 +294,8 @@ async function evaluatePage(client, sessionId, route) {
         height: Math.round(rect.height),
       };
     });
+  const uxPrimary = Array.from(document.querySelectorAll('[data-ux-primary-action]'))
+    .find(el => isVisible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true');
   const action = controls.find(control => pattern.test(control.text));
   const mobilePrimarySelector = [
     '[data-mobile-hit-target="primary"]',
@@ -292,7 +305,8 @@ async function evaluatePage(client, sessionId, route) {
     '[data-poker-action="fold"]',
     '[data-poker-action="call"]',
     '[data-poker-action="check"]',
-    '[data-poker-action="raise"]'
+    '[data-poker-action="raise"]',
+    '[data-ux-primary-action]'
   ].join(',');
   const primaryTarget = viewportWidth < 768
     ? [
@@ -304,6 +318,7 @@ async function evaluatePage(client, sessionId, route) {
         '[data-poker-action="call"]',
         '[data-poker-action="check"]',
         '[data-poker-action="raise"]',
+        '[data-ux-primary-action]',
       ]
         .map(selector => Array.from(document.querySelectorAll(selector)).find(el => isVisible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true'))
         .find(Boolean)
@@ -325,6 +340,57 @@ async function evaluatePage(client, sessionId, route) {
   })();
   const titleEl = document.querySelector('h1, .game-badge, .game-title, [data-game-title]');
   const loadingBlocking = Boolean(document.querySelector('.core-stage.is-loading')) || /LOADING\\s+(LAB|STAGE)/i.test(document.body.innerText || '');
+  const scrollOwners = [
+    document.querySelector('.app-main-wrapper'),
+    document.querySelector('.main-content'),
+    document.querySelector('.game-shell'),
+    document.querySelector('.gs-playfield'),
+    document.querySelector('.casino-page'),
+    document.querySelector('.collections-page'),
+    document.querySelector('.sb-page'),
+    document.querySelector('.sb-main'),
+    document.scrollingElement,
+  ].filter(Boolean);
+  const scrollableSurfaces = scrollOwners
+    .filter((el, index, arr) => arr.indexOf(el) === index)
+    .map(el => {
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return {
+        tag: el === document.scrollingElement ? 'document' : describe(el).tag,
+        scrollHeight: Math.round(el.scrollHeight || 0),
+        clientHeight: Math.round(el.clientHeight || rect.height || 0),
+        overflowY: style.overflowY,
+        visible: isVisible(el) || el === document.scrollingElement,
+        scrollable: (el.scrollHeight || 0) > (el.clientHeight || rect.height || 0) + 6,
+      };
+    });
+  const needsScroll = docHeight > viewportHeight + 6 || scrollableSurfaces.some(item => item.scrollable);
+  const scrollReachable = !needsScroll || scrollableSurfaces.some(item => item.visible && item.scrollable && item.overflowY !== 'hidden' && item.overflowY !== 'clip');
+  const playfield = document.querySelector('.gs-playfield, [data-game-stage], [data-mobile-critical-surface]');
+  const controlsPanel = document.querySelector('.gs-panel');
+  const playfieldPriority = (() => {
+    if (viewportWidth >= 768 || !document.querySelector('.game-shell')) return null;
+    if (!playfield || !controlsPanel || !isVisible(controlsPanel)) return true;
+    const playRect = playfield.getBoundingClientRect();
+    const panelRect = controlsPanel.getBoundingClientRect();
+    return playRect.top <= panelRect.top + 2;
+  })();
+  const uxSurfaces = Array.from(document.querySelectorAll('[data-ux-surface]'))
+    .filter(isVisible)
+    .map(el => el.getAttribute('data-ux-surface'))
+    .filter(Boolean);
+  const uniqueUxSurfaces = [...new Set(uxSurfaces)];
+  const uxPrimaryVisible = Boolean(uxPrimary);
+  const uxScore = Math.max(0, 100
+    - (docWidth > viewportWidth + 1 ? 20 : 0)
+    - (loadingBlocking ? 15 : 0)
+    - (brokenImages.length ? 15 : 0)
+    - (!action && !uxPrimary ? 15 : 0)
+    - (!scrollReachable ? 15 : 0)
+    - (mobileActionHit.blocked ? 20 : 0)
+    - (playfieldPriority === false ? 10 : 0)
+    - (uniqueUxSurfaces.length === 0 ? 5 : 0));
   return {
     title: titleEl ? titleEl.textContent.trim().replace(/\\s+/g, ' ').slice(0, 90) : document.title,
     viewport: { width: viewportWidth, height: viewportHeight },
@@ -335,10 +401,19 @@ async function evaluatePage(client, sessionId, route) {
     overflowing,
     brokenImages,
     visibleControlCount: controls.length,
-    keyActionVisible: Boolean(action),
+    keyActionVisible: Boolean(action || uxPrimary),
     keyAction: action || null,
+    uxPrimaryAction: uxPrimary ? describe(uxPrimary) : null,
     loadingBlocking,
     mobileActionHit,
+    ux: {
+      score: uxScore,
+      surfaces: uniqueUxSurfaces,
+      primaryActionVisible: uxPrimaryVisible,
+      scrollReachable,
+      scrollableSurfaces,
+      playfieldPriority,
+    },
   };
 })()`
     const result = await client.send('Runtime.evaluate', {
@@ -392,12 +467,12 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
     el.click();
     return { clicked: true, selector, target: describe(el) };
   };
-  const primary = '[data-mobile-hit-target="primary"], [data-mobile-primary-action]';
+  const primary = '[data-mobile-hit-target="primary"], [data-mobile-primary-action], [data-ux-primary-action]';
   const textIncludes = value => (document.body.innerText || '').toLowerCase().includes(value.toLowerCase());
   const ok = (message, extra = {}) => ({ status: 'passed', message, ...extra });
   const fail = (message, extra = {}) => ({ status: 'failed', message, ...extra });
 
-  if (['/vault-rush', '/river-catcher', '/bars', '/slots'].includes(route)) {
+  if (document.querySelector('[data-slot-mobile-dock]')) {
     const click = clickTarget('[data-slot-mobile-dock] [data-slot-action="spin"]');
     if (!click.clicked) return fail('slot spin target was not clickable', click);
     await sleep(700);
@@ -516,7 +591,9 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
 async function run() {
     const baseUrl = argValue('baseUrl', 'http://127.0.0.1:5173').replace(/\/$/, '')
     const origin = new URL(baseUrl).origin
-    const outDir = resolve(argValue('out', 'output/browser-smoke'))
+    const mode = argValue('mode', 'smoke')
+    const isUxMode = mode === 'ux'
+    const outDir = resolve(argValue('out', isUxMode ? 'output/ux-benchmark' : 'output/browser-smoke'))
     const label = argValue('label', new Date().toISOString().replace(/[:.]/g, '-'))
     const clean = process.argv.includes('--clean') || process.env.npm_config_clean === 'true'
     const routes = parseListArg('routes', DEFAULT_ROUTES)
@@ -578,7 +655,12 @@ async function run() {
                 }
                 await client.send('Page.navigate', { url }, sessionId)
                 await waitForLoad(client, sessionId)
-                await waitForReady(client, sessionId, readyTimeoutMs)
+                let ready = await waitForReady(client, sessionId, readyTimeoutMs)
+                if (!ready) {
+                    await client.send('Page.reload', { ignoreCache: true }, sessionId)
+                    await waitForLoad(client, sessionId)
+                    ready = await waitForReady(client, sessionId, Math.max(readyTimeoutMs, 12000))
+                }
                 await sleep(settleMs)
                 const events = client.drainEvents(sessionId)
                 const metrics = await evaluatePage(client, sessionId, route)
@@ -601,7 +683,8 @@ async function run() {
                     ...metrics,
                 })
                 const blocked = metrics.mobileActionHit?.blocked ? ' blocked' : ''
-                console.log(`${viewport.width}x${viewport.height} ${route} overflow=${metrics.overflowDelta}px action=${metrics.keyActionVisible ? 'yes' : 'no'}${blocked} interaction=${interaction.status} errors=${collectErrors([...events, ...interactionEvents]).length}`)
+                const score = isUxMode && metrics.ux ? ` ux=${metrics.ux.score}` : ''
+                console.log(`${viewport.width}x${viewport.height} ${route} overflow=${metrics.overflowDelta}px action=${metrics.keyActionVisible ? 'yes' : 'no'}${blocked}${score} interaction=${interaction.status} errors=${collectErrors([...events, ...interactionEvents]).length}`)
             }
         }
 
@@ -617,6 +700,7 @@ async function run() {
         const report = {
             baseUrl,
             browser,
+            mode,
             generatedAt: new Date().toISOString(),
             viewports,
             routes,
@@ -626,18 +710,26 @@ async function run() {
             results,
         }
         await writeFile(join(runDir, 'report.json'), JSON.stringify(report, null, 2))
+        const summaryRows = results.map(item => {
+            const common = `| ${item.viewport.width}x${item.viewport.height} | ${item.route} | ${item.overflowDelta}px | ${item.loadingBlocking ? 'yes' : 'no'} | ${item.keyActionVisible ? 'yes' : 'no'} | ${item.mobileActionHit?.checked ? (item.mobileActionHit.blocked ? 'blocked' : 'clean') : 'n/a'} | ${item.interaction?.status || 'n/a'} | ${item.brokenImages.length} | ${item.errors.length}`
+            if (!isUxMode) return `${common} | ${item.screenshot.replaceAll('\\', '/')} |`
+            return `${common} | ${item.ux?.score ?? 'n/a'} | ${uxStatus(item.ux?.scrollReachable)} | ${uxStatus(item.ux?.playfieldPriority)} | ${item.ux?.surfaces?.join(', ') || 'none'} | ${item.screenshot.replaceAll('\\', '/')} |`
+        })
         await writeFile(join(runDir, 'summary.md'), [
-            `# GamPo Browser Smoke ${label}`,
+            `# GamPo ${isUxMode ? 'UX Benchmark' : 'Browser Smoke'} ${label}`,
             '',
             `Base URL: ${baseUrl}`,
+            `Mode: ${mode}`,
             `Total checks: ${results.length}`,
             `Failures: ${failures.length}`,
             '',
-            '| Viewport | Route | Overflow | Loading | Key Action | Hit Test | Interaction | Broken Images | Errors | Screenshot |',
-            '| --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | --- |',
-            ...results.map(item => (
-                `| ${item.viewport.width}x${item.viewport.height} | ${item.route} | ${item.overflowDelta}px | ${item.loadingBlocking ? 'yes' : 'no'} | ${item.keyActionVisible ? 'yes' : 'no'} | ${item.mobileActionHit?.checked ? (item.mobileActionHit.blocked ? 'blocked' : 'clean') : 'n/a'} | ${item.interaction?.status || 'n/a'} | ${item.brokenImages.length} | ${item.errors.length} | ${item.screenshot.replaceAll('\\', '/')} |`
-            )),
+            isUxMode
+                ? '| Viewport | Route | Overflow | Loading | Key Action | Hit Test | Interaction | Broken Images | Errors | UX Score | Scroll | Playfield First | UX Surfaces | Screenshot |'
+                : '| Viewport | Route | Overflow | Loading | Key Action | Hit Test | Interaction | Broken Images | Errors | Screenshot |',
+            isUxMode
+                ? '| --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |'
+                : '| --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | --- |',
+            ...summaryRows,
             '',
         ].join('\n'))
 

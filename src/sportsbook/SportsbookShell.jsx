@@ -173,7 +173,7 @@ function SportsbookShell() {
     }
 
     return (
-        <div className="sb-page" data-sportsbook-view={viewState.view} data-sportsbook-feed-source={feedSource}>
+        <div className="sb-page" data-sportsbook-view={viewState.view} data-sportsbook-feed-source={feedSource} data-ux-surface="shell">
             <SportsRail
                 sports={sports}
                 view={viewState.view}
@@ -181,8 +181,8 @@ function SportsbookShell() {
                 onNavigate={navigateSportsbook}
             />
 
-            <section className="sb-main" aria-labelledby="sportsbook-heading">
-                <header className="sb-topbar">
+            <section className="sb-main" aria-labelledby="sportsbook-heading" data-ux-surface="stage">
+                <header className="sb-topbar" data-ux-surface="shell">
                     <div>
                         <span>Gampo Sportsbook</span>
                         <h1 id="sportsbook-heading">{titleForView(viewState, sports)}</h1>
@@ -230,7 +230,7 @@ function SportsbookShell() {
                 )}
             </section>
 
-            <div className="sb-desktop-slip">
+            <div className="sb-desktop-slip" data-ux-surface="aside">
                 <BetSlip
                     selections={selections}
                     tickets={tickets}
@@ -251,7 +251,7 @@ function SportsbookShell() {
             </div>
 
             {mobileSlipOpen ? (
-                <div className="sb-mobile-slip">
+                <div className="sb-mobile-slip" data-ux-surface="dock">
                     <BetSlip
                         selections={selections}
                         tickets={tickets}

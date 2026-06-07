@@ -49,6 +49,7 @@ export default function AchievementToast() {
                 onClick={dismissLevelUp}
                 aria-label={`Level up: reached level ${recentLevelUp.level}`}
                 style={{ '--rank-accent': recentLevelUp.rank?.accent || '#ffd166' }}
+                data-ux-surface="toast"
             >
                 <span className="ach-toast-icon"><RankIcon size={20} /></span>
                 <span className="ach-toast-body">
@@ -74,6 +75,7 @@ export default function AchievementToast() {
             className={`ach-toast ${tierClass}`}
             onClick={dismissUnlock}
             aria-label={`Achievement unlocked: ${recentUnlock.name}`}
+            data-ux-surface="toast"
         >
             <span className="ach-toast-icon"><Icon size={20} /></span>
             <span className="ach-toast-body">

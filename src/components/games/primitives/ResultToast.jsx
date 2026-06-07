@@ -35,7 +35,7 @@ export default function ResultToast({
 
     const kind = latched.kind || 'win'
     return (
-        <div className={`rt-toast rt-${kind} ${visible ? 'in' : 'out'}`} role="status">
+        <div className={`rt-toast rt-${kind} ${visible ? 'in' : 'out'}`} role="status" data-ux-surface="toast">
             <div className="rt-row">
                 {latched.message ? <span className="rt-msg">{latched.message}</span> : <span className="rt-msg">{defaultMessage(kind)}</span>}
                 {Number.isFinite(latched.multiplier) ? <strong className="rt-mult">{formatMult(latched.multiplier)}x</strong> : null}

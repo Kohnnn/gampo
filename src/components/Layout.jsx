@@ -30,11 +30,11 @@ function Layout() {
     }
 
     return (
-        <div className="app-layout">
+        <div className="app-layout" data-ux-surface="shell">
             <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-            <div className="app-main-wrapper">
+            <div className="app-main-wrapper" data-ux-surface="shell">
                 <Header />
-                <main className="main-content">
+                <main className="main-content" data-ux-surface="stage">
                     <Outlet />
                 </main>
             </div>

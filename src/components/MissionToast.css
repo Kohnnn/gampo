@@ -4,7 +4,7 @@
     position: fixed;
     top: 16px;
     left: 16px;
-    z-index: 100;
+    z-index: var(--z-toast, 1600);
     display: grid;
     grid-template-columns: 44px 1fr;
     grid-template-rows: auto auto;

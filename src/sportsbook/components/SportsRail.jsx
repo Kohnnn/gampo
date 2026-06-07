@@ -22,7 +22,7 @@ function SportsRail({ sports, view, activeSportId, onNavigate }) {
     const topSports = sports.slice(0, 10)
 
     return (
-        <aside className="sb-rail">
+        <aside className="sb-rail" data-ux-surface="aside">
             <div className="sb-rail-section">
                 <RailRow active={view === 'live'} icon={Radio} label="Live Events" count={liveCount} onClick={() => onNavigate({ view: 'live' })} />
                 <RailRow active={view === 'starting'} icon={Clock3} label="Starting Soon" onClick={() => onNavigate({ view: 'starting' })} />

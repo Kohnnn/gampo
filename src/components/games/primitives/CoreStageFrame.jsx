@@ -41,7 +41,7 @@ export default function CoreStageFrame({
         className,
     ].filter(Boolean).join(' ')
     return (
-        <div className={classes} style={style} data-game-stage data-mobile-scroll-surface={mobileScrollable || undefined}>
+        <div className={classes} style={style} data-game-stage data-mobile-scroll-surface={mobileScrollable || undefined} data-ux-surface="stage">
             {loading ? (
                 <div className="core-stage-loading">
                     {loadingNode || <DefaultLoader />}

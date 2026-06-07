@@ -167,7 +167,7 @@ function ChatDock() {
 
     if (state === 'closed') {
         return (
-            <button className="chat-dock-fab" onClick={() => setState('open')} aria-label="Open chat">
+            <button className="chat-dock-fab" onClick={() => setState('open')} aria-label="Open chat" data-ux-surface="dock">
                 <MessageCircle size={20} />
                 {unread > 0 && <span className="chat-dock-unread">{unread > 9 ? '9+' : unread}</span>}
             </button>
@@ -180,6 +180,7 @@ function ChatDock() {
                 className="chat-dock-mini"
                 onClick={() => setState('open')}
                 aria-label="Expand chat"
+                data-ux-surface="dock"
             >
                 <MessageCircle size={14} />
                 <span>Chat</span>
@@ -190,7 +191,7 @@ function ChatDock() {
     }
 
     return (
-        <aside className={`chat-dock ${widthClass} ${gameSafeClass}`.trim()}>
+        <aside className={`chat-dock ${widthClass} ${gameSafeClass}`.trim()} data-ux-surface="dock">
             <header className="chat-dock-header">
                 <div className="chat-dock-tabs">
                     <button

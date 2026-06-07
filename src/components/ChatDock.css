@@ -9,7 +9,7 @@
     border-radius: 12px;
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(8px);
-    z-index: 90;
+    z-index: var(--z-dock, 900);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -41,7 +41,7 @@
     background: var(--accent-green);
     color: #071109;
     cursor: pointer;
-    z-index: 90;
+    z-index: var(--z-dock, 900);
     display: grid;
     place-items: center;
     box-shadow: 0 12px 24px rgba(0, 231, 1, 0.32);
@@ -124,7 +124,7 @@
     font-weight: 800;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    z-index: 90;
+    z-index: var(--z-dock, 900);
 }
 
 .chat-dock-mini:hover {

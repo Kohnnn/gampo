@@ -37,9 +37,10 @@ export default function GameShell({
         <div
             className={`game-shell gs-variant-${safeVariant}`}
             data-variant={safeVariant}
+            data-ux-surface="shell"
             style={{ '--accent': accent, '--shell-backdrop': backdrop ? `url("${backdrop}")` : 'none' }}
         >
-            <div className="gs-titlebar">
+            <div className="gs-titlebar" data-ux-surface="shell">
                 <div>
                     <Link to="/" className="gs-back">‹ Hub</Link>
                     <h1>{title || definition?.name}</h1>
@@ -52,9 +53,9 @@ export default function GameShell({
                 </div>
             </div>
             <div className="gs-layout">
-                <div className="gs-panel">{panel}</div>
-                <div className="gs-playfield" role="region" aria-label={playfieldLabel} tabIndex={0} data-mobile-scroll-surface>{children}</div>
-                <div className="gs-aside">{aside}</div>
+                <div className="gs-panel" data-ux-surface="controls">{panel}</div>
+                <div className="gs-playfield" role="region" aria-label={playfieldLabel} tabIndex={0} data-mobile-scroll-surface data-ux-surface="stage">{children}</div>
+                <div className="gs-aside" data-ux-surface="aside">{aside}</div>
             </div>
         </div>
     )

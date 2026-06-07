@@ -16,7 +16,7 @@ function MobileBottomNav() {
     }
 
     return (
-        <nav className="mobile-bottom-nav" data-mobile-bottom-nav aria-label="Mobile primary navigation">
+        <nav className="mobile-bottom-nav" data-mobile-bottom-nav data-ux-surface="dock" aria-label="Mobile primary navigation">
             {navItems.map(item => {
                 const Icon = item.icon
                 const active = item.match(location.pathname)

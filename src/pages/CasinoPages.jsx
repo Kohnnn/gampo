@@ -175,7 +175,7 @@ export function VipPage() {
             title="VIP Lab"
             text="Tiers track simulated wager volume across all games. Perks are cosmetic — no real-world value."
             icon={<Crown size={18} />}
-            action={<Link to="/originals" className="casino-action primary">Practice games</Link>}
+            action={<Link to="/originals" className="casino-action primary" data-ux-primary-action>Practice games</Link>}
         >
             <div className="vip-headline">
                 <div>
@@ -225,7 +225,7 @@ export function LearnPage() {
             title="Probability lessons"
             text="A compact reference desk for RTP, edge, volatility, hit frequency, bankroll risk and sportsbook margin."
             icon={<BookOpen size={18} />}
-            action={<Link to="/originals" className="casino-action primary">Practice games</Link>}
+            action={<Link to="/originals" className="casino-action primary" data-ux-primary-action>Practice games</Link>}
         >
             <div className="lesson-grid">
                 {sourceNotes.map(note => (
@@ -389,7 +389,7 @@ export function PromotionsPage() {
                         <small className="promotion-kicker">{p.kicker}</small>
                         <h2>{p.title}</h2>
                         <p>{p.description}</p>
-                        <Link to={p.link} className="casino-action primary">{p.cta}</Link>
+                        <Link to={p.link} className="casino-action primary" data-ux-primary-action>{p.cta}</Link>
                     </article>
                 ))}
             </div>
@@ -402,8 +402,8 @@ export function PromotionsPage() {
 
 function CasinoSection({ kicker, title, text, icon, action, children }) {
     return (
-        <div className="casino-page">
-            <section className="section-hero">
+        <div className="casino-page" data-ux-surface="stage">
+            <section className="section-hero" data-ux-surface="stage">
                 <div>
                     <span className="casino-kicker">{icon}{kicker}</span>
                     <h1>{title}</h1>
@@ -411,7 +411,7 @@ function CasinoSection({ kicker, title, text, icon, action, children }) {
                 </div>
                 {action}
             </section>
-            {children}
+            <div data-ux-surface="stage">{children}</div>
         </div>
     )
 }

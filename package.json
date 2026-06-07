@@ -9,6 +9,7 @@
         "preview": "vite preview",
         "test": "vitest run",
         "smoke:browser": "node scripts/browserSmoke.mjs",
+        "ux:benchmark": "node scripts/browserSmoke.mjs --mode=ux --out=output/ux-benchmark",
         "gen:assets": "node scripts/genAssets.js"
     },
     "dependencies": {

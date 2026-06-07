@@ -20,6 +20,7 @@ export default function ActionLockOverlay({
         <div
             className={`action-lock ${interactive ? 'pass' : 'block'} ${className}`}
             aria-hidden={!label}
+            data-ux-surface="toast"
         >
             {label ? <span className="action-lock-label">{label}</span> : null}
         </div>

@@ -44,6 +44,7 @@ export default function MissionToast() {
             className={`mission-toast ${periodClass}`}
             onClick={onClick}
             aria-label={`Mission complete: ${recentComplete.name}`}
+            data-ux-surface="toast"
         >
             <span className="mission-toast-icon"><Icon size={20} /></span>
             <span className="mission-toast-body">
