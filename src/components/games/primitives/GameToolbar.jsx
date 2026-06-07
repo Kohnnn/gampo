@@ -16,6 +16,7 @@ import { useReduceMotion } from '../../fx'
 import FairnessDrawer from './FairnessDrawer'
 import HotkeyHelp from './HotkeyHelp'
 import OddsPopup from './OddsPopup'
+import { recordLearningEvent } from '../../../hooks/useProgress'
 import VolumeMixer from './VolumeMixer'
 
 export default function GameToolbar({ helpHref, definition }) {
@@ -97,7 +98,7 @@ export default function GameToolbar({ helpHref, definition }) {
 
     const openFairness = () => { setFairOpen(true); setPopoverOpen(false) }
     const openHotkeys = () => { setHotkeyOpen(true); setPopoverOpen(false) }
-    const openOdds = () => { setOddsOpen(true); setPopoverOpen(false) }
+    const openOdds = () => { setOddsOpen(true); setPopoverOpen(false); recordLearningEvent('odds') }
 
     const popover = popoverOpen && pos.ready && createPortal(
         <div

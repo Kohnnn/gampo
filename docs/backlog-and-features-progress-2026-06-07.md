@@ -52,3 +52,11 @@ Each batch: implement → unit tests → `vitest run` → build → commit. Depl
   - `src/data/achievements.js` — new `learning` group (5 achievements) + group label (B5).
   - `src/hooks/useProgress.js` — `oddsViewed`/`sandboxRuns` stats + `recordLearningEvent('odds'|'sandbox')` (test updated, 8 pass).
   - Full suite: PASS (325).
+- 2026-06-07: UI surfaces + routes:
+  - `/sandbox` Strategy Sandbox page (`StrategySandboxPage.jsx` + `sandbox.css`) — runs `strategySandbox`, histogram, presets, `recordLearningEvent('sandbox')`.
+  - `/settings` Settings page (`SettingsPage.jsx` + `settings.css`) — accent/density/reduce-motion via `useSettings`, save export/import via `useLocalSave` (B6 UI).
+  - `/insights` Session Insight dashboard (`InsightsPage.jsx` + `insights.css` + `sessionInsights.js` +test 6 pass) — realized vs theoretical RTP, streaks, per-game, real-stakes framing (B2d).
+  - `useSettings()` mounted in `Layout.jsx`; accent/density applied to `<html>`.
+  - `GameToolbar.openOdds` now fires `recordLearningEvent('odds')`.
+  - Sidebar nav: Strategy Sandbox + Session Insights under Progress, Settings under Account.
+  - Build OK; full suite PASS (331).
