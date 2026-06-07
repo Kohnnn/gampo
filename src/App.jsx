@@ -62,6 +62,9 @@ const DrillGame = lazy(() => import('./components/games/drill/DrillGame'))
 const PacksGame = lazy(() => import('./components/games/packs/PacksGame'))
 const TomeOfLifeGame = lazy(() => import('./components/games/tomeoflife/TomeOfLifeGame'))
 const TarotGame = lazy(() => import('./components/games/tarot/TarotGame'))
+const StrategySandboxPage = lazy(() => import('./pages/StrategySandboxPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const InsightsPage = lazy(() => import('./pages/InsightsPage'))
 function RouteFallback() {
     return (
         <div className="route-fallback" data-route-fallback="loading">
@@ -143,6 +146,10 @@ function App() {
                 <Route path="packs" element={lazied(<PacksGame />)} />
                 <Route path="tomeoflife" element={lazied(<TomeOfLifeGame />)} />
                 <Route path="tarot" element={lazied(<TarotGame />)} />
+                <Route path="sandbox" element={lazied(<StrategySandboxPage />)} />
+                <Route path="strategy-sandbox" element={<Navigate to="/sandbox" replace />} />
+                <Route path="settings" element={lazied(<SettingsPage />)} />
+                <Route path="insights" element={lazied(<InsightsPage />)} />
                 {SLOT_TEMPLATE_ROUTES.map(route => (
                     <Route
                         key={route.id}

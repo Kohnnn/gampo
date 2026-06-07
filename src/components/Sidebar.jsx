@@ -25,6 +25,8 @@ const navSections = [
             { icon: 'mission', label: 'Missions', path: '/missions' },
             { icon: 'vip', label: 'VIP Lab', path: '/vip' },
             { icon: 'academy', label: 'Risk Academy', path: '/learn' },
+            { icon: 'barChart', label: 'Strategy Sandbox', path: '/sandbox' },
+            { icon: 'pnl', label: 'Session Insights', path: '/insights' },
         ],
     },
     {
@@ -33,6 +35,7 @@ const navSections = [
             { icon: 'verify', label: 'Verify', path: '/verify' },
             { icon: 'race', label: 'Race', path: '/race' },
             { icon: 'activity', label: 'Activity', path: '/activity' },
+            { icon: 'progress', label: 'Settings', path: '/settings' },
         ],
     },
 ]

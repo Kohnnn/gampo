@@ -8,6 +8,7 @@ import MissionToast from './MissionToast'
 import MobileBottomNav from './MobileBottomNav'
 import { useMenuBgm } from '../audio/useBgm'
 import { playSample } from '../audio/audioContext'
+import { useSettings } from '../hooks/useSettings'
 
 const SIDEBAR_KEY = 'gampo_sidebar_open'
 
@@ -31,6 +32,10 @@ function readInitialSidebar() {
 function Layout() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(readInitialSidebar)
     const location = useLocation()
+
+    // Subscribe to display settings so accent/density/reduce-motion stay applied
+    // to <html> across navigation (applySettingsToDom runs on mount + change).
+    useSettings()
 
     // Play lobby music only on menu surfaces; in-game routes own their BGM.
     useMenuBgm(LOBBY_PATHS.has(location.pathname))
