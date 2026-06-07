@@ -35,7 +35,7 @@ export default function InsightsPage() {
                 <div className="insights-empty">
                     <BarChart3 size={32} />
                     <p>Play a few rounds and your stats will appear here.</p>
-                    <Link to="/originals" className="insights-cta">Browse games →</Link>
+                    <Link to="/originals" className="insights-cta" data-ux-primary-action>Browse games →</Link>
                 </div>
             ) : (
                 <>
@@ -113,7 +113,7 @@ export default function InsightsPage() {
             )}
 
             <footer className="insights-foot">
-                <Link to="/sandbox">Try the strategy sandbox →</Link>
+                <Link to="/sandbox" data-ux-primary-action>Try the strategy sandbox →</Link>
             </footer>
         </div>
     )

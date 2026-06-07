@@ -349,6 +349,9 @@ async function evaluatePage(client, sessionId, route) {
     document.querySelector('.collections-page'),
     document.querySelector('.sb-page'),
     document.querySelector('.sb-main'),
+    document.querySelector('.sandbox-page'),
+    document.querySelector('.settings-page'),
+    document.querySelector('.insights-page'),
     document.scrollingElement,
   ].filter(Boolean);
   const scrollableSurfaces = scrollOwners

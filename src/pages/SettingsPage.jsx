@@ -45,6 +45,14 @@ export default function SettingsPage() {
                 <span className="settings-kicker"><SettingsIcon size={18} /> Settings</span>
                 <h1>Display, accessibility & save data</h1>
                 <p>Personalise the look, tune accessibility, and back up your local progress. Everything stays on this device.</p>
+                <div className="settings-hero-actions">
+                    <button type="button" className="settings-btn primary" onClick={onExport} data-ux-primary-action>
+                        <Download size={15} /> Export save
+                    </button>
+                    <button type="button" className="settings-btn" onClick={onPickFile}>
+                        <Upload size={15} /> Import
+                    </button>
+                </div>
             </section>
 
             <div className="settings-sections">
