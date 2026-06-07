@@ -47,3 +47,8 @@ Each batch: implement → unit tests → `vitest run` → build → commit. Depl
   - `src/utils/evCoach.js` (+test, 7 pass) — generalized EV coach (theoretical vs observed, verdict, lesson).
   - `src/utils/strategySandbox.js` (+test, 8 pass) — headless Monte-Carlo of staking strategies (B3 engine).
   - Bundle note: plinko `rows-*` (2MB each) are already lazy per-row-count; not first-load. First-load `index-*.js` ~199KB. No split needed.
+- 2026-06-07: Hooks/data layer (no UI yet):
+  - `src/hooks/useSettings.js` (+test, 7 pass) — accent theme + density + reduce-motion, applied to `<html>` (B2a/B2b).
+  - `src/data/achievements.js` — new `learning` group (5 achievements) + group label (B5).
+  - `src/hooks/useProgress.js` — `oddsViewed`/`sandboxRuns` stats + `recordLearningEvent('odds'|'sandbox')` (test updated, 8 pass).
+  - Full suite: PASS (325).

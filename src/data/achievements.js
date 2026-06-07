@@ -372,6 +372,58 @@ export const ACHIEVEMENTS = [
         target: 100,
         evaluate: stats => stats.freeSpinsAwarded,
     },
+
+    // ---- Learning the math (the educational core) ----
+    {
+        id: 'learn-odds-first',
+        group: 'learning',
+        tier: 'bronze',
+        name: 'Read the odds',
+        detail: 'Open the Odds & RTP lab on any game. Know the house edge before you play.',
+        icon: 'book',
+        target: 1,
+        evaluate: stats => stats.oddsViewed,
+    },
+    {
+        id: 'learn-odds-10',
+        group: 'learning',
+        tier: 'silver',
+        name: 'Edge auditor',
+        detail: 'Inspect the odds on 10 games. Compare house edges across the lobby.',
+        icon: 'book',
+        target: 10,
+        evaluate: stats => stats.oddsViewed,
+    },
+    {
+        id: 'learn-sandbox-first',
+        group: 'learning',
+        tier: 'bronze',
+        name: 'Run the numbers',
+        detail: 'Run a Strategy Sandbox simulation. See where a system really ends up.',
+        icon: 'sparkles',
+        target: 1,
+        evaluate: stats => stats.sandboxRuns,
+    },
+    {
+        id: 'learn-sandbox-10',
+        group: 'learning',
+        tier: 'gold',
+        name: 'Systems debunked',
+        detail: 'Run 10 sandbox simulations. No staking system beats a negative edge.',
+        icon: 'sparkles',
+        target: 10,
+        evaluate: stats => stats.sandboxRuns,
+    },
+    {
+        id: 'learn-resilience',
+        group: 'learning',
+        tier: 'silver',
+        name: 'Variance survivor',
+        detail: 'Weather a 10-round losing streak and keep playing. That is variance, not "due".',
+        icon: 'compass',
+        target: 10,
+        evaluate: stats => stats.bestLossStreak,
+    },
 ]
 
 export const ACHIEVEMENT_GROUPS = {
@@ -382,6 +434,7 @@ export const ACHIEVEMENT_GROUPS = {
     bonus: { label: 'Bonus Rounds', sort: 5 },
     cases: { label: 'Cases', sort: 6 },
     volume: { label: 'Volume', sort: 7 },
+    learning: { label: 'Learning', sort: 8 },
 }
 
 export function evaluateAchievements(stats) {
