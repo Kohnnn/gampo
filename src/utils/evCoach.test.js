@@ -44,4 +44,19 @@ describe('buildEvCoach', () => {
     it('exposes verdict labels', () => {
         expect(EV_VERDICT_LABELS['on-model']).toBeTruthy()
     })
+
+    it('flags multi-bet games and adds a clarifying note', () => {
+        const roulette = buildEvCoach({ id: 'roulette', rtp: 0.973, houseEdge: 0.027 }, {}, 5)
+        expect(roulette.multiBet).toBe(true)
+        expect(roulette.note).toMatch(/several bet types/i)
+
+        const explicit = buildEvCoach({ name: 'Custom', multiBet: true, rtp: 0.95 }, {}, 5)
+        expect(explicit.multiBet).toBe(true)
+    })
+
+    it('does not flag single-bet games', () => {
+        const dice2 = buildEvCoach({ id: 'dice', rtp: 0.99, houseEdge: 0.01 }, {}, 5)
+        expect(dice2.multiBet).toBe(false)
+        expect(dice2.note).not.toMatch(/several bet types/i)
+    })
 })

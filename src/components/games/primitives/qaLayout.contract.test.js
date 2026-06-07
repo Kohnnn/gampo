@@ -60,6 +60,17 @@ describe('QA layout and loader contracts', () => {
         expect(primitivesCss).not.toContain('@media (max-width: 720px)')
     })
 
+    it('makes the open mobile bet sheet an accessible focus-trapped dialog', () => {
+        // Focus management: dialog role, Escape-to-close, Tab trap, and focus
+        // restore to the trigger on close.
+        expect(betPanelSource).toContain("role={isMobile ? 'dialog' : undefined}")
+        expect(betPanelSource).toContain("aria-modal={isMobile && mobileControlsOpen ? 'true' : undefined}")
+        expect(betPanelSource).toContain("if (e.key === 'Escape')")
+        expect(betPanelSource).toContain("if (e.key !== 'Tab') return")
+        expect(betPanelSource).toContain('sheetTriggerRef')
+        expect(betPanelSource).toContain('ref={sheetRef}')
+    })
+
     it('prevents asset preloaders from blanking games forever', () => {
         expect(preloaderSource).toContain('timeoutMs = 4500')
         expect(preloaderSource).toContain('window.setTimeout')

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildSessionInsights } from './sessionInsights'
+import { buildSessionInsights, rtpConfidenceBand } from './sessionInsights'
 
 const entries = [
     { ts: 1, gameId: 'dice', profit: 10, betAmount: 10 },
@@ -54,5 +54,29 @@ describe('buildSessionInsights', () => {
     it('flags 20+ rounds as reliable', () => {
         const many = Array.from({ length: 25 }, (_, i) => ({ ts: i, gameId: 'dice', profit: i % 2 ? 5 : -5, betAmount: 5 }))
         expect(buildSessionInsights(many).reliable).toBe(true)
+    })
+})
+
+describe('rtpConfidenceBand', () => {
+    it('returns null for zero rounds or invalid rtp', () => {
+        expect(rtpConfidenceBand(0.96, 0)).toBeNull()
+        expect(rtpConfidenceBand(NaN, 100)).toBeNull()
+    })
+
+    it('narrows as sample size grows', () => {
+        const small = rtpConfidenceBand(0.96, 25)
+        const large = rtpConfidenceBand(0.96, 2500)
+        expect(large.halfWidth).toBeLessThan(small.halfWidth)
+    })
+
+    it('centers the band on the theoretical RTP', () => {
+        const band = rtpConfidenceBand(0.96, 100)
+        expect((band.lower + band.upper) / 2).toBeCloseTo(0.96, 6)
+    })
+
+    it('scales width with per-round volatility', () => {
+        const evenMoney = rtpConfidenceBand(0.96, 100, 1.0)
+        const jackpot = rtpConfidenceBand(0.96, 100, 5.0)
+        expect(jackpot.halfWidth).toBeGreaterThan(evenMoney.halfWidth)
     })
 })

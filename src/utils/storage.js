@@ -9,6 +9,40 @@
 
 export const STORAGE_PREFIX = 'gampo_'
 
+// Quota-exceeded signalling. Writes that fail because storage is full notify
+// these listeners so the UI can surface a one-time "storage full" notice
+// instead of silently dropping the player's progress.
+const quotaListeners = new Set()
+let lastQuotaError = 0
+
+export function onStorageQuotaError(fn) {
+    quotaListeners.add(fn)
+    return () => quotaListeners.delete(fn)
+}
+
+export function getLastQuotaError() {
+    return lastQuotaError
+}
+
+function isQuotaError(err) {
+    if (!err) return false
+    // Browsers report quota via name or legacy code 22 / 1014 (Firefox).
+    return (
+        err.name === 'QuotaExceededError' ||
+        err.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+        err.code === 22 ||
+        err.code === 1014
+    )
+}
+
+function signalQuota(err, key) {
+    if (!isQuotaError(err)) return
+    lastQuotaError = Date.now()
+    for (const fn of quotaListeners) {
+        try { fn({ key, ts: lastQuotaError }) } catch { /* ignore */ }
+    }
+}
+
 function getStore() {
     try {
         if (typeof localStorage !== 'undefined') return localStorage
@@ -39,7 +73,8 @@ export function writeJson(key, value) {
     try {
         store.setItem(key, JSON.stringify(value))
         return true
-    } catch {
+    } catch (err) {
+        signalQuota(err, key)
         return false
     }
 }
@@ -63,7 +98,8 @@ export function writeRaw(key, value) {
     try {
         store.setItem(key, String(value))
         return true
-    } catch {
+    } catch (err) {
+        signalQuota(err, key)
         return false
     }
 }

@@ -4,13 +4,20 @@
 // warn/exceeded. Educational framing, practice credits only.
 
 import { useEffect, useState } from 'react'
-import { ShieldAlert, X } from 'lucide-react'
+import { ShieldAlert, X, HardDrive } from 'lucide-react'
 import { useSessionGuard } from '../hooks/useSessionGuard'
+import { onStorageQuotaError } from '../utils/storage'
 import './SessionGuardBanner.css'
 
 export default function SessionGuardBanner() {
     const { status } = useSessionGuard()
     const [dismissedKey, setDismissedKey] = useState(null)
+    const [quotaHit, setQuotaHit] = useState(false)
+    const [quotaDismissed, setQuotaDismissed] = useState(false)
+
+    // Surface a storage-full notice so the player knows progress may stop
+    // persisting (rather than silently dropping writes).
+    useEffect(() => onStorageQuotaError(() => setQuotaHit(true)), [])
 
     // A stable signature for the current alert so re-dismissing only happens
     // when the situation escalates (level or reason set changes).
@@ -22,6 +29,27 @@ export default function SessionGuardBanner() {
         // re-surfaces the banner.
         if (!active && dismissedKey) setDismissedKey(null)
     }, [active, dismissedKey])
+
+    if (quotaHit && !quotaDismissed) {
+        return (
+            <div className="guard-banner guard-exceeded" role="status" data-ux-surface="toast">
+                <span className="guard-icon"><HardDrive size={16} /></span>
+                <div className="guard-body">
+                    <strong>Local storage is full</strong>
+                    <span>Your progress may stop saving on this device.</span>
+                    <small>Export a save file from Settings, then clear some browser storage.</small>
+                </div>
+                <button
+                    type="button"
+                    className="guard-dismiss"
+                    aria-label="Dismiss storage notice"
+                    onClick={() => setQuotaDismissed(true)}
+                >
+                    <X size={15} />
+                </button>
+            </div>
+        )
+    }
 
     if (!active || dismissedKey === signature) return null
 

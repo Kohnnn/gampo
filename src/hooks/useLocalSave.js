@@ -16,6 +16,30 @@ export const SAVE_VERSION = 1
 export const SAVE_APP = 'gampo'
 export const SAVE_KIND = 'save'
 
+// Migration registry. When the save schema changes, bump SAVE_VERSION and add
+// a migrator keyed by the version it upgrades FROM. Each migrator receives the
+// payload's `data` map and returns the upgraded map. Migrators run in sequence
+// from the file's version up to SAVE_VERSION, so a v1 file passes through
+// MIGRATIONS[1], MIGRATIONS[2], ... as needed.
+const MIGRATIONS = {
+    // Example shape (no-op today; v1 is current):
+    // 1: (data) => ({ ...data, gampo_new_key: data.gampo_old_key }),
+}
+
+/** Upgrade a save payload's data from its version to the current SAVE_VERSION. */
+export function migrateSaveData(data, fromVersion) {
+    let result = data && typeof data === 'object' ? { ...data } : {}
+    let v = Number.isFinite(fromVersion) ? fromVersion : SAVE_VERSION
+    while (v < SAVE_VERSION) {
+        const migrator = MIGRATIONS[v]
+        if (typeof migrator === 'function') {
+            result = migrator(result) || result
+        }
+        v += 1
+    }
+    return result
+}
+
 /** Build the JSON-serialisable save envelope. */
 export function buildSavePayload() {
     const data = snapshotGampoState()
@@ -48,7 +72,9 @@ export function validateSavePayload(payload) {
 export function applySavePayload(payload, options) {
     const check = validateSavePayload(payload)
     if (!check.ok) throw new Error(check.error)
-    return restoreGampoState(payload.data, options)
+    const fromVersion = Number.isFinite(payload.version) ? payload.version : SAVE_VERSION
+    const data = migrateSaveData(payload.data, fromVersion)
+    return restoreGampoState(data, options)
 }
 
 export function useLocalSave() {

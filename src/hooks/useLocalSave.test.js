@@ -4,6 +4,7 @@ import {
     buildSavePayload,
     validateSavePayload,
     applySavePayload,
+    migrateSaveData,
     useLocalSave,
 } from './useLocalSave'
 import { writeJson, writeRaw, readJson, readRaw } from '../utils/storage'
@@ -60,5 +61,15 @@ describe('useLocalSave', () => {
 
     it('exposes a hook function', () => {
         expect(typeof useLocalSave).toBe('function')
+    })
+
+    it('migrateSaveData is a no-op at the current version', () => {
+        const data = { gampo_credits: '100' }
+        expect(migrateSaveData(data, SAVE_VERSION)).toEqual(data)
+    })
+
+    it('migrateSaveData tolerates missing/old version without throwing', () => {
+        expect(migrateSaveData({ gampo_x: '1' }, 0)).toEqual({ gampo_x: '1' })
+        expect(migrateSaveData(null, undefined)).toEqual({})
     })
 })
