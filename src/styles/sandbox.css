@@ -76,7 +76,7 @@
 }
 
 .sandbox-field small {
-    color: var(--text-muted, #6f829a);
+    color: var(--text-muted, #909cb0);
     font-size: 11px;
 }
 
@@ -132,7 +132,7 @@
 
 .sandbox-disclaimer {
     margin: 0;
-    color: var(--text-muted, #6f829a);
+    color: var(--text-muted, #909cb0);
     font-size: 11px;
     text-align: center;
 }
@@ -147,7 +147,7 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
-    color: var(--text-muted, #6f829a);
+    color: var(--text-muted, #909cb0);
     text-align: center;
 }
 
@@ -184,7 +184,7 @@
     background: rgba(0, 0, 0, 0.24);
 }
 
-.sandbox-stat span { color: var(--text-muted, #6f829a); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
+.sandbox-stat span { color: var(--text-muted, #909cb0); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; }
 .sandbox-stat strong { color: var(--text-primary, #fff); font-size: 16px; font-weight: 950; font-variant-numeric: tabular-nums; }
 .sandbox-stat strong.pos { color: var(--accent-green, #00e701); }
 .sandbox-stat strong.neg { color: var(--accent-red, #ff5562); }
@@ -219,7 +219,7 @@
     display: flex;
     justify-content: space-between;
     margin-top: 6px;
-    color: var(--text-muted, #6f829a);
+    color: var(--text-muted, #909cb0);
     font-size: 10px;
     font-weight: 800;
 }

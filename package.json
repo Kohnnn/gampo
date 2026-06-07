@@ -12,6 +12,7 @@
         "ux:benchmark": "node scripts/browserSmoke.mjs --mode=ux --out=output/ux-benchmark",
         "verify:betsheet": "node scripts/verifyBetSheet.mjs",
         "audit:a11y": "node scripts/auditA11y.mjs",
+        "audit:contrast": "node scripts/auditContrast.mjs",
         "gen:assets": "node scripts/genAssets.js"
     },
     "dependencies": {

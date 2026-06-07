@@ -61,7 +61,7 @@
     font-weight: 950;
 }
 
-.settings-help { margin: 0; color: var(--text-muted, #6f829a); font-size: 12px; line-height: 1.5; }
+.settings-help { margin: 0; color: var(--text-muted, #909cb0); font-size: 12px; line-height: 1.5; }
 
 .settings-accents {
     display: grid;
@@ -116,7 +116,7 @@
 }
 
 .settings-seg strong { font-size: 13px; font-weight: 950; }
-.settings-seg small { font-size: 11px; color: var(--text-muted, #6f829a); }
+.settings-seg small { font-size: 11px; color: var(--text-muted, #909cb0); }
 .settings-seg.active {
     border-color: var(--accent, #00e701);
     color: var(--text-primary, #fff);
@@ -161,7 +161,7 @@
 
 .settings-switch-label { display: flex; flex-direction: column; gap: 2px; }
 .settings-switch-label strong { color: var(--text-primary, #fff); font-size: 13px; font-weight: 950; }
-.settings-switch-label small { color: var(--text-muted, #6f829a); font-size: 11px; }
+.settings-switch-label small { color: var(--text-muted, #909cb0); font-size: 11px; }
 
 .settings-limit-grid {
     display: grid;
@@ -240,7 +240,7 @@
     background: none;
     border: 0;
     padding: 4px 0;
-    color: var(--text-muted, #6f829a);
+    color: var(--text-muted, #909cb0);
     font-size: 12px;
     font-weight: 800;
     cursor: pointer;
