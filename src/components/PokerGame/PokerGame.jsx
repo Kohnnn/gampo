@@ -527,8 +527,8 @@ export default function PokerGame() {
     })()
 
     return (
-        <div className="poker-page">
-            <div className="poker-titlebar">
+        <div className="poker-page" data-ux-surface="shell">
+            <div className="poker-titlebar" data-ux-surface="shell">
                 <Link to="/" className="poker-back">‹ Hub</Link>
                 <h1>Live Poker (No-Limit Hold'em, 6-max)</h1>
                 <div className="poker-balance"><span>Balance</span><strong>{formatCredits(balance)}</strong></div>
@@ -678,7 +678,7 @@ export default function PokerGame() {
                     )}
 
                     <div className="poker-layout" ref={tableRef}>
-                        <div className="poker-table">
+                        <div className="poker-table" data-ux-surface="stage">
                             <div className="pk-table-status" aria-label="Live poker table status">
                                 <div>
                                     <span>Street</span>
@@ -754,7 +754,7 @@ export default function PokerGame() {
                                     </span>
                                 ))}
                             </div>
-                            <div className="pk-actions">
+                            <div className="pk-actions" data-ux-surface="controls">
                                 {state.street === 'showdown' ? (
                                     <>
                                         <div className="pk-winners">
@@ -797,7 +797,7 @@ export default function PokerGame() {
                                 )}
                             </div>
                         </div>
-                        <aside className="poker-sidebar">
+                        <aside className="poker-sidebar" data-ux-surface="aside">
                             <div className="poker-tabs">
                                 <button className={`poker-tab ${tab === 'gto' ? 'active' : ''}`} onClick={() => setTab('gto')}>GTO</button>
                                 <button className={`poker-tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>

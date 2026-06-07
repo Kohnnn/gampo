@@ -1,0 +1,144 @@
+// Focused regression check for the "bet & options blurred / unclickable" bug.
+// Opens the mobile bet/options sheet on a set of games and asserts:
+//   1. the sheet (.bp-content) becomes visible and opaque,
+//   2. an elementFromPoint hit test on the bet input lands inside the sheet
+//      (NOT on the dismiss scrim that previously painted over it).
+// Reuses raw CDP over Node's global WebSocket so it needs no extra deps.
+
+import { existsSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const BASE = (process.argv.find(a => a.startsWith('--baseUrl='))?.split('=')[1] || 'http://127.0.0.1:4173').replace(/\/$/, '')
+const ROUTES = (process.argv.find(a => a.startsWith('--routes='))?.split('=')[1] || '/dice,/blackjack,/roulette,/keno').split(',')
+const EDGE_CANDIDATES = [
+    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files/Google/Chrome/Application/chrome.exe',
+    'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+]
+const browser = process.argv.find(a => a.startsWith('--browser='))?.split('=')[1]
+    || EDGE_CANDIDATES.find(c => existsSync(c))
+if (!browser) throw new Error('No Edge/Chrome found; pass --browser=')
+
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+const port = 9700 + Math.floor(Math.random() * 200)
+const userDataDir = join(tmpdir(), `gampo-betsheet-${process.pid}`)
+
+const proc = spawn(browser, [
+    '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+    '--mute-audio', `--remote-debugging-port=${port}`, `--user-data-dir=${userDataDir}`, 'about:blank',
+], { stdio: 'ignore' })
+proc.unref()
+
+async function waitForDebugger() {
+    const start = Date.now()
+    while (Date.now() - start < 10000) {
+        try {
+            const res = await fetch(`http://127.0.0.1:${port}/json/version`)
+            if (res.ok) return res.json()
+        } catch { /* retry */ }
+        await sleep(200)
+    }
+    throw new Error('debugger not ready')
+}
+
+let nextId = 1
+const pending = new Map()
+let ws
+
+function send(method, params = {}, sessionId) {
+    const id = nextId++
+    const msg = { id, method, params }
+    if (sessionId) msg.sessionId = sessionId
+    return new Promise((resolve, reject) => {
+        pending.set(id, { resolve, reject })
+        ws.send(JSON.stringify(msg))
+    })
+}
+
+async function evalExpr(expression, sessionId) {
+    const res = await send('Runtime.evaluate', {
+        expression, returnByValue: true, awaitPromise: true,
+    }, sessionId)
+    if (res.exceptionDetails) throw new Error(JSON.stringify(res.exceptionDetails))
+    return res.result?.value
+}
+
+const checkExpr = `
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const toggle = document.querySelector('[data-mobile-settings-toggle]');
+  if (!toggle) return { ok: false, reason: 'no settings toggle (game may have no setup controls)' };
+  toggle.click();
+  await sleep(320);
+  const sheet = document.querySelector('.bp-content');
+  if (!sheet) return { ok: false, reason: 'no .bp-content sheet' };
+  const cs = getComputedStyle(sheet);
+  const rect = sheet.getBoundingClientRect();
+  const opaque = Number(cs.opacity) > 0.9;
+  const onScreen = rect.top < innerHeight && rect.bottom > 0 && rect.height > 0;
+  // Hit-test the bet input (or first control) center: it must resolve to an
+  // element inside the sheet, not the scrim.
+  const ctrl = sheet.querySelector('.bp-bet-input, button, input');
+  let hit = null, hitInsideSheet = false, hitIsScrim = false;
+  if (ctrl) {
+    const r = ctrl.getBoundingClientRect();
+    const x = Math.max(1, Math.min(innerWidth - 1, r.left + r.width / 2));
+    const y = Math.max(1, Math.min(innerHeight - 1, r.top + r.height / 2));
+    const top = document.elementFromPoint(x, y);
+    hit = top ? (top.className || top.tagName) : null;
+    hitInsideSheet = !!top && (sheet === top || sheet.contains(top));
+    hitIsScrim = !!top && typeof top.className === 'string' && top.className.includes('bp-mobile-scrim');
+  }
+  return {
+    ok: opaque && onScreen && hitInsideSheet && !hitIsScrim,
+    opaque, onScreen, hitInsideSheet, hitIsScrim,
+    hit: typeof hit === 'string' ? hit.slice(0, 60) : hit,
+    sheetTop: Math.round(rect.top), sheetHeight: Math.round(rect.height),
+  };
+})()
+`
+
+async function main() {
+    const version = await waitForDebugger()
+    ws = new WebSocket(version.webSocketDebuggerUrl)
+    await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject })
+    ws.onmessage = (ev) => {
+        const data = JSON.parse(ev.data)
+        if (data.id && pending.has(data.id)) {
+            const { resolve, reject } = pending.get(data.id)
+            pending.delete(data.id)
+            if (data.error) reject(new Error(data.error.message))
+            else resolve(data.result)
+        }
+    }
+    const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
+    const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
+    await send('Page.enable', {}, sessionId)
+    await send('Runtime.enable', {}, sessionId)
+    await send('Emulation.setDeviceMetricsOverride', {
+        width: 390, height: 844, deviceScaleFactor: 1, mobile: true,
+    }, sessionId)
+
+    let failures = 0
+    for (const route of ROUTES) {
+        await send('Page.navigate', { url: `${BASE}${route}` }, sessionId)
+        await sleep(1700)
+        let r
+        try { r = await evalExpr(checkExpr, sessionId) }
+        catch (e) { r = { ok: false, reason: String(e).slice(0, 80) } }
+        const status = r.ok ? 'PASS' : (r.reason?.includes('no setup') ? 'SKIP' : 'FAIL')
+        if (status === 'FAIL') failures++
+        console.log(`${status} ${route} :: ${JSON.stringify(r)}`)
+    }
+
+    await send('Target.closeTarget', { targetId })
+    ws.close()
+    proc.kill()
+    console.log(failures === 0 ? '\\nALL BET-SHEET CHECKS PASSED' : `\\n${failures} BET-SHEET CHECK(S) FAILED`)
+    process.exit(failures === 0 ? 0 : 1)
+}
+
+main().catch(err => { console.error(err); proc.kill(); process.exit(1) })

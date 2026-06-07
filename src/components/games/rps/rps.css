@@ -125,7 +125,7 @@
     display: none;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .rps-stage {
         gap: 12px;
         padding: 12px 6px calc(var(--mobile-action-height, 74px) + 18px);

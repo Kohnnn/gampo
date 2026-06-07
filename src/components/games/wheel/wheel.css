@@ -89,7 +89,7 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .wheel-stage {
         gap: 8px;
         padding: 12px 6px calc(var(--mobile-action-height, 74px) + 18px);

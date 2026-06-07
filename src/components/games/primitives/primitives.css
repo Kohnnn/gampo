@@ -311,7 +311,7 @@
 .sim-bet-row.tone-lost .sim-bet-result strong,
 .sim-bet-row.tone-busted .sim-bet-result strong { color: var(--accent-red); }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .sim-bet-strip { max-height: 218px; }
     .sim-bet-row {
         grid-template-columns: minmax(94px, 0.9fr) minmax(130px, 1.2fr) minmax(72px, 0.6fr);
@@ -376,9 +376,9 @@
     }
 }
 
-/* Wave 24: tablet tier (761–1024) — sidebar collapses under but the bet
+/* Wave 24: tablet tier (769–1024) — sidebar collapses under but the bet
    panel still fits beside the playfield. Tighten panel width + paddings. */
-@media (min-width: 761px) and (max-width: 1024px) {
+@media (min-width: 769px) and (max-width: 1024px) {
     .gs-layout {
         grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
     }
@@ -387,7 +387,7 @@
     .gs-titlebar { padding: 8px 12px; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .gs-layout {
         grid-template-columns: 1fr;
     }
@@ -1540,7 +1540,7 @@ input:focus-visible,
     place-items: center;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .gt-toolbar > .gt-group:first-child,
     .gt-toolbar > .gt-divider {
         display: none;
@@ -2011,7 +2011,7 @@ input:focus-visible,
 
 /* === Mobile collapse: stacked layout with sticky bet panel at bottom === */
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .main-content {
         overflow-y: auto;
         overflow-x: hidden;
@@ -2113,7 +2113,8 @@ input:focus-visible,
         pointer-events: none;
         transition: transform 180ms ease, opacity 180ms ease;
     }
-    .bp-panel.mobile-open .bp-content {
+    .bp-panel.mobile-open .bp-content,
+    .bp-mobile-layer.mobile-open .bp-content {
         transform: translateY(0);
         opacity: 1;
         pointer-events: auto;
@@ -2684,19 +2685,19 @@ input:focus-visible,
     to { transform: rotate(360deg); }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .core-stage {
         min-height: clamp(260px, 42dvh, 360px) !important;
     }
 }
 
-@media (max-height: 740px) and (min-width: 761px) {
+@media (max-height: 740px) and (min-width: 769px) {
     .core-stage {
         min-height: min(var(--core-stage-min-height, 420px), calc(100dvh - 210px)) !important;
     }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .core-stage.core-stage-mobile-scroll {
         overflow: visible;
         min-height: auto !important;

@@ -176,7 +176,7 @@
     animation: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .cc-stage {
         gap: 10px;
         padding: 12px 6px;

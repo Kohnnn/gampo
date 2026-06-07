@@ -53,6 +53,11 @@ export default function BetPanel({
     // we can nudge first-time users toward game setup (chips, decks, rules).
     const [mobileOpenedOnce, setMobileOpenedOnce] = useState(false)
     const [portalRoot, setPortalRoot] = useState(null)
+    // Canonical mobile breakpoint (matches index.css nav metrics + browserSmoke
+    // + SportsbookShell). On mobile the betting sheet must be portaled to <body>
+    // alongside the dock/scrim so the global z-index ordering (scrim < dock <
+    // sheet) actually applies. Rendered in-flow on desktop.
+    const [isMobile, setIsMobile] = useState(false)
     // The mobile dock is portaled to <body>, so the game's --accent (set on
     // .game-shell) does not cascade to it and the play button rendered with a
     // transparent background. Capture the accent at mount and re-apply it inline.
@@ -174,6 +179,28 @@ export default function BetPanel({
         setPortalRoot(document.body)
     }, [])
 
+    // Track the mobile breakpoint so the betting sheet can be portaled to <body>
+    // on mobile (escaping the .game-shell stacking context that would otherwise
+    // trap it below the body-level dismiss scrim).
+    useEffect(() => {
+        if (typeof window === 'undefined' || !window.matchMedia) return undefined
+        const mq = window.matchMedia('(max-width: 768px)')
+        const sync = () => setIsMobile(mq.matches)
+        sync()
+        if (mq.addEventListener) {
+            mq.addEventListener('change', sync)
+            return () => mq.removeEventListener('change', sync)
+        }
+        mq.addListener(sync)
+        return () => mq.removeListener(sync)
+    }, [])
+
+    // Collapse the open sheet when we transition back to desktop so a stale
+    // mobile-open state can't leave the desktop panel in a weird mode.
+    useEffect(() => {
+        if (!isMobile && mobileControlsOpen) setMobileControlsOpen(false)
+    }, [isMobile, mobileControlsOpen])
+
     // Resolve the game accent from the nearest .game-shell (or :root fallback)
     // so the portaled mobile dock can re-apply it inline. The shell's inline
     // --accent may not be committed on the first frame, so retry across a few
@@ -281,69 +308,8 @@ export default function BetPanel({
         setMobileOpenedOnce(true)
     }
 
-    const mobileDock = (
-        <div
-            className={`bp-mobile-layer ${mobileControlsOpen ? 'mobile-open' : ''}`}
-            style={dockAccent ? { '--accent': dockAccent } : undefined}
-        >
-            <div className="bp-mobile-dock" data-mobile-action-dock data-ux-surface="dock">
-                <button
-                    type="button"
-                    className={`bp-mobile-settings ${showSetupNudge ? 'nudge' : ''}`}
-                    onClick={openMobileControls}
-                    aria-expanded={mobileControlsOpen}
-                    aria-controls={`${panelId}-mobile-controls`}
-                    aria-label={settingsLabel}
-                    data-mobile-settings-toggle
-                >
-                    <Settings size={16} />
-                    <span>{settingsLabel}</span>
-                </button>
-                <div className="bp-mobile-summary">
-                    <span>{dockSummary}</span>
-                    <strong>{dockValue}</strong>
-                </div>
-                <button
-                    type="button"
-                    className={`bp-mobile-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''} ${inRound ? 'in-round' : ''}`}
-                    disabled={playDisabled}
-                    onClick={handlePlay}
-                    data-mobile-primary-action
-                    data-mobile-hit-target="primary"
-                    data-ux-primary-action
-                    {...playButtonProps}
-                >
-                    {mobilePlayContent}
-                </button>
-            </div>
-
-            {showSetupNudge && (
-                <button
-                    type="button"
-                    className="bp-mobile-setup-hint"
-                    onClick={openMobileControls}
-                    data-mobile-setup-hint
-                >
-                    Set bet &amp; options ↑
-                </button>
-            )}
-
-            {mobileControlsOpen && (
-                <button
-                    type="button"
-                    className="bp-mobile-scrim"
-                    aria-label="Close betting controls"
-                    onClick={() => setMobileControlsOpen(false)}
-                />
-            )}
-        </div>
-    )
-
-    return (
-        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`} ref={panelRef} data-ux-surface="controls">
-            {portalRoot ? createPortal(mobileDock, portalRoot) : mobileDock}
-
-            <div className="bp-content" id={`${panelId}-mobile-controls`}>
+    const sheetContent = (
+        <div className="bp-content" id={`${panelId}-mobile-controls`}>
                 <button
                     type="button"
                     className="bp-mobile-close"
@@ -457,6 +423,80 @@ export default function BetPanel({
                 </button>
                 {afterPlayChildren}
             </div>
+    )
+
+    const mobileDock = (
+        <div
+            className={`bp-mobile-layer ${mobileControlsOpen ? 'mobile-open' : ''}`}
+            style={dockAccent ? { '--accent': dockAccent } : undefined}
+        >
+            <div className="bp-mobile-dock" data-mobile-action-dock data-ux-surface="dock">
+                <button
+                    type="button"
+                    className={`bp-mobile-settings ${showSetupNudge ? 'nudge' : ''}`}
+                    onClick={openMobileControls}
+                    aria-expanded={mobileControlsOpen}
+                    aria-controls={`${panelId}-mobile-controls`}
+                    aria-label={settingsLabel}
+                    data-mobile-settings-toggle
+                >
+                    <Settings size={16} />
+                    <span>{settingsLabel}</span>
+                </button>
+                <div className="bp-mobile-summary">
+                    <span>{dockSummary}</span>
+                    <strong>{dockValue}</strong>
+                </div>
+                <button
+                    type="button"
+                    className={`bp-mobile-play ${isAutoLive ? 'stop' : ''} ${runningRound ? 'busy' : ''} ${inRound ? 'in-round' : ''}`}
+                    disabled={playDisabled}
+                    onClick={handlePlay}
+                    data-mobile-primary-action
+                    data-mobile-hit-target="primary"
+                    data-ux-primary-action
+                    {...playButtonProps}
+                >
+                    {mobilePlayContent}
+                </button>
+            </div>
+
+            {showSetupNudge && (
+                <button
+                    type="button"
+                    className="bp-mobile-setup-hint"
+                    onClick={openMobileControls}
+                    data-mobile-setup-hint
+                >
+                    Set bet &amp; options ↑
+                </button>
+            )}
+
+            {mobileControlsOpen && (
+                <button
+                    type="button"
+                    className="bp-mobile-scrim"
+                    aria-label="Close betting controls"
+                    onClick={() => setMobileControlsOpen(false)}
+                />
+            )}
+
+            {/* On mobile the sheet is portaled alongside the dock/scrim so the
+                body-level z-index ordering (scrim 1390 < dock 1400 < sheet 1410)
+                actually applies. Without this the sheet stays trapped inside the
+                .game-shell stacking context (z:1) and is painted under the scrim,
+                appearing "blurred out" and intercepting every tap. */}
+            {isMobile && sheetContent}
+        </div>
+    )
+
+    return (
+        <div className={`bp-panel ${mobileControlsOpen ? 'mobile-open' : ''}`} ref={panelRef} data-ux-surface="controls">
+            {portalRoot ? createPortal(mobileDock, portalRoot) : mobileDock}
+
+            {/* Desktop renders the sheet in-flow (display:contents). On mobile it
+                is rendered through the portal above instead, so skip it here. */}
+            {!isMobile && sheetContent}
         </div>
     )
 }

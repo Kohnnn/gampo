@@ -154,7 +154,7 @@
 .gampo-reduce-motion .mines-face { transition: none; }
 .gampo-reduce-motion .mines-cell.hit .mines-face-front { animation: none; }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .mines-stage {
         gap: 8px;
         padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);

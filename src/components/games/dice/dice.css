@@ -231,7 +231,7 @@
     height: 8px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .dice-stage {
         gap: 14px;
         padding: 12px 6px;

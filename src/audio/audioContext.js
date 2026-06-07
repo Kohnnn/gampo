@@ -1,25 +1,40 @@
-// Lazy WebAudio context shared across all games.
+// Lazy WebAudio context shared across all games. (Option 3 unification)
 //
-// Wave 29: split master into BGM and SFX buses with independent gain.
-// All buses connect through `masterGain` so the global mute toggle still
-// works. Volumes persist to localStorage so user prefs survive reloads.
+// Single AudioContext for the whole app. Three gain buses hang off the
+// master gain so the global mute still governs everything:
 //
-// Audio format target (Wave 1): 16-bit PCM mono .wav, 44.1 kHz. Loader
-// uses decodeAudioData which handles wav/ogg/mp3 transparently. The
-// procedural chiptune generator (`scripts/genSfx.mjs`) outputs 16-bit
-// PCM mono .wav files directly.
+//   master ── destination
+//     ├── bgm   (looping background music, via useBgm)
+//     └── sfx   (one-shot effects, via useSfx + AudioProvider.play)
+//
+// Mute model (per the product spec):
+//   - master mute  -> the global toolbar/header toggle. Default: ON (audible).
+//   - bgm mute     -> background music. Default: MUTED.
+//   - sfx mute     -> effects. Default: ON (audible).
+//
+// Each bus also has an independent volume that persists to localStorage.
+// BGM volume defaults low so music sits under the effects when enabled.
+//
+// Audio format target: 16-bit PCM mono .wav 44.1 kHz, but decodeAudioData
+// handles wav/ogg/mp3 transparently.
 
 let ctx = null
 let masterGain = null
 let bgmGain = null
 let sfxGain = null
-let muted = false
+
+let masterMuted = false
+let bgmMuted = true
+let sfxMuted = false
+
 let unlockingPromise = null
 let masterVolume = 1
-let bgmVolume = 0.6
-let sfxVolume = 0.85
+let bgmVolume = 0.3
+let sfxVolume = 0.7
 
 const MUTE_STORAGE_KEY = 'gampo:audio:muted'
+const BGM_MUTE_STORAGE_KEY = 'gampo:audio:bgmMuted'
+const SFX_MUTE_STORAGE_KEY = 'gampo:audio:sfxMuted'
 const VOLUME_STORAGE_KEY = 'gampo:audio:volumes'
 export const AUDIO_RESUME_TIMEOUT_MS = 250
 
@@ -30,17 +45,19 @@ export function resumeWithTimeout(resumePromise, timeoutMs = AUDIO_RESUME_TIMEOU
     ])
 }
 
-function readMuteFromStorage() {
+function readBool(key, fallback) {
     try {
-        return localStorage.getItem(MUTE_STORAGE_KEY) === '1'
+        const v = localStorage.getItem(key)
+        if (v === null) return fallback
+        return v === '1'
     } catch (e) {
-        return false
+        return fallback
     }
 }
 
-function writeMuteToStorage(value) {
+function writeBool(key, value) {
     try {
-        localStorage.setItem(MUTE_STORAGE_KEY, value ? '1' : '0')
+        localStorage.setItem(key, value ? '1' : '0')
     } catch (e) {
         // ignore
     }
@@ -54,8 +71,8 @@ function readVolumes() {
         if (!parsed || typeof parsed !== 'object') return null
         return {
             master: typeof parsed.master === 'number' ? parsed.master : 1,
-            bgm: typeof parsed.bgm === 'number' ? parsed.bgm : 0.6,
-            sfx: typeof parsed.sfx === 'number' ? parsed.sfx : 0.85,
+            bgm: typeof parsed.bgm === 'number' ? parsed.bgm : 0.3,
+            sfx: typeof parsed.sfx === 'number' ? parsed.sfx : 0.7,
         }
     } catch (e) {
         return null
@@ -71,7 +88,9 @@ function writeVolumes() {
 }
 
 if (typeof window !== 'undefined') {
-    muted = readMuteFromStorage()
+    masterMuted = readBool(MUTE_STORAGE_KEY, false)
+    bgmMuted = readBool(BGM_MUTE_STORAGE_KEY, true)
+    sfxMuted = readBool(SFX_MUTE_STORAGE_KEY, false)
     const v = readVolumes()
     if (v) {
         masterVolume = v.master
@@ -96,20 +115,47 @@ export function getSfxGain() {
     return sfxGain
 }
 
+// Re-apply every gain node from current mute+volume state.
+function applyGains() {
+    try {
+        if (masterGain) masterGain.gain.value = masterMuted ? 0 : masterVolume
+        if (bgmGain) bgmGain.gain.value = bgmMuted ? 0 : bgmVolume
+        if (sfxGain) sfxGain.gain.value = sfxMuted ? 0 : sfxVolume
+    } catch (e) {
+        // ignore
+    }
+}
+
+// ---- Master mute (the global toggle) ----
 export function isMuted() {
-    return muted
+    return masterMuted
 }
 
 export function setMuted(value) {
-    muted = !!value
-    writeMuteToStorage(muted)
-    if (masterGain) {
-        try {
-            masterGain.gain.value = muted ? 0 : masterVolume
-        } catch (e) {
-            // ignore
-        }
-    }
+    masterMuted = !!value
+    writeBool(MUTE_STORAGE_KEY, masterMuted)
+    applyGains()
+}
+
+// ---- Per-bus mute ----
+export function isBgmMuted() {
+    return bgmMuted
+}
+
+export function setBgmMuted(value) {
+    bgmMuted = !!value
+    writeBool(BGM_MUTE_STORAGE_KEY, bgmMuted)
+    applyGains()
+}
+
+export function isSfxMuted() {
+    return sfxMuted
+}
+
+export function setSfxMuted(value) {
+    sfxMuted = !!value
+    writeBool(SFX_MUTE_STORAGE_KEY, sfxMuted)
+    applyGains()
 }
 
 export function getVolumes() {
@@ -120,14 +166,12 @@ export function setVolume(bus, value) {
     const v = Math.max(0, Math.min(1, Number(value) || 0))
     if (bus === 'master') {
         masterVolume = v
-        if (masterGain) masterGain.gain.value = muted ? 0 : v
     } else if (bus === 'bgm') {
         bgmVolume = v
-        if (bgmGain) bgmGain.gain.value = v
     } else if (bus === 'sfx') {
         sfxVolume = v
-        if (sfxGain) sfxGain.gain.value = v
     }
+    applyGains()
     writeVolumes()
 }
 
@@ -141,14 +185,12 @@ export async function unlockAudio() {
             if (!ctx) {
                 ctx = new Ctor({ sampleRate: 44100 })
                 masterGain = ctx.createGain()
-                masterGain.gain.value = muted ? 0 : masterVolume
                 masterGain.connect(ctx.destination)
                 bgmGain = ctx.createGain()
-                bgmGain.gain.value = bgmVolume
                 bgmGain.connect(masterGain)
                 sfxGain = ctx.createGain()
-                sfxGain.gain.value = sfxVolume
                 sfxGain.connect(masterGain)
+                applyGains()
             }
             if (ctx.state !== 'running') {
                 await resumeWithTimeout(ctx.resume())
@@ -180,4 +222,67 @@ export async function decode(arrayBuffer) {
             reject(e)
         }
     })
+}
+
+// ---- Shared sample loader + one-shot player (used by useSfx and AudioProvider) ----
+const bufferCache = new Map()
+
+export async function loadBuffer(url) {
+    if (!url) return null
+    if (bufferCache.has(url)) return bufferCache.get(url)
+    const promise = (async () => {
+        try {
+            const res = await fetch(url)
+            if (!res.ok) return null
+            const ab = await res.arrayBuffer()
+            const buf = await decode(ab)
+            return buf || null
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn('[audio] sample load failed', url, e)
+            return null
+        }
+    })()
+    bufferCache.set(url, promise)
+    return promise
+}
+
+// De-dupe gate: collapse identical sounds fired within a short window so a
+// single game event can't double-fire (e.g. synth + sample for the same win).
+const lastFired = new Map()
+const DEDUPE_MS = 60
+
+export function shouldFire(key, windowMs = DEDUPE_MS) {
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+    const prev = lastFired.get(key)
+    if (prev !== undefined && (now - prev) < windowMs) return false
+    lastFired.set(key, now)
+    return true
+}
+
+// Play a one-shot sample on the SFX bus. Honors master + sfx mute.
+export async function playSample(url, { volume = 1, dedupeKey } = {}) {
+    if (!url) return false
+    if (masterMuted || sfxMuted) return false
+    if (dedupeKey && !shouldFire(dedupeKey)) return false
+    await unlockAudio()
+    const c = getAudioCtx()
+    const dest = getSfxGain() || getMasterGain()
+    if (!c || !dest) return false
+    const buffer = await loadBuffer(url)
+    if (!buffer) return false
+    try {
+        const source = c.createBufferSource()
+        source.buffer = buffer
+        const gain = c.createGain()
+        gain.gain.value = Math.max(0, Math.min(1, Number.isFinite(volume) ? volume : 1))
+        source.connect(gain)
+        gain.connect(dest)
+        source.start(0)
+        return true
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[audio] sample play failed', url, e)
+        return false
+    }
 }

@@ -475,7 +475,7 @@
     font-weight: 950;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .cases-session-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -2238,7 +2238,7 @@
     line-height: 1;
 }
 
-@media (min-width: 761px) {
+@media (min-width: 769px) {
     .cases-stage:not(.is-opening):not(.has-result) .cases-case-grid {
         grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
         max-height: 128px;
@@ -3204,7 +3204,7 @@
     }
 }
 
-@media (min-width: 761px) and (max-width: 1180px) {
+@media (min-width: 769px) and (max-width: 1180px) {
     .game-shell:has(.cases-stage-frame) .gs-aside {
         grid-row: 1;
     }
@@ -3220,7 +3220,7 @@
     }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .game-shell:has(.cases-stage-frame) .gs-layout {
         grid-template-columns: 1fr;
         overflow: visible;

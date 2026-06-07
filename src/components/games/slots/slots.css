@@ -1742,7 +1742,7 @@
     .slot-control-spin { grid-column: 1 / -1; justify-self: center; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .slot-panel-spin {
         /* The fixed slot-mobile-dock owns the primary Spin on phones.
            Hiding this in-flow duplicate keeps a single, unambiguous CTA. */
@@ -1875,7 +1875,7 @@
    stays visible while reels and overlays scroll above it. iOS safe-area
    inset is honored. */
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .slot-controls-v2 {
         position: sticky;
         bottom: 0;
@@ -3021,7 +3021,7 @@
     display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .slot-stage-v2 {
         min-height: 0;
         height: auto;

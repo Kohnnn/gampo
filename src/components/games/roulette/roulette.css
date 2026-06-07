@@ -73,7 +73,7 @@
     .rou-recent-rail-col { grid-column: 1 / -1; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .rou-top-deck { grid-template-columns: 1fr; justify-items: center; }
 }
 
@@ -795,7 +795,7 @@
     .rou-live-panel { width: 100%; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .rou-state-card,
     .rou-ticket-strip {
         grid-template-columns: 1fr;

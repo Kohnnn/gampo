@@ -183,7 +183,7 @@
     display: block;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .education-panel {
         min-width: 0;
     }

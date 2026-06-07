@@ -6,14 +6,21 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Music2, Sliders, Volume2, Wand2 } from 'lucide-react'
-import { getVolumes, setVolume } from '../../../audio/audioContext'
+import { Music2, Sliders, Volume2, VolumeX, Wand2 } from 'lucide-react'
+import {
+    getVolumes, setVolume,
+    isBgmMuted, setBgmMuted,
+    isSfxMuted, setSfxMuted,
+    unlockAudio,
+} from '../../../audio/audioContext'
 
 export default function VolumeMixer() {
     const [open, setOpen] = useState(false)
     const triggerRef = useRef(null)
     const popoverRef = useRef(null)
     const [volumes, setVolumesState] = useState(() => getVolumes())
+    const [bgmMuted, setBgmMutedState] = useState(() => isBgmMuted())
+    const [sfxMuted, setSfxMutedState] = useState(() => isSfxMuted())
     const [pos, setPos] = useState({ top: 0, left: 0, ready: false })
 
     const reposition = useCallback(() => {
@@ -63,6 +70,20 @@ export default function VolumeMixer() {
         setVolumesState(getVolumes())
     }
 
+    const toggleBgm = () => {
+        const next = !bgmMuted
+        setBgmMuted(next)
+        setBgmMutedState(next)
+        if (!next) unlockAudio()
+    }
+
+    const toggleSfx = () => {
+        const next = !sfxMuted
+        setSfxMuted(next)
+        setSfxMutedState(next)
+        if (!next) unlockAudio()
+    }
+
     const popover = open && pos.ready && createPortal(
         <div
             ref={popoverRef}
@@ -77,12 +98,30 @@ export default function VolumeMixer() {
                 <em>{Math.round(volumes.master * 100)}%</em>
             </div>
             <div className="volmix-row">
-                <Music2 size={14} /> <label>Music</label>
+                <button
+                    type="button"
+                    className={`gt-btn volmix-mute ${bgmMuted ? 'muted' : ''}`}
+                    onClick={toggleBgm}
+                    aria-label={bgmMuted ? 'Unmute music' : 'Mute music'}
+                    title={bgmMuted ? 'Unmute music' : 'Mute music'}
+                >
+                    {bgmMuted ? <VolumeX size={14} /> : <Music2 size={14} />}
+                </button>
+                <label>Music</label>
                 <input type="range" min="0" max="1" step="0.05" value={volumes.bgm} onChange={onChange('bgm')} />
                 <em>{Math.round(volumes.bgm * 100)}%</em>
             </div>
             <div className="volmix-row">
-                <Wand2 size={14} /> <label>Effects</label>
+                <button
+                    type="button"
+                    className={`gt-btn volmix-mute ${sfxMuted ? 'muted' : ''}`}
+                    onClick={toggleSfx}
+                    aria-label={sfxMuted ? 'Unmute effects' : 'Mute effects'}
+                    title={sfxMuted ? 'Unmute effects' : 'Mute effects'}
+                >
+                    {sfxMuted ? <VolumeX size={14} /> : <Wand2 size={14} />}
+                </button>
+                <label>Effects</label>
                 <input type="range" min="0" max="1" step="0.05" value={volumes.sfx} onChange={onChange('sfx')} />
                 <em>{Math.round(volumes.sfx * 100)}%</em>
             </div>

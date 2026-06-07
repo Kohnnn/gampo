@@ -7,7 +7,7 @@
 // the hook is a no-op.
 
 import { useEffect, useRef } from 'react'
-import { getAudioCtx, getBgmGain, isMuted, unlockAudio, decode } from './audioContext'
+import { getAudioCtx, getBgmGain, unlockAudio, decode } from './audioContext'
 import { resolveBgm } from './bgmManifest'
 import { resolveGameBgm } from './gameBgmManifest'
 
@@ -74,7 +74,6 @@ function useBgmInner(url) {
 
         async function start() {
             if (!url) return
-            if (isMuted()) return
             await unlockAudio()
             const ctx = getAudioCtx()
             const dest = getBgmGain()
@@ -152,4 +151,10 @@ export function useBgm(skinFamily, mode = 'idle') {
 // Wave 35: per-game BGM. `gameId` keys into `gameBgmManifest`.
 export function useGameBgm(gameId, mode = 'idle') {
     useBgmInner(resolveGameBgm(gameId, mode))
+}
+
+// Option 3: lobby/menu background music. Plays a single loop on menu
+// surfaces. Defaults muted via the BGM bus; the volume mixer toggles it.
+export function useMenuBgm(enabled = true) {
+    useBgmInner(enabled ? '/audio/bgm/menu/idle.wav' : null)
 }

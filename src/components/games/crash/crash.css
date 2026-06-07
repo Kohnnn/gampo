@@ -402,7 +402,7 @@
     50% { opacity: 1; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .crash-stage {
         overflow: visible;
         align-items: stretch;

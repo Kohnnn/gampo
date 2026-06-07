@@ -346,7 +346,7 @@
 .gampo-reduce-motion .bj-card,
 .gampo-reduce-motion .bj-chip-slide { animation: none; }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .bj-stage {
         align-items: stretch;
         overflow: visible;

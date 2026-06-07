@@ -163,7 +163,7 @@
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .limbo-stage {
         gap: 14px;
         padding: 14px 6px calc(var(--mobile-action-height, 74px) + 18px);

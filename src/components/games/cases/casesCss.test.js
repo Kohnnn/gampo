@@ -24,7 +24,7 @@ describe('cases CSS polish', () => {
         expect(css).toContain('.cases-carousel-tile.is-mini img')
         expect(css).toContain('.cases-right-panel')
         expect(css).toMatch(/\.game-shell:has\(\.cases-stage-frame\) \.gs-layout\s*\{[^}]*minmax\(300px,\s*340px\)/s)
-        expect(css).toMatch(/@media \(max-width: 760px\)[\s\S]*\.game-shell:has\(\.cases-stage-frame\) \.gs-aside\s*\{[^}]*order:\s*1/s)
+        expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.game-shell:has\(\.cases-stage-frame\) \.gs-aside\s*\{[^}]*order:\s*1/s)
         expect(css).toContain('.cases-inventory-grid')
     })
 })

@@ -42,7 +42,22 @@ describe('QA layout and loader contracts', () => {
         expect(coreSource).toContain('data-game-stage')
         expect(coreSource).toContain('calc(100dvh - 220px)')
         expect(primitivesCss).toMatch(/\.core-stage\s*\{[^}]*--core-stage-min-height/s)
-        expect(primitivesCss).toMatch(/@media \(max-width: 760px\)[\s\S]*\.core-stage/s)
+        expect(primitivesCss).toMatch(/@media \(max-width: 768px\)[\s\S]*\.core-stage/s)
+    })
+
+    it('portals the mobile bet sheet alongside the dock so it clears the scrim', () => {
+        // Root-cause regression: the sheet (.bp-content, z 1410) must render in
+        // the body-portaled mobile layer on mobile, not trapped inside the
+        // .game-shell stacking context (z:1) where the body-level scrim (1390)
+        // paints over it and steals taps.
+        expect(betPanelSource).toContain("matchMedia('(max-width: 768px)')")
+        expect(betPanelSource).toContain('{isMobile && sheetContent}')
+        expect(betPanelSource).toContain('{!isMobile && sheetContent}')
+        expect(primitivesCss).toContain('.bp-mobile-layer.mobile-open .bp-content')
+        // The canonical mobile dock/sheet collapse must live at the unified
+        // 768px breakpoint (matches nav metrics + browserSmoke + sportsbook JS).
+        expect(primitivesCss).toMatch(/@media \(max-width: 768px\)[\s\S]*\.bp-mobile-dock/s)
+        expect(primitivesCss).not.toContain('@media (max-width: 720px)')
     })
 
     it('prevents asset preloaders from blanking games forever', () => {
@@ -96,7 +111,7 @@ describe('QA layout and loader contracts', () => {
         expect(slotsCss).toContain('position: fixed')
         expect(slotsCss).toContain('var(--z-mobile-action, 1400)')
         expect(slotsCss).toContain('bottom: calc(var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)))')
-        expect(slotsCss).toMatch(/@media \(max-width: 760px\)[\s\S]*\.slot-controls-v2\s*\{[\s\S]*display:\s*none/s)
+        expect(slotsCss).toMatch(/@media \(max-width: 768px\)[\s\S]*\.slot-controls-v2\s*\{[\s\S]*display:\s*none/s)
     })
 
     it('marks audited mobile critical surfaces for browser smoke visibility checks', () => {
