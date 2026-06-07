@@ -93,6 +93,18 @@
 .insights-rtp-figure[data-tone="neg"] strong { color: var(--accent-red, #ff5562); }
 .insights-rtp-figure em { font-style: normal; color: var(--text-muted, #909cb0); font-size: 11px; }
 
+.insights-band {
+    margin: 14px 0 0;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+    background: rgba(0, 0, 0, 0.22);
+    color: var(--text-secondary, #9fb2c8);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+.insights-band strong { color: var(--text-primary, #fff); }
+
 .insights-realstakes {
     margin: 14px 0 0;
     padding: 12px;

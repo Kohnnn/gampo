@@ -18,6 +18,8 @@ function pct(v) { return `${((Number(v) || 0) * 100).toFixed(1)}%` }
 
 export default function StrategySandboxPage() {
     const [strategy, setStrategy] = useState('flat')
+    const [compareEnabled, setCompareEnabled] = useState(false)
+    const [strategyB, setStrategyB] = useState('martingale')
     const [preset, setPreset] = useState('cointoss')
     const [startBalance, setStartBalance] = useState(1000)
     const [baseBet, setBaseBet] = useState(10)
@@ -25,17 +27,21 @@ export default function StrategySandboxPage() {
     const [runs, setRuns] = useState(2000)
     const [pctOfBankroll, setPctOfBankroll] = useState(5)
     const [result, setResult] = useState(null)
+    const [resultB, setResultB] = useState(null)
     const [running, setRunning] = useState(false)
 
     const activePreset = PRESETS.find(p => p.id === preset) || PRESETS[0]
     const activeStrategy = STRATEGIES.find(s => s.id === strategy) || STRATEGIES[0]
+    const activeStrategyB = STRATEGIES.find(s => s.id === strategyB) || STRATEGIES[0]
 
     const run = () => {
         setRunning(true)
         // Defer so the button shows its pressed state before the synchronous sim.
         setTimeout(() => {
-            const r = runStrategySandbox({
-                strategy,
+            // Shared seed so a side-by-side comparison runs both strategies
+            // against the same random sequence — a fair head-to-head.
+            const seed = Math.floor(Math.random() * 1e9)
+            const common = {
                 startBalance: Number(startBalance) || 1000,
                 baseBet: Number(baseBet) || 10,
                 winChance: activePreset.winChance,
@@ -43,18 +49,22 @@ export default function StrategySandboxPage() {
                 rounds: Number(rounds) || 200,
                 runs: Number(runs) || 2000,
                 pctOfBankroll: Number(pctOfBankroll) || 5,
-                seed: Math.floor(Math.random() * 1e9),
-            })
-            setResult(r)
+                seed,
+            }
+            setResult(runStrategySandbox({ ...common, strategy }))
+            setResultB(compareEnabled ? runStrategySandbox({ ...common, strategy: strategyB }) : null)
             setRunning(false)
             recordLearningEvent('sandbox')
         }, 20)
     }
 
     const maxBucket = useMemo(() => {
-        if (!result) return 1
-        return Math.max(1, ...result.histogram.map(b => b.count))
-    }, [result])
+        const buckets = [
+            ...(result ? result.histogram.map(b => b.count) : []),
+            ...(resultB ? resultB.histogram.map(b => b.count) : []),
+        ]
+        return Math.max(1, ...buckets, 1)
+    }, [result, resultB])
 
     return (
         <div className="sandbox-page" data-ux-surface="stage">
@@ -84,12 +94,27 @@ export default function StrategySandboxPage() {
                     </label>
 
                     <label className="sandbox-field">
-                        <span>Strategy</span>
+                        <span>Strategy{compareEnabled ? ' A' : ''}</span>
                         <select value={strategy} onChange={e => setStrategy(e.target.value)}>
                             {STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                         <small>{activeStrategy.detail}</small>
                     </label>
+
+                    <label className="sandbox-check">
+                        <input type="checkbox" checked={compareEnabled} onChange={e => setCompareEnabled(e.target.checked)} />
+                        <span>Compare two strategies head-to-head (same random sequence)</span>
+                    </label>
+
+                    {compareEnabled && (
+                        <label className="sandbox-field">
+                            <span>Strategy B</span>
+                            <select value={strategyB} onChange={e => setStrategyB(e.target.value)}>
+                                {STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            <small>{activeStrategyB.detail}</small>
+                        </label>
+                    )}
 
                     <div className="sandbox-row">
                         <label className="sandbox-field">
@@ -134,48 +159,38 @@ export default function StrategySandboxPage() {
                         </div>
                     ) : (
                         <>
-                            <div className="sandbox-verdict" data-tone={result.expectedNetPerRun >= 0 ? 'pos' : 'neg'}>
-                                <span>Average end balance after {result.input.rounds} rounds</span>
-                                <strong>{formatCredits(result.meanFinal)}</strong>
-                                <em>
-                                    {result.expectedNetPerRun >= 0 ? '+' : ''}{formatCredits(result.expectedNetPerRun)} vs your {formatCredits(result.input.startBalance)} start
-                                </em>
+                            <div className={resultB ? 'sandbox-compare' : ''}>
+                                <ResultBlock
+                                    result={result}
+                                    maxBucket={maxBucket}
+                                    label={resultB ? activeStrategy.name : null}
+                                />
+                                {resultB && (
+                                    <ResultBlock
+                                        result={resultB}
+                                        maxBucket={maxBucket}
+                                        label={activeStrategyB.name}
+                                    />
+                                )}
                             </div>
 
-                            <div className="sandbox-stats">
-                                <Stat label="Median end" value={formatCredits(result.medianFinal)} />
-                                <Stat label="Went bust" value={pct(result.bustRate)} tone={result.bustRate > 0.2 ? 'neg' : ''} />
-                                <Stat label="Ended ahead" value={pct(result.profitableRate)} />
-                                <Stat label="Worst 5%" value={formatCredits(result.p05)} tone="neg" />
-                                <Stat label="Best 5%" value={formatCredits(result.p95)} tone="pos" />
-                                <Stat label="Biggest single bet" value={formatCredits(result.maxBetSeen)} />
-                            </div>
+                            {resultB && (
+                                <p className="sandbox-lesson">
+                                    <strong>Head-to-head:</strong> both ran the same {Number(result.runs).toLocaleString()} random
+                                    sequences. {activeStrategy.name} averaged {formatCredits(result.meanFinal)} and {activeStrategyB.name} averaged
+                                    {' '}{formatCredits(resultB.meanFinal)} — neither escapes the
+                                    {' '}{pct(1 - (activePreset.winChance * activePreset.payoutMultiplier))} house edge. Systems only reshape
+                                    the swings (bust rate, tails), not the average.
+                                </p>
+                            )}
 
-                            <div className="sandbox-hist" aria-label="Distribution of final balances">
-                                <span className="sandbox-hist-title">Where {Number(result.runs).toLocaleString()} sessions ended up</span>
-                                <div className="sandbox-bars">
-                                    {result.histogram.map((b, i) => (
-                                        <div key={i} className="sandbox-bar-col" title={`${formatCredits(b.from)}–${formatCredits(b.to)}: ${b.count}`}>
-                                            <div
-                                                className="sandbox-bar"
-                                                style={{ height: `${(b.count / maxBucket) * 100}%` }}
-                                                data-zero={b.from <= result.input.startBalance && b.to >= result.input.startBalance ? 'true' : undefined}
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="sandbox-hist-axis">
-                                    <span>{formatCredits(result.histogram[0].from)}</span>
-                                    <span>final balance →</span>
-                                    <span>{formatCredits(result.histogram[result.histogram.length - 1].to)}</span>
-                                </div>
-                            </div>
-
-                            <p className="sandbox-lesson">
-                                <strong>Lesson:</strong> the house edge is {pct(1 - (activePreset.winChance * activePreset.payoutMultiplier))} per round.
-                                Staking systems change the <em>shape</em> of the distribution (more busts, bigger swings) but
-                                can't move the average above your starting bankroll on a negative-edge game.
-                            </p>
+                            {!resultB && (
+                                <p className="sandbox-lesson">
+                                    <strong>Lesson:</strong> the house edge is {pct(1 - (activePreset.winChance * activePreset.payoutMultiplier))} per round.
+                                    Staking systems change the <em>shape</em> of the distribution (more busts, bigger swings) but
+                                    can't move the average above your starting bankroll on a negative-edge game.
+                                </p>
+                            )}
                         </>
                     )}
                 </div>
@@ -193,6 +208,50 @@ function Stat({ label, value, tone = '' }) {
         <div className="sandbox-stat">
             <span>{label}</span>
             <strong className={tone}>{value}</strong>
+        </div>
+    )
+}
+
+function ResultBlock({ result, maxBucket, label }) {
+    return (
+        <div className="sandbox-result-block">
+            {label && <h3 className="sandbox-result-label">{label}</h3>}
+            <div className="sandbox-verdict" data-tone={result.expectedNetPerRun >= 0 ? 'pos' : 'neg'}>
+                <span>Average end balance after {result.input.rounds} rounds</span>
+                <strong>{formatCredits(result.meanFinal)}</strong>
+                <em>
+                    {result.expectedNetPerRun >= 0 ? '+' : ''}{formatCredits(result.expectedNetPerRun)} vs your {formatCredits(result.input.startBalance)} start
+                </em>
+            </div>
+
+            <div className="sandbox-stats">
+                <Stat label="Median end" value={formatCredits(result.medianFinal)} />
+                <Stat label="Went bust" value={pct(result.bustRate)} tone={result.bustRate > 0.2 ? 'neg' : ''} />
+                <Stat label="Ended ahead" value={pct(result.profitableRate)} />
+                <Stat label="Worst 5%" value={formatCredits(result.p05)} tone="neg" />
+                <Stat label="Best 5%" value={formatCredits(result.p95)} tone="pos" />
+                <Stat label="Biggest single bet" value={formatCredits(result.maxBetSeen)} />
+            </div>
+
+            <div className="sandbox-hist" aria-label="Distribution of final balances">
+                <span className="sandbox-hist-title">Where {Number(result.runs).toLocaleString()} sessions ended up</span>
+                <div className="sandbox-bars">
+                    {result.histogram.map((b, i) => (
+                        <div key={i} className="sandbox-bar-col" title={`${formatCredits(b.from)}–${formatCredits(b.to)}: ${b.count}`}>
+                            <div
+                                className="sandbox-bar"
+                                style={{ height: `${(b.count / maxBucket) * 100}%` }}
+                                data-zero={b.from <= result.input.startBalance && b.to >= result.input.startBalance ? 'true' : undefined}
+                            />
+                        </div>
+                    ))}
+                </div>
+                <div className="sandbox-hist-axis">
+                    <span>{formatCredits(result.histogram[0].from)}</span>
+                    <span>final balance →</span>
+                    <span>{formatCredits(result.histogram[result.histogram.length - 1].to)}</span>
+                </div>
+            </div>
         </div>
     )
 }

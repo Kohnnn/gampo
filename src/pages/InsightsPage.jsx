@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { BarChart3, TrendingUp, TrendingDown, Flame, Snowflake } from 'lucide-react'
 import { useGlobalPnl } from '../hooks/useGlobalPnl'
-import { buildSessionInsights } from '../utils/sessionInsights'
+import { buildSessionInsights, rtpConfidenceBand } from '../utils/sessionInsights'
 import { findGameDefinition } from '../data/gameDefinitions'
 import { formatCredits } from '../utils/simulationMath'
 import '../styles/insights.css'
@@ -17,6 +17,22 @@ export default function InsightsPage() {
 
     const allTime = useMemo(() => buildSessionInsights(history.alltime), [history.alltime])
     const session = useMemo(() => buildSessionInsights(history.session), [history.session])
+
+    // Wager-weighted theoretical RTP across the games actually played, and the
+    // 95% variance band around it for the current sample size.
+    const theoretical = useMemo(() => {
+        let wagered = 0
+        let weighted = 0
+        for (const g of allTime.games) {
+            const def = findGameDefinition(g.gameId)
+            const rtp = Number.isFinite(def?.rtp) ? def.rtp : 0.97
+            wagered += g.wagered
+            weighted += rtp * g.wagered
+        }
+        const rtp = wagered > 0 ? weighted / wagered : null
+        const band = rtp != null ? rtpConfidenceBand(rtp, allTime.count) : null
+        return { rtp, band }
+    }, [allTime.games, allTime.count])
 
     const empty = allTime.count === 0
 
@@ -63,6 +79,17 @@ export default function InsightsPage() {
                                 <em>What the edge has cost across {formatCredits(allTime.wagered)} wagered</em>
                             </div>
                         </div>
+                        {theoretical.band && (
+                            <p className="insights-band">
+                                Expected return for these games is <strong>{pct(theoretical.rtp)}</strong>.
+                                With {allTime.count} rounds, results between{' '}
+                                <strong>{pct(theoretical.band.lower)}</strong> and <strong>{pct(theoretical.band.upper)}</strong>{' '}
+                                are just normal variance (95% band). Your <strong>{pct(allTime.realizedRtp)}</strong> is{' '}
+                                {allTime.realizedRtp != null && (allTime.realizedRtp < theoretical.band.lower || allTime.realizedRtp > theoretical.band.upper)
+                                    ? 'outside that band — an unusual run, but it converges with more play.'
+                                    : 'right where the math expects it.'}
+                            </p>
+                        )}
                         <p className="insights-realstakes">
                             At a real <strong>$1 / credit</strong> stake, your {formatCredits(allTime.wagered)} of
                             volume would mean a net of{' '}

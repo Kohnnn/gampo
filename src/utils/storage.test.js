@@ -9,6 +9,7 @@ import {
     listGampoKeys,
     snapshotGampoState,
     restoreGampoState,
+    onStorageQuotaError,
 } from './storage'
 
 beforeEach(() => {
@@ -79,5 +80,26 @@ describe('storage util', () => {
         restoreGampoState({ gampo_new: 'fresh' })
         expect(readRaw('gampo_stale', null)).toBeNull()
         expect(readRaw('gampo_new')).toBe('fresh')
+    })
+
+    it('signals quota errors to listeners and returns false', () => {
+        let signalled = null
+        const off = onStorageQuotaError((e) => { signalled = e })
+        const quotaErr = Object.assign(new Error('full'), { name: 'QuotaExceededError' })
+        globalThis.localStorage.setItem = () => { throw quotaErr }
+        const ok = writeJson('gampo_big', { x: 1 })
+        expect(ok).toBe(false)
+        expect(signalled).toBeTruthy()
+        expect(signalled.key).toBe('gampo_big')
+        off()
+    })
+
+    it('does not signal quota for non-quota write errors', () => {
+        let signalled = false
+        const off = onStorageQuotaError(() => { signalled = true })
+        globalThis.localStorage.setItem = () => { throw new Error('other') }
+        expect(writeRaw('gampo_x', '1')).toBe(false)
+        expect(signalled).toBe(false)
+        off()
     })
 })

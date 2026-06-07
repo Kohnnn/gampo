@@ -108,3 +108,14 @@ markup remains duplicated.
 - Found + fixed a real failure: `--text-muted` was `#5f6368` (~2.4:1 on `--bg-primary`) — below AA for all the hint/secondary text using it. Bumped to `#909cb0` (5.2:1). Also replaced the `#6f829a` (3.65:1) hardcoded fallback in new page CSS + primitives with `#909cb0`.
 - Added `src/styles/contrast.test.js` — parses the tokens from `index.css` and asserts text-primary/secondary/muted all clear AA, so a future edit can't silently regress them.
 - Verify: full suite PASS (344), build OK, contrast audit PASS (0 issues on `/ /settings /insights /sandbox /dice /poker /missions /cases`), a11y PASS, bet-sheet PASS, ux=100.
+
+## Follow-on shipped (8 brainstorm hardening items, 2026-06-07)
+1. Save-file migration path: `migrateSaveData(data, fromVersion)` runs registered migrators from the file's version up to `SAVE_VERSION` before restore (+test).
+2. localStorage quota handling: `storage.js` detects QuotaExceeded and fires `onStorageQuotaError` listeners; `SessionGuardBanner` shows a "local storage is full" notice (+tests). Writes still fail-safe.
+3. EV coach multi-bet scoping: `evCoach.js` flags multi-bet games (roulette/sicbo/keno/baccarat/war/craps or `multiBet:true`) and appends a clarifying note that the edge varies by bet choice (+tests).
+4. Mobile bet sheet a11y: open sheet is now a focus-trapped `role="dialog"` — Escape closes, Tab is trapped, focus moves in on open and restores to the trigger on close (+contract test).
+5. `npm run audit:all` — runs a11y + contrast + bet-sheet audits together.
+6. Bundle hygiene guard: `bundleGuard.test.js` caps eager catalog data source size + forbids inlined base64 blobs. (First-load `index` ~202KB; games + plinko rows already lazy.)
+7. Strategy Sandbox compare mode: opt-in head-to-head of two strategies on the same seed, side-by-side result blocks + comparative lesson. Run CTA made sticky on mobile to stay hit-testable.
+8. Insights variance band: `rtpConfidenceBand()` (+tests) shows the 95% range around wager-weighted theoretical RTP for the player's sample size, quantifying "running hot/cold".
+- Verify: full suite PASS (358), build OK, contrast PASS, a11y PASS, bet-sheet PASS, sandbox-compare functional check OK (2 blocks), ux=100 on all sampled routes/viewports.

@@ -308,8 +308,62 @@ export default function BetPanel({
         setMobileOpenedOnce(true)
     }
 
+    const sheetRef = useRef(null)
+    const sheetTriggerRef = useRef(null)
+
+    // Accessibility for the portaled mobile sheet: trap Tab focus inside the
+    // open sheet, close on Escape, move focus into the sheet on open, and
+    // restore focus to the trigger on close.
+    useEffect(() => {
+        if (!isMobile || !mobileControlsOpen) return undefined
+        const sheet = sheetRef.current
+        if (!sheet) return undefined
+
+        const focusables = () => Array.from(
+            sheet.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+        ).filter(el => !el.disabled && el.offsetParent !== null)
+
+        // Move focus into the sheet (first control) on open.
+        const first = focusables()[0]
+        if (first) first.focus()
+
+        const onKey = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                setMobileControlsOpen(false)
+                return
+            }
+            if (e.key !== 'Tab') return
+            const items = focusables()
+            if (items.length === 0) return
+            const firstEl = items[0]
+            const lastEl = items[items.length - 1]
+            if (e.shiftKey && document.activeElement === firstEl) {
+                e.preventDefault()
+                lastEl.focus()
+            } else if (!e.shiftKey && document.activeElement === lastEl) {
+                e.preventDefault()
+                firstEl.focus()
+            }
+        }
+        document.addEventListener('keydown', onKey, true)
+        return () => {
+            document.removeEventListener('keydown', onKey, true)
+            // Restore focus to the trigger when the sheet closes.
+            const trigger = sheetTriggerRef.current
+            if (trigger && typeof trigger.focus === 'function') trigger.focus()
+        }
+    }, [isMobile, mobileControlsOpen])
+
     const sheetContent = (
-        <div className="bp-content" id={`${panelId}-mobile-controls`}>
+        <div
+            className="bp-content"
+            id={`${panelId}-mobile-controls`}
+            ref={sheetRef}
+            role={isMobile ? 'dialog' : undefined}
+            aria-modal={isMobile && mobileControlsOpen ? 'true' : undefined}
+            aria-label={isMobile ? settingsLabel : undefined}
+        >
                 <button
                     type="button"
                     className="bp-mobile-close"
@@ -435,6 +489,7 @@ export default function BetPanel({
                     type="button"
                     className={`bp-mobile-settings ${showSetupNudge ? 'nudge' : ''}`}
                     onClick={openMobileControls}
+                    ref={sheetTriggerRef}
                     aria-expanded={mobileControlsOpen}
                     aria-controls={`${panelId}-mobile-controls`}
                     aria-label={settingsLabel}

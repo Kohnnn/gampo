@@ -13,6 +13,7 @@
         "verify:betsheet": "node scripts/verifyBetSheet.mjs",
         "audit:a11y": "node scripts/auditA11y.mjs",
         "audit:contrast": "node scripts/auditContrast.mjs",
+        "audit:all": "node scripts/auditA11y.mjs && node scripts/auditContrast.mjs && node scripts/verifyBetSheet.mjs",
         "gen:assets": "node scripts/genAssets.js"
     },
     "dependencies": {

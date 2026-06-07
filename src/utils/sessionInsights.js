@@ -12,6 +12,31 @@
 
 import { round2 } from './simulationMath'
 
+/**
+ * Confidence band for realized RTP around a theoretical value (teaching aid).
+ *
+ * Per-round return has a standard deviation on the order of the payout spread;
+ * the standard error of the mean shrinks with 1/sqrt(n). We approximate a 95%
+ * band (~1.96 SE) so the player sees "with N rounds, results within ±X% of
+ * theoretical are just normal variance". Intentionally an approximation.
+ *
+ * @param {number} theoreticalRtp e.g. 0.96
+ * @param {number} count rounds played
+ * @param {number} [perRoundSd=1.0] rough SD of single-round return vs stake
+ * @returns {{ lower:number, upper:number, halfWidth:number }|null}
+ */
+export function rtpConfidenceBand(theoreticalRtp, count, perRoundSd = 1.0) {
+    const n = Number(count) || 0
+    if (n < 1 || !Number.isFinite(theoreticalRtp)) return null
+    const se = (Number(perRoundSd) || 1.0) / Math.sqrt(n)
+    const halfWidth = 1.96 * se
+    return {
+        lower: theoreticalRtp - halfWidth,
+        upper: theoreticalRtp + halfWidth,
+        halfWidth,
+    }
+}
+
 function computeStreaks(entries) {
     let bestWin = 0
     let bestLoss = 0

@@ -137,6 +137,34 @@
     text-align: center;
 }
 
+.sandbox-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--text-secondary, #9fb2c8);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+}
+.sandbox-check input { margin-top: 2px; width: 16px; height: 16px; flex: 0 0 auto; }
+.sandbox-check input:focus-visible { outline: 2px solid var(--accent, #00e701); outline-offset: 2px; }
+
+.sandbox-compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.sandbox-result-label {
+    margin: 0 0 8px;
+    color: var(--accent, #00e701);
+    font-size: 13px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 .sandbox-results { min-height: 320px; }
 
 .sandbox-empty {
@@ -253,7 +281,15 @@
     .sandbox-grid {
         grid-template-columns: 1fr;
     }
+    .sandbox-compare { grid-template-columns: 1fr; }
     .sandbox-hero h1 { font-size: 21px; }
+    /* Keep the primary CTA reachable on small screens even as the form grows
+       (compare mode adds fields) — sticky to the bottom of the controls. */
+    .sandbox-run {
+        position: sticky;
+        bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)) + 8px);
+        z-index: 2;
+    }
     .sandbox-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sandbox-page {
         padding-bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)) + 8px);
