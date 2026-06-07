@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { levelForXp, rankForLevel, xpForRound } from '../data/xpLevels'
+import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const XP_KEY = 'gampo_xp_state'
 
@@ -31,23 +32,17 @@ function dayKey(ts = Date.now()) {
 }
 
 function readState() {
-    try {
-        const raw = localStorage.getItem(XP_KEY)
-        if (!raw) return { ...DEFAULT_STATE }
-        const parsed = JSON.parse(raw)
-        if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STATE }
-        return {
-            ...DEFAULT_STATE,
-            ...parsed,
-            seenGames: Array.isArray(parsed.seenGames) ? parsed.seenGames : [],
-        }
-    } catch {
-        return { ...DEFAULT_STATE }
+    const parsed = readJson(XP_KEY, null)
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STATE }
+    return {
+        ...DEFAULT_STATE,
+        ...parsed,
+        seenGames: Array.isArray(parsed.seenGames) ? parsed.seenGames : [],
     }
 }
 
 function writeState() {
-    try { localStorage.setItem(XP_KEY, JSON.stringify(state)) } catch { /* ignore */ }
+    writeJson(XP_KEY, state)
 }
 
 function notify() {
@@ -97,7 +92,7 @@ export function dismissLevelUp() {
 export function resetXp() {
     state = { ...DEFAULT_STATE }
     recentLevelUp = null
-    try { localStorage.removeItem(XP_KEY) } catch { /* ignore */ }
+    removeKey(XP_KEY)
     notify()
 }
 

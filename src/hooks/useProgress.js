@@ -29,6 +29,7 @@
 
 import { useEffect, useState } from 'react'
 import { ACHIEVEMENTS, evaluateAchievements } from '../data/achievements'
+import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const STATS_KEY = 'gampo_progress_stats'
 const UNLOCK_KEY = 'gampo_progress_unlocked'
@@ -67,38 +68,26 @@ let unlocked = readUnlocked()
 let recentUnlock = null
 
 function readStats() {
-    try {
-        const raw = localStorage.getItem(STATS_KEY)
-        if (!raw) return { ...DEFAULT_STATS }
-        const parsed = JSON.parse(raw)
-        if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STATS }
-        return {
-            ...DEFAULT_STATS,
-            ...parsed,
-            uniqueGames: Array.isArray(parsed.uniqueGames) ? parsed.uniqueGames : [],
-        }
-    } catch {
-        return { ...DEFAULT_STATS }
+    const parsed = readJson(STATS_KEY, null)
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STATS }
+    return {
+        ...DEFAULT_STATS,
+        ...parsed,
+        uniqueGames: Array.isArray(parsed.uniqueGames) ? parsed.uniqueGames : [],
     }
 }
 
 function readUnlocked() {
-    try {
-        const raw = localStorage.getItem(UNLOCK_KEY)
-        if (!raw) return {}
-        const parsed = JSON.parse(raw)
-        return parsed && typeof parsed === 'object' ? parsed : {}
-    } catch {
-        return {}
-    }
+    const parsed = readJson(UNLOCK_KEY, {})
+    return parsed && typeof parsed === 'object' ? parsed : {}
 }
 
 function writeStats() {
-    try { localStorage.setItem(STATS_KEY, JSON.stringify(stats)) } catch { /* ignore */ }
+    writeJson(STATS_KEY, stats)
 }
 
 function writeUnlocked() {
-    try { localStorage.setItem(UNLOCK_KEY, JSON.stringify(unlocked)) } catch { /* ignore */ }
+    writeJson(UNLOCK_KEY, unlocked)
 }
 
 function notify() {
@@ -204,10 +193,8 @@ export function resetProgress() {
     stats = { ...DEFAULT_STATS }
     unlocked = {}
     recentUnlock = null
-    try {
-        localStorage.removeItem(STATS_KEY)
-        localStorage.removeItem(UNLOCK_KEY)
-    } catch { /* ignore */ }
+    removeKey(STATS_KEY)
+    removeKey(UNLOCK_KEY)
     notify()
 }
 

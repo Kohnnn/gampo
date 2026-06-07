@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react'
 import { DAILY_CLAIM_CREDITS, PROGRESS_PACK_CREDITS, STARTER_PACKS, levelRewardCredits } from '../data/rewards'
+import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const KEY = 'gampo_rewards'
 
@@ -24,24 +25,18 @@ function dayKey(ts = Date.now()) {
 }
 
 function readState() {
-    try {
-        const raw = localStorage.getItem(KEY)
-        if (!raw) return { ...DEFAULT_STATE }
-        const parsed = JSON.parse(raw)
-        if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STATE }
-        return {
-            ...DEFAULT_STATE,
-            ...parsed,
-            claimedLevels: Array.isArray(parsed.claimedLevels) ? parsed.claimedLevels : [],
-            progressPacks: Number.isFinite(parsed.progressPacks) ? parsed.progressPacks : 0,
-        }
-    } catch {
-        return { ...DEFAULT_STATE }
+    const parsed = readJson(KEY, null)
+    if (!parsed || typeof parsed !== 'object') return { ...DEFAULT_STATE }
+    return {
+        ...DEFAULT_STATE,
+        ...parsed,
+        claimedLevels: Array.isArray(parsed.claimedLevels) ? parsed.claimedLevels : [],
+        progressPacks: Number.isFinite(parsed.progressPacks) ? parsed.progressPacks : 0,
     }
 }
 
 function write() {
-    try { localStorage.setItem(KEY, JSON.stringify(state)) } catch { /* ignore */ }
+    writeJson(KEY, state)
 }
 
 function notify() {
@@ -112,7 +107,7 @@ export function takeProgressPack() {
 
 export function resetRewards() {
     state = { ...DEFAULT_STATE }
-    try { localStorage.removeItem(KEY) } catch { /* ignore */ }
+    removeKey(KEY)
     notify()
 }
 

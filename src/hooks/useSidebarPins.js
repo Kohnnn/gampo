@@ -11,6 +11,7 @@
 // in sync without prop drilling.
 
 import { useEffect, useState } from 'react'
+import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const KEY = 'gampo_pinned_games'
 const MAX_PINS = 12
@@ -19,18 +20,12 @@ const listeners = new Set()
 let pins = read()
 
 function read() {
-    try {
-        const raw = localStorage.getItem(KEY)
-        if (!raw) return []
-        const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed.filter(p => typeof p === 'string') : []
-    } catch {
-        return []
-    }
+    const parsed = readJson(KEY, [])
+    return Array.isArray(parsed) ? parsed.filter(p => typeof p === 'string') : []
 }
 
 function write() {
-    try { localStorage.setItem(KEY, JSON.stringify(pins)) } catch { /* ignore */ }
+    writeJson(KEY, pins)
 }
 
 function notify() {
@@ -58,7 +53,7 @@ export function isPinned(path) {
 
 export function clearPins() {
     pins = []
-    try { localStorage.removeItem(KEY) } catch { /* ignore */ }
+    removeKey(KEY)
     notify()
 }
 

@@ -17,6 +17,7 @@
 // pages) sees the same numbers without a Provider tree.
 
 import { useEffect, useState } from 'react'
+import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const ALLTIME_KEY = 'gampo_pnl_alltime'
 const ALLTIME_LIMIT = 500
@@ -27,23 +28,14 @@ let alltimeHistory = readAlltime()
 let currentGameId = null
 
 function readAlltime() {
-    try {
-        const raw = localStorage.getItem(ALLTIME_KEY)
-        if (!raw) return []
-        const parsed = JSON.parse(raw)
-        return Array.isArray(parsed) ? parsed : []
-    } catch {
-        return []
-    }
+    const parsed = readJson(ALLTIME_KEY, [])
+    return Array.isArray(parsed) ? parsed : []
 }
 
 function writeAlltime() {
-    try {
-        const trimmed = alltimeHistory.slice(-ALLTIME_LIMIT)
-        localStorage.setItem(ALLTIME_KEY, JSON.stringify(trimmed))
+    const trimmed = alltimeHistory.slice(-ALLTIME_LIMIT)
+    if (writeJson(ALLTIME_KEY, trimmed)) {
         alltimeHistory = trimmed
-    } catch {
-        // ignore quota errors
     }
 }
 
@@ -71,7 +63,7 @@ export function resetScope(scope) {
     if (scope === 'session') sessionHistory = []
     else if (scope === 'alltime') {
         alltimeHistory = []
-        try { localStorage.removeItem(ALLTIME_KEY) } catch { /* ignore */ }
+        removeKey(ALLTIME_KEY)
     } else if (scope === 'game' && currentGameId) {
         sessionHistory = sessionHistory.filter(e => e.gameId !== currentGameId)
     }
