@@ -93,7 +93,7 @@ describe('slotFactory layout helpers', () => {
         // On phones the slot-mobile-dock provides the primary Spin. The in-flow
         // slot-panel-spin is hidden to avoid two competing spin buttons.
         expect(slotsCssSource).toContain('.slot-panel-spin')
-        expect(slotsCssSource).toMatch(/@media \(max-width: 760px\)[\s\S]*\.slot-panel-spin\s*\{[\s\S]*display:\s*none/)
+        expect(slotsCssSource).toMatch(/@media \(max-width: 768px\)[\s\S]*\.slot-panel-spin\s*\{[\s\S]*display:\s*none/)
         expect(slotsCssSource).toContain('.slot-mobile-spin')
     })
 

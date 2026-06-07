@@ -123,7 +123,7 @@
     box-shadow: 0 0 18px rgba(109, 183, 255, 0.34);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .coinflip-stage {
         gap: 14px;
         padding: 14px 6px calc(var(--mobile-action-height, 74px) + 18px);

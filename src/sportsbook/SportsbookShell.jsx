@@ -139,7 +139,7 @@ function SportsbookShell() {
 
     const handleToggleSelection = (selectionId) => {
         setSelections(current => toggleSelection(current, events, selectionId))
-        if (window.matchMedia('(max-width: 760px)').matches) setMobileSlipOpen(true)
+        if (window.matchMedia('(max-width: 768px)').matches) setMobileSlipOpen(true)
     }
 
     const refreshFeed = async () => {

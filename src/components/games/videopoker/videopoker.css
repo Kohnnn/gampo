@@ -156,7 +156,7 @@
     animation: none;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .vp-stage {
         align-items: stretch;
         gap: 12px;

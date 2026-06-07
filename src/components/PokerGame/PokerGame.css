@@ -965,7 +965,7 @@
 
 /* Wave 15: tablet and mobile responsive scaling */
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .poker-page { padding: 8px; }
     .poker-titlebar {
         grid-template-columns: 1fr auto;
@@ -1768,7 +1768,7 @@
 }
 
 /* Mobile QA v2: compact seated table with a reachable action bar. */
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .poker-page {
         padding: 8px 8px calc(var(--mobile-nav-height, 64px) + 18px);
         scroll-padding-bottom: calc(var(--mobile-nav-height, 64px) + 88px);
@@ -2058,7 +2058,7 @@
        opponents rail (grid)  ->  pot + board  ->  hero seat  ->  actions
    It only applies on small screens; desktop is untouched.
    ============================================================ */
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     /* Dissolve the oval: the felt becomes a normal vertical flow container. */
     .poker-table-felt {
         aspect-ratio: auto !important;

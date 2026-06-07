@@ -1192,7 +1192,7 @@
 .sb-search-overlay {
     position: fixed;
     inset: 0;
-    z-index: 500;
+    z-index: var(--z-modal, 1500);
     background: rgba(4, 12, 18, 0.74);
     display: flex;
     justify-content: center;
@@ -1359,7 +1359,7 @@
 .sb-coach-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 620;
+    z-index: var(--z-modal, 1500);
     display: flex;
     justify-content: flex-end;
     background: rgba(4, 12, 18, 0.62);
@@ -1732,7 +1732,7 @@
         position: fixed;
         right: 12px;
         bottom: calc(var(--mobile-nav-height, 64px) + max(12px, env(safe-area-inset-bottom)));
-        z-index: 320;
+        z-index: var(--z-mobile-action, 1400);
         min-height: 46px;
         display: inline-flex;
         align-items: center;
@@ -1766,7 +1766,7 @@
     .sb-mobile-slip {
         position: fixed;
         inset: 0;
-        z-index: 410;
+        z-index: var(--z-modal, 1500);
         display: block;
         background: rgba(4, 12, 18, 0.58);
         padding: 64px 8px calc(var(--mobile-nav-height, 64px) + 8px);

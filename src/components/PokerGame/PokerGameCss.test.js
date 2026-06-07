@@ -27,9 +27,19 @@ describe('poker layout CSS', () => {
         for (const action of ['fold', 'check', 'call', 'raise']) {
             expect(source).toContain(`data-poker-action="${action}"`)
         }
-        expect(css).toMatch(/@media \(max-width: 760px\)[\s\S]*\.pk-actions\s*\{[\s\S]*position:\s*sticky/s)
+        expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.pk-actions\s*\{[\s\S]*position:\s*sticky/s)
         expect(css).toContain('bottom: calc(var(--mobile-nav-height, 64px) + 8px)')
         expect(css).toContain('max-height: 260px')
         expect(css).toContain('.poker-mobile-gto-now')
+    })
+
+    it('instruments poker surfaces for the UX benchmark like the shared shell', () => {
+        // Poker is a custom shell; without these markers it was exempt from the
+        // benchmark's surface-coverage and playfield-priority scoring.
+        expect(source).toContain('className="poker-page" data-ux-surface="shell"')
+        expect(source).toContain('className="poker-titlebar" data-ux-surface="shell"')
+        expect(source).toContain('className="poker-table" data-ux-surface="stage"')
+        expect(source).toContain('className="poker-sidebar" data-ux-surface="aside"')
+        expect(source).toContain('className="pk-actions" data-ux-surface="controls"')
     })
 })

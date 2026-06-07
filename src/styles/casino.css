@@ -732,7 +732,7 @@
     text-align: right;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .race-row {
         grid-template-columns: 28px 1fr;
     }

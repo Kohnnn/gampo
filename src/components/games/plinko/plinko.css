@@ -154,7 +154,7 @@
 }
 .gampo-reduce-motion .plinko-bin-chip.hit { animation: none; }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
     .plinko-stage { gap: 6px; }
     .plinko-stage .rrs-strip {
         min-height: 30px;

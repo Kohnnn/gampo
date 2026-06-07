@@ -362,7 +362,7 @@
 .gampo-reduce-motion .tarot-card,
 .gampo-reduce-motion .tarot-card::before { animation: none; transition: none; }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
     .game-shell:has(.tarot-stage-frame) .gs-panel {
         order: 1;
         height: auto !important;
