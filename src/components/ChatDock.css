@@ -652,6 +652,18 @@
 .prog-claim-btn:hover:not(:disabled) { transform: translateY(-1px); }
 .prog-claim-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.prog-progress-pack { margin-top: 8px; }
+.prog-progress-pack-btn {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    border-color: color-mix(in srgb, var(--accent-yellow, #ffc107), transparent 50%);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent-yellow, #ffc107), transparent 86%), color-mix(in srgb, var(--accent-orange, #f7931a), transparent 90%));
+}
+.prog-progress-pack-btn strong { color: var(--accent-yellow, #ffc107); }
+.prog-progress-pack .prog-rewards-hint { margin-top: 6px; }
+
 .prog-ring {
     --pct: 0;
     width: 76px;
