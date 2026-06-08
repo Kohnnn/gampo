@@ -98,9 +98,33 @@ lacks many game cards (Cases, etc.)".
   - contrast: PASS (0 AA issues) across 8 routes incl. `/roulette`.
 - Verified at 466px: 51 cards, Poker card present, 0 clipped badges, 9 crash presets visible.
 
-## Follow-ups
-- Netlify GitHub auto-deploy lag: investigate why the push-triggered build did not publish
-  (had to deploy via CLI). Not blocking; production is current.
-- `/poker` @390px ux interaction probe: consider tagging the SIT-DOWN CTA with
-  `data-mobile-primary-action` so the harness can complete the probe, or document it as an
-  expected skip for modal-entry games.
+## Cases open-flow UX (excessive scrolling) — fixed
+Reference: `https://case.oki.gg/case/glove-case/open` (reel-first focal layout).
+
+Problem: in the "open" view the spinning reel/results rendered AFTER the selected-case banner,
+room summary, opening timeline, category chips, market-reel preview, and the FULL case-selection
+grid. On mobile the Open CTA lives in the top aside, so tapping it fired the reel animation at
+~1982px down the page — players never saw it without manually scrolling.
+
+Fix (`CasesGame.jsx` + `cases.css`):
+- Wrapped the reel + results in a single `.cases-reel-area` block (`ref={reelAreaRef}`); it is
+  `display:none` while empty and reorders ABOVE the case browser once tracks mount.
+- CSS `order` on the flex stage: recent-results → selected-case → reel-area → stack-row →
+  room-summary → timeline → category chips → market preview → case grid. The browser/selection
+  controls now sit below the action instead of above it.
+- Added a `useEffect` keyed on `tracks.length` that `scrollIntoView({block:'center'})` the reel
+  area when a spin starts (reduced-motion aware), so the animation is always brought on-screen.
+
+Result (measured via CDP, local + production):
+- Reel top on spin: mobile 1982px → ~349px (390w) / ~289px (466w); desktop 407px. `reelInView:true`
+  on all of 390/466/1365.
+- Open → spin (in-view) → settle → results panel renders (1 card), `panelInView:true`, 0 errors.
+- Smoke 0 overflow / 0 errors on `/cases /collections` × 390/466/492/1365; a11y PASS; vitest 391.
+- Deployed `index-BkXoomPx.js` (matches local); production reel verified in-view mobile+desktop.
+
+## Open follow-ups
+- Netlify GitHub auto-deploy lag: push-triggered builds did not publish promptly; deployed via
+  authenticated Netlify CLI (`netlify deploy --prod --dir dist`). Not blocking; production current.
+- `/poker` @390px ux interaction probe: SIT-DOWN buy-in modal isn't a one-tap dock, so the probe
+  can't complete (passes @466px). Consider tagging the CTA with `data-mobile-primary-action` or
+  documenting it as an expected skip for modal-entry games.
