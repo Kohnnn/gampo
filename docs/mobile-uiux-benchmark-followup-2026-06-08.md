@@ -83,5 +83,24 @@ lacks many game cards (Cases, etc.)".
 - `src/components/games/tomeoflife/tomeoflife.css` — indicator grid.
 - `src/components/games/primitives/primitives.css` — active bet-tab contrast.
 
-## Next
-- Deploy + production parity (asset hash match, re-run smoke/ux/a11y/contrast/bet-sheet on prod).
+## Deploy + production parity (DONE)
+- Commits: `95538f2b` (mobile UI/UX follow-up) + `74240ae6` (Cases category-chip a11y names).
+  Both pushed to `origin/codex/gampo-polish-deploy` and `origin/main`.
+- GitHub auto-deploy did not fire within ~30min (prior session deploys published in minutes);
+  deployed directly via authenticated Netlify CLI (`netlify deploy --prod --dir dist`).
+- Live asset `index-DnADSfI3.js` MATCHES local `dist/index.html`.
+- Production gates (https://gampo-educational-simulator.netlify.app):
+  - smoke: 0 overflow / 0 errors across 12 routes × 390/466/492/1365.
+  - ux: ux=100 all routes; only soft flag `/poker` interaction=failed @390px (SIT-DOWN buy-in
+    modal, not a one-tap bet dock — pre-existing PokerGame behavior, passes @466px; not a hard gate).
+  - bet-sheet: ALL PASS 390/466/492 × games.
+  - a11y: PASS (0 issues) incl. `/cases` + `/collections` after chip fix.
+  - contrast: PASS (0 AA issues) across 8 routes incl. `/roulette`.
+- Verified at 466px: 51 cards, Poker card present, 0 clipped badges, 9 crash presets visible.
+
+## Follow-ups
+- Netlify GitHub auto-deploy lag: investigate why the push-triggered build did not publish
+  (had to deploy via CLI). Not blocking; production is current.
+- `/poker` @390px ux interaction probe: consider tagging the SIT-DOWN CTA with
+  `data-mobile-primary-action` so the harness can complete the probe, or document it as an
+  expected skip for modal-entry games.
