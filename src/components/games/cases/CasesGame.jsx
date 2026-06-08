@@ -537,6 +537,7 @@ export default function CasesGame() {
     const pendingRoundRef = useRef(null)
     const celebrationTimerRef = useRef(null)
     const resultsPanelRef = useRef(null)
+    const reelAreaRef = useRef(null)
     const initialCaseIdRef = useRef(searchParams.get('caseId'))
     const casesBgmMode = celebrationDrop ? 'bonus' : 'idle'
     useGameBgm('cases', casesBgmMode)
@@ -605,6 +606,24 @@ export default function CasesGame() {
         if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current)
         if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
     }, [clearRevealTimers])
+
+    // Bring the spinning reel into view once it renders so mobile players see
+    // the animation instead of it firing far below the case browser. The reel
+    // area is empty (display:none) until tracks mount, so we wait for tracks.
+    useEffect(() => {
+        if (tracks.length === 0) return
+        const reducedMotion = Boolean(
+            window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+            || document.documentElement.classList.contains('gampo-reduce-motion'),
+        )
+        const raf = requestAnimationFrame(() => {
+            reelAreaRef.current?.scrollIntoView({
+                behavior: reducedMotion ? 'auto' : 'smooth',
+                block: 'center',
+            })
+        })
+        return () => cancelAnimationFrame(raf)
+    }, [tracks.length])
 
     const scheduleTickSfx = useCallback((durationMs = CASE_REVEAL_MS) => {
         tickRef.current.ids.forEach(id => window.clearTimeout(id))
@@ -1342,6 +1361,7 @@ export default function CasesGame() {
                                     </button>
                                 ))}
                             </div>
+                            <div className="cases-reel-area" ref={reelAreaRef}>
                             {tracks.length > 0 && rows === 10 && (
                                 <CaseMultiOpenGrid
                                     activeCase={activeCase}
@@ -1437,6 +1457,7 @@ export default function CasesGame() {
                                     </div>
                                 </div>
                             )}
+                            </div>
                             <div className="cases-stack-row">
                                 <MultiplierBadge label="Rows" value={rows} suffix="" size="sm" state={running ? 'active' : 'idle'} />
                                 {activeCase && (
