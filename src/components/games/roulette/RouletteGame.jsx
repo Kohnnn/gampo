@@ -339,7 +339,7 @@ export default function RouletteGame() {
                 </>
             }
         >
-            <div className={`roulette-stage spin-phase-${spinPhase} ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+            <div data-ux-surface="stage" className={`roulette-stage spin-phase-${spinPhase} ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className={`rou-state-card ${meta?.color || 'idle'}`}>
                     <div>

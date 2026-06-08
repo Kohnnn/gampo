@@ -1937,53 +1937,6 @@
         order: 3;
     }
 
-    .game-shell:has(.cases-stage-frame) .bp-panel {
-        gap: 7px;
-        padding: 10px;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-panel > * {
-        order: 4;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-panel > .bp-section:first-of-type {
-        order: 1;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-play[data-game-action="case-open"] {
-        order: 2;
-        position: static;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-panel > .bp-section:nth-of-type(2) {
-        order: 3;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-tabs,
-    .game-shell:has(.cases-stage-frame) .cases-collection-panel {
-        display: none;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-hint {
-        display: none;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-section {
-        gap: 6px;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-bet-input,
-    .game-shell:has(.cases-stage-frame) .bp-bet-btn {
-        height: 34px;
-    }
-
-    .game-shell:has(.cases-stage-frame) .bp-play {
-        min-height: 46px;
-        height: 46px;
-        flex-basis: 46px;
-        margin-top: 2px;
-    }
-
     .cases-room-summary {
         grid-template-columns: 1fr;
     }
@@ -2678,7 +2631,7 @@
 .cases-inventory-chips button,
 .cases-inventory-pager button {
     appearance: none;
-    min-height: 32px;
+    min-height: 40px;
     border-radius: 9px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(8, 15, 24, 0.74);
@@ -3230,8 +3183,7 @@
         display: block;
         order: 1;
         flex: 0 0 auto;
-        position: sticky;
-        top: 0;
+        position: static;
         z-index: 8;
         height: auto;
         overflow: visible;
@@ -3253,18 +3205,34 @@
 
     .cases-right-panel {
         grid-template-columns: 1fr;
-        gap: 0;
+        gap: 8px;
     }
 
+    /* Restore mobile access to case switching + session analytics (previously
+       display:none). They flow below the primary controls and scroll with the
+       page; inner lists keep a capped height so they don't dominate. */
     .cases-switcher-card,
     .cases-side-stats {
-        display: none;
+        display: block;
+        order: 9;
+    }
+    .cases-switcher-list {
+        max-height: 220px;
     }
 
     .cases-control-primary {
         display: grid;
         gap: 7px;
         padding: 8px;
+    }
+
+    /* Keep the primary Open CTA reachable while browsing/opening on mobile —
+       sticks to the bottom of the viewport as the controls card scrolls. */
+    .cases-right-cta {
+        position: sticky;
+        bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)) + 6px);
+        z-index: 6;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
     }
 
     .cases-right-selected {
@@ -3354,8 +3322,8 @@
     .cases-row-switch button,
     .cases-quick-auto button,
     .cases-side-actions button {
-        min-height: 30px;
-        font-size: 9px;
+        min-height: 44px;
+        font-size: 11px;
     }
 
     .cases-right-cta {
@@ -3501,5 +3469,29 @@
 
     .game-shell:has(.cases-stage-frame) .cases-side-stats {
         grid-column: auto;
+    }
+}
+
+/* Touch-target floor: dense inventory/result controls are mouse-sized on
+   desktop but must clear 44px on touch devices. */
+@media (pointer: coarse) {
+    .cases-inventory-favorite {
+        width: 44px;
+        height: 44px;
+    }
+    .cases-inventory-archive {
+        min-height: 44px;
+    }
+    .cases-sell-btn {
+        min-height: 36px;
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+    .cases-inventory-toolbar button,
+    .cases-inventory-chips button,
+    .cases-inventory-pager button,
+    .cases-auto-presets button,
+    .cases-control-card header button {
+        min-height: 44px;
     }
 }

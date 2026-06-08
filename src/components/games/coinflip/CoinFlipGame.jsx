@@ -74,7 +74,8 @@ export default function CoinFlipGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div className={`coinflip-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+            <div             data-ux-surface="stage"
+            className={`coinflip-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="coin-stage-choices" data-mobile-critical-surface>
                     <button className={choice === 'head' ? 'active' : ''} disabled={flipping} onClick={() => setChoice('head')}>

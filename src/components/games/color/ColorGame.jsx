@@ -88,7 +88,7 @@ export default function ColorGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div className={`color-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} style={{ '--result-color': result?.color }}>
+            <div data-ux-surface="stage" className={`color-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} style={{ '--result-color': result?.color }}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="color-pointer" />
                 <div className="color-spectrum" style={{ transform: `rotate(${rotation}deg)` }} />
