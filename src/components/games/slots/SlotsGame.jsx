@@ -19,6 +19,7 @@ import EducationPanel from '../../EducationPanel'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { getFeatureContract } from '../../../data/slotFeatureContracts'
 import { recordFeatureEvent } from '../../../hooks/useProgress'
+import { useSettings } from '../../../hooks/useSettings'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import {
     SLOT_TEMPLATES,
@@ -38,6 +39,7 @@ import {
     buildSlotFeatureDemoState,
 } from './slotsMotion'
 import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
+import { winTier } from './slotWinPresentation'
 import './slots.css'
 
 const FEATURE_LABELS = {
@@ -78,6 +80,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const slotSfx = useSfx('slots')
+    const { reduceMotion } = useSettings()
+    // "Fast bonus": reduced-motion players skip the full bonus-entry cinematic.
+    const bonusCineMs = reduceMotion ? 450 : BONUS_CINEMATIC_MS
     const session = useGameSession('slots')
 
     const startId = useMemo(() => {
@@ -126,6 +131,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         gainPercent: 50,
     })
     const [anticipating, setAnticipating] = useState(false)
+    const [anticipationScatters, setAnticipationScatters] = useState({ have: 0, need: 0 })
     const [mysteryReveal, setMysteryReveal] = useState(null)
     const [persistentMultiplier, setPersistentMultiplier] = useState(0)
     const [persistRamp, setPersistRamp] = useState(false)
@@ -374,7 +380,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             })
             timers.current.push(window.setTimeout(() => {
                 setBonusCine(current => (current && current.trigger === revealTrigger ? null : current))
-            }, BONUS_CINEMATIC_MS))
+            }, bonusCineMs))
         }
         if (result.featureEvents.some(item => item.type === 'persistent-multiplier')) {
             setPersistRamp(true)
@@ -443,7 +449,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 })
                 timers.current.push(window.setTimeout(() => {
                     setBonusCine(current => (current && current.trigger === revealTrigger ? null : current))
-                }, BONUS_CINEMATIC_MS))
+                }, bonusCineMs))
             }
             // Progression: count a bonus trigger (only on the initial entry, not
             // retriggers) plus the free spins awarded for achievement tracking.
@@ -587,6 +593,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
             const willAnticipate = scatterEarlyCount >= scatterMin
             const anticipationFromCol = cols - 2
+            const scatterTrigger = config.features?.scatter?.triggerCount ?? config.features?.freeSpins?.triggerCount ?? (scatterMin + 1)
 
             setLastStake(stake)
             setRunning(true)
@@ -624,6 +631,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     if (willAnticipate && captureCol === anticipationFromCol + 1) {
                         slotSfx.play('anticipation', { volume: 0.72 })
                         setAnticipating(true)
+                        setAnticipationScatters({ have: scatterEarlyCount, need: scatterTrigger })
                     }
                     setStoppedColumnState(captureCol)
                     setGrid(prev => prev.map((cell, index) => {
@@ -1138,7 +1146,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         {anticipating && running && (
                             <div className="slot-anticipation-callout" aria-live="polite">
                                 <span>Scatter watch</span>
-                                <strong>reels slowing</strong>
+                                {anticipationScatters.need > 0 ? (
+                                    <strong>
+                                        {anticipationScatters.have}/{anticipationScatters.need}
+                                        {' · '}
+                                        {Math.max(1, anticipationScatters.need - anticipationScatters.have)} to go
+                                    </strong>
+                                ) : (
+                                    <strong>reels slowing</strong>
+                                )}
                             </div>
                         )}
                         {visibleFeatureEvents.length > 0 && (
@@ -1338,7 +1354,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 )}
 
                 {lastResult?.multiplier > 0 && !running && (
-                    <div className={`slot-result-banner ${config.features?.darkWinOverlay ? 'dark' : ''}`}>
+                    <div className={`slot-result-banner ${config.features?.darkWinOverlay ? 'dark' : ''} tier-${winTier(lastResult.multiplier).id}`}>
+                        {winTier(lastResult.multiplier).label && (
+                            <i className="slot-win-tier">{winTier(lastResult.multiplier).label}</i>
+                        )}
                         <span>Total win</span>
                         <strong>{formatCredits(lastResult.returnAmount)}</strong>
                         <em>{lastResult.multiplier.toFixed(2)}×</em>
@@ -1467,19 +1486,27 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         </header>
                         <p>Pick a tier; cost multiplier applies to current bet.</p>
                         <div className="slot-buy-tiers">
-                            {buyTiers.map(tier => (
-                                <button key={tier.id} type="button" onClick={() => handlePickTier(tier)}>
-                                    <div className="slot-buy-tier-head">
-                                        <strong>{tier.label}</strong>
-                                        <span>{tier.costMultiplier}× bet</span>
-                                    </div>
-                                    <div className="slot-buy-tier-meta">
-                                        {tier.guaranteedScatters && <em>{tier.guaranteedScatters} scatters</em>}
-                                        {tier.persistentMultiplier ? <em>+{tier.persistentMultiplier}× persistent</em> : null}
-                                        <em>cost {formatCredits(round2(betAmount * tier.costMultiplier))}</em>
-                                    </div>
-                                </button>
-                            ))}
+                            {buyTiers.map(tier => {
+                                const cost = round2(betAmount * tier.costMultiplier)
+                                const spins = config.features?.scatter?.awardFreeSpins || config.features?.freeSpins?.count || 0
+                                const indicativeReturn = round2(cost * (config.rtpTarget || definition.rtp || 0.95))
+                                return (
+                                    <button key={tier.id} type="button" onClick={() => handlePickTier(tier)}>
+                                        <div className="slot-buy-tier-head">
+                                            <strong>{tier.label}</strong>
+                                            <span>{tier.costMultiplier}× bet</span>
+                                        </div>
+                                        <div className="slot-buy-tier-meta">
+                                            {tier.guaranteedScatters && <em>{tier.guaranteedScatters} scatters{spins ? ` → ~${spins} spins` : ''}</em>}
+                                            {tier.persistentMultiplier ? <em>+{tier.persistentMultiplier}× persistent</em> : null}
+                                            <em>cost {formatCredits(cost)}</em>
+                                        </div>
+                                        <div className="slot-buy-tier-ev">
+                                            Indicative return ~{formatCredits(indicativeReturn)} ({Math.round((config.rtpTarget || definition.rtp || 0.95) * 100)}% RTP). Buying the bonus doesn't beat the house edge.
+                                        </div>
+                                    </button>
+                                )
+                            })}
                         </div>
                     </div>
                 )}
