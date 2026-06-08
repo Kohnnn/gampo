@@ -2537,6 +2537,80 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Full per-count pay ladder (3/4/5-of-a-kind etc). */
+.slot-paytable-ladder {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.slot-paytable-head,
+.slot-paytable-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 6px;
+}
+.slot-paytable-head {
+    padding: 0 7px 2px;
+}
+.slot-paytable-head span,
+.slot-paytable-head em {
+    font-style: normal;
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--slot-text-dim, #c2cdd9);
+}
+.slot-paytable-head em { text-align: right; }
+.slot-paytable-row {
+    padding: 4px 7px;
+    border-radius: 7px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.slot-paytable-sym {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.slot-paytable-sym img,
+.slot-paytable-sym svg {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+.slot-paytable-sym small {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--slot-text-dim, #c2cdd9);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.slot-paytable-row em {
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 950;
+    text-align: right;
+    color: color-mix(in srgb, var(--slot-accent), white 30%);
+    font-variant-numeric: tabular-nums;
+}
+.slot-paytable-special {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 6px;
+}
+.slot-paytable-special span {
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--slot-text-dim, #c2cdd9);
+}
+.slot-paytable-special strong { color: var(--slot-text, #fff); }
+
 .slot-contract-block { margin-top: 4px; }
 .slot-contract-block h4 {
     margin: 0 0 4px;
@@ -3148,6 +3222,23 @@
         white-space: nowrap;
     }
 
+    .slot-mobile-bet {
+        appearance: none;
+        text-align: left;
+        cursor: pointer;
+        position: relative;
+    }
+    .slot-mobile-bet::after {
+        content: '✎';
+        position: absolute;
+        top: 5px;
+        right: 7px;
+        font-size: 10px;
+        color: color-mix(in srgb, var(--slot-accent, #00e701), white 20%);
+    }
+    .slot-mobile-bet:disabled { cursor: default; opacity: 0.85; }
+    .slot-mobile-bet:disabled::after { display: none; }
+
     .slot-mobile-icon,
     .slot-mobile-spin {
         appearance: none;
@@ -3547,4 +3638,331 @@
 .gampo-reduce-motion .slot-near-miss {
     animation-duration: 0.001ms;
     opacity: 1;
+}
+
+/* ---- Mobile bet sheet (S2) ---- */
+.slot-mobile-bet-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal, 1500);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0 8px calc(var(--mobile-nav-height, 64px) + var(--mobile-action-height, 74px) + max(8px, env(safe-area-inset-bottom)) + 8px);
+    background: rgba(4, 12, 18, 0.6);
+    animation: slotBetSheetFade 180ms ease;
+}
+@keyframes slotBetSheetFade { from { opacity: 0; } to { opacity: 1; } }
+
+.slot-mobile-bet-sheet {
+    width: min(440px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(180deg, rgba(20, 39, 51, 0.98), rgba(15, 33, 46, 0.98));
+    box-shadow: 0 -18px 54px rgba(0, 0, 0, 0.6);
+    animation: slotBetSheetRise 200ms ease;
+}
+@keyframes slotBetSheetRise { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+:root.gampo-reduce-motion .slot-mobile-bet-sheet-backdrop,
+:root.gampo-reduce-motion .slot-mobile-bet-sheet { animation: none; }
+
+.slot-mobile-bet-sheet header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.slot-mobile-bet-sheet header strong {
+    color: var(--text-primary, #fff);
+    font-size: 14px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.slot-mobile-bet-sheet header button {
+    appearance: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-secondary, #b1bad3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.slot-mobile-bet-value {
+    text-align: center;
+    color: var(--text-primary, #fff);
+    font-size: 28px;
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+}
+.slot-mobile-bet-steppers {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+.slot-mobile-bet-steppers button {
+    appearance: none;
+    min-height: 48px;
+    border-radius: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-primary, #fff);
+    font-size: 14px;
+    font-weight: 950;
+    cursor: pointer;
+}
+.slot-mobile-bet-steppers button:disabled { opacity: 0.45; cursor: not-allowed; }
+.slot-mobile-bet-input {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(0, 0, 0, 0.36);
+    color: var(--text-primary, #fff);
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+}
+.slot-mobile-bet-info {
+    appearance: none;
+    min-height: 44px;
+    border-radius: 11px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.24);
+    color: var(--text-secondary, #b1bad3);
+    font-size: 12px;
+    font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.slot-mobile-bet-info:focus-visible,
+.slot-mobile-bet-steppers button:focus-visible,
+.slot-mobile-bet-input:focus-visible { outline: 2px solid var(--slot-accent, #00e701); outline-offset: 2px; }
+
+/* Bet sheet is a mobile affordance only. */
+@media (min-width: 769px) {
+    .slot-mobile-bet-sheet-backdrop { display: none; }
+}
+
+/* ---- How-it-pays visualizer (S4) ---- */
+.slot-howpay-toggle {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--slot-text-dim, #c2cdd9);
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+}
+.slot-howpay-toggle.active {
+    border-color: color-mix(in srgb, var(--slot-accent, #00e701), transparent 40%);
+    background: color-mix(in srgb, var(--slot-accent, #00e701), transparent 84%);
+    color: var(--slot-text, #fff);
+}
+
+.slot-howpay-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    border-radius: inherit;
+    background: rgba(4, 12, 18, 0.42);
+}
+.slot-howpay-lines {
+    position: absolute;
+    inset: 0;
+}
+.slot-howpay-line {
+    position: absolute;
+    left: 4%;
+    right: 4%;
+    top: var(--line-top, 50%);
+    height: 2px;
+    transform: translateY(-50%);
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--slot-accent, #00e701), white 20%), transparent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--slot-accent, #00e701), transparent 40%);
+}
+.slot-howpay-explain {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    width: min(90%, 460px);
+    margin: 0;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(8, 16, 24, 0.92);
+    color: var(--slot-text, #fff);
+    font-size: 12px;
+    line-height: 1.45;
+    text-align: center;
+}
+
+/* ---- Bankroll sparkline (S5) ---- */
+.slot-bankroll-spark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.26);
+}
+.slot-bankroll-spark svg {
+    width: 120px;
+    height: 30px;
+    flex: 0 0 auto;
+}
+.slot-spark-zero {
+    stroke: rgba(255, 255, 255, 0.2);
+    stroke-width: 1;
+    stroke-dasharray: 3 4;
+}
+.slot-spark-line {
+    stroke: var(--accent-green, #00e701);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+.slot-bankroll-spark.neg .slot-spark-line {
+    stroke: var(--accent-red, #ed4245);
+}
+.slot-bankroll-spark-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+.slot-bankroll-spark-meta small {
+    color: var(--slot-text-dim, #c2cdd9);
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.slot-bankroll-spark-meta strong {
+    color: var(--slot-text, #fff);
+    font-size: 14px;
+    font-weight: 950;
+    font-variant-numeric: tabular-nums;
+}
+.slot-bankroll-spark.pos .slot-bankroll-spark-meta strong { color: var(--accent-green, #00e701); }
+.slot-bankroll-spark.neg .slot-bankroll-spark-meta strong { color: var(--accent-red, #ed4245); }
+
+/* ---- Free-spin session HUD trail (S6) ---- */
+.slot-fs-trail {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 26px;
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+.slot-fs-trail-step {
+    width: 5px;
+    height: var(--bar, 10%);
+    min-height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    transition: height 200ms ease;
+}
+.slot-fs-trail-step.hit {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--slot-accent, #00e701), white 25%), var(--slot-accent, #00e701));
+}
+:root.gampo-reduce-motion .slot-fs-trail-step { transition: none; }
+.slot-fs-trail-persist {
+    align-self: center;
+    margin-left: 4px;
+    font-style: normal;
+    font-size: 12px;
+    font-weight: 950;
+    color: var(--feature-gold, #ffe680);
+    text-shadow: 0 0 10px rgba(255, 230, 128, 0.5);
+}
+
+/* ---- S7: adaptive mobile overlay stacking + landscape reels ----
+   The fixed slot-mobile-dock sits at the bottom on phones. Center-anchored
+   stage overlays must clear it (and the bottom nav) and never exceed the
+   reduced vertical space, so they don't collide with the dock or overflow. */
+@media (max-width: 768px) {
+    .slot-wheel-overlay,
+    .slot-hold-overlay,
+    .slot-collect-overlay,
+    .slot-cascade-overlay,
+    .slot-result-banner,
+    .slot-bonus-end-banner,
+    .slot-mystery-reveal,
+    .slot-buy-modal,
+    .slot-autoplay-drawer {
+        max-height: calc(100dvh - var(--mobile-nav-height, 64px) - var(--mobile-action-height, 74px) - 96px);
+        overflow-y: auto;
+    }
+
+    /* Bottom-anchored / drawer overlays lift above the fixed dock. */
+    .slot-buy-modal,
+    .slot-autoplay-drawer {
+        bottom: calc(var(--mobile-nav-height, 64px) + var(--mobile-action-height, 74px) + max(8px, env(safe-area-inset-bottom)) + 10px);
+    }
+
+    /* Center-anchored cinematics nudge up so the dock never overlaps them. */
+    .slot-wheel-overlay,
+    .slot-hold-overlay {
+        top: calc(50% - (var(--mobile-action-height, 74px) / 2));
+    }
+}
+
+/* Landscape phone: reels go wide and short, controls hug the bottom, so the
+   playable grid uses the limited height without the dock crowding it. */
+@media (max-height: 520px) and (orientation: landscape) {
+    .slot-stage-v2 {
+        grid-template-rows: auto minmax(150px, 1fr);
+        padding-bottom: 4px;
+    }
+    /* Landscape can introduce transformed ancestors that re-base position:fixed;
+       force the slot dock to the real viewport bottom and above the stage so the
+       Spin target is never covered (fixes the landscape hit-test block). */
+    .slot-mobile-dock {
+        position: fixed;
+        left: 6px;
+        right: 6px;
+        bottom: max(6px, env(safe-area-inset-bottom));
+        z-index: var(--z-mobile-action, 1400);
+        min-height: 56px;
+    }
+    .slot-reel-frame,
+    .slot-reels-v2 {
+        max-height: calc(100dvh - 120px);
+    }
+    .slot-stage-header {
+        padding-top: 4px;
+        padding-bottom: 4px;
+    }
+    .slot-stage-meta { font-size: 10px; }
+    /* Keep cinematics compact so they fit the short viewport. */
+    .slot-wheel-overlay,
+    .slot-hold-overlay,
+    .slot-bonus-cine {
+        max-height: calc(100dvh - 40px);
+        transform: scale(0.86);
+    }
 }

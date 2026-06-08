@@ -480,7 +480,7 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
     if (!click.clicked) return fail('slot spin target was not clickable', click);
     await sleep(700);
     const cells = document.querySelectorAll('.slot-reel-grid .slot-cell, .slot-reel-grid .slot-symbol-card').length;
-    const active = Boolean(document.querySelector('.slot-stage-v2.spinning, .slot-mobile-spin:disabled, .slot-result-banner'));
+    const active = Boolean(document.querySelector('.slot-stage-v2[data-slot-spinning="true"], .slot-stage-v2.spinning, .slot-mobile-spin:disabled, .slot-result-banner'));
     return cells > 0 && active ? ok('slot spin entered active state', { cells }) : fail('slot spin did not mutate visible state', { cells, active });
   }
 
