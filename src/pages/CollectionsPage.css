@@ -108,6 +108,9 @@
     margin-bottom: 16px;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    /* Right-edge fade hints that more filters are scrollable when clipped. */
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
 }
 
 .collections-category-rail::-webkit-scrollbar {

@@ -17,6 +17,27 @@ import '../styles/casino.css'
 
 const filters = ['All', 'Originals', 'Slots', 'Table', 'Arcade', 'Sports']
 
+// Compact volatility labels so the metadata chip reads fully on narrow cards
+// instead of hard-truncating ("Low to ext..." -> "Low–Extreme"). Falls back to
+// the source string for any label not in the map.
+const VOLATILITY_ABBR = {
+    'Low to extreme': 'Low–Extreme',
+    'Low to medium': 'Low–Med',
+    'Low to high': 'Low–High',
+    'Medium to high': 'Med–High',
+    'Medium high': 'Med-high',
+    'Very high': 'Very high',
+    'Market dependent': 'Market',
+    'Target dependent': 'Target',
+    'Skill dependent': 'Skill',
+    'Configurable': 'Config',
+}
+
+function abbreviateVolatility(volatility) {
+    if (!volatility) return 'Variable'
+    return VOLATILITY_ABBR[volatility] || volatility
+}
+
 const labelToGameId = {
     'Dice': 'dice', 'Limbo': 'limbo', 'Keno': 'keno', 'Wheel': 'wheel', 'Roulette': 'roulette',
     'Blackjack': 'blackjack', 'Slots': 'slots', 'Coin Flip': 'coinflip', 'Rock Paper Scissors': 'rps',
@@ -71,10 +92,13 @@ function HomePage() {
             .slice(0, 12)
     ), [pins])
 
-    const originalsRow = gameDefinitions.filter(g => ['Arcade originals', 'Lottery math'].includes(g.category)).slice(0, 12)
-    const tablesRow = gameDefinitions.filter(g => ['Table math', 'Card room', 'Dice table', 'Decision games'].includes(g.category)).slice(0, 12)
-    const arcadeRow = gameDefinitions.filter(g => g.category === 'Arcade classics').slice(0, 12)
-    const slotsRow = slotCatalog.slice(0, 12)
+    // Curated rows scroll horizontally, so we surface the full set per category
+    // (capped generously) rather than silently dropping entries like Cases past
+    // a 12-item slice. The "View all" link still routes to the full grid.
+    const originalsRow = gameDefinitions.filter(g => ['Arcade originals', 'Lottery math'].includes(g.category)).slice(0, 24)
+    const tablesRow = gameDefinitions.filter(g => ['Table math', 'Card room', 'Dice table', 'Decision games'].includes(g.category)).slice(0, 24)
+    const arcadeRow = gameDefinitions.filter(g => g.category === 'Arcade classics').slice(0, 24)
+    const slotsRow = slotCatalog.slice(0, 24)
     const recommendedRow = useMemo(() => {
         // Pick a few games with low complexity / strong educational value first
         const priority = ['dice', 'coinflip', 'limbo', 'wheel', 'blackjack', 'baccarat', 'roulette', 'videopoker']
@@ -238,7 +262,7 @@ export function GameGrid({ games = [] }) {
             {games.map(game => {
                 const badges = [
                     `RTP ${game.rtp ? `${(game.rtp * 100).toFixed(1)}%` : 'Lab'}`,
-                    game.volatility || 'Variable',
+                    abbreviateVolatility(game.volatility),
                     game.hitFrequency || game.category || 'Practice',
                 ].filter(Boolean)
                 const visibleBadges = badges.slice(0, 2)
@@ -254,9 +278,9 @@ export function GameGrid({ games = [] }) {
                         </div>
                         <div className="casino-game-body">
                             <span>{game.provider || game.category || 'GamPo Lab'}</span>
-                            <div className="casino-game-badges" title={badges.join(' · ')}>
+                            <div className="casino-game-badges" title={[`RTP ${game.rtp ? `${(game.rtp * 100).toFixed(1)}%` : 'Lab'}`, game.volatility || 'Variable', game.hitFrequency || game.category || 'Practice'].join(' · ')}>
                                 {visibleBadges.map(label => <b key={label}>{label}</b>)}
-                                {hiddenCount > 0 ? <b className="casino-game-more">More {hiddenCount}</b> : null}
+                                {hiddenCount > 0 ? <b className="casino-game-more">+{hiddenCount}</b> : null}
                             </div>
                         </div>
                     </Link>

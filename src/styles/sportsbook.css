@@ -276,9 +276,14 @@
     background: #0d1f2a;
     padding: 5px;
     overflow-x: auto;
+    scroll-snap-type: x proximity;
+    /* Right-edge fade hints that more tabs are scrollable when clipped. */
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent);
 }
 
 .sb-subnav button {
+    scroll-snap-align: start;
     min-height: 40px;
     white-space: nowrap;
     border: 0;

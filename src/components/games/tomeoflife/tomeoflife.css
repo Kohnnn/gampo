@@ -105,3 +105,21 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
+
+/* On narrow phones the four indicators cram into a single tight row above the
+   dock. Lay them out as a 2x2 grid with full-width chips so each stays legible. */
+@media (max-width: 466px) {
+    .tome-paytable {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 5px;
+    }
+    .tome-paytable span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 10.5px;
+        white-space: nowrap;
+    }
+}

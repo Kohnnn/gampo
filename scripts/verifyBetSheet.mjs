@@ -12,6 +12,15 @@ import { join } from 'node:path'
 
 const BASE = (process.argv.find(a => a.startsWith('--baseUrl='))?.split('=')[1] || 'http://127.0.0.1:4173').replace(/\/$/, '')
 const ROUTES = (process.argv.find(a => a.startsWith('--routes='))?.split('=')[1] || '/dice,/blackjack,/roulette,/keno').split(',')
+// Multiple mobile widths so a mid-mobile regression (e.g. 466px) can't slip
+// through a 390-only check. The report observed a no-op tap at 466x704 even
+// though the 390-only synthetic-click check passed.
+const VIEWPORTS = (process.argv.find(a => a.startsWith('--viewports='))?.split('=')[1] || '390x844,466x704,492x820')
+    .split(',')
+    .map(v => {
+        const [w, h] = v.split('x').map(Number)
+        return { w, h }
+    })
 const EDGE_CANDIDATES = [
     'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
     'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
@@ -71,7 +80,27 @@ const checkExpr = `
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const toggle = document.querySelector('[data-mobile-settings-toggle]');
   if (!toggle) return { ok: false, reason: 'no settings toggle (game may have no setup controls)' };
-  toggle.click();
+  // Real hit-test the toggle center BEFORE clicking. If another element paints
+  // on top of the portaled dock at this viewport width, the tap is a no-op and
+  // the top element is something other than the toggle (or its descendant).
+  const tr = toggle.getBoundingClientRect();
+  const tx = Math.max(1, Math.min(innerWidth - 1, tr.left + tr.width / 2));
+  const ty = Math.max(1, Math.min(innerHeight - 1, tr.top + tr.height / 2));
+  const topAtToggle = document.elementFromPoint(tx, ty);
+  const toggleReachable = !!topAtToggle && (toggle === topAtToggle || toggle.contains(topAtToggle) || topAtToggle.contains(toggle));
+  if (!toggleReachable) {
+    return {
+      ok: false,
+      reason: 'toggle not hit-reachable',
+      toggleTop: topAtToggle ? String(topAtToggle.className || topAtToggle.tagName).slice(0, 60) : null,
+      toggleRect: { top: Math.round(tr.top), left: Math.round(tr.left), w: Math.round(tr.width), h: Math.round(tr.height) },
+    };
+  }
+  // Dispatch a real pointer/click sequence on the actual top element so any
+  // interception or pointer-events trap surfaces as a failure.
+  ['pointerdown','mousedown','pointerup','mouseup','click'].forEach(type => {
+    topAtToggle.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: tx, clientY: ty }));
+  });
   await sleep(320);
   const sheet = document.querySelector('.bp-content');
   if (!sheet) return { ok: false, reason: 'no .bp-content sheet' };
@@ -118,20 +147,31 @@ async function main() {
     const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
     await send('Page.enable', {}, sessionId)
     await send('Runtime.enable', {}, sessionId)
-    await send('Emulation.setDeviceMetricsOverride', {
-        width: 390, height: 844, deviceScaleFactor: 1, mobile: true,
-    }, sessionId)
+
+    // Pre-seed first-visit onboarding as seen so the one-time WelcomeModal
+    // (welcome-backdrop / welcome-card / welcome-cta) doesn't intercept taps
+    // on a fresh browser profile. The modal is verified separately.
+    try {
+        await send('Page.addScriptToEvaluateOnNewDocument', {
+            source: "try { localStorage.setItem('gampo_onboarding_v1', JSON.stringify({ seen: true, seenAt: new Date().toISOString() })); } catch (e) {}",
+        }, sessionId)
+    } catch { /* older Chromium may reject */ }
 
     let failures = 0
-    for (const route of ROUTES) {
-        await send('Page.navigate', { url: `${BASE}${route}` }, sessionId)
-        await sleep(1700)
-        let r
-        try { r = await evalExpr(checkExpr, sessionId) }
-        catch (e) { r = { ok: false, reason: String(e).slice(0, 80) } }
-        const status = r.ok ? 'PASS' : (r.reason?.includes('no setup') ? 'SKIP' : 'FAIL')
-        if (status === 'FAIL') failures++
-        console.log(`${status} ${route} :: ${JSON.stringify(r)}`)
+    for (const vp of VIEWPORTS) {
+        await send('Emulation.setDeviceMetricsOverride', {
+            width: vp.w, height: vp.h, deviceScaleFactor: 1, mobile: true,
+        }, sessionId)
+        for (const route of ROUTES) {
+            await send('Page.navigate', { url: `${BASE}${route}` }, sessionId)
+            await sleep(1700)
+            let r
+            try { r = await evalExpr(checkExpr, sessionId) }
+            catch (e) { r = { ok: false, reason: String(e).slice(0, 80) } }
+            const status = r.ok ? 'PASS' : (r.reason?.includes('no setup') ? 'SKIP' : 'FAIL')
+            if (status === 'FAIL') failures++
+            console.log(`${status} ${vp.w}x${vp.h} ${route} :: ${JSON.stringify(r)}`)
+        }
     }
 
     await send('Target.closeTarget', { targetId })

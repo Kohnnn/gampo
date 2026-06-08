@@ -3153,7 +3153,7 @@
     }
 
     .slot-reel-wrap {
-        min-height: clamp(240px, calc(100dvh - var(--mobile-safe-bottom, 138px) - 150px), 380px);
+        min-height: clamp(220px, calc(100dvh - var(--mobile-safe-bottom, 138px) - 200px), 340px);
     }
 
     .slot-reel-wrap,
