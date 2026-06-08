@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, Flame, Gauge, Info, Play, RotateCcw, Sparkles, Square, Ticket, TrendingUp, X, Zap } from 'lucide-react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
@@ -40,6 +41,9 @@ import {
 } from './slotsMotion'
 import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
 import { winTier } from './slotWinPresentation'
+import { buildPaytable } from './slotPaytable'
+import { describePaylines } from './slotPaylines'
+import { buildSparkline } from './slotSparkline'
 import './slots.css'
 
 const FEATURE_LABELS = {
@@ -139,6 +143,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [bonusCine, setBonusCine] = useState(null)
     const [nearMiss, setNearMiss] = useState(null)
     const [showInfo, setShowInfo] = useState(false)
+    const [showMobileBet, setShowMobileBet] = useState(false)
+    const [showPaylines, setShowPaylines] = useState(false)
+    const [dockPortal, setDockPortal] = useState(null)
+    useEffect(() => { setDockPortal(document.body) }, [])
     // Wave 9: sticky wild lock during free-spin sessions and feature cinematics
     const [stickyWilds, setStickyWilds] = useState([])
     const [wheelReveal, setWheelReveal] = useState(null)
@@ -156,6 +164,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const timers = useRef([])
     const ticker = useRef(null)
     const stoppedColsRef = useRef(startTemplate.layout.cols)
+    // Slam-stop: holds the in-flight round so a second tap can resolve it now.
+    const pendingFinishRef = useRef(null)
     const autoplayBaselineRef = useRef(null)
     const autoplayRemainingRef = useRef(0)
     const autoplayInfiniteRef = useRef(false)
@@ -315,6 +325,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     }, [betAmount, cellPositions, config, grid])
 
     const paylineMode = evaluationLabel(config.layout.evaluation)
+    const paylinesInfo = useMemo(() => describePaylines(config), [config])
+    const sparkline = useMemo(() => buildSparkline(session.history, { width: 120, height: 30 }), [session.history])
     const buyTiers = useMemo(() => getBuyTiers(config), [config])
     const activeBuyTier = useMemo(() => buyTiers.find(t => t.id === bonusBuyTierId) || null, [buyTiers, bonusBuyTierId])
     const canUseFreeSpin = freeSpins > 0
@@ -425,10 +437,18 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 if (!prev) return prev
                 const updatedWin = round2(prev.totalWin + returnAmount)
                 const updatedPlayed = prev.played + 1
+                // Keep a compact per-spin trail so the bonus reads as an arc:
+                // win contribution + the persistent multiplier in force.
+                const trail = [...(prev.trail || []), {
+                    win: returnAmount,
+                    mult: result.multiplier || 0,
+                    persist: persistentMultiplierRef.current || 0,
+                }].slice(-24)
                 return {
                     ...prev,
                     played: updatedPlayed,
                     totalWin: updatedWin,
+                    trail,
                 }
             })
         }
@@ -642,16 +662,34 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
 
             const totalDelay = cumulative + totalSettleDelay
-            timers.current.push(window.setTimeout(() => {
+            // Capture the resolution so a second tap (slam-stop) can finish now.
+            pendingFinishRef.current = () => {
                 finishRound({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
+            }
+            timers.current.push(window.setTimeout(() => {
+                if (!pendingFinishRef.current) return
+                const finish = pendingFinishRef.current
+                pendingFinishRef.current = null
+                finish()
             }, totalDelay))
         })
     ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, finishRound, freeSpins, placeBet, playSound, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
 
+    const slamStop = useCallback(() => {
+        // Resolve an in-flight spin immediately: snap all reels to their final
+        // cells, cancel pending timers, and run the captured finish.
+        const finish = pendingFinishRef.current
+        if (!finish) return
+        pendingFinishRef.current = null
+        clearTimers()
+        finish()
+    }, [clearTimers])
+
     const triggerStageSpin = useCallback(() => {
+        if (running) { slamStop(); return }
         const tierId = canUseFreeSpin ? null : buyTierIdRef.current
         performSpin({ source: 'stage', bet: betAmount, free: canUseFreeSpin, tierId })
-    }, [betAmount, canUseFreeSpin, performSpin])
+    }, [betAmount, canUseFreeSpin, performSpin, running, slamStop])
 
     const startAutoplay = useCallback(() => {
         if (autoplayActive || running) return
@@ -888,20 +926,18 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         </button>
                         {showInfo && (() => {
                             const contract = getFeatureContract(config.id)
-                            const paytable = [...(config.symbols || [])]
-                                .filter(s => (s.type || 'pay') !== 'scatter' && Number(s.payout) > 0)
-                                .sort((a, b) => (b.payout || 0) - (a.payout || 0))
-                                .slice(0, 6)
-                            // Indicative max win: top symbol pay scaled by the template's
-                            // feature ceiling (multiplier wheel / persistent mult / cascade
-                            // all raise the realistic top end). Educational estimate only.
-                            const topPay = paytable[0]?.payout || 0
+                            const fullPaytable = buildPaytable(config)
+                            // Prefer the engine's real max-win cap; fall back to an
+                            // indicative estimate only when the template has no cap.
+                            const topPay = fullPaytable.rows[0]?.pays?.slice(-1)[0]?.multiplier || 0
                             const featureFactor = config.features?.multiplierWheel ? 60
                                 : config.features?.persistentMultiplier ? 50
                                 : config.features?.cascade ? 40
                                 : config.features?.holdAndRespin ? 30
                                 : 20
-                            const maxWin = topPay > 0 ? Math.round(topPay * featureFactor) : 0
+                            const estMaxWin = topPay > 0 ? Math.round(topPay * featureFactor) : 0
+                            const maxWin = fullPaytable.maxWin || estMaxWin
+                            const maxWinExact = Boolean(fullPaytable.maxWin)
                             return (
                                 <div className="slot-feature-contract">
                                     <p className="slot-panel-note">{contract?.summary || config.featureText}</p>
@@ -909,7 +945,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                         <span><small>RTP</small><strong>{Math.round(config.rtpTarget * 100)}%</strong></span>
                                         <span><small>Volatility</small><strong>{config.volatility}</strong></span>
                                         <span><small>Grid</small><strong>{config.layout.cols}×{config.layout.rows}</strong></span>
-                                        <span><small>Max win</small><strong>{maxWin ? `~${maxWin.toLocaleString()}×` : '—'}</strong></span>
+                                        <span><small>Max win</small><strong>{maxWin ? `${maxWinExact ? '' : '~'}${maxWin.toLocaleString()}×` : '—'}</strong></span>
                                     </div>
                                     <div className="slot-tag-row">
                                         <span>{paylineMode}</span>
@@ -923,18 +959,30 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                         {config.features?.multiplierWheel && <span>Wheel</span>}
                                         {config.features?.stackedWildReel && <span>Stacked wilds</span>}
                                     </div>
-                                    {paytable.length > 0 && (
+                                    {fullPaytable.rows.length > 0 && (
                                         <div className="slot-contract-block">
-                                            <h4>Paytable (5-of-a-kind)</h4>
-                                            <ul className="slot-paytable-list">
-                                                {paytable.map(s => (
-                                                    <li key={s.id}>
-                                                        <Asset src={s.asset} alt={s.label} fallback={<strong>{s.label}</strong>} />
-                                                        <span>{s.label}</span>
-                                                        <em>{s.payout}×</em>
-                                                    </li>
+                                            <h4>Paytable</h4>
+                                            <div className="slot-paytable-ladder">
+                                                <div className="slot-paytable-head">
+                                                    <span>Symbol</span>
+                                                    {fullPaytable.rungs.map(c => <em key={c}>{c}{fullPaytable.mode === 'cluster' || fullPaytable.mode === 'pay-anywhere' ? '+' : '×'}</em>)}
+                                                </div>
+                                                {fullPaytable.rows.map(row => (
+                                                    <div className="slot-paytable-row" key={row.id}>
+                                                        <span className="slot-paytable-sym">
+                                                            <Asset src={row.asset} alt={row.label} fallback={<strong>{row.label}</strong>} />
+                                                            <small>{row.label}</small>
+                                                        </span>
+                                                        {row.pays.map(p => <em key={p.count}>{p.multiplier}×</em>)}
+                                                    </div>
                                                 ))}
-                                            </ul>
+                                            </div>
+                                            <div className="slot-paytable-special">
+                                                {fullPaytable.wild && <span><strong>Wild</strong> substitutes for pay symbols</span>}
+                                                {fullPaytable.scatter && (
+                                                    <span><strong>Scatter</strong> {fullPaytable.scatter.trigger}+ triggers{fullPaytable.scatter.awardFreeSpins ? ` ${fullPaytable.scatter.awardFreeSpins} free spins` : ' the feature'}</span>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                     {contract?.mechanics && (
@@ -981,6 +1029,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         >
             <div
                 className={`slot-stage-v2 slot-template-${config.id} skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''} ${freeSpinSession || freeSpins > 0 ? 'is-bonus-active' : ''} ${lastResult?.featureEvents?.length ? 'has-feature-event' : ''} ${slotAssetsReady ? '' : 'is-loading'}`}
+                data-slot-spinning={running ? 'true' : undefined}
                 style={{
                     '--slot-accent': config.accent,
                     '--slot-cover': `url(${cover})`,
@@ -1002,6 +1051,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             <span><Gauge size={12} /> {config.volatility}</span>
                             <span>{config.layout.cols}×{config.layout.rows}</span>
                             <span>{paylineMode}</span>
+                            <button
+                                type="button"
+                                className={`slot-howpay-toggle ${showPaylines ? 'active' : ''}`}
+                                onClick={() => setShowPaylines(v => !v)}
+                                aria-pressed={showPaylines}
+                            >
+                                <Info size={11} /> How it pays
+                            </button>
                         </div>
                     </div>
                     <div className="slot-stage-pills">
@@ -1143,6 +1200,22 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 accent={config.accent}
                             />
                         )}
+                        {showPaylines && !running && (
+                            <div className="slot-howpay-overlay" aria-live="polite">
+                                {paylinesInfo.groups.length > 0 && (
+                                    <div className="slot-howpay-lines">
+                                        {paylinesInfo.groups.map((group, gi) => (
+                                            <span
+                                                key={gi}
+                                                className="slot-howpay-line"
+                                                style={{ '--line-top': `${((gi + 0.5) / paylinesInfo.groups.length) * 100}%` }}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                                <p className="slot-howpay-explain">{paylinesInfo.explain}</p>
+                            </div>
+                        )}
                         {anticipating && running && (
                             <div className="slot-anticipation-callout" aria-live="polite">
                                 <span>Scatter watch</span>
@@ -1181,15 +1254,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                     <button
                         type="button"
-                        className="slot-control-spin"
+                        className={`slot-control-spin ${running ? 'slam' : ''}`}
                         onClick={triggerStageSpin}
-                        disabled={running || autoplayActive}
-                        aria-label="Spin"
+                        disabled={autoplayActive}
+                        aria-label={running ? 'Skip animation' : 'Spin'}
                         data-slot-action="spin"
                         data-ux-primary-action
                     >
                         <span className="slot-control-spin-inner">
-                            {running ? <RotateCcw size={28} /> : <Play size={28} />}
+                            {running ? <Square size={24} /> : <Play size={28} />}
                         </span>
                     </button>
                     <div className="slot-control-quick">
@@ -1306,6 +1379,21 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <strong>{freeSpinSession.totalAwarded - freeSpins}/{freeSpinSession.totalAwarded}</strong>
                         <em>WON {formatCredits(freeSpinSession.totalWin)}</em>
                         {freeSpinSession.retriggers > 0 && <i>+{freeSpinSession.retriggers} retrigger</i>}
+                        {freeSpinSession.trail?.length > 0 && (
+                            <div className="slot-fs-trail" aria-hidden>
+                                {freeSpinSession.trail.map((step, i) => (
+                                    <span
+                                        key={i}
+                                        className={`slot-fs-trail-step ${step.win > 0 ? 'hit' : 'miss'}`}
+                                        title={step.win > 0 ? `${formatCredits(step.win)} (${step.mult.toFixed(1)}×)` : 'no win'}
+                                        style={{ '--bar': `${Math.min(100, Math.max(8, (step.mult || 0) * 8))}%` }}
+                                    />
+                                ))}
+                                {persistentMultiplier > 0 && (
+                                    <em className="slot-fs-trail-persist">×{persistentMultiplier}</em>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1512,21 +1600,42 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 )}
 
                 <div className="slot-stage-foot">
+                    {sparkline.points.length > 1 && (
+                        <div className={`slot-bankroll-spark ${sparkline.net >= 0 ? 'pos' : 'neg'}`} title="Session net profit trail">
+                            <svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden>
+                                <line x1="0" y1={sparkline.zeroY} x2="120" y2={sparkline.zeroY} className="slot-spark-zero" />
+                                <path d={sparkline.path} className="slot-spark-line" fill="none" />
+                            </svg>
+                            <div className="slot-bankroll-spark-meta">
+                                <small>Session</small>
+                                <strong>{sparkline.net >= 0 ? '+' : ''}{formatCredits(sparkline.net)}</strong>
+                            </div>
+                        </div>
+                    )}
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 </div>
             </div>
 
-            <div
-                className="slot-mobile-dock"
-                style={{ '--slot-accent': config.accent }}
-                data-slot-mobile-dock
-                data-mobile-critical-surface
-                data-ux-surface="dock"
-            >
-                <div className="slot-mobile-readout">
-                    <span>Bet</span>
+            {(() => {
+              const dock = (
+                <div
+                    className="slot-mobile-dock"
+                    style={{ '--slot-accent': config.accent }}
+                    data-slot-mobile-dock
+                    data-mobile-critical-surface
+                    data-ux-surface="dock"
+                >
+                <button
+                    type="button"
+                    className="slot-mobile-readout slot-mobile-bet"
+                    onClick={() => setShowMobileBet(true)}
+                    disabled={running || autoplayActive || canUseFreeSpin}
+                    aria-label="Edit bet"
+                    aria-haspopup="dialog"
+                >
+                    <span>{canUseFreeSpin ? 'Free' : 'Bet'}</span>
                     <strong>{formatCredits(effectiveStake)}</strong>
-                </div>
+                </button>
                 <div className="slot-mobile-readout">
                     <span>Win</span>
                     <strong>{formatCredits(lastResult?.returnAmount || 0)}</strong>
@@ -1555,15 +1664,59 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     type="button"
                     className="slot-mobile-spin"
                     onClick={triggerStageSpin}
-                    disabled={running || autoplayActive}
+                    disabled={autoplayActive}
                     data-slot-action="spin"
                     data-mobile-hit-target="primary"
                     data-ux-primary-action
                 >
                     <Play size={18} />
-                    {running ? 'Spinning' : slotSpinLabel}
+                    {running ? 'Skip' : slotSpinLabel}
                 </button>
-            </div>
+              </div>
+              )
+              return dockPortal ? createPortal(dock, dockPortal) : dock
+            })()}
+
+            {showMobileBet && (
+                <div
+                    className="slot-mobile-bet-sheet-backdrop"
+                    onClick={() => setShowMobileBet(false)}
+                    role="dialog"
+                    aria-label="Adjust bet"
+                >
+                    <div className="slot-mobile-bet-sheet" onClick={e => e.stopPropagation()}>
+                        <header>
+                            <strong>Bet amount</strong>
+                            <button type="button" onClick={() => setShowMobileBet(false)} aria-label="Close"><X size={16} /></button>
+                        </header>
+                        <div className="slot-mobile-bet-value">{formatCredits(betAmount)}</div>
+                        <div className="slot-mobile-bet-steppers">
+                            <button type="button" onClick={() => setBet(0.1)} disabled={running || autoplayActive}>Min</button>
+                            <button type="button" onClick={() => setBet(betAmount / 2)} disabled={running || autoplayActive}>½</button>
+                            <button type="button" onClick={() => setBet(betAmount * 2)} disabled={running || autoplayActive}>2×</button>
+                            <button type="button" onClick={() => setBet(Math.min(10000, balance || 10000))} disabled={running || autoplayActive}>Max</button>
+                        </div>
+                        <input
+                            type="number"
+                            className="slot-mobile-bet-input"
+                            min="0.1"
+                            max="10000"
+                            step="0.5"
+                            value={betAmount}
+                            onChange={e => setBet(e.target.value)}
+                            disabled={running || autoplayActive}
+                            aria-label="Bet amount"
+                        />
+                        <button
+                            type="button"
+                            className="slot-mobile-bet-info"
+                            onClick={() => { setShowMobileBet(false); setShowInfo(true) }}
+                        >
+                            <Info size={14} /> View paytable &amp; rules
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
             <EducationPanel
