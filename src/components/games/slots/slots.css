@@ -1065,6 +1065,27 @@
     margin-top: 4px;
 }
 
+/* Win-tier label (Nice/Good/Great below the 8x big-win threshold). Bigger
+   tiers escalate hue toward the feature-gold celebration palette. */
+.slot-result-banner i.slot-win-tier {
+    order: -1;
+    font-style: normal;
+    font-weight: 950;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #b1bad3);
+}
+.slot-result-banner.tier-nice i.slot-win-tier { color: #8fd3ff; }
+.slot-result-banner.tier-good i.slot-win-tier { color: #7fe0a6; }
+.slot-result-banner.tier-great i.slot-win-tier { color: #ffd166; }
+.slot-result-banner.tier-big i.slot-win-tier,
+.slot-result-banner.tier-huge i.slot-win-tier,
+.slot-result-banner.tier-mega i.slot-win-tier {
+    color: var(--feature-gold, #ffe680);
+    text-shadow: 0 0 14px rgba(255, 230, 128, 0.5);
+}
+
 @keyframes slotResultIn {
     from { opacity: 0; transform: translate(-50%, -42%) scale(0.88); }
     to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -1443,6 +1464,14 @@
     font-style: normal;
     font-size: 11px;
     font-weight: 900;
+}
+
+.slot-buy-tier-ev {
+    margin-top: 6px;
+    font-size: 10.5px;
+    line-height: 1.4;
+    color: var(--text-muted, #909cb0);
+    text-align: left;
 }
 
 /* ---------- Reduced motion ---------- */
