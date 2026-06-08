@@ -15,6 +15,28 @@
         linear-gradient(180deg, #131826 0%, #08101a 100%);
 }
 
+/* Reel + results focal block. Reordered above the case browser so opening a
+   case animates in-view (was buried below the selected-case banner, room
+   summary, timeline, chips, preview, and the full case grid -> heavy scroll). */
+.cases-reel-area {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-margin-top: 16px;
+}
+.cases-reel-area:empty {
+    display: none;
+}
+.cases-stage .rrs-strip { order: 0; }
+.cases-stage .cases-selected-case { order: 1; }
+.cases-stage .cases-reel-area { order: 2; }
+.cases-stage .cases-stack-row { order: 3; }
+.cases-stage .cases-room-summary { order: 4; }
+.cases-stage .cases-opening-timeline { order: 5; }
+.cases-stage .cases-category-row { order: 6; }
+.cases-stage .cases-market-reel { order: 7; }
+.cases-stage .cases-case-grid { order: 8; }
+
 /* Wave 18: view tabs */
 
 .cases-view-tabs {
