@@ -1267,7 +1267,7 @@ export default function CasesGame() {
                             </div>
                                 <div className="cases-category-row">
                                     {CASE_CATEGORIES.map(c => (
-                                    <button key={c.value} className={`cases-category-chip ${category === c.value ? 'active' : ''}`} disabled={running} onClick={() => selectCategory(c.value)}>
+                                    <button key={c.value} className={`cases-category-chip ${category === c.value ? 'active' : ''}`} disabled={running} onClick={() => selectCategory(c.value)} aria-label={`${c.label} cases`} aria-pressed={category === c.value}>
                                         <span>{c.label}</span>
                                         <strong>{categoryCounts[c.value] || 0}</strong>
                                         <em>{categoryStats[c.value]?.band || 'Budget'}</em>
