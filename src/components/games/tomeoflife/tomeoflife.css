@@ -18,13 +18,15 @@
 
 .tome-pages {
     display: grid;
-    grid-template-columns: repeat(3, 130px);
+    grid-template-columns: repeat(3, minmax(0, 130px));
     gap: 12px;
+    width: 100%;
+    max-width: 414px;
 }
 
 .tome-page {
-    width: 130px;
-    height: 170px;
+    width: 100%;
+    aspect-ratio: 130 / 170;
     border-radius: 12px;
     border: 2px solid rgba(255, 209, 102, 0.25);
     display: flex;

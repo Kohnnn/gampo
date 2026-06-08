@@ -90,7 +90,7 @@ export default function LotteryGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div className="lottery-stage">
+            <div className="lottery-stage" data-ux-surface="stage">
                 <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className={`lot-tumbler ${drawing ? 'shaking' : ''} ${settling ? 'settling' : ''}`}>
                     {/* Idle: rotating drum with ghost balls so the panel is never empty. */}

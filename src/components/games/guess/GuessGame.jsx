@@ -76,7 +76,7 @@ export default function GuessGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div className={`guess-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+            <div data-ux-surface="stage" className={`guess-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className={`guess-orb ${spinning ? 'spinning' : ''} ${lastWon === true ? 'won' : lastWon === false ? 'lost' : ''}`}>
                     <NumberRoll value={result === null ? '?' : result} format={v => v === '?' ? '?' : String(v)} />

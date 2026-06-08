@@ -12,20 +12,23 @@
     gap: 18px;
     padding: 24px;
     border-radius: inherit;
+    --stage-glow: rgba(120, 200, 255, 0.16);
     background:
-        radial-gradient(ellipse at top, rgba(120, 200, 255, 0.16), transparent 60%),
-        linear-gradient(180deg, #14202b 0%, #0c151c 100%);
+        radial-gradient(ellipse at top, var(--stage-glow), transparent 60%),
+        var(--stage-bg);
 }
 
 .diamonds-row {
     display: grid;
-    grid-template-columns: repeat(5, 92px);
+    grid-template-columns: repeat(5, minmax(0, 92px));
     gap: 12px;
+    width: 100%;
+    max-width: 520px;
 }
 
 .diamond-slot {
-    width: 92px;
-    height: 110px;
+    width: 100%;
+    aspect-ratio: 92 / 110;
     border-radius: 14px;
     display: flex;
     align-items: center;
@@ -69,3 +72,9 @@
     text-transform: uppercase;
 }
 .diamonds-paytable strong { color: var(--text-primary, #fff); }
+
+@media (max-width: 768px) {
+    .diamonds-stage { padding: 16px 10px; gap: 14px; }
+    .diamonds-row { gap: 8px; }
+    .diamond-slot { font-size: 30px; }
+}

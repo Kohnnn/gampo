@@ -176,7 +176,7 @@ export default function DinoGame() {
                 </>
             }
         >
-            <div className={`dino-stage phase-${phase}`}>
+            <div data-ux-surface="stage" className={`dino-stage phase-${phase}`}>
                 <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className="dino-scene">
                     <canvas ref={canvasRef} className="dino-canvas" aria-label="Dino runner" />

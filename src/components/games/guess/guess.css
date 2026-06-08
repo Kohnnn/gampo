@@ -51,3 +51,7 @@
     gap: 6px;
 }
 
+@media (max-width: 768px) {
+    .guess-pick { grid-template-columns: repeat(3, 1fr); }
+}
+

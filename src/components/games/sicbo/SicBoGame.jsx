@@ -158,7 +158,7 @@ export default function SicBoGame() {
                 </>
             }
         >
-            <div className={`sb-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} data-mobile-scroll-surface>
+            <div data-ux-surface="stage" className={`sb-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} data-mobile-scroll-surface>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 {shaking ? (
                     <div className="sb-cup-area">
