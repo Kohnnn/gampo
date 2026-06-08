@@ -16,6 +16,17 @@ const fmtMult = (m) => {
     return `${m.toFixed(2)}×`
 }
 
+// Compact a free-text result label so it fits a small chip without losing
+// meaning. Roulette emits "10 black" / "0 green" etc; abbreviate the colour
+// word rather than hard-slicing to 6 chars ("10 bla").
+const COLOR_ABBR = { black: 'BLK', red: 'RED', green: 'GRN' }
+export const compactLabel = (raw) => {
+    const label = String(raw).trim()
+    const m = label.match(/^(\d+)\s+(black|red|green)$/i)
+    if (m) return `${m[1]} ${COLOR_ABBR[m[2].toLowerCase()]}`
+    return label.length > 6 ? label.slice(0, 6) : label
+}
+
 export default function RecentResultsStrip({ results = [], limit = 14, mode = 'auto', emptyHint = 'No history yet' }) {
     const visible = useMemo(() => results.slice(0, limit), [results, limit])
 
@@ -36,7 +47,7 @@ export default function RecentResultsStrip({ results = [], limit = 14, mode = 'a
                 if (mode === 'multiplier' || (mode === 'auto' && Number.isFinite(item.multiplier))) {
                     text = fmtMult(item.multiplier) || (dir === 'win' ? 'W' : dir === 'loss' ? 'L' : 'P')
                 } else if (item.label) {
-                    text = String(item.label).slice(0, 6)
+                    text = compactLabel(item.label)
                 } else {
                     text = dir === 'win' ? 'W' : dir === 'loss' ? 'L' : 'P'
                 }

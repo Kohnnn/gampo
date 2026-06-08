@@ -860,7 +860,7 @@
 
 .casino-game-badges {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 6px;
     margin-top: auto;
     min-height: 23px;
@@ -1180,9 +1180,6 @@
         padding-inline: 6px;
     }
 
-    .casino-game-badges b:first-child {
-        flex-basis: 76px;
-    }
 }
 
 /* Wave 25: live missions + VIP styling */

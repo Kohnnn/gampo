@@ -429,13 +429,9 @@
 
     .crash-mobile-targets .crash-mobile-target-row {
         display: grid;
-        grid-auto-flow: column;
-        grid-auto-columns: minmax(58px, 1fr);
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: 5px;
-        overflow-x: auto;
         padding-bottom: 2px;
-        scrollbar-width: thin;
-        mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent);
     }
 
     .crash-mobile-targets button {

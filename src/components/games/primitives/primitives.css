@@ -565,8 +565,8 @@
 .bp-tab:hover { color: var(--text-primary); }
 
 .bp-tab.active {
-    background: var(--accent);
-    color: #071109;
+    background: color-mix(in srgb, var(--accent), black 50%);
+    color: #fff;
     box-shadow: 0 4px 12px color-mix(in srgb, var(--accent), transparent 50%);
 }
 
