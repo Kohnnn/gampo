@@ -541,7 +541,7 @@ export const SLOT_TEMPLATES = [
         volatility: 'Very high',
         layout: { rows: 4, cols: 5, evaluation: 'ways' },
         backdrop: '/assets/games/backdrops/backdrop-parchment.png',
-        featureText: 'Hacksaw-style multiplier wheel feature gate. Trigger 3+ gongs to spin a 2x to 30x multiplier.',
+        featureText: 'Hacksaw-style multiplier wheel feature gate. Trigger 3+ gongs to spin a 2x to 20x multiplier.',
         controls: { buyBonus: true, turbo: true, auto: true },
         features: {
             scatter: { symbolId: 'gong', trigger: 3, awardFreeSpins: 6, pay: 1.4 },

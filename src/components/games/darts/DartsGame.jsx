@@ -39,6 +39,12 @@ const SECTOR_PAYOUT = 1.6
 const NEIGHBOR_PAYOUT = 0
 const BULLSEYE_PAYOUT = 12
 const BULL_HIT_CHANCE = 0.078
+// Engine bias distribution for a sector pick: the dart lands on the chosen
+// sector SECTOR_HIT_CHANCE of the time (the only paying outcome), a neighbor
+// NEIGHBOR_HIT_CHANCE of the time, otherwise it misses elsewhere. These are the
+// authoritative win odds used both by sampleHit and the Probability Lab.
+const SECTOR_HIT_CHANCE = 0.6
+const NEIGHBOR_HIT_CHANCE = 0.25
 
 function sampleHit({ sector }) {
     const r = nextRoll('darts').roll
@@ -46,8 +52,8 @@ function sampleHit({ sector }) {
         if (r < BULL_HIT_CHANCE) return { kind: 'bull' }
         return { kind: 'miss', hitSector: Math.floor(nextRoll('darts').roll * SECTOR_COUNT) }
     }
-    if (r < 0.6) return { kind: 'sector', hitSector: sector }
-    if (r < 0.85) {
+    if (r < SECTOR_HIT_CHANCE) return { kind: 'sector', hitSector: sector }
+    if (r < SECTOR_HIT_CHANCE + NEIGHBOR_HIT_CHANCE) {
         const dir = nextRoll('darts').roll < 0.5 ? -1 : 1
         const neighbor = ((sector + dir) + SECTOR_COUNT) % SECTOR_COUNT
         return { kind: 'neighbor', hitSector: neighbor }
@@ -237,7 +243,19 @@ export default function DartsGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={0.6} payoutMultiplier={SECTOR_PAYOUT} balance={balance} recentProfit={recentProfit} />
+            {/* Win odds derived from the engine's sampleHit thresholds for the
+                currently-selected target. Only the chosen sector (or the bull)
+                pays — neighbor lands at NEIGHBOR_PAYOUT=0 — so the paying chance
+                is exactly SECTOR_HIT_CHANCE (0.6 → 1.6× = 0.96 RTP) or
+                BULL_HIT_CHANCE (0.078 → 12× = 0.936 RTP). */}
+            <EducationPanel
+                definition={definition}
+                betAmount={5}
+                winProbability={target === 'bull' ? BULL_HIT_CHANCE : SECTOR_HIT_CHANCE}
+                payoutMultiplier={target === 'bull' ? BULLSEYE_PAYOUT : SECTOR_PAYOUT}
+                balance={balance}
+                recentProfit={recentProfit}
+            />
         </GameShell>
     )
 }

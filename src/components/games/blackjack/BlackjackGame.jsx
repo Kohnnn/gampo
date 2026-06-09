@@ -45,6 +45,12 @@ import { useGameBgm } from '../../../audio/useBgm'
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 const SUITS = ['S', 'H', 'D', 'C']
 
+// Published basic-strategy outcome split for a single hand vs dealer:
+// ~43.3% win, ~8.7% push, ~48.0% loss. We use the win frequency as the
+// Probability Lab "win chance"; payoutMultiplier is reconciled from RTP so the
+// binary EV model lands at EV ≈ RTP. See EducationPanel usage note below.
+const BJ_WIN_FREQUENCY = 0.433
+
 function buildDeck() {
     const out = []
     for (const s of SUITS) for (const r of RANKS) out.push({ rank: r, suit: s })
@@ -603,7 +609,23 @@ export default function BlackjackGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={2.4} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={0.43} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
+            {/* Basic-strategy hand-win frequency. Rounds resolve into win/push/
+                loss with 3:2 blackjacks, so the engine's true RTP lives in
+                blackjackRules/settleBlackjackHands, not a single multiplier. The
+                Probability Lab uses a binary EV model, so we surface the standard
+                basic-strategy win frequency (~43% of hands win outright, the rest
+                push or lose) and reconcile payoutMultiplier from the definition's
+                RTP (0.995) so EV ≈ RTP. The constant is the best available
+                single-number summary; deriving an exact per-rule figure would
+                require simulating settleBlackjackHands across the full hand space. */}
+            <EducationPanel
+                definition={definition}
+                betAmount={5}
+                winProbability={BJ_WIN_FREQUENCY}
+                payoutMultiplier={(definition?.rtp ?? 0.995) / BJ_WIN_FREQUENCY}
+                balance={balance}
+                recentProfit={recentProfit}
+            />
         </GameShell>
     )
 }
