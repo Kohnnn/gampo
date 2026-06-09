@@ -125,6 +125,47 @@ Result (measured via CDP, local + production):
 ## Open follow-ups
 - Netlify GitHub auto-deploy lag: push-triggered builds did not publish promptly; deployed via
   authenticated Netlify CLI (`netlify deploy --prod --dir dist`). Not blocking; production current.
-- `/poker` @390px ux interaction probe: SIT-DOWN buy-in modal isn't a one-tap dock, so the probe
-  can't complete (passes @466px). Consider tagging the CTA with `data-mobile-primary-action` or
-  documenting it as an expected skip for modal-entry games.
+
+## Core UX pass — shared scroll hook + Poker + Cases dock (2026-06-09)
+Shipped `5bff9455` + `eb18028a`; deployed `index-DPeVKNsX.js` (matches local).
+
+### Shared `useScrollActionIntoView` hook (`src/hooks/useScrollActionIntoView.js` +5 tests)
+- Pure `resolveScrollPlan` core (testable) + thin effect wrapper; reduced-motion aware.
+- Solves the "tapped but the change is off-screen" class of bug generically.
+- Applied to Cases (reel) and Poker (action bar); ready to reuse on any below-fold action.
+
+### Poker `/poker` @390px ux probe — FIXED
+- Root cause was a harness timing race, not a layout bug: after sit-down the button is at seat 4
+  of 6, so up to 5 bots act first at `BOT_THINK_MS=1100ms` before the human's turn; the old probe
+  waited a fixed 900ms then asserted action buttons that only render on `isHumanTurn`. Flaky →
+  failed @390px, passed @466px by luck.
+- Fixes: (1) harness now polls up to ~8s for an enabled `[data-poker-action]` instead of a fixed
+  sleep; (2) action bar (`.pk-actions`) scrolls into view via the shared hook when it becomes the
+  player's turn (also a real mobile UX win — controls no longer stranded below the fold). The
+  seated GTO-now panel already renders pre-turn with a "waiting on {actor}" state.
+- Verified production: `/poker` interaction=passed @390 and @466 (was failing @390), ux=100.
+
+### Cases sticky mobile open dock + collapsible browser
+- Portaled `.cases-mobile-dock` to `<body>` (Quick · case summary · Open ×N), fixed at bottom on
+  ≤768px using the shared `--z-mobile-action` / `--mobile-action-height` tokens; hidden on desktop
+  where the right-panel CTA is kept. Replaces the in-aside sticky CTA on mobile (no double button).
+  Stage `gs-playfield` gets bottom padding so content clears the dock.
+- Added a "Change case / Hide case browser" collapse toggle so the open flow is reel→result rather
+  than scrolling past the 60-card grid (grid hidden when collapsed; defaults open).
+- Dock open button uses `data-cases-mobile-open` + `data-mobile-hit-target="primary"` (kept the
+  canonical single `data-game-action` contract intact). Smoke gained a `/cases` interaction
+  contract that opens via the dock and polls for the reel in-view.
+- Verified: dock fixed + Open hit-reachable @390 (bottom 761px), desktop dock display:none with
+  right CTA visible; production `/cases` interaction=passed @390/466, ux=100, a11y PASS.
+
+### Gates (local + production)
+- vitest 396 PASS (+5 hook tests); build OK.
+- Local: smoke 0/0 across 12 routes × 390/466/492/1365; bet-sheet ALL PASS; contrast AA PASS;
+  a11y PASS (after adding `aria-label` to `.cases-browser-toggle`, caught by the a11y guard).
+- Production: `/poker` + `/cases` interaction=passed @390/466, ux=100, smoke 0/0, a11y PASS.
+
+## Remaining follow-ups
+- Apply `useScrollActionIntoView` to other below-fold actions if the pattern proves out (user to
+  evaluate Cases/Poker first).
+- Deferred phases from this brainstorm: Slots autoplay stop-condition parity in the mobile sheet;
+  Arcade in-round CTA consistency sweep (mines/diamonds/snakes/tower cashout/again).
