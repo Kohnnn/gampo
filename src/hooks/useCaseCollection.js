@@ -9,6 +9,13 @@
 //   gampo_cases_pokedex      — { [variantKey]: { count, name, image, rarity, color,
 //                                                wear, float, statTrak, souvenir,
 //                                                multiplier, valueGc, firstSeen, lastSeen, skinId } }
+//   gampo_cases_stats_v1     — { [caseId]: { caseId, caseName, opens, totalWageredGc,
+//                                            totalReturnGc, netGc, luckiest, lastOpened } }
+//
+// Per-case stats live in their own versioned key (not derived from `drops`)
+// because the drop history is capped at 400 entries — lifetime open counts,
+// wagered totals and net P/L must survive beyond that window, so we accumulate
+// them eagerly on every recordDrop.
 //
 // Variant key shape: `${skinId}::${wear}::${statTrak ? 'st' : 'reg'}::${souvenir ? 'sv' : 'std'}`.
 //
@@ -24,11 +31,13 @@ import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const DROPS_KEY = 'gampo_cases_drops_v2'
 const POKEDEX_KEY = 'gampo_cases_pokedex'
+const CASE_STATS_KEY = 'gampo_cases_stats_v1'
 const DROPS_LIMIT = 400
 
 const listeners = new Set()
 let drops = readDrops()
 let pokedex = readPokedex()
+let caseStats = readCaseStats()
 
 function makeDropId(entry = {}, index = 0) {
     if (entry.dropId) return entry.dropId
@@ -56,6 +65,11 @@ function readPokedex() {
     return parsed && typeof parsed === 'object' ? parsed : {}
 }
 
+function readCaseStats() {
+    const parsed = readJson(CASE_STATS_KEY, {})
+    return parsed && typeof parsed === 'object' ? parsed : {}
+}
+
 function writeDrops() {
     const trimmed = drops.slice(0, DROPS_LIMIT)
     if (writeJson(DROPS_KEY, trimmed)) {
@@ -65,6 +79,10 @@ function writeDrops() {
 
 function writePokedex() {
     writeJson(POKEDEX_KEY, pokedex)
+}
+
+function writeCaseStats() {
+    writeJson(CASE_STATS_KEY, caseStats)
 }
 
 function notify() {
@@ -129,7 +147,65 @@ export function recordDrop(pick, ctx = {}) {
     }
     writeDrops()
     writePokedex()
+    accumulateCaseStats(pick, ctx, ts)
     notify()
+}
+
+// Per-case lifetime aggregates. Keyed by case id. Tracks how many drops were
+// opened from the case, total wagered (sum of per-drop open price), total value
+// returned, net P/L (return - wagered), and the single luckiest drop seen
+// (highest value, ties broken by multiplier). Accumulated eagerly so the totals
+// survive the 400-drop history cap.
+function accumulateCaseStats(pick, ctx, ts) {
+    const caseId = ctx.caseId
+    if (!caseId) return
+    const wagered = Number(ctx.openPriceGc ?? pick.openPriceGc) || 0
+    const value = Number(pick.valueGc) || 0
+    const prev = caseStats[caseId] || {
+        caseId,
+        caseName: ctx.caseName || pick.caseName || caseId,
+        opens: 0,
+        totalWageredGc: 0,
+        totalReturnGc: 0,
+        netGc: 0,
+        luckiest: null,
+        lastOpened: 0,
+    }
+    const prevLuckyValue = prev.luckiest ? Number(prev.luckiest.valueGc) || 0 : -Infinity
+    const prevLuckyMult = prev.luckiest ? Number(prev.luckiest.multiplier) || 0 : -Infinity
+    const mult = Number(pick.multiplier) || 0
+    const isLuckier = value > prevLuckyValue || (value === prevLuckyValue && mult > prevLuckyMult)
+    const luckiest = isLuckier
+        ? {
+            skinId: pick.skinId,
+            name: pick.name,
+            image: pick.image,
+            color: pick.color,
+            rarity: pick.rarity,
+            wear: pick.wear,
+            statTrak: !!pick.statTrak,
+            souvenir: !!pick.souvenir,
+            valueGc: value,
+            multiplier: mult,
+            ts,
+        }
+        : prev.luckiest
+    const totalWageredGc = (Number(prev.totalWageredGc) || 0) + wagered
+    const totalReturnGc = (Number(prev.totalReturnGc) || 0) + value
+    caseStats = {
+        ...caseStats,
+        [caseId]: {
+            ...prev,
+            caseName: ctx.caseName || prev.caseName,
+            opens: (Number(prev.opens) || 0) + 1,
+            totalWageredGc: Math.round(totalWageredGc * 100) / 100,
+            totalReturnGc: Math.round(totalReturnGc * 100) / 100,
+            netGc: Math.round((totalReturnGc - totalWageredGc) * 100) / 100,
+            luckiest,
+            lastOpened: ts,
+        },
+    }
+    writeCaseStats()
 }
 
 function patchDrop(dropId, patch) {
@@ -190,6 +266,7 @@ export function exportInventory() {
         exportedAt: new Date().toISOString(),
         drops: drops.map(normalizeDrop),
         pokedex,
+        caseStats,
     }, null, 2)
 }
 
@@ -200,8 +277,10 @@ export function importInventory(payload) {
     }
     drops = parsed.drops.map(normalizeDrop).slice(0, DROPS_LIMIT)
     pokedex = parsed.pokedex
+    caseStats = parsed.caseStats && typeof parsed.caseStats === 'object' ? parsed.caseStats : {}
     writeDrops()
     writePokedex()
+    writeCaseStats()
     notify()
     return { drops: drops.length, variants: Object.keys(pokedex).length }
 }
@@ -209,9 +288,17 @@ export function importInventory(payload) {
 export function resetCases() {
     drops = []
     pokedex = {}
+    caseStats = {}
     removeKey(DROPS_KEY)
     removeKey(POKEDEX_KEY)
+    removeKey(CASE_STATS_KEY)
     notify()
+}
+
+// Lifetime open stats for a single case id (or null if never opened).
+export function caseStatsFor(caseId) {
+    if (!caseId) return null
+    return caseStats[caseId] || null
 }
 
 function summarise(catalogTotal = 0) {
@@ -256,6 +343,7 @@ export function useCaseCollection({ catalogTotal = 0 } = {}) {
     return {
         drops,
         pokedex,
+        caseStats,
         summary: summarise(catalogTotal),
         recordDrop,
         reset: resetCases,
@@ -265,5 +353,6 @@ export function useCaseCollection({ catalogTotal = 0 } = {}) {
         removeJunk,
         exportInventory,
         importInventory,
+        caseStatsFor,
     }
 }

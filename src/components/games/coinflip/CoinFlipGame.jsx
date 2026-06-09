@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset } from '../primitives'
+import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './coinflip.css'
@@ -74,8 +74,8 @@ export default function CoinFlipGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div             data-ux-surface="stage"
-            className={`coinflip-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+            <CoreStageFrame minHeight={420} maxWidth={760} className="coinflip-stage-frame">
+            <div className={`coinflip-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="coin-stage-choices" data-mobile-critical-surface>
                     <button className={choice === 'head' ? 'active' : ''} disabled={flipping} onClick={() => setChoice('head')}>
@@ -94,6 +94,7 @@ export default function CoinFlipGame() {
                 </div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={16} color="#ffcf5a" />}
             </div>
+            </CoreStageFrame>
             <EducationPanel definition={definition} betAmount={5} winProbability={0.5} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

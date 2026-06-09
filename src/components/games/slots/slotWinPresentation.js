@@ -52,6 +52,40 @@ export function rollupValue(target, progress) {
 }
 
 /**
+ * Per-tier rollup durations (ms) for the win-tier banner count-up. Bigger tiers
+ * ramp longer so the payoff feels graduated (nice < good < great < big …).
+ * Reduced-motion returns 0 so callers render the final value instantly.
+ */
+export const ROLLUP_TIER_MS = {
+    nice: 420,
+    good: 620,
+    great: 820,
+    big: 1000,
+    huge: 1200,
+    mega: 1500,
+}
+
+export function rollupDurationMs(tierId, reduceMotion = false) {
+    if (reduceMotion) return 0
+    return ROLLUP_TIER_MS[tierId] || 0
+}
+
+/**
+ * Resolve the displayed rollup amount for a given elapsed time. This is the
+ * pure core of the banner count-up wiring: callers feed it the win target, how
+ * long the animation has run, its total duration, and whether reduced-motion is
+ * on. When reduced-motion is on (or the animation is complete / duration is
+ * non-positive) it returns the exact target so the value lands instantly.
+ */
+export function rollupFrame(target, elapsedMs, durationMs, reduceMotion = false) {
+    const t = Number(target) || 0
+    const dur = Number(durationMs)
+    const elapsed = Number(elapsedMs)
+    if (reduceMotion || !(dur > 0) || !(elapsed >= 0) || elapsed >= dur) return t
+    return rollupValue(t, elapsed / dur)
+}
+
+/**
  * Map a template's textual volatility band to an approximate per-spin hit
  * frequency (probability that a spin returns anything > 0). Higher volatility
  * pays less often but bigger. These are sensible presentation defaults — the

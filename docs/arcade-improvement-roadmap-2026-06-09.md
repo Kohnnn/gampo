@@ -34,7 +34,7 @@ Games are well-consolidated on shared primitives (BetPanel, StatsOverlay, Recent
 ## Status board
 | Task | Priority | Status | Commit | Notes |
 |---|---|---|---|---|
-| A-P0-1 CoreStageFrame migration | P0 | todo | | roulette/sicbo/dino first (deferred, higher risk) |
+| A-P0-1 CoreStageFrame migration | P0 | DONE | (batch 3) | all 8 migrated: roulette/sicbo/dino/coinflip/color/guess/lottery/rps; viewport clamp gained, qaLayout contract green |
 | A-P0-2 scroll into view | P0 | DONE | (this batch) | roulette(spinning)/sicbo(running)/blackjack(inRound) via useScrollActionIntoView |
 | A-P1-1 inert overlays | P1 | DONE | (P1 batch) | removed inert ActionLockOverlay + unused import from blackjack & videopoker (no clean busy flag) |
 | A-P1-2 dup cashout | P1 | DONE | (P1 batch) | removed duplicate in-stage cashout from tomeoflife/drill/pump; BetPanel in-round CTA retained |

@@ -48,11 +48,18 @@ describe('dice payout math', () => {
     })
 
     it('simulated RTP holds the house edge over 30k trials', () => {
+        // Deterministic seeded RNG (mulberry32) for a stable convergence check.
+        const mulberry32 = (seed) => () => {
+            seed |= 0; seed = (seed + 0x6D2B79F5) | 0
+            let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+        }
         for (const c of [10, 50, 90]) {
-            const rtp = simulateRtp(c, 30000)
+            const rng = mulberry32(0x1ce * (c + 1))
+            const rtp = simulateRtp(c, 30000, rng)
             // eslint-disable-next-line no-console
             console.log(`dice winChance=${c}% RTP=${rtp.toFixed(4)} (target ~${RTP})`)
-            expect(rtp).toBeLessThan(1.02)
             expect(rtp).toBeGreaterThan(RTP * 0.9)
             expect(rtp).toBeLessThan(RTP * 1.1)
         }

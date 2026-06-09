@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './color.css'
@@ -88,13 +88,15 @@ export default function ColorGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div data-ux-surface="stage" className={`color-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} style={{ '--result-color': result?.color }}>
+            <CoreStageFrame minHeight={460} maxWidth={760} className="color-stage-frame">
+            <div className={`color-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} style={{ '--result-color': result?.color }}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="color-pointer" />
                 <div className="color-spectrum" style={{ transform: `rotate(${rotation}deg)` }} />
                 <div className="color-result-label">{result?.label || 'Pick'}</div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={20} color={result?.color || '#fff'} />}
             </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={3} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.25} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>

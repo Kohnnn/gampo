@@ -41,5 +41,5 @@ Shared/read-only here: `src/utils/fairRng.js` (read its API, don't change), `Edu
 | C-P1-3 filter leak | P1 | DONE | (P1 batch) | split historyRarityFilter vs inventoryRarity; views filter independently |
 | C-P2-1 dead CSS | P2 | DONE | (P1 batch) | removed .cases-sell-btn/.cases-view-tabs/.cases-tier-chip |
 | C-P2-2 cold-load skeleton | P2 | DONE | (P1 batch) | skeleton cards while loading + fixed image dims (no reflow) |
-| C-P2-3 per-case stats | P2 | todo | | |
-| C-P2-4 pricing decision | P2 | todo | | WS-6 overlap |
+| C-P2-3 per-case stats | P2 | DONE | (batch 3) | gampo_cases_stats_v1: opens/wagered/net/luckiest; "This case" block |
+| C-P2-4 pricing decision | P2 | DONE | (batch 3) | formally accepted fallback-EV (documented); honest UI label; csmarket path kept dormant |

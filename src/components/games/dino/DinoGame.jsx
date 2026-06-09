@@ -13,7 +13,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import DinoEngine from './engine/DinoEngine'
@@ -176,7 +176,8 @@ export default function DinoGame() {
                 </>
             }
         >
-            <div data-ux-surface="stage" className={`dino-stage phase-${phase}`}>
+            <CoreStageFrame minHeight={380} maxWidth={760} className="dino-stage-frame">
+            <div className={`dino-stage phase-${phase}`}>
                 <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className="dino-scene">
                     <canvas ref={canvasRef} className="dino-canvas" aria-label="Dino runner" />
@@ -186,6 +187,7 @@ export default function DinoGame() {
                 </div>
                 {phase === 'cashed' && burstKey > 0 && <Particles key={burstKey} count={16} color="#9bf08a" />}
             </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={config.safe} payoutMultiplier={multiplier || config.growth} balance={balance} recentProfit={recentProfit} />
         </GameShell>
