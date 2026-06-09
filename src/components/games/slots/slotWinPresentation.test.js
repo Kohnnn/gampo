@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { winTier, winTierId, rollupValue, WIN_TIERS, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, volatilityHitFrequency } from './slotWinPresentation'
+import { winTier, winTierId, rollupValue, rollupDurationMs, rollupFrame, ROLLUP_TIER_MS, WIN_TIERS, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, volatilityHitFrequency } from './slotWinPresentation'
 
 describe('slotWinPresentation', () => {
     it('returns none tier for losses / zero / invalid', () => {
@@ -31,6 +31,38 @@ describe('slotWinPresentation', () => {
         const mid = rollupValue(100, 0.5)
         expect(mid).toBeGreaterThan(50) // easeOutCubic is ahead of linear
         expect(mid).toBeLessThan(100)
+    })
+
+    it('rollupDurationMs scales by tier and is 0 for reduced motion / untiered', () => {
+        // Bigger tiers ramp longer so the payoff feels graduated.
+        expect(rollupDurationMs('nice')).toBeGreaterThan(0)
+        expect(rollupDurationMs('great')).toBeGreaterThan(rollupDurationMs('nice'))
+        expect(rollupDurationMs('mega')).toBeGreaterThan(rollupDurationMs('great'))
+        // Untiered ('none') and unknown tiers have no rollup.
+        expect(rollupDurationMs('none')).toBe(0)
+        expect(rollupDurationMs('mystery-tier')).toBe(0)
+        // Reduced motion forces an instant (0ms) rollup regardless of tier.
+        expect(rollupDurationMs('mega', true)).toBe(0)
+        // The exported table backs the durations.
+        expect(rollupDurationMs('good')).toBe(ROLLUP_TIER_MS.good)
+    })
+
+    it('rollupFrame ramps 0->target over the duration, landing exactly on target', () => {
+        // Start of the animation shows nothing yet.
+        expect(rollupFrame(200, 0, 800)).toBe(0)
+        // Mid-flight is between 0 and the target, ahead of linear (easeOutCubic).
+        const mid = rollupFrame(200, 400, 800)
+        expect(mid).toBeGreaterThan(100)
+        expect(mid).toBeLessThan(200)
+        // At/after the duration it lands exactly on the target.
+        expect(rollupFrame(200, 800, 800)).toBe(200)
+        expect(rollupFrame(200, 5000, 800)).toBe(200)
+    })
+
+    it('rollupFrame is instant (returns target) for reduced motion or non-positive duration', () => {
+        expect(rollupFrame(200, 0, 800, true)).toBe(200)
+        expect(rollupFrame(200, 10, 0)).toBe(200)
+        expect(rollupFrame(200, 10, -100)).toBe(200)
     })
 
     it('exposes a tier table', () => {

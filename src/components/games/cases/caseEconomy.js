@@ -152,6 +152,16 @@ export function fallbackOpenPriceGc(caseData = {}, priceMap = {}) {
     return Math.max(1, roundGc(ev * 0.92, 1))
 }
 
+// Pricing decision (C-P2-4): GamPo intentionally prices every case from its
+// expected value, NOT from a live market feed. `public/data/cs-prices.json` is
+// deliberately absent so the simulator stays self-contained and reproducible —
+// no network/market dependency. Consequently `deriveOpenPriceGc` resolves the
+// `fallback-ev` source for all cases by design.
+//
+// The `csmarket` branch below is kept dormant-by-design (not broken): if a
+// price map is ever supplied it will be honored, but the default product
+// behavior is EV-based pricing. UI copy must therefore not imply "market
+// median" pricing when the source is `fallback-ev` (see CasesGame.jsx).
 export function deriveOpenPriceGc(caseData = {}, priceMap = {}) {
     const direct = marketPriceFromRecord(lookupPriceRecord(
         priceMap,
@@ -160,9 +170,11 @@ export function deriveOpenPriceGc(caseData = {}, priceMap = {}) {
         caseData.name,
         caseData.id,
     ))
+    // Dormant-by-design: only taken when an explicit price map is provided.
     if (direct) return { value: Math.max(1, roundGc(direct, 1)), source: 'csmarket' }
     const existing = firstFinite(caseData.openPriceGc, caseData.priceGc, caseData.marketPriceUsd)
     if (existing) return { value: Math.max(1, roundGc(existing, 1)), source: caseData.priceSource || 'manifest' }
+    // Default product path: expected-value pricing, self-contained.
     return { value: fallbackOpenPriceGc(caseData, priceMap), source: 'fallback-ev' }
 }
 

@@ -1138,6 +1138,14 @@ export default function CasesGame() {
 
     const dropOdds = useMemo(() => (activeCase ? caseDropOdds(activeCase) : []), [activeCase])
 
+    // C-P2-3: lifetime open stats for the active case (opens, total wagered,
+    // luckiest drop, net P/L). Read from the collection's per-case ledger so the
+    // figures survive the 400-drop history cap.
+    const activeCaseStats = useMemo(
+        () => (activeCase ? collection.caseStats[activeCase.id] || null : null),
+        [activeCase, collection.caseStats],
+    )
+
     // C-P0-2: feed the EV coach real per-case numbers instead of placeholders.
     //  - payoutMultiplier: the case's expected value per unit stake (evGc / open
     //    price). Below 1 reflects the built-in house edge of opening.
@@ -1361,7 +1369,7 @@ export default function CasesGame() {
                                     <div className="cases-selected-copy">
                                         <span>{activeCase.categoryLabel || activeCase.type || 'Case'}</span>
                                         <strong>{activeCase.name}</strong>
-                                        <em>{activeCase.items.length} possible drops · {activeCase.priceSource === 'csmarket' ? 'market median' : 'EV estimate'}</em>
+                                        <em>{activeCase.items.length} possible drops · {activeCase.priceSource === 'csmarket' ? 'market median price' : 'EV-based price'}</em>
                                         <div className="cases-selected-metrics">
                                             <b>EV {formatCredits(activeCase.evGc || 0)}</b>
                                             <b>{activeCase.volatility?.label || casePriceBand(casePrice)}</b>
@@ -1380,6 +1388,32 @@ export default function CasesGame() {
                                         <strong>{formatCredits(casePrice)}</strong>
                                         <em>{rows} row{rows > 1 ? 's' : ''} · {formatCredits(totalStake)}</em>
                                     </aside>
+                                </section>
+                            )}
+                            {activeCase && activeCaseStats && activeCaseStats.opens > 0 && (
+                                <section className="cases-this-case-stats" aria-label={`Your ${activeCase.name} stats`}>
+                                    <header className="cases-this-case-head">
+                                        <strong>This case</strong>
+                                        <small>your lifetime opens</small>
+                                    </header>
+                                    <div className="cases-this-case-grid">
+                                        <span><small>Opens</small><strong>{activeCaseStats.opens}</strong></span>
+                                        <span><small>Wagered</small><strong>{formatCredits(activeCaseStats.totalWageredGc || 0)}</strong></span>
+                                        <span className={(activeCaseStats.netGc || 0) >= 0 ? 'pos' : 'neg'}>
+                                            <small>Net P/L</small>
+                                            <strong>{(activeCaseStats.netGc || 0) >= 0 ? '+' : ''}{formatCredits(activeCaseStats.netGc || 0)}</strong>
+                                        </span>
+                                        <span>
+                                            <small>Luckiest</small>
+                                            <strong>{activeCaseStats.luckiest ? formatCredits(activeCaseStats.luckiest.valueGc || 0) : '—'}</strong>
+                                        </span>
+                                    </div>
+                                    {activeCaseStats.luckiest && (
+                                        <p className="cases-this-case-lucky" title={activeCaseStats.luckiest.name}>
+                                            Best drop: {activeCaseStats.luckiest.statTrak ? 'StatTrak™ ' : ''}{activeCaseStats.luckiest.name}
+                                            {activeCaseStats.luckiest.multiplier ? ` · ×${(activeCaseStats.luckiest.multiplier || 0).toFixed(2)}` : ''}
+                                        </p>
+                                    )}
                                 </section>
                             )}
                             {activeCase && dropOdds.length > 0 && (

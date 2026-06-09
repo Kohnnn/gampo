@@ -42,6 +42,6 @@ Do NOT edit outside this scope without coordinating (shared files: `primitives/`
 | S-P1-2 FS cap | P1 | DONE | (P1 batch) | MAX_FREE_SPINS_PER_SESSION in new slotConstants.js; imported by 2 scripts + slotRtp.test |
 | S-P1-3 EV panel | P1 | DONE | (P1 batch) | deriveEducationEv() from rtpTarget+volatility; blends live multiplier |
 | S-P1-4 autoplay limits | P1 | DONE | (P1 batch) | absolute loss/gain/single-win caps in autoplay loop + dock stop summary |
-| S-P2-1 win rollup | P2 | todo | | |
-| S-P2-2 turbo/instant | P2 | todo | | |
-| S-P2-3 a11y | P2 | todo | | |
+| S-P2-1 win rollup | P2 | DONE | (batch 3) | rollupValue wired to graduated win-tier count-up, reduced-motion aware |
+| S-P2-2 turbo/instant | P2 | DONE | (batch 3) | Normal/Turbo/Instant mode; instant keeps data-slot-spinning contract |
+| S-P2-3 a11y | P2 | DONE | (batch 3) | reel region label, win-tier aria-live, spin keyboard shortcut, reduced-motion reel/cascade |

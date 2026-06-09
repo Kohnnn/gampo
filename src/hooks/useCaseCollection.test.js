@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
     archiveDrop,
+    caseStatsFor,
     exportInventory,
     importInventory,
     recordDrop,
@@ -30,6 +31,10 @@ function readDrops() {
 
 function readPokedex() {
     return JSON.parse(globalThis.localStorage.getItem('gampo_cases_pokedex') || '{}')
+}
+
+function readCaseStats() {
+    return JSON.parse(globalThis.localStorage.getItem('gampo_cases_stats_v1') || '{}')
 }
 
 const baseSkin = {
@@ -157,5 +162,62 @@ describe('useCaseCollection v2', () => {
         const a = variantKey({ skinId: 'x', wear: 'FN', statTrak: false, souvenir: false })
         const b = variantKey({ skinId: 'x', wear: 'FN', statTrak: false, souvenir: false })
         expect(a).toBe(b)
+    })
+})
+
+describe('useCaseCollection per-case stats (C-P2-3)', () => {
+    it('aggregates opens, wagered, return and net P/L per case', () => {
+        recordDrop({ ...baseSkin, valueGc: 12, multiplier: 2.4 }, { caseId: 'case-a', caseName: 'Case A', openPriceGc: 5 })
+        recordDrop({ ...baseSkin, valueGc: 3, multiplier: 0.6 }, { caseId: 'case-a', caseName: 'Case A', openPriceGc: 5 })
+
+        const stats = readCaseStats()['case-a']
+        expect(stats.opens).toBe(2)
+        expect(stats.caseName).toBe('Case A')
+        expect(stats.totalWageredGc).toBe(10)
+        expect(stats.totalReturnGc).toBe(15)
+        expect(stats.netGc).toBe(5)
+    })
+
+    it('tracks the luckiest drop by value, breaking ties on multiplier', () => {
+        recordDrop({ ...baseSkin, skinId: 'lo', valueGc: 8, multiplier: 1.6 }, { caseId: 'case-b', openPriceGc: 5 })
+        recordDrop({ ...baseSkin, skinId: 'hi', valueGc: 40, multiplier: 8 }, { caseId: 'case-b', openPriceGc: 5 })
+        recordDrop({ ...baseSkin, skinId: 'mid', valueGc: 12, multiplier: 2.4 }, { caseId: 'case-b', openPriceGc: 5 })
+
+        const stats = readCaseStats()['case-b']
+        expect(stats.luckiest.skinId).toBe('hi')
+        expect(stats.luckiest.valueGc).toBe(40)
+        expect(stats.luckiest.multiplier).toBe(8)
+    })
+
+    it('keeps per-case stats isolated and falls back to open price when ctx omits it', () => {
+        recordDrop({ ...baseSkin, valueGc: 6, openPriceGc: 4 }, { caseId: 'case-c', caseName: 'Case C' })
+        recordDrop({ ...baseSkin, valueGc: 9 }, { caseId: 'case-d', caseName: 'Case D', openPriceGc: 7 })
+
+        const stats = readCaseStats()
+        expect(stats['case-c'].totalWageredGc).toBe(4)
+        expect(stats['case-d'].totalWageredGc).toBe(7)
+        expect(Object.keys(stats)).toHaveLength(2)
+    })
+
+    it('exposes caseStatsFor and survives the 400-drop history cap', () => {
+        for (let i = 0; i < 450; i += 1) {
+            recordDrop({ ...baseSkin, skinId: `s${i}`, valueGc: 2 }, { caseId: 'case-cap', openPriceGc: 5 })
+        }
+        expect(readDrops().length).toBe(400)
+        const stats = caseStatsFor('case-cap')
+        expect(stats.opens).toBe(450)
+        expect(stats.totalWageredGc).toBe(2250)
+    })
+
+    it('reset and import/export round-trip per-case stats', () => {
+        recordDrop({ ...baseSkin, valueGc: 12 }, { caseId: 'case-e', caseName: 'Case E', openPriceGc: 5 })
+        const exported = exportInventory()
+        resetCases()
+        expect(caseStatsFor('case-e')).toBe(null)
+
+        importInventory(exported)
+        const stats = caseStatsFor('case-e')
+        expect(stats.opens).toBe(1)
+        expect(stats.totalWageredGc).toBe(5)
     })
 })

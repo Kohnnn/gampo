@@ -40,7 +40,7 @@ import {
     buildSlotFeatureDemoState,
 } from './slotsMotion'
 import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
-import { winTier, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv } from './slotWinPresentation'
+import { winTier, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, rollupDurationMs, rollupFrame } from './slotWinPresentation'
 import { buildPaytable } from './slotPaytable'
 import { describePaylines } from './slotPaylines'
 import { buildSparkline } from './slotSparkline'
@@ -65,6 +65,11 @@ const FEATURE_LABELS = {
 }
 
 const AUTOPLAY_COUNTS = [10, 25, 50, 100]
+
+// Spin resolve speed cycle: Normal (full animation) → Turbo (sped-up reels) →
+// Instant (no reel animation, immediate result).
+const SPIN_MODE_ORDER = ['normal', 'turbo', 'instant']
+const SPIN_MODE_LABELS = { normal: 'Normal', turbo: 'Turbo', instant: 'Instant' }
 
 // Cubic-out easing for per-column stop delays.
 function cubicOut(t) {
@@ -113,7 +118,16 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [winningCells, setWinningCells] = useState([])
     const [lastResult, setLastResult] = useState(null)
     const [lastStake, setLastStake] = useState(5)
-    const [turbo, setTurbo] = useState(false)
+    // Spin resolve mode: 'normal' (full animation), 'turbo' (sped-up reels),
+    // 'instant' (no reel animation — result lands immediately). Distinct from
+    // slam-stop, which interrupts an in-flight animated spin. `turbo`/`instant`
+    // are derived so the existing speed branches read unchanged.
+    const [spinMode, setSpinMode] = useState('normal')
+    const turbo = spinMode === 'turbo' || spinMode === 'instant'
+    const instant = spinMode === 'instant'
+    // Graduated win-tier rollup: count-up of the banner total for nice/good/
+    // great (and bigger) tiers. `{ amount }` is the live displayed value.
+    const [winRollup, setWinRollup] = useState({ trigger: 0, amount: 0, target: 0, tierId: 'none' })
     const [bonusBuyTierId, setBonusBuyTierId] = useState(null)
     const [showBuyModal, setShowBuyModal] = useState(false)
     const [freeSpins, setFreeSpins] = useState(0)
@@ -152,6 +166,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [bonusCine, setBonusCine] = useState(null)
     const [nearMiss, setNearMiss] = useState(null)
     const [showInfo, setShowInfo] = useState(false)
+    // a11y: polite live-region message announcing the latest spin outcome
+    // (win tier + multiplier, or "No win").
+    const [liveAnnounce, setLiveAnnounce] = useState('')
     const [showMobileBet, setShowMobileBet] = useState(false)
     const [showPaylines, setShowPaylines] = useState(false)
     const [dockPortal, setDockPortal] = useState(null)
@@ -184,6 +201,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const persistentMultiplierRef = useRef(0)
     const reelFrameRef = useRef(null)
     const templateResetRef = useRef(startTemplate.id)
+    // rAF handle + start timestamp for the win-tier rollup count-up.
+    const rollupRafRef = useRef(null)
 
     useEffect(() => { stopsRef.current = advancedStops }, [advancedStops])
     useEffect(() => { buyTierIdRef.current = bonusBuyTierId }, [bonusBuyTierId])
@@ -263,6 +282,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     }, [config, resetSlotTemplate])
 
     useEffect(() => () => clearTimers(), [clearTimers])
+
+    // Cancel any in-flight win-rollup animation frame on unmount.
+    useEffect(() => () => {
+        if (rollupRafRef.current) {
+            cancelAnimationFrame(rollupRafRef.current)
+            rollupRafRef.current = null
+        }
+    }, [])
 
     useEffect(() => {
         if (typeof window === 'undefined') return undefined
@@ -355,6 +382,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setBetAmount(round2(next))
     }, [])
 
+    // Cycle the spin resolve speed: Normal → Turbo → Instant → Normal.
+    const cycleSpinMode = useCallback(() => {
+        setSpinMode(prev => {
+            const i = SPIN_MODE_ORDER.indexOf(prev)
+            return SPIN_MODE_ORDER[(i + 1) % SPIN_MODE_ORDER.length]
+        })
+    }, [])
+    const spinModeLabel = SPIN_MODE_LABELS[spinMode] || 'Normal'
+
     const finishRound = useCallback(({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve }) => {
         clearTimers()
         const returnAmount = round2(baseBet * result.multiplier)
@@ -368,6 +404,42 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setAnticipating(false)
         setMysteryReveal(result.mysteryReveal || null)
         setRetriggerFlyers([])
+
+        // Graduated win-tier rollup + a11y announcement. Drive a count-up of the
+        // banner total for any tiered win (nice/good/great and the big tiers),
+        // so mid wins below the BigWinOverlay threshold still get a satisfying
+        // ramp rather than a static number. Reduced-motion lands instantly.
+        const tier = winTier(result.multiplier)
+        if (rollupRafRef.current) {
+            cancelAnimationFrame(rollupRafRef.current)
+            rollupRafRef.current = null
+        }
+        if (result.multiplier > 0) {
+            setLiveAnnounce(`${tier.label || 'Win'}, ${result.multiplier.toFixed(2)}× — ${formatCredits(returnAmount)}`)
+        } else {
+            setLiveAnnounce('No win')
+        }
+        const rollTrigger = Date.now()
+        const duration = rollupDurationMs(tier.id, reduceMotion)
+        if (returnAmount > 0 && duration > 0 && typeof requestAnimationFrame !== 'undefined') {
+            setWinRollup({ trigger: rollTrigger, amount: 0, target: returnAmount, tierId: tier.id })
+            const startedAt = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+            const step = () => {
+                const now = (typeof performance !== 'undefined' ? performance.now() : Date.now())
+                const elapsed = now - startedAt
+                const amount = rollupFrame(returnAmount, elapsed, duration, reduceMotion)
+                setWinRollup(prev => (prev.trigger === rollTrigger ? { ...prev, amount } : prev))
+                if (elapsed < duration) {
+                    rollupRafRef.current = requestAnimationFrame(step)
+                } else {
+                    rollupRafRef.current = null
+                }
+            }
+            rollupRafRef.current = requestAnimationFrame(step)
+        } else {
+            // Reduced-motion, instant, or no win: show the final value immediately.
+            setWinRollup({ trigger: rollTrigger, amount: returnAmount, target: returnAmount, tierId: tier.id })
+        }
 
         // "Truly slots" tension: near-miss framing. When the bonus scatter lands
         // exactly one short of its trigger count and no bonus fired, flash a
@@ -575,7 +647,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`,
         )
         resolve({ profit, multiplier: result.multiplier, featureEvents: result.featureEvents })
-    }, [addWinnings, cellPositions, clearTimers, config, freeSpinSession, playSound, session, showToast, slotSfx])
+    }, [addWinnings, cellPositions, clearTimers, config, freeSpinSession, playSound, reduceMotion, session, showToast, slotSfx])
 
     const performSpin = useCallback(({ source = 'manual', bet = betAmount, free = canUseFreeSpin, tierId = null } = {}) => (
         new Promise(resolve => {
@@ -609,8 +681,43 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 ...(funScalar != null ? { rtpScalar: funScalar } : {}),
             })
             const cols = config.layout.cols
-            const totalSettleDelay = turbo ? 180 : 360
-            const baseStop = turbo ? 80 : 200
+            // Instant resolve: skip the reel animation entirely and land the
+            // result immediately. Distinct from slam-stop (which interrupts an
+            // already-animating spin). We still flip `running` true→false and
+            // mount the result so the smoke contract stays satisfiable
+            // (cells>0 plus data-slot-spinning briefly / result banner).
+            if (instant) {
+                setLastStake(stake)
+                setRunning(true)
+                setSpinPhase(source === 'stage' ? 'stage-spin' : 'spinning')
+                setWinningCells([])
+                setLastResult(null)
+                setMysteryReveal(null)
+                setRetriggerFlyers([])
+                setEventFlash(null)
+                setNearMiss(null)
+                setAnticipating(false)
+                // Snap every reel straight to its resolved cell — no scrolling.
+                setStoppedColumnState(cols)
+                setGrid(result.cells)
+                playSound('tick')
+                slotSfx.play('spinStart', { volume: 0.7 })
+                pendingFinishRef.current = () => {
+                    finishRound({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
+                }
+                timers.current.push(window.setTimeout(() => {
+                    if (!pendingFinishRef.current) return
+                    const finish = pendingFinishRef.current
+                    pendingFinishRef.current = null
+                    finish()
+                }, 0))
+                return
+            }
+            // Reduced-motion shortens the reel spin/settle the same way turbo
+            // does, so motion-sensitive players get a quick, low-movement spin.
+            const fast = turbo || reduceMotion
+            const totalSettleDelay = fast ? 180 : 360
+            const baseStop = fast ? 80 : 200
             const colDelays = []
             for (let col = 1; col <= cols; col += 1) {
                 const ratio = col / cols
@@ -654,7 +761,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     if (col < stoppedColsRef.current) return cell
                     return randomVisualSymbol(config)
                 }))
-            }, turbo ? 55 : 85)
+            }, fast ? 55 : 85)
 
             let cumulative = 0
             for (let col = 1; col <= cols; col += 1) {
@@ -691,7 +798,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 finish()
             }, totalDelay))
         })
-    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, finishRound, freeSpins, placeBet, playSound, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
+    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, finishRound, freeSpins, instant, placeBet, playSound, reduceMotion, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
 
     const slamStop = useCallback(() => {
         // Resolve an in-flight spin immediately: snap all reels to their final
@@ -708,6 +815,31 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const tierId = canUseFreeSpin ? null : buyTierIdRef.current
         performSpin({ source: 'stage', bet: betAmount, free: canUseFreeSpin, tierId })
     }, [betAmount, canUseFreeSpin, performSpin, running, slamStop])
+
+    // a11y: Space spins (and slam-stops an in-flight animated spin), mirroring
+    // BetPanel's Space handler but scoped to slots. Skips when typing in an
+    // input/textarea/select, when modifiers are held, when autoplay owns the
+    // loop, or when a real spin button is focused (so the button's own click
+    // handles it — no double-fire). preventDefault stops page scroll.
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined
+        const onKey = (e) => {
+            if (e.key !== ' ' && e.code !== 'Space') return
+            if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+            const el = e.target
+            const tag = (el?.tagName || '').toLowerCase()
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+            if (el?.isContentEditable) return
+            // The spin button (button/[role=button]) handles its own Space via
+            // native activation — don't double-fire if it's the focused element.
+            if (el?.closest?.('[data-slot-action="spin"]')) return
+            if (autoplayActive) return
+            e.preventDefault()
+            triggerStageSpin()
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [autoplayActive, triggerStageSpin])
 
     const startAutoplay = useCallback(() => {
         if (autoplayActive || running) return
@@ -800,13 +932,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const moneyTotal = lastResult?.moneyTotal || 0
     const holdTiles = useMemo(() => holdReveal ? buildHoldTileStates(holdReveal.board) : [], [holdReveal])
     const cascadeTraceCells = useMemo(() => {
-        if (!lastResult?.cascadeSteps || running) return []
+        // Reduced-motion: skip the animated cascade trace dots entirely.
+        if (!lastResult?.cascadeSteps || running || reduceMotion) return []
         return buildCascadeTraceCells({
             indexes: lastResult.winningIndexes || [],
             cellPositions,
             layout: config.layout,
         })
-    }, [cellPositions, config.layout, lastResult, running])
+    }, [cellPositions, config.layout, lastResult, running, reduceMotion])
     const visibleFeatureEvents = useMemo(() => {
         if (running || !lastResult?.featureEvents?.length) return []
         return lastResult.featureEvents.slice(0, 3)
@@ -920,11 +1053,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     <div className="slot-panel-card slot-feature-switches">
                         <button
                             type="button"
-                            className={turbo ? 'active' : ''}
-                            onClick={() => setTurbo(value => !value)}
+                            className={spinMode !== 'normal' ? 'active' : ''}
+                            onClick={cycleSpinMode}
                             disabled={running}
+                            aria-label={`Spin speed: ${spinModeLabel}. Tap to cycle Normal, Turbo, Instant.`}
                         >
-                            <Zap size={14} /> Turbo
+                            <Zap size={14} /> {spinModeLabel}
                         </button>
                         <button
                             type="button"
@@ -1133,7 +1267,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 </header>
 
                 <div className="slot-reel-wrap">
-                    <div className="slot-reel-frame-v2" ref={reelFrameRef}>
+                    <div
+                        className="slot-reel-frame-v2"
+                        ref={reelFrameRef}
+                        role="group"
+                        aria-label={`Slot reels, ${config.layout.cols} by ${config.layout.rows}`}
+                        aria-busy={running ? 'true' : undefined}
+                    >
                         {config.layout.evaluation === 'megaways' ? (
                             <div className="slot-megaways-grid" style={{ gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))` }}>
                                 {Array.from({ length: config.layout.cols }).map((_, col) => {
@@ -1281,6 +1421,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                 </div>
 
+                {/* a11y: polite live region announcing each spin's outcome
+                    (win tier + multiplier, or "No win") for screen readers. */}
+                <div className="slot-sr-only" role="status" aria-live="polite" aria-atomic="true">
+                    {liveAnnounce}
+                </div>
+
                 <div className="slot-controls-v2">
                     <div className="slot-control-readout">
                         <small>{canUseFreeSpin ? 'Free' : activeBuyTier ? 'Feature cost' : 'Bet'}</small>
@@ -1306,10 +1452,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     <div className="slot-control-quick">
                         <button
                             type="button"
-                            onClick={() => setTurbo(value => !value)}
-                            className={turbo ? 'active' : ''}
+                            onClick={cycleSpinMode}
+                            className={spinMode !== 'normal' ? 'active' : ''}
                             disabled={running}
-                            aria-label="Toggle turbo"
+                            aria-label={`Spin speed: ${spinModeLabel}. Tap to cycle Normal, Turbo, Instant.`}
+                            data-slot-spin-mode={spinMode}
                         ><Zap size={16} /></button>
                         <button
                             type="button"
@@ -1479,17 +1626,23 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                 )}
 
-                {lastResult?.multiplier > 0 && !running && (
-                    <div className={`slot-result-banner ${config.features?.darkWinOverlay ? 'dark' : ''} tier-${winTier(lastResult.multiplier).id}`}>
+                {lastResult?.multiplier > 0 && !running && (() => {
+                    // Use the live rollup amount only while it's tracking THIS
+                    // result (matched by target); otherwise show the final total.
+                    const rollupActive = winRollup.target === lastResult.returnAmount && winRollup.amount < winRollup.target
+                    const shownWin = rollupActive ? winRollup.amount : lastResult.returnAmount
+                    return (
+                    <div className={`slot-result-banner ${config.features?.darkWinOverlay ? 'dark' : ''} tier-${winTier(lastResult.multiplier).id} ${rollupActive ? 'is-rolling' : ''}`}>
                         {winTier(lastResult.multiplier).label && (
                             <i className="slot-win-tier">{winTier(lastResult.multiplier).label}</i>
                         )}
                         <span>Total win</span>
-                        <strong>{formatCredits(lastResult.returnAmount)}</strong>
+                        <strong>{formatCredits(shownWin)}</strong>
                         <em>{lastResult.multiplier.toFixed(2)}×</em>
                         {moneyTotal > 0 && <i className="result-money">+{formatCredits(moneyTotal)} collected</i>}
                     </div>
-                )}
+                    )
+                })()}
 
                 {lastResult?.featureEvents?.length > 0 && !running && (
                     <div className="slot-feature-events">
@@ -1740,13 +1893,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 </div>
                 <button
                     type="button"
-                    className={turbo ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
-                    onClick={() => setTurbo(value => !value)}
+                    className={spinMode !== 'normal' ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
+                    onClick={cycleSpinMode}
                     disabled={running}
-                    aria-label="Toggle turbo"
+                    aria-label={`Spin speed: ${spinModeLabel}. Tap to cycle Normal, Turbo, Instant.`}
+                    data-slot-spin-mode={spinMode}
                 >
                     <Zap size={16} />
-                    <span>Quick</span>
+                    <span>{spinModeLabel}</span>
                 </button>
                 <button
                     type="button"

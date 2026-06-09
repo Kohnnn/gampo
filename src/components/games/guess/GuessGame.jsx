@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './guess.css'
@@ -76,7 +76,8 @@ export default function GuessGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div data-ux-surface="stage" className={`guess-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+            <CoreStageFrame minHeight={460} maxWidth={760} className="guess-stage-frame">
+            <div className={`guess-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className={`guess-orb ${spinning ? 'spinning' : ''} ${lastWon === true ? 'won' : lastWon === false ? 'lost' : ''}`}>
                     <NumberRoll value={result === null ? '?' : result} format={v => v === '?' ? '?' : String(v)} />
@@ -84,6 +85,7 @@ export default function GuessGame() {
                 <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>You picked <strong>{choice}</strong> — hit chance 10%</p>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={18} color="#41d6ff" />}
             </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.1} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>

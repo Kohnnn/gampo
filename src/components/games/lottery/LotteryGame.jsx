@@ -4,7 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, sampleUniqueNumbers } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './lottery.css'
@@ -90,7 +90,8 @@ export default function LotteryGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <div className="lottery-stage" data-ux-surface="stage">
+            <CoreStageFrame minHeight={520} maxWidth={780} mobileScrollable className="lottery-stage-frame">
+            <div className="lottery-stage">
                 <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className={`lot-tumbler ${drawing ? 'shaking' : ''} ${settling ? 'settling' : ''}`}>
                     {/* Idle: rotating drum with ghost balls so the panel is never empty. */}
@@ -120,6 +121,7 @@ export default function LotteryGame() {
                 </div>
                 {burstKey > 0 && lastWon && <Particles key={burstKey} count={20} color="#ffcf5a" />}
             </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
             <EducationPanel definition={definition} betAmount={5} winProbability={1 / 376992} payoutMultiplier={5000} balance={balance} recentProfit={recentProfit} />
         </GameShell>

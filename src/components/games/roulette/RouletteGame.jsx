@@ -6,7 +6,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { BOARD_NUMBERS, WHEEL_ORDER, buildRouletteCoverage, colorOf, makeBet } from './layout'
 import EducationPanel from '../../EducationPanel'
 import './roulette.css'
@@ -345,7 +345,8 @@ export default function RouletteGame() {
                 </>
             }
         >
-            <div data-ux-surface="stage" className={`roulette-stage spin-phase-${spinPhase} ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
+            <CoreStageFrame minHeight={520} maxWidth={1040} mobileScrollable className="roulette-stage-frame">
+            <div className={`roulette-stage spin-phase-${spinPhase} ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className={`rou-state-card ${meta?.color || 'idle'}`}>
                     <div>
@@ -512,6 +513,7 @@ export default function RouletteGame() {
                     </div>
                 </details>
             </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={18 / 37} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>

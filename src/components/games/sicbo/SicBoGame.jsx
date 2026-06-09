@@ -6,7 +6,7 @@ import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
-import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import { evaluate, rollDice } from './bets'
 import SicBoDie from './SicBoDie'
@@ -164,7 +164,8 @@ export default function SicBoGame() {
                 </>
             }
         >
-            <div ref={stageRef} data-ux-surface="stage" className={`sb-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} data-mobile-scroll-surface>
+            <CoreStageFrame minHeight={560} maxWidth={900} mobileScrollable className="sicbo-stage-frame">
+            <div ref={stageRef} className={`sb-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} data-mobile-scroll-surface>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 {shaking ? (
                     <div className="sb-cup-area">
@@ -262,6 +263,7 @@ export default function SicBoGame() {
 
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={16} color="#ff8f3d" />}
             </div>
+            </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={0.486} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>
