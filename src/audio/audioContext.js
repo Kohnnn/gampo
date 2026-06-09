@@ -115,6 +115,22 @@ export function getSfxGain() {
     return sfxGain
 }
 
+// ---- Change notification so every UI control (header, mixer, settings)
+// stays in sync no matter which one toggled the state. ----
+const listeners = new Set()
+
+export function subscribeAudio(listener) {
+    if (typeof listener !== 'function') return () => {}
+    listeners.add(listener)
+    return () => listeners.delete(listener)
+}
+
+function notify() {
+    listeners.forEach(fn => {
+        try { fn() } catch (e) { /* ignore */ }
+    })
+}
+
 // Re-apply every gain node from current mute+volume state.
 function applyGains() {
     try {
@@ -126,6 +142,12 @@ function applyGains() {
     }
 }
 
+// True when BGM should actually be audible (master on AND bgm on). Used by
+// useBgm to gate playback at start time, not just via gain.
+export function isBgmAudible() {
+    return !masterMuted && !bgmMuted
+}
+
 // ---- Master mute (the global toggle) ----
 export function isMuted() {
     return masterMuted
@@ -135,6 +157,7 @@ export function setMuted(value) {
     masterMuted = !!value
     writeBool(MUTE_STORAGE_KEY, masterMuted)
     applyGains()
+    notify()
 }
 
 // ---- Per-bus mute ----
@@ -146,6 +169,7 @@ export function setBgmMuted(value) {
     bgmMuted = !!value
     writeBool(BGM_MUTE_STORAGE_KEY, bgmMuted)
     applyGains()
+    notify()
 }
 
 export function isSfxMuted() {
@@ -156,6 +180,7 @@ export function setSfxMuted(value) {
     sfxMuted = !!value
     writeBool(SFX_MUTE_STORAGE_KEY, sfxMuted)
     applyGains()
+    notify()
 }
 
 export function getVolumes() {
@@ -173,6 +198,7 @@ export function setVolume(bus, value) {
     }
     applyGains()
     writeVolumes()
+    notify()
 }
 
 export async function unlockAudio() {

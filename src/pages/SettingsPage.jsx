@@ -6,6 +6,7 @@ import { useLocalSave } from '../hooks/useLocalSave'
 import { useSessionGuard } from '../hooks/useSessionGuard'
 import { useOnboarding } from '../hooks/useOnboarding'
 import { useReduceMotion } from '../components/fx'
+import AudioSettings from '../components/AudioSettings'
 import '../styles/settings.css'
 
 export default function SettingsPage() {
@@ -116,7 +117,7 @@ export default function SettingsPage() {
                         </span>
                     </label>
                     <p className="settings-help">
-                        <Volume2 size={13} style={{ verticalAlign: '-2px' }} /> Audio volume lives in the in-game audio menu.
+                        <Volume2 size={13} style={{ verticalAlign: '-2px' }} /> Audio volume &amp; mute controls are below and in the in-game audio menu.
                     </p>
                     <button
                         type="button"
@@ -126,6 +127,8 @@ export default function SettingsPage() {
                         <RotateCcw size={13} /> Replay welcome intro
                     </button>
                 </section>
+
+                <AudioSettings />
 
                 <section className="settings-card" data-ux-surface="controls">
                     <h2><ShieldCheck size={16} /> Responsible play (optional)</h2>

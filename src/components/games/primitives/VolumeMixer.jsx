@@ -11,7 +11,7 @@ import {
     getVolumes, setVolume,
     isBgmMuted, setBgmMuted,
     isSfxMuted, setSfxMuted,
-    unlockAudio,
+    unlockAudio, subscribeAudio,
 } from '../../../audio/audioContext'
 
 export default function VolumeMixer() {
@@ -22,6 +22,18 @@ export default function VolumeMixer() {
     const [bgmMuted, setBgmMutedState] = useState(() => isBgmMuted())
     const [sfxMuted, setSfxMutedState] = useState(() => isSfxMuted())
     const [pos, setPos] = useState({ top: 0, left: 0, ready: false })
+
+    // Re-sync from the audio context whenever any control mutates state, so the
+    // mixer's mute icons + sliders never drift from the header/settings toggles.
+    useEffect(() => {
+        const sync = () => {
+            setVolumesState(getVolumes())
+            setBgmMutedState(isBgmMuted())
+            setSfxMutedState(isSfxMuted())
+        }
+        sync()
+        return subscribeAudio(sync)
+    }, [])
 
     const reposition = useCallback(() => {
         if (!triggerRef.current) return
