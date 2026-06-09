@@ -84,6 +84,31 @@ describe('buildPaytable', () => {
         }
     })
 
+    it('renders the real evaluation mode (layout.evaluation) for all 20 templates', () => {
+        expect(SLOT_TEMPLATES.length).toBe(20)
+        for (const t of SLOT_TEMPLATES) {
+            const tpl = getSlotTemplate(t.id)
+            const pt = buildPaytable(tpl)
+            expect(pt.mode).toBe(tpl.layout.evaluation)
+        }
+    })
+
+    it('surfaces gummy-drops max-win cap from features.maxWinMultiplier', () => {
+        const tpl = getSlotTemplate('gummy-drops')
+        const pt = buildPaytable(tpl)
+        expect(Number.isFinite(pt.maxWin)).toBe(true)
+        expect(pt.maxWin).toBe(tpl.features.maxWinMultiplier)
+    })
+
+    it('reads max-win from features before the top-level field', () => {
+        const pt = buildPaytable({
+            layout: { rows: 4, cols: 5, evaluation: 'lines' },
+            symbols: [{ id: 'a', label: 'A', payout: 5 }],
+            features: { maxWinMultiplier: 3000 },
+        })
+        expect(pt.maxWin).toBe(3000)
+    })
+
     it('exposes mode labels', () => {
         expect(PAYTABLE_MODE_LABELS.lines).toBeTruthy()
         expect(PAYTABLE_MODE_LABELS.cluster).toBeTruthy()

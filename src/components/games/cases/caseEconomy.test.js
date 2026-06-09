@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
     caseCategoryCounts,
     caseCategoryStats,
+    caseDropOdds,
     caseExpectedValueGc,
     caseOpenStakeGc,
     caseRarePreview,
@@ -11,8 +12,10 @@ import {
     filterCasesByCategory,
     inferCaseCategory,
     normalizeCaseForRuntime,
+    rarityDropWeight,
     roundSignedGc,
 } from './caseEconomy'
+import { rarityWeight } from './caseOpening'
 
 const weaponCase = {
     id: 'case-a',
@@ -113,5 +116,49 @@ describe('case economy helpers', () => {
         expect(caseRarePreview(caseData, 1)).toEqual([
             expect.objectContaining({ id: 'rare', name: 'Knife' }),
         ])
+    })
+
+    it('shares one rarity weight source between economy and roll picker', () => {
+        const samples = [
+            { rarity: 'Mil-Spec Grade' },
+            { rarity: 'Restricted' },
+            { rarity: 'Classified' },
+            { rarity: 'Covert' },
+            { rarity: 'Extraordinary' },
+            { rarity: 'Contraband' },
+            { rarity: '★' },
+            { rarity: 'Unknown rarity' },
+            { isRare: true },
+        ]
+        samples.forEach(item => {
+            expect(rarityWeight(item)).toBe(rarityDropWeight(item))
+        })
+        expect(rarityDropWeight({ rarity: 'Mil-Spec Grade' })).toBe(78.92)
+        expect(rarityDropWeight({ isRare: true })).toBe(0.4)
+        expect(rarityDropWeight({ rarity: 'Unknown rarity' })).toBe(12)
+    })
+
+    it('derives per-rarity drop odds normalized to 100%', () => {
+        const caseData = {
+            items: [
+                { id: 'm1', rarity: 'Mil-Spec Grade', valueGc: 1, color: '#4b69ff' },
+                { id: 'm2', rarity: 'Mil-Spec Grade', valueGc: 1.2, color: '#4b69ff' },
+                { id: 'r1', rarity: 'Restricted', valueGc: 6, color: '#8847ff' },
+                { id: 'c1', rarity: 'Covert', valueGc: 40, color: '#eb4b4b' },
+                { id: 'k1', rarity: 'Covert', valueGc: 220, isRare: true, color: '#e4ae39' },
+            ],
+        }
+        const odds = caseDropOdds(caseData)
+        const total = odds.reduce((sum, row) => sum + row.pct, 0)
+        expect(total).toBeCloseTo(100, 6)
+        // Two Mil-Spec items combine into one bucket with double the weight.
+        const milspec = odds.find(row => row.rarity === 'Mil-Spec Grade')
+        expect(milspec.count).toBe(2)
+        // The flagged rare item collapses into a dedicated special bucket.
+        const special = odds.find(row => row.isRare)
+        expect(special.label).toBe('Rare special')
+        // Highest-weight bucket sorts first.
+        expect(odds[0].rarity).toBe('Mil-Spec Grade')
+        expect(caseDropOdds({ items: [] })).toEqual([])
     })
 })

@@ -1,5 +1,5 @@
 import { nextRoll } from '../../../utils/fairRng'
-import { roundGc, roundSignedGc } from './caseEconomy'
+import { rarityDropWeight, roundGc, roundSignedGc } from './caseEconomy'
 import {
     CASE_PRIZE_INDEX,
     CASE_TILE_GAP_PX,
@@ -19,19 +19,10 @@ export const STANDARD_WEARS = [
     { wear: 'Battle-Scarred', short: 'BS', minFloat: 0.45, maxFloat: 1.00, weight: 12, mult: 0.85 },
 ]
 
-export function rarityWeight(item = {}) {
-    if (item.isRare) return 0.4
-    switch (item.rarity) {
-        case 'Mil-Spec Grade': return 78.92
-        case 'Restricted': return 15.98
-        case 'Classified': return 3.20
-        case 'Covert': return 0.64
-        case 'Extraordinary':
-        case 'Contraband':
-        case '★': return 0.26
-        default: return 12
-    }
-}
+// `rarityWeight` is kept as a thin alias so existing call sites/tests stay
+// stable, but the weights themselves live in caseEconomy.js as the single
+// source of truth shared with the EV math and the player-facing odds table.
+export const rarityWeight = rarityDropWeight
 
 export function weightedPick(items = [], roll = nextRoll('cases').roll) {
     const totalWeight = items.reduce((s, it) => s + rarityWeight(it), 0)
@@ -129,8 +120,17 @@ export function createCaseOpeningRound({
 } = {}) {
     const items = caseData?.items || []
     const entries = Array.from({ length: rows }, () => {
-        const base = weightedPick(items)
-        const outcome = buildCaseOutcome(base, { unitPrice })
+        // Pull the pick roll explicitly so we can stamp its seed+nonce onto the
+        // outcome for the per-drop fairness badge. This is the deterministic
+        // sync hash (`hmacRollSync`), not the async SHA-256 path.
+        const pick = nextRoll('cases')
+        const base = weightedPick(items, pick.roll)
+        const outcome = {
+            ...buildCaseOutcome(base, { unitPrice }),
+            nonce: pick.nonce,
+            serverSeedHash: pick.serverSeedHash,
+            clientSeed: pick.clientSeed,
+        }
         const reelTrack = buildCaseReelTrack(items, outcome, { targetIndex })
         const jitter = (nextRoll('cases-jit').roll - 0.5) * 14
         const finalOffset = finalCaseReelOffset({ jitter, targetIndex })

@@ -25,7 +25,9 @@ function isPay(item) {
  */
 export function buildPaytable(config = {}) {
     const symbols = Array.isArray(config.symbols) ? config.symbols : []
-    const mode = config.evaluation || 'lines'
+    // Real templates store the evaluation mode at config.layout.evaluation;
+    // synthetic test configs sometimes set config.evaluation directly.
+    const mode = config.layout?.evaluation || config.evaluation || 'lines'
     const cols = config.layout?.cols || 5
     const paySymbols = symbols.filter(isPay)
 
@@ -81,7 +83,10 @@ export function buildPaytable(config = {}) {
         }
         : null
 
-    const maxWin = Number.isFinite(config.maxWinMultiplier) ? config.maxWinMultiplier : null
+    // Engine reads the cap from config.features.maxWinMultiplier (slotFactory.js
+    // resolveSlotSpin). Fall back to a top-level field for synthetic configs.
+    const maxWinRaw = config.features?.maxWinMultiplier ?? config.maxWinMultiplier
+    const maxWin = Number.isFinite(maxWinRaw) ? maxWinRaw : null
 
     return {
         mode,

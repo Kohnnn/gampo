@@ -5,6 +5,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { BOARD_NUMBERS, WHEEL_ORDER, buildRouletteCoverage, colorOf, makeBet } from './layout'
 import EducationPanel from '../../EducationPanel'
@@ -96,6 +97,11 @@ export default function RouletteGame() {
 
     const roundLocked = spinning || bettingMs > 0
     const totalStake = bets.reduce((sum, b) => sum + b.amount, 0)
+
+    // When the wheel starts spinning, bring the wheel/result area into view so
+    // mobile players see the spin and the landed number instead of it firing
+    // far below the betting board. Same class as the Poker action-bar fix.
+    useScrollActionIntoView(wheelAreaRef, spinning, [spinning], { block: 'nearest' })
 
     const addBet = (type, params = {}) => {
         if (roundLocked) return

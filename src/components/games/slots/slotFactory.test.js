@@ -54,6 +54,41 @@ describe('slot feature contracts', () => {
     it('contract count matches template count (no orphans)', () => {
         expect(Object.keys(SLOT_FEATURE_CONTRACTS).length).toBe(SLOT_TEMPLATES.length)
     })
+
+    it('numeric contract claims match the engine config (no drift)', () => {
+        // iron-fist multiplier wheel values must be reflected verbatim in the text.
+        const ironCfg = getSlotTemplate('iron-fist')
+        const ironContract = getFeatureContract('iron-fist')
+        const wheelValues = ironCfg.features.multiplierWheel.values
+        expect(wheelValues).toEqual([2, 3, 5, 10, 20])
+        const ironText = JSON.stringify(ironContract)
+        expect(ironText).toContain(wheelValues.join('/') + 'x') // "2/3/5/10/20x"
+        const wheelTop = Math.max(...wheelValues)
+        expect(ironText).toContain(`2x to ${wheelTop}x`)
+        // Must not still claim the old wheel values.
+        expect(ironText).not.toContain('2/4/8/15/30x')
+        expect(ironText).not.toContain('30x')
+
+        // bars jackpot multiplier must match config.
+        const barsCfg = getSlotTemplate('bars')
+        const barsContract = getFeatureContract('bars')
+        const jackpot = barsCfg.features.classicThreeReel.jackpotMultiplier
+        expect(jackpot).toBe(30)
+        const barsText = JSON.stringify(barsContract)
+        expect(barsText).toContain(`${jackpot}x headline jackpot`)
+        expect(barsText).not.toContain('60x')
+        // Bars has no bonus entry in config; contract must agree.
+        expect(barsContract.bonusEntry).toBeNull()
+
+        // dust-rail has expanding wilds only — no sticky-wild or retrigger config.
+        const dustCfg = getSlotTemplate('dust-rail')
+        expect(dustCfg.features.expandingWilds).toBe(true)
+        expect(dustCfg.features.stickyWilds).toBeUndefined()
+        expect(dustCfg.features.scatter.retriggerSpins).toBeUndefined()
+        const dustText = JSON.stringify(getFeatureContract('dust-rail'))
+        expect(dustText).not.toContain('sticky')
+        expect(dustText.toLowerCase()).not.toContain('retrigger')
+    })
 })
 
 describe('slotFactory layout helpers', () => {

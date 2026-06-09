@@ -85,18 +85,29 @@ export function marketPriceFromRecord(record) {
     )
 }
 
+// Single source of truth for per-rarity drop weights. Both the EV/economy
+// helpers here and the live roll picker (`caseOpening.weightedPick`) import
+// these so odds shown to the player match the odds actually rolled.
+export const RARITY_DROP_WEIGHTS = {
+    'Mil-Spec Grade': 78.92,
+    Restricted: 15.98,
+    Classified: 3.20,
+    Covert: 0.64,
+    Extraordinary: 0.26,
+    Contraband: 0.26,
+    '★': 0.26,
+}
+
+// Weight applied to items flagged `isRare` (knives/gloves special pool).
+export const RARE_ITEM_DROP_WEIGHT = 0.4
+
+// Weight applied when an item's rarity is unknown / unmapped.
+export const DEFAULT_DROP_WEIGHT = 12
+
 export function rarityDropWeight(item = {}) {
-    if (item.isRare) return 0.4
-    switch (item.rarity) {
-        case 'Mil-Spec Grade': return 78.92
-        case 'Restricted': return 15.98
-        case 'Classified': return 3.20
-        case 'Covert': return 0.64
-        case 'Extraordinary':
-        case 'Contraband':
-        case '★': return 0.26
-        default: return 12
-    }
+    if (item.isRare) return RARE_ITEM_DROP_WEIGHT
+    const mapped = RARITY_DROP_WEIGHTS[item.rarity]
+    return mapped === undefined ? DEFAULT_DROP_WEIGHT : mapped
 }
 
 function lookupPriceRecord(priceMap = {}, ...keys) {
@@ -237,6 +248,49 @@ export function caseRarePreview(caseData = {}, limit = 3) {
             valueGc: Number(item.valueGc) || Number(item.multiplier) || 0,
             isRare: Boolean(item.isRare),
         }))
+}
+
+// Per-rarity drop odds for a single case, normalized to percentages from the
+// same weights the live roll uses (`rarityDropWeight`). The picker sums the
+// weight of every contained item, so a rarity bucket's true probability is the
+// summed weight of its items over the total weight — this groups items by their
+// displayed rarity tier (rare/special items collapse into a "Rare special"
+// bucket) and reports the aggregate chance the next drop lands in that tier.
+export function caseDropOdds(caseData = {}) {
+    const items = Array.isArray(caseData.items) ? caseData.items : []
+    if (!items.length) return []
+    const buckets = new Map()
+    let totalWeight = 0
+    items.forEach(item => {
+        const weight = rarityDropWeight(item)
+        totalWeight += weight
+        const isSpecial = Boolean(item.isRare)
+        const label = isSpecial ? 'Rare special' : (item.rarity || 'Unknown')
+        const key = isSpecial ? '__rare__' : label
+        const existing = buckets.get(key)
+        if (existing) {
+            existing.weight += weight
+            existing.count += 1
+            if (!existing.color && item.color) existing.color = item.color
+        } else {
+            buckets.set(key, {
+                key,
+                label,
+                rarity: isSpecial ? '★' : (item.rarity || 'Unknown'),
+                color: item.color || null,
+                weight,
+                count: 1,
+                isRare: isSpecial,
+            })
+        }
+    })
+    if (totalWeight <= 0) return []
+    return [...buckets.values()]
+        .map(bucket => ({
+            ...bucket,
+            pct: (bucket.weight / totalWeight) * 100,
+        }))
+        .sort((a, b) => b.pct - a.pct)
 }
 
 export function normalizeCaseForRuntime(caseData = {}, priceMap = {}) {
