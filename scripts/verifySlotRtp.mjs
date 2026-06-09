@@ -1,6 +1,7 @@
 // Verifies that calibrated slot scalars bring each template within tolerance of
 // its rtpTarget. Run: node --loader ./scripts/extResolve.mjs scripts/verifySlotRtp.mjs
 import { SLOT_TEMPLATES, resolveSlotSpin, __setSlotCalibrationRng } from '../src/components/games/slots/slotFactory.js'
+import { MAX_FREE_SPINS_PER_SESSION } from '../src/components/games/slots/slotConstants.js'
 
 const SPINS = Number(process.env.SLOT_VER_SPINS) || 200000
 // High-variance slots (wheels, big clusters, megaways, single-payline jackpots)
@@ -48,7 +49,7 @@ for (const config of SLOT_TEMPLATES) {
     const seeds = heavy
         ? [0xc0ffee, 0x1234abcd, 0x9e3779b9, 0x51ed270b, 0xfeedface]
         : [0xc0ffee]
-    const MAX_FS = 20
+    const MAX_FS = MAX_FREE_SPINS_PER_SESSION
     const award = config.features?.scatter?.awardFreeSpins || 0
     const hasPersistent = Boolean(config.features?.persistentMultiplier)
     const cap = config.features?.persistentMultiplierCap || 10

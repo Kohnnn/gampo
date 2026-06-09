@@ -36,10 +36,11 @@ Games are well-consolidated on shared primitives (BetPanel, StatsOverlay, Recent
 |---|---|---|---|---|
 | A-P0-1 CoreStageFrame migration | P0 | todo | | roulette/sicbo/dino first (deferred, higher risk) |
 | A-P0-2 scroll into view | P0 | DONE | (this batch) | roulette(spinning)/sicbo(running)/blackjack(inRound) via useScrollActionIntoView |
-| A-P1-1 inert overlays | P1 | todo | | blackjack/videopoker |
-| A-P1-2 dup cashout | P1 | todo | | tomeoflife/drill/pump |
-| A-P1-3 war playPhase | P1 | todo | | |
-| A-P2-1 breakpoints | P2 | todo | | crash 1023, roulette 760 |
+| A-P1-1 inert overlays | P1 | DONE | (P1 batch) | removed inert ActionLockOverlay + unused import from blackjack & videopoker (no clean busy flag) |
+| A-P1-2 dup cashout | P1 | DONE | (P1 batch) | removed duplicate in-stage cashout from tomeoflife/drill/pump; BetPanel in-round CTA retained |
+| A-P1-3 war playPhase | P1 | deferred | | higher risk; left as-is this pass |
+| A-P2-1 breakpoints | P2 | DONE | (P1 batch) | roulette 760→768 (separate block, no collision); crash 1023 kept (intentional pair with min-width:1024) |
 | A-P2-2 derived EV | P2 | todo | | overlaps WS-5 |
+| A-P2-3 videopoker card a11y | P2 | DONE | (P1 batch) | added aria-label/aria-pressed to vp-card-slot (caught by a11y guard) |
 | A-P3-1 diamonds test | P3 | DONE | (this batch) | RTP 0.9665 sim, guard <1.5 vs old ~258% |
 | A-P3-2 math tests | P3 | DONE | (this batch) | tower/drill/snakes/pump/wheel/keno/dice all house-favorable, near target |

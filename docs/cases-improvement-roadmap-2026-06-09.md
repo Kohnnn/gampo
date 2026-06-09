@@ -37,9 +37,9 @@ Shared/read-only here: `src/utils/fairRng.js` (read its API, don't change), `Edu
 | C-P0-2 real EV panel | P0 | DONE | (this batch) | payoutMultiplier=evGc/casePrice; winProbability=weighted share value>=price |
 | C-P0-3 odds table | P0 | DONE | (this batch) | caseDropOdds() per-rarity % from deduped weights |
 | C-P1-1 dedupe weights | P1 | DONE | (this batch) | RARITY_DROP_WEIGHTS single source in caseEconomy; caseOpening aliases it |
-| C-P1-2 default collapsed | P1 | todo | | |
-| C-P1-3 filter leak | P1 | todo | | |
-| C-P2-1 dead CSS | P2 | todo | | |
-| C-P2-2 cold-load skeleton | P2 | todo | | |
+| C-P1-2 default collapsed | P1 | DONE | (P1 batch) | collapses on selectCase/performPlay; open on first paint; toggle reopens |
+| C-P1-3 filter leak | P1 | DONE | (P1 batch) | split historyRarityFilter vs inventoryRarity; views filter independently |
+| C-P2-1 dead CSS | P2 | DONE | (P1 batch) | removed .cases-sell-btn/.cases-view-tabs/.cases-tier-chip |
+| C-P2-2 cold-load skeleton | P2 | DONE | (P1 batch) | skeleton cards while loading + fixed image dims (no reflow) |
 | C-P2-3 per-case stats | P2 | todo | | |
 | C-P2-4 pricing decision | P2 | todo | | WS-6 overlap |

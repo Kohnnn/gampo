@@ -12,6 +12,7 @@
 
 import { writeFileSync } from 'node:fs'
 import { SLOT_TEMPLATES, resolveSlotSpin, __setSlotCalibrationRng } from '../src/components/games/slots/slotFactory.js'
+import { MAX_FREE_SPINS_PER_SESSION } from '../src/components/games/slots/slotConstants.js'
 
 const SPINS = Number(process.env.SLOT_CAL_SPINS) || 200000
 
@@ -45,7 +46,6 @@ function makeRng(seed) {
 // exact way SlotsGame plays it: free spins are zero-cost full-EV respins and can
 // retrigger. A realistic hard cap on total free spins per session bounds the
 // loop (and matches how real slots cap retriggers).
-const MAX_FREE_SPINS_PER_SESSION = 20
 function simulateRound(config, scalar) {
     const hasPersistent = Boolean(config.features?.persistentMultiplier)
     const cap = config.features?.persistentMultiplierCap || 10
