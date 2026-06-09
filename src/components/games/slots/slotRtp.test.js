@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SLOT_TEMPLATES, resolveSlotSpin, __setSlotCalibrationRng } from './slotFactory'
 import { SLOT_RTP_SCALARS } from './slotRtpScalars'
+import { MAX_FREE_SPINS_PER_SESSION } from './slotConstants'
 
 function makeRng(seed) {
     let s = seed >>> 0
@@ -22,11 +23,11 @@ function measureRtp(config, rng, spins) {
         total += base.multiplier
         let fs = base.triggeredFreeSpins ? award : 0
         let played = 0
-        while (fs > 0 && played < 20) {
+        while (fs > 0 && played < MAX_FREE_SPINS_PER_SESSION) {
             fs -= 1; played += 1
             const spin = resolveSlotSpin(config)
             total += spin.multiplier
-            if (spin.triggeredFreeSpins && played + fs < 20) fs += award
+            if (spin.triggeredFreeSpins && played + fs < MAX_FREE_SPINS_PER_SESSION) fs += award
         }
         sum += total
     }

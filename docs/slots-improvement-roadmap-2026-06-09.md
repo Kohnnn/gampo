@@ -38,10 +38,10 @@ Do NOT edit outside this scope without coordinating (shared files: `primitives/`
 | S-P0-1 paytable mode | P0 | DONE | (this batch) | reads config.layout.evaluation; real-template test added |
 | S-P0-2 maxWin field | P0 | DONE | (this batch) | reads config.features.maxWinMultiplier; gummy-drops test |
 | S-P0-3 contract drift | P0 | DONE | (this batch) | dust-rail/bars(30x)/iron-fist([2,3,5,10,20]) reconciled; note: iron-fist featureText in slotFactory.js:544 still says 2x-30x (engine file, deferred) |
-| S-P1-1 magic 8 | P1 | todo | | |
-| S-P1-2 FS cap | P1 | todo | | |
-| S-P1-3 EV panel | P1 | todo | | |
-| S-P1-4 autoplay limits | P1 | todo | | |
+| S-P1-1 magic 8 | P1 | DONE | (P1 batch) | SLOT_BIG_WIN_THRESHOLD exported from slotWinPresentation.js, used by tier min + SFX gate + BigWinOverlay |
+| S-P1-2 FS cap | P1 | DONE | (P1 batch) | MAX_FREE_SPINS_PER_SESSION in new slotConstants.js; imported by 2 scripts + slotRtp.test |
+| S-P1-3 EV panel | P1 | DONE | (P1 batch) | deriveEducationEv() from rtpTarget+volatility; blends live multiplier |
+| S-P1-4 autoplay limits | P1 | DONE | (P1 batch) | absolute loss/gain/single-win caps in autoplay loop + dock stop summary |
 | S-P2-1 win rollup | P2 | todo | | |
 | S-P2-2 turbo/instant | P2 | todo | | |
 | S-P2-3 a11y | P2 | todo | | |

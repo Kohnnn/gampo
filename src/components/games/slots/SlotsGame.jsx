@@ -40,7 +40,7 @@ import {
     buildSlotFeatureDemoState,
 } from './slotsMotion'
 import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
-import { winTier } from './slotWinPresentation'
+import { winTier, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv } from './slotWinPresentation'
 import { buildPaytable } from './slotPaytable'
 import { describePaylines } from './slotPaylines'
 import { buildSparkline } from './slotSparkline'
@@ -133,6 +133,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         lossPercent: 25,
         stopOnGain: false,
         gainPercent: 50,
+        // Absolute currency caps (SessionGuard-style): stop once cumulative net
+        // loss/gain since autoplay start crosses the cap, or a single spin's
+        // profit exceeds the single-win cap. 0/blank = disabled.
+        stopOnLossAbs: false,
+        lossAbs: 100,
+        stopOnGainAbs: false,
+        gainAbs: 200,
+        stopOnSingleWin: false,
+        singleWinAbs: 250,
     })
     const [anticipating, setAnticipating] = useState(false)
     const [anticipationScatters, setAnticipationScatters] = useState({ have: 0, need: 0 })
@@ -331,6 +340,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const activeBuyTier = useMemo(() => buyTiers.find(t => t.id === bonusBuyTierId) || null, [buyTiers, bonusBuyTierId])
     const canUseFreeSpin = freeSpins > 0
     const effectiveStake = round2(betAmount * (activeBuyTier && config.controls?.buyBonus ? activeBuyTier.costMultiplier : 1))
+
+    // Probability-Lab inputs derived from the ACTIVE template's calibrated
+    // economics (rtpTarget + volatility-implied hit frequency), blended with the
+    // most recent real win multiplier. Replaces the old fixed 0.28 / 2.4.
+    const educationEv = useMemo(() => deriveEducationEv({
+        rtpTarget: config.rtpTarget ?? definition?.rtp,
+        volatility: config.volatility,
+        lastMultiplier: lastResult?.multiplier,
+    }), [config.rtpTarget, config.volatility, definition?.rtp, lastResult?.multiplier])
 
     const setBet = useCallback((value) => {
         const next = Math.max(0.1, Math.min(10000, Number(value) || 0.1))
@@ -542,7 +560,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             },
         })
 
-        if (profit > 0 && (result.multiplier >= 8 || profit >= baseBet * 8)) {
+        if (profit > 0 && (result.multiplier >= SLOT_BIG_WIN_THRESHOLD || profit >= baseBet * SLOT_BIG_WIN_THRESHOLD)) {
             slotSfx.play('bigwin', { volume: 0.9 })
             playSound('bigwin')
             setBigWin({ trigger: Date.now(), profit, multiplier: result.multiplier })
@@ -710,6 +728,21 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         autoplayPendingRef.current = false
     }, [])
 
+    // Compact list of the currently-armed stop conditions, surfaced on the dock
+    // pill (not only inside the drawer) so a running session shows its guardrails.
+    const activeStopChips = useMemo(() => {
+        const s = advancedStops
+        const chips = []
+        if (s.stopOnFeature) chips.push('Feature')
+        if (s.stopOnBigWin) chips.push(`≥${s.bigWinThreshold}×`)
+        if (s.stopOnLoss) chips.push(`−${s.lossPercent}%`)
+        if (s.stopOnGain) chips.push(`+${s.gainPercent}%`)
+        if (s.stopOnLossAbs && s.lossAbs > 0) chips.push(`−${formatCredits(s.lossAbs)}`)
+        if (s.stopOnGainAbs && s.gainAbs > 0) chips.push(`+${formatCredits(s.gainAbs)}`)
+        if (s.stopOnSingleWin && s.singleWinAbs > 0) chips.push(`win ${formatCredits(s.singleWinAbs)}`)
+        return chips
+    }, [advancedStops])
+
     useEffect(() => {
         if (!autoplayActive || running || autoplayPendingRef.current) return
         if (autoplayRemainingRef.current === Infinity) {
@@ -730,10 +763,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 }
                 const stops = stopsRef.current
                 const baseline = autoplayBaselineRef.current ?? balance
+                const net = balance - baseline
+                const spinProfit = Number(outcome?.profit) || 0
                 if (stops.stopOnFeature && outcome?.featureEvents?.length) stopAutoplay()
                 else if (stops.stopOnBigWin && outcome?.multiplier >= stops.bigWinThreshold) stopAutoplay()
                 else if (stops.stopOnLoss && balance <= baseline * (1 - stops.lossPercent / 100)) stopAutoplay()
                 else if (stops.stopOnGain && balance >= baseline * (1 + stops.gainPercent / 100)) stopAutoplay()
+                else if (stops.stopOnLossAbs && stops.lossAbs > 0 && net <= -stops.lossAbs) stopAutoplay()
+                else if (stops.stopOnGainAbs && stops.gainAbs > 0 && net >= stops.gainAbs) stopAutoplay()
+                else if (stops.stopOnSingleWin && stops.singleWinAbs > 0 && spinProfit >= stops.singleWinAbs) stopAutoplay()
                 else if (autoplayRemainingRef.current <= 0 && autoplayRemainingRef.current !== Infinity) stopAutoplay()
             })
         }, 220)
@@ -1545,7 +1583,62 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     onChange={e => setAdvancedStops(s => ({ ...s, gainPercent: Number(e.target.value) || 1 }))}
                                 />%
                             </label>
+                            <div className="slot-auto-section">Absolute limits</div>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={advancedStops.stopOnLossAbs}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, stopOnLossAbs: e.target.checked }))}
+                                />
+                                Stop after losing
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={advancedStops.lossAbs}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, lossAbs: Math.max(0, Number(e.target.value) || 0) }))}
+                                />
+                                credits
+                            </label>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={advancedStops.stopOnGainAbs}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, stopOnGainAbs: e.target.checked }))}
+                                />
+                                Stop after winning
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={advancedStops.gainAbs}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, gainAbs: Math.max(0, Number(e.target.value) || 0) }))}
+                                />
+                                credits
+                            </label>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={advancedStops.stopOnSingleWin}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, stopOnSingleWin: e.target.checked }))}
+                                />
+                                Stop on a single win over
+                                <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={advancedStops.singleWinAbs}
+                                    onChange={e => setAdvancedStops(s => ({ ...s, singleWinAbs: Math.max(0, Number(e.target.value) || 0) }))}
+                                />
+                                credits
+                            </label>
                         </details>
+                        {activeStopChips.length > 0 && (
+                            <div className="slot-auto-stopsummary" aria-label="Active stop conditions">
+                                <span>Stops:</span>
+                                {activeStopChips.map(chip => <em key={chip}>{chip}</em>)}
+                            </div>
+                        )}
                         <div className="slot-auto-actions">
                             <button type="button" className="slot-auto-start" onClick={startAutoplay} disabled={autoplayActive}>
                                 <Play size={14} /> Start
@@ -1562,6 +1655,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <RotateCcw size={14} />
                         <strong>{autoplayRemaining === Infinity ? '∞' : autoplayRemaining}</strong>
                         <span>autoplay</span>
+                        {activeStopChips.length > 0 && (
+                            <span className="slot-autoplay-stops" aria-label="Active stop conditions">
+                                {activeStopChips.join(' · ')}
+                            </span>
+                        )}
                         <button type="button" onClick={stopAutoplay} aria-label="Stop autoplay"><Square size={12} /></button>
                     </div>
                 )}
@@ -1718,12 +1816,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 </div>
             )}
 
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={SLOT_BIG_WIN_THRESHOLD} />
             <EducationPanel
                 definition={definition}
                 betAmount={lastStake || betAmount}
-                winProbability={0.28}
-                payoutMultiplier={lastResult?.multiplier || 2.4}
+                winProbability={educationEv.winProbability}
+                payoutMultiplier={educationEv.payoutMultiplier}
                 balance={balance}
                 recentProfit={recentProfit}
             />

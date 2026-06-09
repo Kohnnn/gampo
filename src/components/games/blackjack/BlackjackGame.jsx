@@ -22,7 +22,6 @@ import {
     useGameSession,
     MultiplierBadge,
     ResultToast,
-    ActionLockOverlay,
     CoreStageFrame,
     ROUND_EVENTS,
     useRoundMachine,
@@ -600,7 +599,6 @@ export default function BlackjackGame() {
                             </span>
                         )}
                     </div>
-                    <ActionLockOverlay active={false} />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>

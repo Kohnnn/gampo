@@ -1331,6 +1331,43 @@
     font: inherit;
 }
 
+.slot-auto-section {
+    margin: 4px 0 8px;
+    font-size: 11px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--slot-text-dim);
+    border-top: 1px solid color-mix(in srgb, var(--slot-rail), transparent 35%);
+    padding-top: 10px;
+}
+
+.slot-auto-stopsummary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: var(--slot-text-dim);
+}
+
+.slot-auto-stopsummary span {
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.slot-auto-stopsummary em {
+    font-style: normal;
+    font-weight: 900;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--slot-accent), #142733 64%);
+    border: 1px solid color-mix(in srgb, var(--slot-accent), transparent 50%);
+    color: var(--slot-text);
+}
+
 .slot-auto-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1387,6 +1424,19 @@
     font-size: 11px;
     font-weight: 900;
     text-transform: uppercase;
+}
+
+.slot-autoplay-pill .slot-autoplay-stops {
+    text-transform: none;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--slot-text);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-left: 8px;
+    border-left: 1px solid color-mix(in srgb, var(--slot-rail), transparent 30%);
 }
 
 .slot-autoplay-pill button {

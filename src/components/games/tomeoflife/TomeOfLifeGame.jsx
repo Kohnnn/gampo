@@ -293,9 +293,6 @@ export default function TomeOfLifeGame() {
                         <button className="tome-action" disabled={!inRound || running || pageIndex >= PAGE_COUNT} onClick={readNextPage}>
                             {pageIndex >= PAGE_COUNT ? 'Reading complete' : `Read page ${pageIndex + 1}`}
                         </button>
-                        {inRound && accumMult > 0 && (
-                            <button className="tome-action cashout" onClick={cashOut}>Cashout {accumMult.toFixed(2)}×</button>
-                        )}
                     </div>
                     <div className="tome-paytable">
                         <span>☀️ Sun +1.4×</span>

@@ -613,7 +613,10 @@ export default function CasesGame() {
     const [showLocked, setShowLocked] = useState(true)
     const [historyFilter, setHistoryFilter] = useState('')
     const [pokedexFilter, setPokedexFilter] = useState('')
-    const [rarityFilter, setRarityFilter] = useState('all')
+    // C-P1-3: history owns its own rarity filter. The inventory/pokedex view
+    // filters by `inventoryRarity` (its existing chip control) so the two views
+    // no longer share one `rarityFilter` and leak into each other.
+    const [historyRarityFilter, setHistoryRarityFilter] = useState('all')
     const [pokedexSort, setPokedexSort] = useState('value')
     const [caseGridSearch, setCaseGridSearch] = useState('')
     const [browserCollapsed, setBrowserCollapsed] = useState(false)
@@ -858,6 +861,9 @@ export default function CasesGame() {
         setTracks([])
         setTrackOffsets([])
         setCasePhase('arming')
+        // C-P1-2: opening also commits to the reel-first stage. Collapse the
+        // browser (the auto-selected first case never fires selectCase).
+        setBrowserCollapsed(true)
         playSound('click')
         sfx.play('open', { volume: 0.65 })
         sfx.play('click')
@@ -1009,16 +1015,16 @@ export default function CasesGame() {
     const filteredDrops = useMemo(() => {
         const q = historyFilter.trim().toLowerCase()
         return collection.drops.filter(d => {
-            if (rarityFilter !== 'all' && d.rarity !== rarityFilter) return false
+            if (historyRarityFilter !== 'all' && d.rarity !== historyRarityFilter) return false
             if (q && !(d.name || '').toLowerCase().includes(q) && !(d.caseName || '').toLowerCase().includes(q)) return false
             return true
         })
-    }, [collection.drops, historyFilter, rarityFilter])
+    }, [collection.drops, historyFilter, historyRarityFilter])
 
     const filteredPokedex = useMemo(() => {
         const q = pokedexFilter.trim().toLowerCase()
         const list = pokedexList.filter(s => {
-            if (rarityFilter !== 'all' && s.rarity !== rarityFilter) return false
+            if (inventoryRarity !== 'all' && s.rarity !== inventoryRarity) return false
             if (q && !(s.name || '').toLowerCase().includes(q)) return false
             return true
         })
@@ -1031,7 +1037,7 @@ export default function CasesGame() {
             case 'multiplier':
             default:           return [...list].sort((a, b) => (b.multiplier || 0) - (a.multiplier || 0))
         }
-    }, [pokedexList, pokedexFilter, rarityFilter, pokedexSort])
+    }, [pokedexList, pokedexFilter, inventoryRarity, pokedexSort])
 
     // Wave 41: locked silhouettes from the full CS2 catalog. Skins not yet
     // discovered show with greyscale + a lock icon; opening the matching
@@ -1043,7 +1049,7 @@ export default function CasesGame() {
         const list = []
         for (const skin of Object.values(csCatalog.catalog.skins || {})) {
             if (discovered.has(skin.id)) continue
-            if (rarityFilter !== 'all' && skin.rarity?.name !== rarityFilter) continue
+            if (inventoryRarity !== 'all' && skin.rarity?.name !== inventoryRarity) continue
             if (q && !(skin.name || '').toLowerCase().includes(q)) continue
             list.push({
                 key: `locked::${skin.id}`,
@@ -1058,7 +1064,7 @@ export default function CasesGame() {
         }
         // Cap to 240 locked rows so the grid stays performant.
         return list.slice(0, 240)
-    }, [showLocked, csCatalog.loaded, csCatalog.catalog, pokedexList, rarityFilter, pokedexFilter])
+    }, [showLocked, csCatalog.loaded, csCatalog.catalog, pokedexList, inventoryRarity, pokedexFilter])
     const collectionTotalSkins = csCatalog.loaded ? csCatalog.catalog.totalSkins : collection.summary.uniqueVariants
     const collectionLockedCount = Math.max(0, (collectionTotalSkins || 0) - collection.summary.uniqueVariants)
     const inventoryRarityRows = useMemo(() => {
@@ -1189,6 +1195,10 @@ export default function CasesGame() {
         if (running || caseId === nextCaseId) return
         sfx.play('reveal', { volume: 0.24 })
         setCaseId(nextCaseId)
+        // C-P1-2: once the player actively picks a case, collapse the browser so
+        // the reel-first stage leads. The browser stays open until this first
+        // explicit selection (or an open), and the toggle still reopens it.
+        setBrowserCollapsed(true)
         setSearchParams(prev => {
             const next = new URLSearchParams(prev)
             next.set('caseId', nextCaseId)
@@ -1247,9 +1257,11 @@ export default function CasesGame() {
         reader.readAsText(file)
     }, [collection, showToast])
 
-    const renderRarityFilter = () => (
+    // C-P1-3: each view passes its own rarity state + setter so history and
+    // inventory filter independently.
+    const renderRarityFilter = (value, setValue) => (
         <>
-            <select className="cases-rarity-select" value={rarityFilter} onChange={e => { sfx.play('click', { volume: 0.24 }); setRarityFilter(e.target.value) }} aria-label="Rarity filter">
+            <select className="cases-rarity-select" value={value} onChange={e => { sfx.play('click', { volume: 0.24 }); setValue(e.target.value) }} aria-label="Rarity filter">
                 {RARITY_FILTERS.map(option => (
                     <option key={option.value} value={option.value}>{option.selectLabel}</option>
                 ))}
@@ -1259,9 +1271,9 @@ export default function CasesGame() {
                     <button
                         key={option.value}
                         type="button"
-                        className={rarityFilter === option.value ? 'active' : ''}
-                        aria-pressed={rarityFilter === option.value}
-                        onClick={() => { sfx.play('click', { volume: 0.24 }); setRarityFilter(option.value) }}
+                        className={value === option.value ? 'active' : ''}
+                        aria-pressed={value === option.value}
+                        onClick={() => { sfx.play('click', { volume: 0.24 }); setValue(option.value) }}
                     >
                         {option.label}
                     </button>
@@ -1482,8 +1494,16 @@ export default function CasesGame() {
                                     </div>
                                 </section>
                             )}
-                            <div className="cases-case-grid">
-                                {categoryCases.map(c => (
+                            <div className="cases-case-grid" aria-busy={stageLoading || !allCases}>
+                                {(stageLoading || !allCases) && categoryCases.length === 0 ? (
+                                    Array.from({ length: 8 }).map((_, i) => (
+                                        <div key={`case-skeleton-${i}`} className="cases-case-card cases-case-skeleton" aria-hidden="true">
+                                            <span className="cases-skeleton-img" />
+                                            <span className="cases-skeleton-line short" />
+                                            <span className="cases-skeleton-line" />
+                                        </div>
+                                    ))
+                                ) : categoryCases.map(c => (
                                     <button
                                         key={c.id}
                                         className={`cases-case-card ${activeCase?.id === c.id ? 'active' : ''} ${(casePhase === 'arming' || casePhase === 'lid') && activeCase?.id === c.id ? 'is-lifting' : ''}`}
@@ -1667,7 +1687,7 @@ export default function CasesGame() {
                                     onChange={e => setHistoryFilter(e.target.value)}
                                     placeholder="Filter by skin name..."
                                 />
-                                {renderRarityFilter()}
+                                {renderRarityFilter(historyRarityFilter, setHistoryRarityFilter)}
                             </div>
                             {filteredDrops.length === 0 ? (
                                 <p className="cases-empty">{collection.drops.length === 0 ? 'No drops yet. Open a case to start filling the collection.' : 'No drops match those filters.'}</p>

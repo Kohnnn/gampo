@@ -15,7 +15,6 @@ import {
     useGameSession,
     MultiplierBadge,
     ResultToast,
-    ActionLockOverlay,
     CoreStageFrame,
     ROUND_EVENTS,
     useRoundMachine,
@@ -29,6 +28,7 @@ import { useGameBgm } from '../../../audio/useBgm'
 
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 const SUITS = ['S', 'H', 'D', 'C']
+const SUIT_NAMES = { S: 'spades', H: 'hearts', D: 'diamonds', C: 'clubs' }
 function rankValue(r) { return r === 'A' ? 14 : r === 'K' ? 13 : r === 'Q' ? 12 : r === 'J' ? 11 : Number(r) }
 
 function buildShuffledDeck() {
@@ -218,6 +218,8 @@ export default function VideoPokerGame() {
                                 disabled={!card || phase !== 'draw'}
                                 style={{ animationDelay: `${i * 90}ms` }}
                                 onClick={() => toggleHold(i)}
+                                aria-pressed={held.includes(i)}
+                                aria-label={card ? `Card ${i + 1}: ${card.rank}${SUIT_NAMES[card.suit] ? ' of ' + SUIT_NAMES[card.suit] : ''}${held.includes(i) ? ', held' : ''}` : `Card slot ${i + 1}`}
                             >
                                 {card
                                     ? <CardFace rank={card.rank} suit={card.suit} dealing size="lg" />
@@ -237,7 +239,6 @@ export default function VideoPokerGame() {
                         </div>
                     </details>
                     {outcomeKey && burstKey > 0 && <Particles key={burstKey} count={14} color="#8ae66e" />}
-                    <ActionLockOverlay active={false} />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>

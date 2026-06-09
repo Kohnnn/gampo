@@ -248,9 +248,6 @@ export default function DrillGame() {
                         <button className="drill-action-chip" disabled={!inRound} onClick={drillStep}>
                             {inRound && nextLayer ? `Drill (${(nextLayer.bustChance * 100).toFixed(0)}%)` : 'Drill'}
                         </button>
-                        {inRound && depth > 0 && (
-                            <button className="drill-action-chip cashout" onClick={() => cashOut()}>Cashout {currentMult.toFixed(2)}×</button>
-                        )}
                     </div>
                     <div>
                         <MultiplierBadge label="Current" value={currentMult} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="md" />

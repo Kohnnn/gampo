@@ -195,9 +195,6 @@ export default function PumpGame() {
                     </div>
                     <div className="pump-actions">
                         <button className="pump-action-chip" disabled={!inRound || busted} onClick={pumpOnce}>Pump</button>
-                        {inRound && pumps > 0 && (
-                            <button className="pump-action-chip cashout" onClick={cashOut}>Cashout {currentMult.toFixed(2)}×</button>
-                        )}
                     </div>
                     <div>
                         <MultiplierBadge label={inRound ? 'Current' : 'Ready'} value={inRound ? currentMult : 1} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="md" />
