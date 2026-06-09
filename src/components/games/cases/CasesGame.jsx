@@ -1280,6 +1280,7 @@ export default function CasesGame() {
                                     type="button"
                                     className="cases-browser-toggle"
                                     aria-expanded={!browserCollapsed}
+                                    aria-label={browserCollapsed ? 'Show case browser' : 'Hide case browser'}
                                     onClick={() => setBrowserCollapsed(v => !v)}
                                 >
                                     {browserCollapsed
