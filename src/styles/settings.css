@@ -257,3 +257,37 @@
     .settings-hero h1 { font-size: 20px; }
     .settings-page { padding-bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)) + 8px); }
 }
+
+/* Audio panel rows (master/music/effects volume + mute) */
+.settings-audio-row {
+    display: grid;
+    grid-template-columns: 36px 64px 1fr 40px;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+}
+.settings-audio-row input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent, #00e701);
+    cursor: pointer;
+}
+.settings-audio-row input[type="range"]:disabled { opacity: 0.4; cursor: not-allowed; }
+.settings-audio-label { font-size: 13px; font-weight: 800; color: var(--text-secondary, #b1bad3); }
+.settings-audio-row em { font-size: 12px; font-weight: 800; color: var(--text-muted, #909cb0); font-style: normal; text-align: right; }
+.settings-audio-mute {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: color-mix(in srgb, var(--accent, #00e701), transparent 86%);
+    color: var(--text-primary, #fff);
+    cursor: pointer;
+}
+.settings-audio-mute.muted {
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--text-muted, #909cb0);
+}
+.settings-audio-mute:focus-visible { outline: 2px solid var(--accent, #00e701); outline-offset: 2px; }

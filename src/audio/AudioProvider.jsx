@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import {
     isMuted, setMuted as setCtxMuted,
-    playSample, unlockAudio,
+    playSample, unlockAudio, subscribeAudio,
 } from './audioContext'
 
 const AudioContext_ = createContext(null)
@@ -25,10 +25,13 @@ export function AudioProvider({ children }) {
     // Mute state mirrors the single shared master mute in audioContext.
     const [muted, setMutedState] = useState(() => isMuted())
 
-    // Keep React state in sync if mute changes from elsewhere (e.g. another tab
-    // or the VolumeMixer) when this provider remounts.
+    // Keep React state in sync whenever mute changes from anywhere (header,
+    // in-game mixer, settings page, another tab). subscribeAudio fires on every
+    // mute/volume mutation so all controls reflect one source of truth.
     useEffect(() => {
         setMutedState(isMuted())
+        const unsub = subscribeAudio(() => setMutedState(isMuted()))
+        return unsub
     }, [])
 
     const play = useCallback((name) => {
