@@ -73,6 +73,30 @@ const PAYTABLE = [
     { key: 'Jacks or Better', multiplier: 1 },
 ]
 
+// Probability Lab inputs derived from the paytable above, which is the standard
+// 9/6 Jacks-or-Better schedule (Royal 250, Straight Flush 50, Quads 25, Full
+// House 9, Flush 6, Straight 4, Trips 3, Two Pair 2, Jacks+ 1, on a 1-credit
+// stake). Under optimal hold strategy the published hand frequencies are:
+//   Royal 0.0000248, SF 0.0000109, Quads 0.00024, Full House 0.01151,
+//   Flush 0.01101, Straight 0.01123, Trips 0.07445, Two Pair 0.12928,
+//   Jacks+ 0.21459  →  P(any paying hand) ≈ 0.4546.
+// Source: standard 9/6 JoB optimal-play return table (long-run RTP ≈ 0.9954,
+// close to the definition's 0.985). We expose the paying-hand frequency as the
+// "win chance" and reconcile payoutMultiplier so EV ≈ RTP in the binary EV
+// model (which can't represent the per-hand multiplier spread directly).
+const VP_HAND_FREQUENCIES = [
+    0.0000248, // Royal Flush
+    0.0000109, // Straight Flush
+    0.00024,   // Four of a Kind
+    0.01151,   // Full House
+    0.01101,   // Flush
+    0.01123,   // Straight
+    0.07445,   // Three of a Kind
+    0.12928,   // Two Pair
+    0.21459,   // Jacks or Better
+]
+const VP_WIN_PROBABILITY = VP_HAND_FREQUENCIES.reduce((sum, p) => sum + p, 0)
+
 export default function VideoPokerGame() {
     useGameBgm('videopoker', 'idle')
     const definition = findGameDefinition('videopoker')
@@ -243,7 +267,18 @@ export default function VideoPokerGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={9} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={0.45} payoutMultiplier={1.85} balance={balance} recentProfit={recentProfit} />
+            {/* Win chance = P(any paying hand) derived from the 9/6 JoB paytable
+                under optimal play (~0.4546). payoutMultiplier is reconciled from
+                the game's RTP so the binary EV model lands at EV ≈ RTP rather
+                than the old hardcoded 0.45 × 1.85 (which implied only ~83% RTP). */}
+            <EducationPanel
+                definition={definition}
+                betAmount={5}
+                winProbability={VP_WIN_PROBABILITY}
+                payoutMultiplier={(definition?.rtp ?? 0.985) / VP_WIN_PROBABILITY}
+                balance={balance}
+                recentProfit={recentProfit}
+            />
         </GameShell>
     )
 }

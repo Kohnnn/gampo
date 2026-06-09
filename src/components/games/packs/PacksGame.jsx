@@ -10,7 +10,7 @@
 // Distinct from Cases: Packs uses 3 simultaneous reveals with a tiered
 // prize pool (no case carousel, no real CS data).
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -92,6 +92,29 @@ function weightedPick(pool) {
     return pool[pool.length - 1]
 }
 
+// Probability Lab metrics derived directly from a tier's weighted prize pool.
+//   - expectedMult: E[single pick multiplier] = Σ p_i · mult_i. Because the
+//     round pays mean(3 picks) × stake, the expected return multiple equals
+//     this same value, i.e. the tier RTP.
+//   - winProbability: P(profit > 0) = P(mean of 3 picks > 1) = P(sum > 3),
+//     computed exactly by enumerating the 3-pick distribution over the pool.
+function tierMetrics(pool) {
+    const total = pool.reduce((s, p) => s + p.weight, 0)
+    const dist = pool.map(p => ({ mult: p.mult, prob: p.weight / total }))
+    const expectedMult = dist.reduce((s, d) => s + d.prob * d.mult, 0)
+    // Exact enumeration of three independent picks (pool sizes are ≤7, so 7³
+    // ≈ 343 combinations — cheap and precise).
+    let winProb = 0
+    for (const a of dist) {
+        for (const b of dist) {
+            for (const c of dist) {
+                if (a.mult + b.mult + c.mult > 3) winProb += a.prob * b.prob * c.prob
+            }
+        }
+    }
+    return { expectedMult, winProbability: winProb }
+}
+
 export default function PacksGame() {
     useGameBgm('packs', 'idle')
     const definition = findGameDefinition('packs') || { name: 'Packs', category: 'Arcade originals' }
@@ -111,6 +134,8 @@ export default function PacksGame() {
     const machine = useRoundMachine({})
 
     const tierConf = TIERS[tier]
+    // Win odds + expected return for the selected tier, derived from its pool.
+    const tierStats = useMemo(() => tierMetrics(tierConf.pool), [tierConf])
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (running) { resolve({ profit: 0 }); return }
@@ -259,7 +284,19 @@ export default function PacksGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={0.5} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
+            {/* Win chance + payout derived from the selected tier's weighted pool
+                (see tierMetrics). winProbability = P(mean of 3 picks > 1); the
+                expected return multiple equals E[pick mult] = tier RTP, so we
+                reconcile payoutMultiplier = expectedMult / winProbability to keep
+                EV ≈ RTP in the binary EV model. Replaces the old flat 0.5 / 1.5. */}
+            <EducationPanel
+                definition={definition}
+                betAmount={5}
+                winProbability={tierStats.winProbability}
+                payoutMultiplier={tierStats.winProbability > 0 ? tierStats.expectedMult / tierStats.winProbability : tierStats.expectedMult}
+                balance={balance}
+                recentProfit={recentProfit}
+            />
         </GameShell>
     )
 }

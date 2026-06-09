@@ -124,7 +124,7 @@ export default function CasinoWarGame() {
     })
 
     const surrender = () => {
-        if (!tiedHand) return
+        if (!tiedHand || slamming) return
         addWinnings(pendingBet / 2, 'Casino War surrender')
         const profit = -pendingBet / 2
         session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: 'Surrender', profit, betAmount: pendingBet })
@@ -133,7 +133,7 @@ export default function CasinoWarGame() {
     }
 
     const goToWar = () => {
-        if (!tiedHand) return
+        if (!tiedHand || slamming) return
         if (!placeBet(pendingBet, 'Casino War double')) { showToast('error', 'Not enough credits', 'Cannot go to war'); return }
         playSound('deal'); setSlamming(true)
         const np = drawCard(); const nd = drawCard()
@@ -168,15 +168,25 @@ export default function CasinoWarGame() {
             backdrop="/assets/games/backdrops/backdrop-felt-green.png"
             variant="stake"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={slamming || phase === 'tied'} actionLabel="Draw Cards" onPlay={performPlay} lastBet={lastBet}>
+                <BetPanel
+                    balance={balance}
+                    initialBet={5}
+                    runningRound={slamming}
+                    actionLabel="Draw Cards"
+                    onPlay={performPlay}
+                    lastBet={lastBet}
+                    playPhase={phase === 'tied' ? 'in-round' : null}
+                    playLabel={phase === 'tied' ? 'Go to War (+1×)' : 'Draw Cards'}
+                    mobilePlayLabel={phase === 'tied' ? 'Go to War' : null}
+                    onPlayPhaseAction={goToWar}
+                    afterPlayChildren={phase === 'tied' ? (
+                        <button className="bp-bet-btn war-surrender-btn" disabled={slamming} onClick={surrender}>
+                            Surrender (50%)
+                        </button>
+                    ) : null}
+                >
                     <div className="bp-bal-line"><span>Win</span><strong>2×</strong></div>
                     <div className="bp-bal-line"><span>Tie-win</span><strong>+1×</strong></div>
-                    {phase === 'tied' && (
-                        <>
-                            <button className="bp-bet-btn" onClick={surrender}>Surrender (50%)</button>
-                            <button className="bp-bet-btn" onClick={goToWar}>Go to War (+1×)</button>
-                        </>
-                    )}
                 </BetPanel>
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
