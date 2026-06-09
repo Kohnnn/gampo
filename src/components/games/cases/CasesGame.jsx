@@ -21,6 +21,7 @@
 // 4× becomes 3.4× (cosmetic — keeps the math contract simple).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
@@ -28,6 +29,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { useCaseCollection } from '../../../hooks/useCaseCollection'
 import { useCsCollection } from '../../../hooks/useCsCollection'
 import { recordCaseDrop as recordProgressCaseDrop } from '../../../hooks/useProgress'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import {
@@ -523,6 +525,7 @@ export default function CasesGame() {
     const [rarityFilter, setRarityFilter] = useState('all')
     const [pokedexSort, setPokedexSort] = useState('value')
     const [caseGridSearch, setCaseGridSearch] = useState('')
+    const [browserCollapsed, setBrowserCollapsed] = useState(false)
     const [caseSwitchSearch, setCaseSwitchSearch] = useState('')
     const [inventoryFilter, setInventoryFilter] = useState('')
     const [inventorySort, setInventorySort] = useState('latest')
@@ -539,6 +542,8 @@ export default function CasesGame() {
     const resultsPanelRef = useRef(null)
     const reelAreaRef = useRef(null)
     const initialCaseIdRef = useRef(searchParams.get('caseId'))
+    const [dockPortal, setDockPortal] = useState(null)
+    useEffect(() => { setDockPortal(document.body) }, [])
     const casesBgmMode = celebrationDrop ? 'bonus' : 'idle'
     useGameBgm('cases', casesBgmMode)
 
@@ -609,21 +614,8 @@ export default function CasesGame() {
 
     // Bring the spinning reel into view once it renders so mobile players see
     // the animation instead of it firing far below the case browser. The reel
-    // area is empty (display:none) until tracks mount, so we wait for tracks.
-    useEffect(() => {
-        if (tracks.length === 0) return
-        const reducedMotion = Boolean(
-            window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
-            || document.documentElement.classList.contains('gampo-reduce-motion'),
-        )
-        const raf = requestAnimationFrame(() => {
-            reelAreaRef.current?.scrollIntoView({
-                behavior: reducedMotion ? 'auto' : 'smooth',
-                block: 'center',
-            })
-        })
-        return () => cancelAnimationFrame(raf)
-    }, [tracks.length])
+    // area is empty (display:none) until tracks mount, so we key on tracks.
+    useScrollActionIntoView(reelAreaRef, tracks.length > 0, [tracks.length])
 
     const scheduleTickSfx = useCallback((durationMs = CASE_REVEAL_MS) => {
         tickRef.current.ids.forEach(id => window.clearTimeout(id))
@@ -1284,6 +1276,18 @@ export default function CasesGame() {
                                     </span>
                                 ))}
                             </div>
+                                <button
+                                    type="button"
+                                    className="cases-browser-toggle"
+                                    aria-expanded={!browserCollapsed}
+                                    onClick={() => setBrowserCollapsed(v => !v)}
+                                >
+                                    {browserCollapsed
+                                        ? `Change case (${activeCategoryStats.count} in ${activeCategoryMeta.label})`
+                                        : 'Hide case browser'}
+                                </button>
+                                {!browserCollapsed && (
+                                <>
                                 <div className="cases-category-row">
                                     {CASE_CATEGORIES.map(c => (
                                     <button key={c.value} className={`cases-category-chip ${category === c.value ? 'active' : ''}`} disabled={running} onClick={() => selectCategory(c.value)} aria-label={`${c.label} cases`} aria-pressed={category === c.value}>
@@ -1361,6 +1365,8 @@ export default function CasesGame() {
                                     </button>
                                 ))}
                             </div>
+                            </>
+                            )}
                             <div className="cases-reel-area" ref={reelAreaRef}>
                             {tracks.length > 0 && rows === 10 && (
                                 <CaseMultiOpenGrid
@@ -1685,6 +1691,36 @@ export default function CasesGame() {
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
             <EducationPanel definition={definition} betAmount={casePrice} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
+            {dockPortal && view === 'open' && createPortal(
+                <div className="cases-mobile-dock" data-cases-mobile-dock data-ux-surface="dock">
+                    <button
+                        type="button"
+                        className={`cases-mobile-quick ${quickOpen ? 'active' : ''}`}
+                        aria-pressed={quickOpen}
+                        disabled={running}
+                        onClick={() => setQuickOpen(v => !v)}
+                    >
+                        <span>Quick</span>
+                        <strong>{quickOpen ? 'On' : 'Off'}</strong>
+                    </button>
+                    <div className="cases-mobile-summary">
+                        <span>{activeCase?.name || 'Loading case'}</span>
+                        <strong>×{rows} · {formatCredits(totalStake)}</strong>
+                    </div>
+                    <button
+                        type="button"
+                        className="cases-mobile-open"
+                        data-cases-mobile-open
+                        data-cases-mobile-action={results.length > 0 ? 'case-open-again' : 'case-open'}
+                        data-mobile-hit-target="primary"
+                        onClick={() => performPlay({ betAmount: casePrice })}
+                        disabled={running || !activeCase || balance < totalStake}
+                    >
+                        {running ? 'Opening…' : results.length > 0 ? `Open again ×${rows}` : `Open ×${rows}`}
+                    </button>
+                </div>,
+                dockPortal,
+            )}
         </GameShell>
     )
 }

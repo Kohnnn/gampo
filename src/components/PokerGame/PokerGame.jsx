@@ -9,6 +9,7 @@ import HeuristicBot from '../../poker/bots/HeuristicBot'
 import { preloadGto } from '../../poker/gto/loader'
 import GtoPanel from './GtoPanel'
 import HandHistoryTab, { recordHand } from './HandHistoryTab'
+import { useScrollActionIntoView } from '../../hooks/useScrollActionIntoView'
 import './PokerGame.css'
 
 const BUY_INS = [1000, 5000, 25000, 100000, 500000]
@@ -153,6 +154,7 @@ export default function PokerGame() {
     const lastHandStartHistoryLen = useRef(-1)
     const initialBuyInRef = useRef(0)
     const lastPutInRef = useRef({})
+    const actionsRef = useRef(null)
     const thinkRafRef = useRef(null)
     const thinkStartRef = useRef(0)
     const tableRef = useRef(null)
@@ -317,6 +319,10 @@ export default function PokerGame() {
     const acts = state ? legalActions(state) : []
     const human = state ? state.players.find(p => p.isHuman) : null
     const isHumanTurn = state && state.toAct >= 0 && state.players[state.toAct]?.isHuman
+
+    // When it becomes the player's turn, bring the action bar into view so the
+    // fold/call/raise controls aren't stranded below the fold on mobile.
+    useScrollActionIntoView(actionsRef, Boolean(isHumanTurn), [isHumanTurn], { block: 'nearest' })
 
     useEffect(() => {
         if (!state || state.street !== 'showdown' || !human) return
@@ -754,7 +760,7 @@ export default function PokerGame() {
                                     </span>
                                 ))}
                             </div>
-                            <div className="pk-actions" data-ux-surface="controls">
+                            <div className="pk-actions" data-ux-surface="controls" ref={actionsRef}>
                                 {state.street === 'showdown' ? (
                                     <>
                                         <div className="pk-winners">
