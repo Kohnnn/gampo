@@ -28,6 +28,7 @@ import {
     useRoundMachine,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import {
@@ -146,6 +147,7 @@ export default function BlackjackGame() {
     const [outcomeSummary, setOutcomeSummary] = useState(null)
     const [chipSlide, setChipSlide] = useState(null)
     const chipSlideTimer = useRef(null)
+    const stageRef = useRef(null)
 
     useEffect(() => () => {
         if (chipSlideTimer.current) window.clearTimeout(chipSlideTimer.current)
@@ -448,6 +450,11 @@ export default function BlackjackGame() {
     const recentProfit = useMemo(() => session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0), [session.history])
     const inRound = phase === 'playing'
     const hintAction = hintActionFromText(hint)
+
+    // When a hand is dealt, bring the table/action stage into view so mobile
+    // players see the cards and hit/stand controls instead of them landing
+    // below the fold. Same class as the Poker action-bar fix.
+    useScrollActionIntoView(stageRef, inRound, [inRound], { block: 'nearest' })
     const dealerVisible = dealer[0] ? `${dealer[0].rank}${suitGlyph(dealer[0].suit)} (${dealerUpValue(dealer[0])})` : '—'
     const playerTotalLabel = activeHand.cards.length ? `${activeScore}${isSoftHand(activeHand.cards) ? ' soft' : ''}` : '—'
     const canSplitActive = canSplitHand(activeHand, hands)
@@ -505,7 +512,7 @@ export default function BlackjackGame() {
             }
         >
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="bj-stage-frame" mobileScrollable>
-                <div className="bj-stage">
+                <div className="bj-stage" ref={stageRef}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     {chipSlide ? (
                         <span key={chipSlide.key} className="bj-chip-slide" aria-hidden="true">

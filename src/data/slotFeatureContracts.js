@@ -54,13 +54,12 @@ export const SLOT_FEATURE_CONTRACTS = {
         mechanics: [
             { name: 'Expanding wilds', detail: 'When a wild lands on reel 2-5 it expands to cover the full reel for the spin.' },
             { name: 'Lines', detail: '20 paylines, left-to-right.' },
-            { name: 'Bonus badges', detail: '3+ badges trigger 5 free spins with sticky expanding wilds.' },
+            { name: 'Bonus badges', detail: '3+ badges trigger 5 free spins. Expanding wilds stay active during the bonus.' },
         ],
         bonusEntry: '3+ sheriff badge scatters.',
         bonusFlow: [
             '5 free spins.',
-            'Wilds that land stay sticky for the rest of the bonus.',
-            'Retriggers add 3 more spins.',
+            'Wilds keep expanding to fill their reel during the bonus.',
         ],
         volatility: 'Medium-high volatility.',
         buyBonus: 'Buy options: 50x (standard), 100x (super).',
@@ -117,7 +116,7 @@ export const SLOT_FEATURE_CONTRACTS = {
         summary: 'Classic 3-reel single-line slot. Sevens pay the jackpot.',
         mechanics: [
             { name: 'Single line', detail: 'One payline, three reels.' },
-            { name: 'Jackpot', detail: 'Triple sevens pay the 60x headline jackpot.' },
+            { name: 'Jackpot', detail: 'Triple sevens pay the 30x headline jackpot.' },
             { name: 'Bar tiers', detail: 'BBB / BB / B and bell + cherry symbols form a classic ladder.' },
         ],
         bonusEntry: null,
@@ -247,15 +246,15 @@ export const SLOT_FEATURE_CONTRACTS = {
         buyBonus: 'Spirit (80x), Ronin (180x + 2x persistent).',
     },
     'iron-fist': {
-        summary: 'Hacksaw-style multiplier wheel slot. Trigger 3+ gongs to spin for 2x to 30x.',
+        summary: 'Hacksaw-style multiplier wheel slot. Trigger 3+ gongs to spin for 2x to 20x.',
         mechanics: [
-            { name: 'Multiplier wheel', detail: '3+ gongs spin a 2/4/8/15/30x wheel. Wheel weights bias toward 2x and 4x; 30x is rare. The wheel multiplier applies across the free-spin session.' },
+            { name: 'Multiplier wheel', detail: '3+ gongs spin a 2/3/5/10/20x wheel. Wheel weights bias toward 2x and 3x; 20x is rare. The wheel multiplier applies across the free-spin session.' },
             { name: 'Ways pays', detail: 'Pays anywhere a matching symbol appears in 3+ adjacent columns left-to-right across the 5×4 grid.' },
             { name: 'Dark win overlay', detail: 'Big wins fade the reels so the wheel value pops.' },
         ],
         bonusEntry: '3+ gong scatters trigger the wheel + 6 free spins.',
         bonusFlow: [
-            'Wheel spin reveals the session multiplier (2x–30x).',
+            'Wheel spin reveals the session multiplier (2x–20x).',
             'Multiplier applies to all 6 free spins.',
             'Re-triggering during the session re-spins the wheel.',
         ],

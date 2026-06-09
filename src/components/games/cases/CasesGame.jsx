@@ -46,6 +46,7 @@ import {
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
+import { getProvablyFair, getRecentRolls, maskSeed, setClientSeed } from '../../../utils/fairRng'
 import {
     CASE_LID_LIFT_MS,
     CASE_LIGHT_SWEEP_LEAD_MS,
@@ -67,15 +68,16 @@ import {
     CASE_CATEGORIES,
     caseCategoryCounts,
     caseCategoryStats,
+    caseDropOdds,
     casePriceBand,
     filterCasesByCategory,
     normalizeCaseForRuntime,
+    rarityDropWeight,
     roundGc,
     roundSignedGc,
 } from './caseEconomy'
 import './cases.css'
 import { useGameBgm } from '../../../audio/useBgm'
-
 const ROW_OPTIONS = [1, 3, 5, 10]
 const REEL_PREVIEW_ROWS = 5
 const REEL_PREVIEW_TILES = 18
@@ -482,6 +484,95 @@ function CaseRightPanel({
     )
 }
 
+// C-P0-1: surfaces the local provably-fair state. NOTE: cases roll via the
+// synchronous lightweight hash (`hmacRollSync`), so this is worded as a
+// deterministic seed+nonce ledger — it does NOT claim cryptographic SHA-256
+// verification of these specific rolls.
+function CaseFairnessPanel({ refreshKey }) {
+    const [state, setState] = useState(() => {
+        try { return getProvablyFair() } catch { return null }
+    })
+    const [recent, setRecent] = useState(() => {
+        try { return getRecentRolls() } catch { return [] }
+    })
+    const [seedDraft, setSeedDraft] = useState('')
+
+    const refresh = useCallback(() => {
+        try { setState(getProvablyFair()) } catch { /* ignore */ }
+        try { setRecent(getRecentRolls()) } catch { /* ignore */ }
+    }, [])
+
+    useEffect(() => { refresh() }, [refresh, refreshKey])
+
+    const applySeed = useCallback(() => {
+        const next = setClientSeed(seedDraft)
+        setSeedDraft('')
+        setState(next)
+        try { setRecent(getRecentRolls()) } catch { /* ignore */ }
+    }, [seedDraft])
+
+    const caseRolls = (recent || []).filter(roll => `${roll.gameId || ''}`.startsWith('cases')).slice(0, 6)
+
+    return (
+        <details className="cases-fairness" data-cases-fairness>
+            <summary>
+                <span>Fairness</span>
+                <small>deterministic seed + nonce</small>
+            </summary>
+            <div className="cases-fairness-body">
+                <p className="cases-fairness-note">
+                    Each drop is derived from a server seed, your client seed, and an
+                    incrementing nonce. Cases use a fast deterministic hash for the live
+                    roll — the seeds and nonces below are reproducible, but this panel does
+                    not perform cryptographic SHA-256 verification of these specific rolls.
+                </p>
+                <dl className="cases-fairness-grid">
+                    <div>
+                        <dt>Server seed (hashed)</dt>
+                        <dd>{state?.serverSeed ? maskSeed(state.serverSeed) : '—'}</dd>
+                    </div>
+                    <div>
+                        <dt>Current nonce</dt>
+                        <dd>{Number.isFinite(state?.nonce) ? state.nonce : '—'}</dd>
+                    </div>
+                </dl>
+                <label className="cases-fairness-seed">
+                    <span>Client seed</span>
+                    <div>
+                        <input
+                            type="text"
+                            value={seedDraft}
+                            onChange={e => setSeedDraft(e.target.value)}
+                            placeholder={state?.clientSeed || 'client seed'}
+                            aria-label="Client seed"
+                        />
+                        <button type="button" onClick={applySeed} disabled={!seedDraft.trim()} aria-label="Set client seed">
+                            Set
+                        </button>
+                    </div>
+                    <em>Active: {state?.clientSeed || '—'}</em>
+                </label>
+                <div className="cases-fairness-rolls" aria-label="Recent case rolls">
+                    <strong>Recent case rolls</strong>
+                    {caseRolls.length === 0 ? (
+                        <em>No case rolls yet</em>
+                    ) : (
+                        <ul>
+                            {caseRolls.map(roll => (
+                                <li key={roll.id}>
+                                    <b>#{roll.nonce}</b>
+                                    <span>{roll.gameId}</span>
+                                    <code>{(Number(roll.roll) || 0).toFixed(6)}</code>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
+        </details>
+    )
+}
+
 export default function CasesGame() {
     const definition = findGameDefinition('cases') || { name: 'Cases', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
@@ -534,6 +625,7 @@ export default function CasesGame() {
     const [inventoryFavoritesOnly, setInventoryFavoritesOnly] = useState(false)
     const [inventoryShowArchived, setInventoryShowArchived] = useState(false)
     const [inventoryPage, setInventoryPage] = useState(1)
+    const [fairnessKey, setFairnessKey] = useState(0)
     const tickRef = useRef({ ids: [], landId: null })
     const revealTimersRef = useRef([])
     const autoTimerRef = useRef(null)
@@ -654,6 +746,7 @@ export default function CasesGame() {
         if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')
         setResults(picks)
         setSettlementSummary(settlement)
+        setFairnessKey(key => key + 1)
 
         picks.forEach(pick => {
             collection.recordDrop(pick, {
@@ -1037,6 +1130,34 @@ export default function CasesGame() {
         ))
     }, [activeCase])
 
+    const dropOdds = useMemo(() => (activeCase ? caseDropOdds(activeCase) : []), [activeCase])
+
+    // C-P0-2: feed the EV coach real per-case numbers instead of placeholders.
+    //  - payoutMultiplier: the case's expected value per unit stake (evGc / open
+    //    price). Below 1 reflects the built-in house edge of opening.
+    //  - winProbability: weight-normalized chance a single drop is worth at least
+    //    the open price (a "break even or better" proxy), using the same drop
+    //    weights as the live roll so the figure matches the odds table.
+    const educationMetrics = useMemo(() => {
+        if (!activeCase) return { winProbability: undefined, payoutMultiplier: undefined }
+        const price = Math.max(1, roundGc(activeCase.openPriceGc, 1))
+        const ev = Number(activeCase.evGc) || 0
+        const payoutMultiplier = price > 0 ? roundGc(ev / price, 0) : undefined
+        const items = Array.isArray(activeCase.items) ? activeCase.items : []
+        let totalWeight = 0
+        let winWeight = 0
+        items.forEach(item => {
+            const weight = rarityDropWeight(item)
+            totalWeight += weight
+            const value = Number(item.valueGc) || Number(item.multiplier) || 0
+            if (value >= price) winWeight += weight
+        })
+        const winProbability = totalWeight > 0
+            ? Math.min(1, Math.max(0, winWeight / totalWeight))
+            : undefined
+        return { winProbability, payoutMultiplier }
+    }, [activeCase])
+
     const selectView = useCallback((nextView) => {
         if (running || view === nextView) return
         sfx.play('click', { volume: 0.34 })
@@ -1249,6 +1370,28 @@ export default function CasesGame() {
                                     </aside>
                                 </section>
                             )}
+                            {activeCase && dropOdds.length > 0 && (
+                                <section className="cases-drop-odds" aria-label={`${activeCase.name} drop odds by rarity`}>
+                                    <header className="cases-drop-odds-head">
+                                        <strong>Drop odds</strong>
+                                        <small>chance per opened drop</small>
+                                    </header>
+                                    <ul className="cases-drop-odds-list">
+                                        {dropOdds.map(row => (
+                                            <li key={row.key} className="cases-drop-odds-row" style={{ '--rarity': row.color || 'var(--accent, #ffd166)' }}>
+                                                <span className="cases-drop-odds-label">
+                                                    <i aria-hidden="true" />
+                                                    {row.label}
+                                                </span>
+                                                <span className="cases-drop-odds-bar" aria-hidden="true">
+                                                    <b style={{ width: `${Math.min(100, Math.max(2, row.pct))}%` }} />
+                                                </span>
+                                                <strong className="cases-drop-odds-pct">{row.pct >= 0.1 ? row.pct.toFixed(2) : row.pct.toFixed(3)}%</strong>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </section>
+                            )}
                             <div className="cases-room-summary" aria-live="polite">
                                 <div>
                                     <span>{activeCategoryMeta.label}</span>
@@ -1452,6 +1595,11 @@ export default function CasesGame() {
                                                 <span className={`cases-result-profit ${(r.profitGc || 0) >= 0 ? 'pos' : 'neg'}`}>
                                                     {(r.profitGc || 0) >= 0 ? '+' : ''}{formatCredits(r.profitGc || 0)}
                                                 </span>
+                                                {Number.isFinite(r.nonce) && (
+                                                    <span className="cases-result-nonce" title={`Deterministic seed+nonce for this drop · nonce ${r.nonce}`}>
+                                                        nonce #{r.nonce}
+                                                    </span>
+                                                )}
                                                 {RARE_TIERS.has(r.rarity) && (
                                                     <span className="cases-particles" aria-hidden>
                                                         {Array.from({ length: 14 }).map((_, p) => (
@@ -1479,6 +1627,7 @@ export default function CasesGame() {
                                     </>
                                 )}
                             </div>
+                            <CaseFairnessPanel refreshKey={fairnessKey} />
                             {celebrationDrop && (
                                 <div className="cases-prize-popover" style={{ '--rarity': celebrationDrop.color }} role="status" aria-label="Rare drop">
                                     <div className="cases-prize-card">
@@ -1691,7 +1840,7 @@ export default function CasesGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
-            <EducationPanel definition={definition} betAmount={casePrice} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} betAmount={casePrice} winProbability={educationMetrics.winProbability} payoutMultiplier={educationMetrics.payoutMultiplier} balance={balance} recentProfit={recentProfit} />
             {dockPortal && view === 'open' && createPortal(
                 <div className="cases-mobile-dock" data-cases-mobile-dock data-ux-surface="dock">
                     <button

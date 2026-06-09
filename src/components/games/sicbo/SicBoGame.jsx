@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { BetPanel, BigWinOverlay, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import { evaluate, rollDice } from './bets'
@@ -35,6 +36,11 @@ export default function SicBoGame() {
     const [lastChips, setLastChips] = useState({})
     const [lastTotal, setLastTotal] = useState(null)
     const { schedule, cancelAll } = useCancellableTimeouts()
+    const stageRef = useRef(null)
+
+    // When the dice roll starts, bring the dice/result stage into view so mobile
+    // players see the shake + reveal instead of it firing below the bet board.
+    useScrollActionIntoView(stageRef, running, [running], { block: 'nearest' })
 
     const totalStake = Object.values(bets).reduce((s, v) => s + v, 0)
     const addBet = (key) => setBets(prev => ({ ...prev, [key]: (prev[key] || 0) + chip }))
@@ -158,7 +164,7 @@ export default function SicBoGame() {
                 </>
             }
         >
-            <div data-ux-surface="stage" className={`sb-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} data-mobile-scroll-surface>
+            <div ref={stageRef} data-ux-surface="stage" className={`sb-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} data-mobile-scroll-surface>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 {shaking ? (
                     <div className="sb-cup-area">

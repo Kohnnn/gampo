@@ -301,6 +301,87 @@
     text-transform: uppercase;
 }
 
+.cases-drop-odds {
+    margin-top: 8px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(18, 28, 42, 0.78), rgba(6, 12, 22, 0.82));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.cases-drop-odds-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.cases-drop-odds-head strong {
+    color: var(--accent, #ffd166);
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.cases-drop-odds-head small {
+    color: var(--text-secondary, #b1bad3);
+    font-size: 10px;
+    font-weight: 800;
+}
+.cases-drop-odds-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.cases-drop-odds-row {
+    display: grid;
+    grid-template-columns: minmax(96px, 1fr) minmax(60px, 2fr) auto;
+    align-items: center;
+    gap: 10px;
+}
+.cases-drop-odds-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    color: var(--text-primary, #fff);
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cases-drop-odds-label i {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    background: var(--rarity, #ffd166);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.cases-drop-odds-bar {
+    display: block;
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+.cases-drop-odds-bar b {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--rarity, #ffd166);
+}
+.cases-drop-odds-pct {
+    color: #ffe680;
+    font-size: 11px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
 .cases-selected-rares {
     display: flex;
     flex-direction: row;
@@ -3655,4 +3736,174 @@
     .cases-control-card header button {
         min-height: 44px;
     }
+}
+
+/* C-P0-1 per-drop nonce badge */
+.cases-result-nonce {
+    display: block;
+    margin-top: 2px;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary, #b1bad3);
+    font-variant-numeric: tabular-nums;
+}
+
+/* C-P0-1 fairness panel */
+.cases-fairness {
+    margin-top: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(18, 28, 42, 0.7), rgba(6, 12, 22, 0.78));
+}
+.cases-fairness > summary {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 11px 14px;
+    cursor: pointer;
+    list-style: none;
+}
+.cases-fairness > summary::-webkit-details-marker { display: none; }
+.cases-fairness > summary span {
+    color: var(--accent, #ffd166);
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.cases-fairness > summary small {
+    color: var(--text-secondary, #b1bad3);
+    font-size: 10px;
+    font-weight: 800;
+}
+.cases-fairness-body {
+    padding: 0 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.cases-fairness-note {
+    margin: 0;
+    color: var(--text-secondary, #b1bad3);
+    font-size: 11px;
+    line-height: 1.45;
+}
+.cases-fairness-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    margin: 0;
+}
+.cases-fairness-grid div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.cases-fairness-grid dt {
+    color: var(--text-secondary, #b1bad3);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.cases-fairness-grid dd {
+    margin: 0;
+    color: var(--text-primary, #fff);
+    font-size: 13px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    word-break: break-all;
+}
+.cases-fairness-seed {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.cases-fairness-seed > span {
+    color: var(--text-secondary, #b1bad3);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.cases-fairness-seed > div {
+    display: flex;
+    gap: 6px;
+}
+.cases-fairness-seed input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 7px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.32);
+    color: var(--text-primary, #fff);
+    font-size: 12px;
+}
+.cases-fairness-seed button {
+    flex: 0 0 auto;
+    padding: 7px 14px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 209, 102, 0.4);
+    background: rgba(255, 209, 102, 0.16);
+    color: var(--accent, #ffd166);
+    font-size: 11px;
+    font-weight: 900;
+    cursor: pointer;
+}
+.cases-fairness-seed button:disabled { opacity: 0.45; cursor: not-allowed; }
+.cases-fairness-seed em {
+    color: var(--text-secondary, #b1bad3);
+    font-style: normal;
+    font-size: 10px;
+    font-weight: 700;
+    word-break: break-all;
+}
+.cases-fairness-rolls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.cases-fairness-rolls strong {
+    color: var(--text-secondary, #b1bad3);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.cases-fairness-rolls em {
+    color: var(--text-secondary, #b1bad3);
+    font-style: normal;
+    font-size: 11px;
+}
+.cases-fairness-rolls ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.cases-fairness-rolls li {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+}
+.cases-fairness-rolls li b {
+    color: var(--accent, #ffd166);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+}
+.cases-fairness-rolls li span {
+    color: var(--text-secondary, #b1bad3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cases-fairness-rolls li code {
+    color: var(--text-primary, #fff);
+    font-variant-numeric: tabular-nums;
 }
