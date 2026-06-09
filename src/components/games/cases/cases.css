@@ -33,9 +33,31 @@
 .cases-stage .cases-stack-row { order: 3; }
 .cases-stage .cases-room-summary { order: 4; }
 .cases-stage .cases-opening-timeline { order: 5; }
-.cases-stage .cases-category-row { order: 6; }
-.cases-stage .cases-market-reel { order: 7; }
-.cases-stage .cases-case-grid { order: 8; }
+.cases-stage .cases-browser-toggle { order: 6; }
+.cases-stage .cases-category-row { order: 7; }
+.cases-stage .cases-market-reel { order: 8; }
+.cases-stage .cases-case-grid { order: 9; }
+
+/* Collapse toggle for the case browser. Once a case is selected, players can
+   hide the 60-card grid so the open flow is reel -> result, not buried under a
+   long scroll. Defaults open; collapses on demand. */
+.cases-browser-toggle {
+    align-self: flex-start;
+    min-height: 36px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, #ffd166, transparent 55%);
+    background: color-mix(in srgb, #ffd166, transparent 88%);
+    color: #ffe6a8;
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+}
+.cases-browser-toggle:hover {
+    background: color-mix(in srgb, #ffd166, transparent 80%);
+}
 
 /* Wave 18: view tabs */
 
@@ -3329,6 +3351,123 @@
         grid-column: 1 / -1;
     }
 }
+
+/* === Sticky mobile open dock ===
+   A fixed bottom action bar (Quick · case summary · Open xN) so the primary
+   action is always thumb-reachable on mobile, mirroring the slot dock. Hidden
+   on desktop where the right-panel CTA is used. */
+.cases-mobile-dock {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .cases-mobile-dock {
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        bottom: calc(var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)));
+        z-index: var(--z-mobile-action, 1400);
+        min-height: var(--mobile-action-height, 74px);
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) minmax(128px, 1.1fr);
+        gap: 8px;
+        align-items: center;
+        padding: 9px;
+        border: 1px solid color-mix(in srgb, #ffd166, transparent 52%);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(20, 39, 51, 0.98));
+        box-shadow: 0 -14px 42px rgba(0, 0, 0, 0.62);
+        backdrop-filter: blur(12px);
+        pointer-events: auto;
+    }
+
+    .cases-mobile-quick,
+    .cases-mobile-open {
+        appearance: none;
+        min-height: 52px;
+        border-radius: 12px;
+        cursor: pointer;
+        touch-action: manipulation;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        font-weight: 950;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .cases-mobile-quick {
+        min-width: 60px;
+        padding: 0 10px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(0, 0, 0, 0.3);
+        color: var(--text-secondary);
+        font-size: 10px;
+    }
+
+    .cases-mobile-quick strong {
+        font-size: 12px;
+        color: var(--text-primary);
+    }
+
+    .cases-mobile-quick.active {
+        border-color: color-mix(in srgb, #ffd166, transparent 35%);
+        background: color-mix(in srgb, #ffd166, transparent 84%);
+        color: #ffe6a8;
+    }
+
+    .cases-mobile-summary {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        line-height: 1.15;
+    }
+
+    .cases-mobile-summary span {
+        overflow: hidden;
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .cases-mobile-summary strong {
+        color: var(--text-primary);
+        font-size: 13px;
+        font-weight: 950;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .cases-mobile-open {
+        border: 0;
+        background: linear-gradient(135deg, #ffd166, #ffb347);
+        color: #1a1205;
+        font-size: 14px;
+    }
+
+    .cases-mobile-open:disabled {
+        opacity: 0.56;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    /* The fixed dock replaces the in-aside sticky CTA on mobile so we don't show
+       two Open buttons. Keep the aside CTA for desktop. */
+    .game-shell:has(.cases-stage-frame) .cases-right-cta {
+        position: static;
+        display: none;
+    }
+
+    /* Reserve space so the stage / browser can scroll clear of the fixed dock. */
+    .game-shell:has(.cases-stage-frame) .gs-playfield {
+        padding-bottom: calc(var(--mobile-action-height, 74px) + 14px);
+    }
+}
+
 
 @media (max-width: 480px) {
     .cases-bet-rail {

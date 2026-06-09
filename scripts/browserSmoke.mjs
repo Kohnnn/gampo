@@ -487,11 +487,40 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
   if (route === '/poker') {
     const click = clickTarget('[data-poker-action="sit-down"]');
     if (!click.clicked) return fail('poker sit-down target was not clickable', click);
-    await sleep(900);
+    // After sit-down, bots left of the blinds act first (BOT_THINK_MS each), so
+    // the human's action bar appears after a variable delay. Poll for the seated
+    // table + GTO panel immediately, then wait up to ~8s for the human turn
+    // (enabled action button) rather than a fixed sleep that races the bots.
+    await sleep(500);
     const table = Boolean(document.querySelector('.poker-layout'));
     const gto = Boolean(document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel="gto"]'));
-    const action = Boolean(document.querySelector('[data-poker-action="fold"], [data-poker-action="call"], [data-poker-action="check"], [data-poker-action="raise"]'));
-    return table && gto && action ? ok('poker seated with mobile GTO/actions') : fail('poker did not enter mobile table state', { table, gto, action });
+    let action = false;
+    for (let i = 0; i < 40; i += 1) {
+      action = Boolean(document.querySelector(
+        '[data-poker-action="fold"]:not(:disabled), [data-poker-action="call"]:not(:disabled), [data-poker-action="check"]:not(:disabled), [data-poker-action="raise"]:not(:disabled)',
+      ));
+      if (action) break;
+      await sleep(200);
+    }
+    return table && gto && action
+      ? ok('poker seated; human action reachable')
+      : fail('poker did not reach human action state', { table, gto, action });
+  }
+
+  if (route === '/cases') {
+    const click = clickTarget('[data-cases-mobile-open]');
+    if (!click.clicked) return fail('cases mobile open target was not clickable', click);
+    let reel = false;
+    let inView = false;
+    for (let i = 0; i < 30; i += 1) {
+      await sleep(160);
+      const area = document.querySelector('.cases-reel-area');
+      reel = Boolean(document.querySelector('.cases-carousel-frame, .cases-multi-open-grid'));
+      const r = area ? area.getBoundingClientRect() : null;
+      inView = Boolean(r && r.top < innerHeight && r.bottom > 0 && r.height > 0);
+      if (reel && inView) break;
+    }
+    return reel && inView ? ok('cases open spun reel in view') : fail('cases open did not surface reel in view', { reel, inView });
   }
 
   if (route === '/baccarat') {
