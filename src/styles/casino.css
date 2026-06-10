@@ -780,6 +780,42 @@
     overflow: hidden;
 }
 
+/* "Live"/feature ribbon on a game cover (e.g. Texas Hold'em). Works on both
+   .casino-game-art and .category-art (both position:relative). */
+.casino-game-tag {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ff4d4d, #c81e1e);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: 0 4px 12px rgba(200, 30, 30, 0.45);
+}
+.casino-game-tag::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+    animation: casinoLivePulse 1.6s ease-in-out infinite;
+}
+@keyframes casinoLivePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6); }
+    50% { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0); }
+}
+:root.gampo-reduce-motion .casino-game-tag::before,
+.gampo-reduce-motion .casino-game-tag::before { animation: none; }
+
 .casino-game-art img {
     width: 100%;
     height: 100%;
