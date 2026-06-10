@@ -116,6 +116,18 @@ export default function SettingsPage() {
                             <small>Disables non-essential animations, particles, and screen shake.</small>
                         </span>
                     </label>
+                    <label className="settings-switch">
+                        <input
+                            type="checkbox"
+                            checked={settings.haptics}
+                            onChange={e => settings.setHaptics(e.target.checked)}
+                        />
+                        <span className="settings-switch-track" aria-hidden="true"><span className="settings-switch-thumb" /></span>
+                        <span className="settings-switch-label">
+                            <strong>Haptics</strong>
+                            <small>Vibration feedback on supported mobile devices. Off when reduce motion is on.</small>
+                        </span>
+                    </label>
                     <p className="settings-help">
                         <Volume2 size={13} style={{ verticalAlign: '-2px' }} /> Audio volume &amp; mute controls are below and in the in-game audio menu.
                     </p>
