@@ -10,6 +10,7 @@ beforeEach(() => {
         clear: () => store.clear(),
     }
     vi.restoreAllMocks()
+    vi.stubEnv('VITE_ODDS_API_KEYS', 'test-key-1,test-key-2,test-key-3')
 })
 
 async function importFresh() {

@@ -3,12 +3,6 @@
 //
 // Env (Vite): VITE_ODDS_API_KEYS = "key1,key2,key3"
 
-const FALLBACK_KEYS = [
-    'f2f8ac446c4bacf51e6a4c5685051756',
-    '5597e41646e48def1c02115f0680f558',
-    'cbd5ce5686b9b0217d5e74167dddc283',
-]
-
 const STORAGE_PREFIX = 'gampo_odds_'
 const COOLDOWN_KEY = `${STORAGE_PREFIX}cooldown`
 const KEY_INDEX_KEY = `${STORAGE_PREFIX}key_index`
@@ -29,7 +23,7 @@ function readEnvKeys() {
 }
 
 function getKeys() {
-    return readEnvKeys() || FALLBACK_KEYS
+    return readEnvKeys() || []
 }
 
 function readStorage(key) {
