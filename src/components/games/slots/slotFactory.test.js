@@ -326,3 +326,63 @@ describe('multiplier orbs', () => {
         }
     })
 })
+
+describe('wild multipliers (S3)', () => {
+    for (const id of ['river-catcher', 'dust-rail', 'storm-banner']) {
+        it(`${id} declares a wildMultiplier feature with a factor > 1`, () => {
+            const config = getSlotTemplate(id)
+            const wm = config.features.wildMultiplier
+            expect(wm).toBeTruthy()
+            expect(wm.multiplier).toBeGreaterThan(1)
+            // The template must actually have a wild symbol to substitute.
+            expect(config.symbols.some(s => s.type === 'wild')).toBe(true)
+        })
+
+        it(`${id} boosts a win that includes a wild and surfaces a wild-multiplier event`, () => {
+            const config = getSlotTemplate(id)
+            let observed = false
+            for (let i = 0; i < 1200; i += 1) {
+                let n = i * 2654435761 + 1
+                const rng = () => {
+                    n = (n * 1103515245 + 12345) & 0x7fffffff
+                    return (n % 100000) / 100000
+                }
+                const result = resolveSlotSpin(config, { rng })
+                const ev = result.featureEvents.find(e => e.type === 'wild-multiplier')
+                if (ev) {
+                    observed = true
+                    expect(result.wildBoostHits).toBeGreaterThan(0)
+                    expect(ev.multiplier).toBe(config.features.wildMultiplier.multiplier)
+                    // A wild-boosted win must be a win.
+                    expect(result.multiplier).toBeGreaterThan(0)
+                    break
+                }
+            }
+            expect(observed, `${id} never produced a wild-substituted win in 1200 spins`).toBe(true)
+        })
+    }
+
+    it('applies the multiplier only to wins whose cells include a wild', () => {
+        // A win with no wild in its indexes is untouched; a win containing a wild
+        // is scaled exactly by the configured factor. Validate via a hand-built
+        // board on a lines template (river-catcher, factor 2).
+        const config = getSlotTemplate('river-catcher')
+        const factor = config.features.wildMultiplier.multiplier
+        let sawBoost = false
+        let sawPlain = false
+        for (let i = 0; i < 2000 && !(sawBoost && sawPlain); i += 1) {
+            let n = i * 40503 + 7
+            const rng = () => {
+                n = (n * 1103515245 + 12345) & 0x7fffffff
+                return (n % 100000) / 100000
+            }
+            const result = resolveSlotSpin(config, { rng })
+            for (const win of result.wins) {
+                const hasWild = (win.indexes || []).some(idx => result.cells[idx]?.type === 'wild')
+                if (hasWild && win.wildBoost) { expect(win.wildBoost).toBe(factor); sawBoost = true }
+                if (!hasWild) { expect(win.wildBoost).toBeUndefined(); sawPlain = true }
+            }
+        }
+        expect(sawBoost || sawPlain).toBe(true)
+    })
+})

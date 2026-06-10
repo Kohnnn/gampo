@@ -4,9 +4,9 @@
 
 export const SLOT_RTP_SCALARS = {
     "vault-rush": 0.15816,
-    "river-catcher": 0.95832,
-    "dust-rail": 0.245384,
-    "storm-banner": 0.0347307,
+    "river-catcher": 0.776839,
+    "dust-rail": 0.133199,
+    "storm-banner": 0.0119814,
     "bassline-bonus": 0.00032779,
     "scarab-spin": 0.296737,
     "bars": 51.9457,
