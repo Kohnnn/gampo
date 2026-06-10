@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Flame, Gauge, Info, Play, RotateCcw, Sparkles, Square, Ticket, TrendingUp, X, Zap } from 'lucide-react'
+import { ChevronDown, Flame, Gauge, Info, Play, RotateCcw, Sparkles, Square, Ticket, TrendingUp, X } from 'lucide-react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useBgm } from '../../../audio/useBgm'
@@ -74,6 +74,134 @@ const SPIN_MODE_LABELS = { normal: 'Normal', turbo: 'Turbo', instant: 'Instant' 
 // Cubic-out easing for per-column stop delays.
 function cubicOut(t) {
     return 1 - Math.pow(1 - t, 3)
+}
+
+// Segmented spin-speed control: Normal / Turbo / Instant shown as three labeled
+// options with an active state, so the current mode AND the alternatives are
+// visible at a glance (replaces the old single cycling button). Renders on both
+// desktop (panel + in-stage quick controls) and the mobile options sheet. Keeps
+// `data-slot-spin-mode` on the wrapper for any external probes.
+function SpinModeControl({ value, onChange, disabled = false, className = '' }) {
+    return (
+        <div
+            className={`slot-spin-mode-seg ${className}`.trim()}
+            role="group"
+            aria-label="Spin speed"
+            data-slot-spin-mode={value}
+        >
+            {SPIN_MODE_ORDER.map(mode => (
+                <button
+                    key={mode}
+                    type="button"
+                    className={value === mode ? 'active' : ''}
+                    onClick={() => onChange(mode)}
+                    disabled={disabled}
+                    aria-pressed={value === mode}
+                    data-slot-spin-mode-option={mode}
+                >
+                    {SPIN_MODE_LABELS[mode]}
+                </button>
+            ))}
+        </div>
+    )
+}
+
+// Shared feature-contract body: full paytable ladder + mechanics + bonus flow.
+// Rendered both inside the desktop panel (gated behind the showInfo toggle) and
+// inside the mobile paytable modal, so both surfaces derive identical data from
+// the same buildPaytable / getFeatureContract calls — no drift between views.
+function FeatureContractBody({ config, paylineMode }) {
+    const contract = getFeatureContract(config.id)
+    const fullPaytable = buildPaytable(config)
+    // Prefer the engine's real max-win cap; fall back to an indicative estimate
+    // only when the template has no cap.
+    const topPay = fullPaytable.rows[0]?.pays?.slice(-1)[0]?.multiplier || 0
+    const featureFactor = config.features?.multiplierWheel ? 60
+        : config.features?.persistentMultiplier ? 50
+        : config.features?.cascade ? 40
+        : config.features?.holdAndRespin ? 30
+        : 20
+    const estMaxWin = topPay > 0 ? Math.round(topPay * featureFactor) : 0
+    const maxWin = fullPaytable.maxWin || estMaxWin
+    const maxWinExact = Boolean(fullPaytable.maxWin)
+    return (
+        <div className="slot-feature-contract">
+            <p className="slot-panel-note">{contract?.summary || config.featureText}</p>
+            <div className="slot-contract-stats">
+                <span><small>RTP</small><strong>{Math.round(config.rtpTarget * 100)}%</strong></span>
+                <span><small>Volatility</small><strong>{config.volatility}</strong></span>
+                <span><small>Grid</small><strong>{config.layout.cols}×{config.layout.rows}</strong></span>
+                <span><small>Max win</small><strong>{maxWin ? `${maxWinExact ? '' : '~'}${maxWin.toLocaleString()}×` : '—'}</strong></span>
+            </div>
+            <div className="slot-tag-row">
+                <span>{paylineMode}</span>
+                <span>{config.volatility}</span>
+                {config.features?.scatter && <span>Scatter</span>}
+                {config.features?.coinMeter && <span>Coin collect</span>}
+                {config.features?.cascade && <span>Cascade</span>}
+                {config.features?.mysterySymbol && <span>Mystery</span>}
+                {config.features?.persistentMultiplier && <span>Persistent ×</span>}
+                {config.features?.holdAndRespin && <span>Hold &amp; respin</span>}
+                {config.features?.multiplierWheel && <span>Wheel</span>}
+                {config.features?.stackedWildReel && <span>Stacked wilds</span>}
+            </div>
+            {fullPaytable.rows.length > 0 && (
+                <div className="slot-contract-block">
+                    <h4>Paytable</h4>
+                    <div className="slot-paytable-ladder">
+                        <div className="slot-paytable-head">
+                            <span>Symbol</span>
+                            {fullPaytable.rungs.map(c => <em key={c}>{c}{fullPaytable.mode === 'cluster' || fullPaytable.mode === 'pay-anywhere' ? '+' : '×'}</em>)}
+                        </div>
+                        {fullPaytable.rows.map(row => (
+                            <div className="slot-paytable-row" key={row.id}>
+                                <span className="slot-paytable-sym">
+                                    <Asset src={row.asset} alt={row.label} fallback={<strong>{row.label}</strong>} />
+                                    <small>{row.label}</small>
+                                </span>
+                                {row.pays.map(p => <em key={p.count}>{p.multiplier}×</em>)}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="slot-paytable-special">
+                        {fullPaytable.wild && <span><strong>Wild</strong> substitutes for pay symbols</span>}
+                        {fullPaytable.scatter && (
+                            <span><strong>Scatter</strong> {fullPaytable.scatter.trigger}+ triggers{fullPaytable.scatter.awardFreeSpins ? ` ${fullPaytable.scatter.awardFreeSpins} free spins` : ' the feature'}</span>
+                        )}
+                    </div>
+                </div>
+            )}
+            {contract?.mechanics && (
+                <div className="slot-contract-block">
+                    <h4>Mechanics</h4>
+                    <ul>
+                        {contract.mechanics.map((m, i) => (
+                            <li key={i}>
+                                <strong>{m.name}.</strong> <span>{m.detail}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            {contract?.bonusEntry && (
+                <div className="slot-contract-block">
+                    <h4>Bonus entry</h4>
+                    <p>{contract.bonusEntry}</p>
+                    {contract.bonusFlow?.length > 0 && (
+                        <ul className="slot-contract-flow">
+                            {contract.bonusFlow.map((b, i) => <li key={i}>{b}</li>)}
+                        </ul>
+                    )}
+                </div>
+            )}
+            {contract?.volatility && (
+                <p className="slot-contract-note"><strong>Math:</strong> {contract.volatility}</p>
+            )}
+            {contract?.buyBonus && (
+                <p className="slot-contract-note"><strong>Bonus buy:</strong> {contract.buyBonus}</p>
+            )}
+        </div>
+    )
 }
 
 function evaluationLabel(evaluation) {
@@ -170,9 +298,19 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     // (win tier + multiplier, or "No win").
     const [liveAnnounce, setLiveAnnounce] = useState('')
     const [showMobileBet, setShowMobileBet] = useState(false)
+    // Mobile-only: full paytable / feature-contract bottom-sheet modal. On
+    // desktop the same content lives inline in the panel (showInfo); on phones
+    // that panel reflows off-screen behind the dock, so we surface it as a
+    // proper dismissible overlay instead.
+    const [showMobileInfo, setShowMobileInfo] = useState(false)
     const [showPaylines, setShowPaylines] = useState(false)
     const [dockPortal, setDockPortal] = useState(null)
     useEffect(() => { setDockPortal(document.body) }, [])
+    // Focus management for the mobile paytable modal: remember the element that
+    // opened it, move focus into the sheet on open, restore it on close, and
+    // trap Tab within the sheet while it is open.
+    const mobileInfoSheetRef = useRef(null)
+    const mobileInfoReturnRef = useRef(null)
     // Wave 9: sticky wild lock during free-spin sessions and feature cinematics
     const [stickyWilds, setStickyWilds] = useState([])
     const [wheelReveal, setWheelReveal] = useState(null)
@@ -291,6 +429,52 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         }
     }, [])
 
+    // Mobile paytable modal a11y: focus-trap + Escape-to-close + focus restore.
+    useEffect(() => {
+        if (!showMobileInfo) return undefined
+        if (typeof document !== 'undefined') {
+            mobileInfoReturnRef.current = document.activeElement
+        }
+        // Move focus into the sheet once it mounts.
+        const focusTimer = window.setTimeout(() => {
+            const sheet = mobileInfoSheetRef.current
+            if (!sheet) return
+            const first = sheet.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+            ;(first || sheet).focus()
+        }, 0)
+        const onKey = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                setShowMobileInfo(false)
+                return
+            }
+            if (e.key !== 'Tab') return
+            const sheet = mobileInfoSheetRef.current
+            if (!sheet) return
+            const focusables = Array.from(
+                sheet.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+            ).filter(el => !el.disabled && el.offsetParent !== null)
+            if (focusables.length === 0) return
+            const first = focusables[0]
+            const last = focusables[focusables.length - 1]
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault()
+                last.focus()
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault()
+                first.focus()
+            }
+        }
+        document.addEventListener('keydown', onKey)
+        return () => {
+            window.clearTimeout(focusTimer)
+            document.removeEventListener('keydown', onKey)
+            // Restore focus to the trigger when the sheet closes.
+            const ret = mobileInfoReturnRef.current
+            if (ret && typeof ret.focus === 'function') ret.focus()
+        }
+    }, [showMobileInfo])
+
     useEffect(() => {
         if (typeof window === 'undefined') return undefined
         const forceBonusState = () => {
@@ -381,15 +565,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const next = Math.max(0.1, Math.min(10000, Number(value) || 0.1))
         setBetAmount(round2(next))
     }, [])
-
-    // Cycle the spin resolve speed: Normal → Turbo → Instant → Normal.
-    const cycleSpinMode = useCallback(() => {
-        setSpinMode(prev => {
-            const i = SPIN_MODE_ORDER.indexOf(prev)
-            return SPIN_MODE_ORDER[(i + 1) % SPIN_MODE_ORDER.length]
-        })
-    }, [])
-    const spinModeLabel = SPIN_MODE_LABELS[spinMode] || 'Normal'
 
     const finishRound = useCallback(({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve }) => {
         clearTimers()
@@ -1050,16 +1225,17 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         </div>
                     </div>
 
-                    <div className="slot-panel-card slot-feature-switches">
-                        <button
-                            type="button"
-                            className={spinMode !== 'normal' ? 'active' : ''}
-                            onClick={cycleSpinMode}
+                    <div className="slot-panel-card slot-panel-speed">
+                        <label className="slot-panel-label">Spin speed</label>
+                        <SpinModeControl
+                            value={spinMode}
+                            onChange={setSpinMode}
                             disabled={running}
-                            aria-label={`Spin speed: ${spinModeLabel}. Tap to cycle Normal, Turbo, Instant.`}
-                        >
-                            <Zap size={14} /> {spinModeLabel}
-                        </button>
+                            className="in-panel"
+                        />
+                    </div>
+
+                    <div className="slot-panel-card slot-feature-switches">
                         <button
                             type="button"
                             className={showAutoplayDrawer ? 'active' : ''}
@@ -1096,99 +1272,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <button type="button" className="slot-panel-info-toggle" onClick={() => setShowInfo(v => !v)}>
                             <Info size={14} /> Feature contract <ChevronDown size={14} className={showInfo ? 'rot' : ''} />
                         </button>
-                        {showInfo && (() => {
-                            const contract = getFeatureContract(config.id)
-                            const fullPaytable = buildPaytable(config)
-                            // Prefer the engine's real max-win cap; fall back to an
-                            // indicative estimate only when the template has no cap.
-                            const topPay = fullPaytable.rows[0]?.pays?.slice(-1)[0]?.multiplier || 0
-                            const featureFactor = config.features?.multiplierWheel ? 60
-                                : config.features?.persistentMultiplier ? 50
-                                : config.features?.cascade ? 40
-                                : config.features?.holdAndRespin ? 30
-                                : 20
-                            const estMaxWin = topPay > 0 ? Math.round(topPay * featureFactor) : 0
-                            const maxWin = fullPaytable.maxWin || estMaxWin
-                            const maxWinExact = Boolean(fullPaytable.maxWin)
-                            return (
-                                <div className="slot-feature-contract">
-                                    <p className="slot-panel-note">{contract?.summary || config.featureText}</p>
-                                    <div className="slot-contract-stats">
-                                        <span><small>RTP</small><strong>{Math.round(config.rtpTarget * 100)}%</strong></span>
-                                        <span><small>Volatility</small><strong>{config.volatility}</strong></span>
-                                        <span><small>Grid</small><strong>{config.layout.cols}×{config.layout.rows}</strong></span>
-                                        <span><small>Max win</small><strong>{maxWin ? `${maxWinExact ? '' : '~'}${maxWin.toLocaleString()}×` : '—'}</strong></span>
-                                    </div>
-                                    <div className="slot-tag-row">
-                                        <span>{paylineMode}</span>
-                                        <span>{config.volatility}</span>
-                                        {config.features?.scatter && <span>Scatter</span>}
-                                        {config.features?.coinMeter && <span>Coin collect</span>}
-                                        {config.features?.cascade && <span>Cascade</span>}
-                                        {config.features?.mysterySymbol && <span>Mystery</span>}
-                                        {config.features?.persistentMultiplier && <span>Persistent ×</span>}
-                                        {config.features?.holdAndRespin && <span>Hold &amp; respin</span>}
-                                        {config.features?.multiplierWheel && <span>Wheel</span>}
-                                        {config.features?.stackedWildReel && <span>Stacked wilds</span>}
-                                    </div>
-                                    {fullPaytable.rows.length > 0 && (
-                                        <div className="slot-contract-block">
-                                            <h4>Paytable</h4>
-                                            <div className="slot-paytable-ladder">
-                                                <div className="slot-paytable-head">
-                                                    <span>Symbol</span>
-                                                    {fullPaytable.rungs.map(c => <em key={c}>{c}{fullPaytable.mode === 'cluster' || fullPaytable.mode === 'pay-anywhere' ? '+' : '×'}</em>)}
-                                                </div>
-                                                {fullPaytable.rows.map(row => (
-                                                    <div className="slot-paytable-row" key={row.id}>
-                                                        <span className="slot-paytable-sym">
-                                                            <Asset src={row.asset} alt={row.label} fallback={<strong>{row.label}</strong>} />
-                                                            <small>{row.label}</small>
-                                                        </span>
-                                                        {row.pays.map(p => <em key={p.count}>{p.multiplier}×</em>)}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="slot-paytable-special">
-                                                {fullPaytable.wild && <span><strong>Wild</strong> substitutes for pay symbols</span>}
-                                                {fullPaytable.scatter && (
-                                                    <span><strong>Scatter</strong> {fullPaytable.scatter.trigger}+ triggers{fullPaytable.scatter.awardFreeSpins ? ` ${fullPaytable.scatter.awardFreeSpins} free spins` : ' the feature'}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {contract?.mechanics && (
-                                        <div className="slot-contract-block">
-                                            <h4>Mechanics</h4>
-                                            <ul>
-                                                {contract.mechanics.map((m, i) => (
-                                                    <li key={i}>
-                                                        <strong>{m.name}.</strong> <span>{m.detail}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    {contract?.bonusEntry && (
-                                        <div className="slot-contract-block">
-                                            <h4>Bonus entry</h4>
-                                            <p>{contract.bonusEntry}</p>
-                                            {contract.bonusFlow?.length > 0 && (
-                                                <ul className="slot-contract-flow">
-                                                    {contract.bonusFlow.map((b, i) => <li key={i}>{b}</li>)}
-                                                </ul>
-                                            )}
-                                        </div>
-                                    )}
-                                    {contract?.volatility && (
-                                        <p className="slot-contract-note"><strong>Math:</strong> {contract.volatility}</p>
-                                    )}
-                                    {contract?.buyBonus && (
-                                        <p className="slot-contract-note"><strong>Bonus buy:</strong> {contract.buyBonus}</p>
-                                    )}
-                                </div>
-                            )
-                        })()}
+                        {showInfo && <FeatureContractBody config={config} paylineMode={paylineMode} />}
                     </div>
                 </div>
             }
@@ -1450,14 +1534,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         </span>
                     </button>
                     <div className="slot-control-quick">
-                        <button
-                            type="button"
-                            onClick={cycleSpinMode}
-                            className={spinMode !== 'normal' ? 'active' : ''}
+                        <SpinModeControl
+                            value={spinMode}
+                            onChange={setSpinMode}
                             disabled={running}
-                            aria-label={`Spin speed: ${spinModeLabel}. Tap to cycle Normal, Turbo, Instant.`}
-                            data-slot-spin-mode={spinMode}
-                        ><Zap size={16} /></button>
+                            className="in-stage"
+                        />
                         <button
                             type="button"
                             onClick={() => setShowAutoplayDrawer(v => !v)}
@@ -1893,14 +1975,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 </div>
                 <button
                     type="button"
-                    className={spinMode !== 'normal' ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
-                    onClick={cycleSpinMode}
-                    disabled={running}
-                    aria-label={`Spin speed: ${spinModeLabel}. Tap to cycle Normal, Turbo, Instant.`}
-                    data-slot-spin-mode={spinMode}
+                    className="slot-mobile-icon"
+                    onClick={() => setShowMobileInfo(true)}
+                    aria-label="View paytable and rules"
+                    aria-haspopup="dialog"
                 >
-                    <Zap size={16} />
-                    <span>{spinModeLabel}</span>
+                    <Info size={16} />
+                    <span>Info</span>
                 </button>
                 <button
                     type="button"
@@ -1959,13 +2040,47 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             disabled={running || autoplayActive}
                             aria-label="Bet amount"
                         />
+                        <div className="slot-mobile-bet-speed">
+                            <span className="slot-mobile-bet-speed-label">Spin speed</span>
+                            <SpinModeControl
+                                value={spinMode}
+                                onChange={setSpinMode}
+                                disabled={running}
+                            />
+                        </div>
                         <button
                             type="button"
                             className="slot-mobile-bet-info"
-                            onClick={() => { setShowMobileBet(false); setShowInfo(true) }}
+                            onClick={() => { setShowMobileBet(false); setShowMobileInfo(true) }}
                         >
                             <Info size={14} /> View paytable &amp; rules
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {showMobileInfo && (
+                <div
+                    className="slot-mobile-info-backdrop"
+                    onClick={() => setShowMobileInfo(false)}
+                >
+                    <div
+                        className="slot-mobile-info-sheet"
+                        ref={mobileInfoSheetRef}
+                        onClick={e => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`${config.title} paytable and rules`}
+                        tabIndex={-1}
+                        style={{ '--slot-accent': config.accent }}
+                    >
+                        <header className="slot-mobile-info-head">
+                            <strong>Paytable &amp; rules</strong>
+                            <button type="button" onClick={() => setShowMobileInfo(false)} aria-label="Close"><X size={16} /></button>
+                        </header>
+                        <div className="slot-mobile-info-body">
+                            <FeatureContractBody config={config} paylineMode={paylineMode} />
+                        </div>
                     </div>
                 </div>
             )}

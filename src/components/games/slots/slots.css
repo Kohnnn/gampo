@@ -195,6 +195,59 @@
     color: #ffe6a8;
 }
 
+/* Segmented spin-speed control (Normal / Turbo / Instant). Replaces the old
+   single cycling button so all three modes + the active one are visible at a
+   glance. Used on desktop (panel) and inside the mobile bet sheet. */
+.slot-spin-mode-seg {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 3px;
+    border-radius: 11px;
+    border: 1px solid var(--slot-rail);
+    background: rgba(15, 28, 44, 0.78);
+}
+
+.slot-spin-mode-seg button {
+    appearance: none;
+    min-height: 36px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--slot-text-dim);
+    font: inherit;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.slot-spin-mode-seg button:hover:not(:disabled) {
+    color: var(--slot-text);
+}
+
+.slot-spin-mode-seg button.active {
+    color: #06120b;
+    border-color: color-mix(in srgb, var(--slot-accent), white 24%);
+    background: color-mix(in srgb, var(--slot-accent), white 6%);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--slot-accent), transparent 70%);
+}
+
+.slot-spin-mode-seg button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.slot-spin-mode-seg button:focus-visible {
+    outline: 2px solid var(--slot-accent, #00e701);
+    outline-offset: 2px;
+}
+
+.slot-panel-speed .slot-panel-label {
+    margin-bottom: 8px;
+}
+
 .slot-panel-spin {
     min-height: 50px;
     display: inline-flex;
@@ -998,6 +1051,30 @@
     color: #fff;
 }
 .slot-control-quick button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Compact segmented spin-speed inside the in-stage quick controls; resets the
+   44×24 icon-button sizing that .slot-control-quick imposes on its buttons. */
+.slot-control-quick .slot-spin-mode-seg.in-stage {
+    grid-row: 1;
+    padding: 2px;
+    gap: 2px;
+    border-radius: 8px;
+}
+.slot-control-quick .slot-spin-mode-seg.in-stage button {
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 22px;
+    padding: 0 6px;
+    font-size: 10px;
+    border-radius: 6px;
+    background: transparent;
+}
+.slot-control-quick .slot-spin-mode-seg.in-stage button.active {
+    color: #06120b;
+    background: color-mix(in srgb, var(--slot-accent), white 6%);
+}
+
 
 /* ---------- Result + feature events ---------- */
 
@@ -3229,9 +3306,24 @@
         display: none;
     }
 
+    /* T3: keep a slimmed recent-results strip on mobile so the last spins stay
+       visible. The bankroll sparkline is dropped to save vertical space; the
+       strip itself is compact and clears the fixed dock + mobile nav. */
     .slot-stage-foot {
+        display: block;
+        margin: 4px 0 calc(var(--mobile-action-height, 74px) + var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)) + 16px);
+    }
+
+    .slot-stage-foot .slot-bankroll-spark {
         display: none;
     }
+
+    .slot-stage-foot .rrs-strip {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .slot-stage-foot .rrs-strip::-webkit-scrollbar { display: none; }
 
     .slot-mobile-dock {
         position: fixed;
@@ -3822,9 +3914,106 @@
 .slot-mobile-bet-steppers button:focus-visible,
 .slot-mobile-bet-input:focus-visible { outline: 2px solid var(--slot-accent, #00e701); outline-offset: 2px; }
 
+/* Spin-speed segmented control inside the mobile bet sheet. */
+.slot-mobile-bet-speed {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.slot-mobile-bet-speed-label {
+    color: var(--text-muted, #8b97a8);
+    font-size: 10px;
+    font-weight: 950;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* ---- Mobile paytable / feature-contract modal (T1) ----
+   A dismissible bottom-sheet that surfaces the SAME feature-contract content
+   the desktop panel shows inline, so the paytable is reachable on phones
+   instead of reflowing off-screen behind the fixed dock. */
+.slot-mobile-info-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal, 1500);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: max(32px, env(safe-area-inset-top)) 8px calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)) + 8px);
+    background: rgba(4, 12, 18, 0.66);
+    animation: slotBetSheetFade 180ms ease;
+}
+
+.slot-mobile-info-sheet {
+    width: min(460px, 100%);
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--slot-accent, #ffd166), transparent 56%);
+    background: linear-gradient(180deg, rgba(20, 39, 51, 0.99), rgba(11, 24, 34, 0.99));
+    box-shadow: 0 -18px 54px rgba(0, 0, 0, 0.62);
+    animation: slotBetSheetRise 200ms ease;
+    overflow: hidden;
+}
+:root.gampo-reduce-motion .slot-mobile-info-backdrop,
+:root.gampo-reduce-motion .slot-mobile-info-sheet { animation: none; }
+
+.slot-mobile-info-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.slot-mobile-info-head strong {
+    color: var(--text-primary, #fff);
+    font-size: 14px;
+    font-weight: 950;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.slot-mobile-info-head button {
+    appearance: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-secondary, #b1bad3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.slot-mobile-info-head button:focus-visible {
+    outline: 2px solid var(--slot-accent, #00e701);
+    outline-offset: 2px;
+}
+
+/* Scrollable body — capped by the sheet's max-height; never overflows
+   horizontally. */
+.slot-mobile-info-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 12px 14px 18px;
+}
+.slot-mobile-info-body .slot-feature-contract {
+    max-width: 100%;
+}
+.slot-mobile-info-body .slot-paytable-ladder {
+    overflow-x: auto;
+}
+
 /* Bet sheet is a mobile affordance only. */
 @media (min-width: 769px) {
     .slot-mobile-bet-sheet-backdrop { display: none; }
+    .slot-mobile-info-backdrop { display: none; }
 }
 
 /* ---- How-it-pays visualizer (S4) ---- */
