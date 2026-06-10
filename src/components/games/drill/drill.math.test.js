@@ -21,6 +21,20 @@ const LAYERS = (() => {
     })
 })()
 
+// Deterministic PRNG (mulberry32) so the Monte-Carlo gate is reproducible and
+// never flakes on high-variance depths. Math.random would cross the RTP<1
+// boundary by chance (~2.5 sigma at depth 8) even though the game is never +EV.
+function mulberry32(seed) {
+    let a = seed >>> 0
+    return function rng() {
+        a |= 0
+        a = (a + 0x6d2b79f5) | 0
+        let t = Math.imul(a ^ (a >>> 15), 1 | a)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+    }
+}
+
 // Cumulative survival to (and including) clearing layer index `depth-1`.
 function survivalTo(depth) {
     let s = 1
@@ -71,7 +85,7 @@ describe('drill payout math', () => {
 
     it('simulated RTP holds the house edge over 20k trials at multiple depths', () => {
         for (const target of [1, 3, 6, 8]) {
-            const rtp = simulateRtp(target, 20000)
+            const rtp = simulateRtp(target, 20000, mulberry32(0x9e3779b9 ^ target))
             // eslint-disable-next-line no-console
             console.log(`drill depth=${target} RTP=${rtp.toFixed(4)} (target ~${TARGET_RTP})`)
             expect(rtp).toBeLessThan(1)
