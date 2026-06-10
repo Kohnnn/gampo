@@ -1331,11 +1331,21 @@ function resolveMoneyValues(cells, config) {
 
 function cascadeTumble(cells, config, baseWins, baseIndexes, rng) {
     const ladder = config.features?.cascade?.tumbleMultiplierLadder
-    if (!ladder || !baseWins.length) return { cells, cascadedWins: baseWins, cascadeSteps: 0 }
+    if (!ladder || !baseWins.length) return { cells, cascadedWins: baseWins, cascadeSteps: 0, cascadeFrames: [] }
     let working = [...cells]
     let cascadedWins = [...baseWins]
     let step = 0
     let lastIndexes = baseIndexes
+    // Per-step frames so the UI can animate real tumbles (pop -> collapse ->
+    // refill) instead of only showing the final grid. Frame 0 captures the
+    // pre-tumble board with its winning cells; each later frame captures the
+    // board AFTER a refill plus the new winning cells found on it.
+    const cascadeFrames = [{
+        cells: [...cells],
+        winCells: [...baseIndexes],
+        stepPayout: round2(baseWins.reduce((sum, w) => sum + w.multiplier, 0)),
+        stepMultiplier: ladder[0] ?? 1,
+    }]
     while (lastIndexes && lastIndexes.size && step < ladder.length - 1) {
         // Replace winning cells with new picks; for cluster/pay-anywhere we rebuild positions.
         working = working.map((item, index) => {
@@ -1344,7 +1354,11 @@ function cascadeTumble(cells, config, baseWins, baseIndexes, rng) {
             return replaced
         })
         const next = evaluateBaseWins(working, config)
-        if (!next.wins.length) break
+        if (!next.wins.length) {
+            // Final settle frame: refilled board with no further wins.
+            cascadeFrames.push({ cells: [...working], winCells: [], stepPayout: 0, stepMultiplier: 0 })
+            break
+        }
         const stepMultiplier = ladder[Math.min(step + 1, ladder.length - 1)]
         next.wins.forEach(win => {
             cascadedWins.push({
@@ -1353,10 +1367,16 @@ function cascadeTumble(cells, config, baseWins, baseIndexes, rng) {
                 cascadeStep: step + 1,
             })
         })
+        cascadeFrames.push({
+            cells: [...working],
+            winCells: [...next.winningIndexes],
+            stepPayout: round2(next.wins.reduce((sum, w) => sum + w.multiplier * stepMultiplier, 0)),
+            stepMultiplier,
+        })
         lastIndexes = next.winningIndexes
         step += 1
     }
-    return { cells: working, cascadedWins, cascadeSteps: step }
+    return { cells: working, cascadedWins, cascadeSteps: step, cascadeFrames }
 }
 
 // ---- main resolver ----
@@ -1427,11 +1447,13 @@ export function resolveSlotSpin(config, options = {}) {
 
     // Cascade tumble (cluster / pay-anywhere / megaways).
     let cascadeSteps = 0
+    let cascadeFrames = []
     if (config.features?.cascade && (config.layout.evaluation === 'cluster' || config.layout.evaluation === 'pay-anywhere' || config.layout.evaluation === 'megaways')) {
         const cascadeResult = cascadeTumble(cells, config, wins, winningIndexes, rng)
         cells = cascadeResult.cells
         wins = cascadeResult.cascadedWins
         cascadeSteps = cascadeResult.cascadeSteps
+        cascadeFrames = cascadeResult.cascadeFrames
     }
 
     // Multiplier zones (Wave 9): scale wins crossing zone columns.
@@ -1637,6 +1659,7 @@ export function resolveSlotSpin(config, options = {}) {
         moneyTotal,
         mysteryReveal,
         cascadeSteps,
+        cascadeFrames,
         zoneHits,
         wheel,
         holdAndRespin,
