@@ -4,6 +4,11 @@ import { SLOT_TEMPLATES, resolveSlotSpin, __setSlotCalibrationRng } from '../src
 import { MAX_FREE_SPINS_PER_SESSION } from '../src/components/games/slots/slotConstants.js'
 
 const SPINS = Number(process.env.SLOT_VER_SPINS) || 200000
+// Optional allowlist (comma-separated template ids). When set, only those
+// templates are verified — useful after a scoped recalibration so the gate runs
+// in minutes instead of the full grid. Usage: SLOT_VER_ONLY=gummy-drops node ...
+const ONLY = (process.env.SLOT_VER_ONLY || '').split(',').map(s => s.trim()).filter(Boolean)
+const ONLY_SET = ONLY.length ? new Set(ONLY) : null
 // High-variance slots (wheels, big clusters, megaways, single-payline jackpots)
 // legitimately swing in finite samples even when the mean RTP is locked. The
 // verify gate now averages multiple seeds for the heaviest titles (see below),
@@ -37,6 +42,7 @@ function hashId(id) {
 let allPass = true
 console.log('id'.padEnd(20), 'target', 'realRTP', 'verdict')
 for (const config of SLOT_TEMPLATES) {
+    if (ONLY_SET && !ONLY_SET.has(config.id)) continue
     // Extreme-variance titles (huge cluster boards, persistent multipliers) have
     // a tail so heavy that a single stream is a poor RTP estimator even at large
     // N. Average several independent seeds for these — matching how calibration
