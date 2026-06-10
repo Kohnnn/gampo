@@ -47,6 +47,8 @@ import { getBigWinThreshold,
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
 import { getProvablyFair, getRecentRolls, maskSeed, setClientSeed } from '../../../utils/fairRng'
+import { haptic, cancelHaptics } from '../../../utils/haptics'
+import { useSettings } from '../../../hooks/useSettings'
 import {
     CASE_LID_LIFT_MS,
     CASE_LIGHT_SWEEP_LEAD_MS,
@@ -572,6 +574,7 @@ export default function CasesGame() {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const sfx = useSfx('cases')
+    const { haptics: hapticsEnabled } = useSettings()
     const session = useGameSession('cases')
     const preloader = useOriginalsPreloader('cases')
     const csCatalog = useCsCollection()
@@ -697,6 +700,7 @@ export default function CasesGame() {
 
     useEffect(() => () => {
         clearRevealTimers()
+        cancelHaptics()
         if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current)
         if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
     }, [clearRevealTimers])
@@ -716,6 +720,10 @@ export default function CasesGame() {
             const vol = Math.max(0.18, 0.6 * (1 - t * 0.65))
             const id = window.setTimeout(() => {
                 sfx.play('tick', { volume: vol })
+                // C7: haptic tick only on the later (decelerating) ticks so the
+                // motor isn't machine-gunned during the fast early scroll. The
+                // helper also throttles + honours reduce-motion.
+                if (t > 0.55) haptic('tick', { enabled: hapticsEnabled })
             }, at)
             ids.push(id)
         }
@@ -723,8 +731,9 @@ export default function CasesGame() {
         if (tickRef.current.landId) window.clearTimeout(tickRef.current.landId)
         tickRef.current.landId = window.setTimeout(() => {
             sfx.play('land', { volume: 0.85 })
+            haptic('land', { enabled: hapticsEnabled })
         }, Math.max(60, durationMs - 40))
-    }, [sfx])
+    }, [sfx, hapticsEnabled])
 
     const finishPendingRound = useCallback(({ skipped = false } = {}) => {
         const pending = pendingRoundRef.current
@@ -786,6 +795,11 @@ export default function CasesGame() {
         if (skipped) sfx.play('land', { volume: 0.72 })
         sfx.play('reveal', { volume: 0.9 })
         if (rare) sfx.play('rare', { volume: 1 })
+        // C7: tactile reward on the result. Rare/celebration drop gets the longer
+        // 'rare' buzz (forced past the throttle since it's a single moment); a
+        // plain win gets a short pulse. Reduce-motion / setting-off no-ops.
+        if (celebrate || rare) haptic('rare', { enabled: hapticsEnabled, force: true })
+        else if (won) haptic('win', { enabled: hapticsEnabled, force: true })
         // Wave 31: extra fanfare variants for special results.
         const knifeOrGloves = picks.some(p => /knife|gloves|bayonet|karambit|huntsman|talon/i.test(p.name || ''))
         if (knifeOrGloves) sfx.play('knife', { volume: 1 })
@@ -827,10 +841,11 @@ export default function CasesGame() {
         }, 80)
         revealTimersRef.current.push(scrollId)
         resolve({ profit })
-    }, [addWinnings, autoOpen, autoRoundsLeft, autoSessionProfit, autoStopLoss, autoStopProfit, autoStopRare, clearRevealTimers, collection, machine, playSound, session, showToast, sfx])
+    }, [addWinnings, autoOpen, autoRoundsLeft, autoSessionProfit, autoStopLoss, autoStopProfit, autoStopRare, clearRevealTimers, collection, machine, playSound, session, showToast, sfx, hapticsEnabled])
 
     const skipCaseAnimation = useCallback(() => {
         if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+        cancelHaptics()
         finishPendingRound({ skipped: true })
     }, [finishPendingRound])
 
@@ -1905,17 +1920,29 @@ export default function CasesGame() {
                         <span>{activeCase?.name || 'Loading case'}</span>
                         <strong>×{rows} · {formatCredits(totalStake)}</strong>
                     </div>
-                    <button
-                        type="button"
-                        className="cases-mobile-open"
-                        data-cases-mobile-open
-                        data-cases-mobile-action={results.length > 0 ? 'case-open-again' : 'case-open'}
-                        data-mobile-hit-target="primary"
-                        onClick={() => performPlay({ betAmount: casePrice })}
-                        disabled={running || !activeCase || balance < totalStake}
-                    >
-                        {running ? 'Opening…' : results.length > 0 ? `Open again ×${rows}` : `Open ×${rows}`}
-                    </button>
+                    {running ? (
+                        <button
+                            type="button"
+                            className="cases-mobile-open cases-mobile-skip"
+                            data-cases-mobile-action="case-skip"
+                            data-mobile-hit-target="primary"
+                            onClick={skipCaseAnimation}
+                        >
+                            Skip
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            className="cases-mobile-open"
+                            data-cases-mobile-open
+                            data-cases-mobile-action={results.length > 0 ? 'case-open-again' : 'case-open'}
+                            data-mobile-hit-target="primary"
+                            onClick={() => performPlay({ betAmount: casePrice })}
+                            disabled={!activeCase || balance < totalStake}
+                        >
+                            {results.length > 0 ? `Open again ×${rows}` : `Open ×${rows}`}
+                        </button>
+                    )}
                 </div>,
                 dockPortal,
             )}

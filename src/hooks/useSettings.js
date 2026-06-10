@@ -36,6 +36,7 @@ const DEFAULTS = {
     accent: 'emerald', // '' / 'default' means use each game's own accent
     density: 'cozy',
     reduceMotion: false,
+    haptics: true, // device vibration feedback (mobile only; also gated by reduce-motion)
 }
 
 function readSettings() {
@@ -45,6 +46,7 @@ function readSettings() {
         accent: typeof parsed.accent === 'string' ? parsed.accent : DEFAULTS.accent,
         density: parsed.density === 'compact' ? 'compact' : 'cozy',
         reduceMotion: Boolean(parsed.reduceMotion),
+        haptics: parsed.haptics === undefined ? DEFAULTS.haptics : Boolean(parsed.haptics),
     }
 }
 
@@ -89,6 +91,11 @@ export function setReduceMotion(value) {
     persist()
 }
 
+export function setHaptics(value) {
+    settings = { ...settings, haptics: !!value }
+    persist()
+}
+
 export function resetSettings() {
     settings = { ...DEFAULTS }
     removeKey(KEY)
@@ -116,6 +123,7 @@ export function useSettings() {
         setAccent,
         setDensity,
         setReduceMotion,
+        setHaptics,
         resetSettings,
     }
 }

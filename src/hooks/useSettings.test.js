@@ -5,6 +5,7 @@ import {
     setAccent,
     setDensity,
     setReduceMotion,
+    setHaptics,
     resetSettings,
     applySettingsToDom,
     useSettings,
@@ -54,6 +55,14 @@ describe('useSettings', () => {
     it('normalises invalid density to cozy', () => {
         setDensity('nonsense')
         expect(readJson('gampo_settings_v1').density).toBe('cozy')
+    })
+
+    it('persists the haptics toggle (defaults to enabled)', () => {
+        // Toggling off then on round-trips through storage.
+        setHaptics(false)
+        expect(readJson('gampo_settings_v1').haptics).toBe(false)
+        setHaptics(true)
+        expect(readJson('gampo_settings_v1').haptics).toBe(true)
     })
 
     it('reset clears persisted settings', () => {
