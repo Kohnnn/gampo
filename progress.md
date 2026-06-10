@@ -473,3 +473,16 @@ Healthy areas (verified, no findings): test suite green and meaningful (math/RTP
 - Key rotation (M1) requires provider-dashboard access — cannot be done from the repo.
 - `package.json:3` version is still `1.0.0` with no tagging/release convention; decide whether versioning matters for this project.
 - Uncommitted `SlotsGame.jsx`/`slots.css` changes predate this audit (in-progress work, left untouched).
+
+## UI/UX Wave (2026-06-10) — partial, handed off
+
+Plan + live status board: `docs/uiux-wave-2026-06-10.md`. Shipped this session:
+
+- **Phase 0** (73b5387f): landed in-flight slots UX — segmented SpinModeControl (panel/stage/mobile sheet), mobile paytable bottom-sheet with focus trap + Escape, shared FeatureContractBody. Repo-audit hardening committed separately (82a022a9).
+- **Phase 1 arcade unification complete** (b6adb227 + 84e3baa3): war mobile CSS + BetPanel `dockExtras` (Surrender reachable on the mobile dock during ties); shared dock-clearance rule on CoreStageFrame replacing 17 hand-rolled paddings; `StageActionButton` primitive adopted across blackjack/chickencross/tower/pump/tomeoflife/drill; legacy-7 (coinflip/rps/color/guess/lottery/sicbo/roulette) brought to baseline with ResultToast + ActionLockOverlay + useSfx; coinflip BigWinOverlay finally rendered; useScrollActionIntoView wired into keno/mines/plinko/tower/chickencross/baccarat; central `bigWinThresholds.js` registry replacing 8 inline magic numbers across all 33 games + cases; `data-mobile-critical-surface` now on all 33 games; one-off breakpoints normalized (466/500 → 480).
+- **Phase 2 slots, S1 engine half** (172d4fed): `cascadeTumble` now records per-step `cascadeFrames` ({cells, winCells, stepPayout, stepMultiplier}) on the spin result. UI tumble animation not yet consumed — see handoff notes in the wave doc.
+- New `audit:scroll` gate (45a98433): `scripts/auditPlayfieldOverflow.mjs` flags CSS that clips inside the gs-playfield scroll contract; wired into `audit:all`.
+
+Verification: 454 tests green on vitest 4; build clean; browser smoke 18 arcade routes x 2 viewports = 36 combos, 0 overflow / 0 console errors (`output/browser-smoke/arcade-wave`).
+
+Open: S1 UI half, S2-S4 mechanics (+calibration), S-anim pack, C1-C7 cases unbox, final deploy. All scoped with implementation notes in `docs/uiux-wave-2026-06-10.md`.
