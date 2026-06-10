@@ -3624,6 +3624,70 @@
     100% { opacity: 0; transform: scale(1.02); }
 }
 
+/* S-anim: base-game feature announce banner (multiplier orbs / wild multiplier
+   / random wilds). A compact ribbon that slides in near the top of the stage,
+   colour-tinted per feature kind, then fades. Reduced-motion shows it static. */
+.slot-feature-announce {
+    position: absolute;
+    top: 9%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 27;
+    pointer-events: none;
+    padding: 8px 22px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--slot-accent, #ffd166), #000 12%), color-mix(in srgb, var(--slot-accent, #ffd166), #d8285f 35%));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 18px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 40%);
+    animation: slotFeatureAnnounce 1.6s ease-out forwards;
+}
+.slot-feature-announce strong {
+    font-size: clamp(14px, 3.4vw, 22px);
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+    text-transform: uppercase;
+}
+.slot-feature-announce.kind-random-feature {
+    background: linear-gradient(135deg, #2a6df0, #7b2ff0 60%, #d8285f);
+}
+.slot-feature-announce.kind-wild-multiplier {
+    background: linear-gradient(135deg, #ff8a3c, #d8285f);
+}
+@keyframes slotFeatureAnnounce {
+    0% { opacity: 0; transform: translate(-50%, -14px) scale(0.86); }
+    16% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    78% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -8px) scale(0.98); }
+}
+
+/* S-anim: coin-shower particle burst on a big win. Lightweight CSS-only coins
+   fall from the top of the stage. Purely decorative (aria-hidden); the win
+   amount is announced by the BigWinOverlay + live region. */
+.slot-coin-shower {
+    position: absolute;
+    inset: 0;
+    z-index: 28;
+    overflow: hidden;
+    pointer-events: none;
+}
+.slot-coin-shower .slot-coin {
+    position: absolute;
+    top: -8%;
+    left: var(--coin-x, 50%);
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff2a8, #ffcf33 55%, #c98a12);
+    box-shadow: 0 0 8px rgba(255, 207, 51, 0.8);
+    animation: slotCoinFall var(--coin-dur, 1000ms) linear var(--coin-delay, 0ms) forwards;
+}
+@keyframes slotCoinFall {
+    0% { opacity: 0; transform: translateY(0) rotate(0deg); }
+    10% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(360px) rotate(420deg); }
+}
+
 /* Near-miss "so close" callout — the bonus scatter landed one short. A quick
    amber pulse that makes a non-winning spin still feel eventful. */
 .slot-near-miss {
@@ -3847,6 +3911,19 @@
 .gampo-reduce-motion .slot-pill.slot-pill-persist.is-ramping strong,
 .gampo-reduce-motion .slot-event-flash {
     animation-duration: 0.001ms;
+}
+
+/* S-anim reduced-motion: feature announce settles in place (no slide/scale);
+   coin shower is suppressed entirely (also gated off in JS). */
+:root.gampo-reduce-motion .slot-feature-announce,
+.gampo-reduce-motion .slot-feature-announce {
+    animation: none;
+    opacity: 1;
+    transform: translateX(-50%);
+}
+:root.gampo-reduce-motion .slot-coin-shower,
+.gampo-reduce-motion .slot-coin-shower {
+    display: none;
 }
 
 :root.gampo-reduce-motion .slot-bonus-cine *,
