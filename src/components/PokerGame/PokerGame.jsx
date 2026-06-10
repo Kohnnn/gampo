@@ -134,6 +134,7 @@ export default function PokerGame() {
     ])
     const [chatInput, setChatInput] = useState('')
     const [raiseAmount, setRaiseAmount] = useState(null)
+    const [raiseOpen, setRaiseOpen] = useState(false)
     const [tab, setTab] = useState('gto')
     const [buyIn, setBuyIn] = useState(1000)
     // Wave 12: format selector
@@ -323,6 +324,12 @@ export default function PokerGame() {
     // When it becomes the player's turn, bring the action bar into view so the
     // fold/call/raise controls aren't stranded below the fold on mobile.
     useScrollActionIntoView(actionsRef, Boolean(isHumanTurn), [isHumanTurn], { block: 'nearest' })
+
+    // Collapse the raise sizing panel whenever it stops being the player's turn
+    // so the action bar returns to its compact 1-2 row height between decisions.
+    useEffect(() => {
+        if (!isHumanTurn && raiseOpen) setRaiseOpen(false)
+    }, [isHumanTurn, raiseOpen])
 
     useEffect(() => {
         if (!state || state.street !== 'showdown' || !human) return
@@ -783,8 +790,21 @@ export default function PokerGame() {
                                             if (a.type === 'call') return <button key={a.type} className="pk-act call" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'call' })} data-poker-action="call" data-ux-primary-action>Call {formatCredits(a.amount)}</button>
                                             if (a.type === 'raise') {
                                                 const r = a
+                                                if (!raiseOpen) {
+                                                    return (
+                                                        <button
+                                                            key={a.type}
+                                                            className="pk-act raise pk-raise-open"
+                                                            disabled={!isHumanTurn}
+                                                            onClick={() => { setRaiseAmount(raiseAmount ?? r.min); setRaiseOpen(true) }}
+                                                            data-poker-action="raise-open"
+                                                        >
+                                                            Raise ▸
+                                                        </button>
+                                                    )
+                                                }
                                                 return (
-                                                    <div key={a.type} className="pk-raise">
+                                                    <div key={a.type} className="pk-raise pk-raise-open-panel">
                                                         <div className="pk-raise-presets">
                                                             <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, Math.round(state.pot * 0.5))))}>½ pot</button>
                                                             <button onClick={() => setRaiseAmount(Math.min(r.max, Math.max(r.min, Math.round(state.pot * 0.75))))}>¾ pot</button>
@@ -793,7 +813,7 @@ export default function PokerGame() {
                                                             <button onClick={() => setRaiseAmount(r.max)}>All-in</button>
                                                         </div>
                                                         <input type="range" min={r.min} max={r.max} value={raiseAmount ?? r.min} onChange={e => setRaiseAmount(Number(e.target.value))} />
-                                                        <button className="pk-act raise" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'raise', amount: raiseAmount ?? r.min })} data-poker-action="raise" data-ux-primary-action>Raise to {formatCredits(raiseAmount ?? r.min)}</button>
+                                                        <button className="pk-act raise" disabled={!isHumanTurn} onClick={() => { handleAction({ type: 'raise', amount: raiseAmount ?? r.min }); setRaiseOpen(false) }} data-poker-action="raise" data-ux-primary-action>Raise to {formatCredits(raiseAmount ?? r.min)}</button>
                                                     </div>
                                                 )
                                             }

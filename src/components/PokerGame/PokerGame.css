@@ -1990,6 +1990,21 @@
         grid-column: 1 / -1;
     }
 
+    /* Raise sizing is collapsed by default on mobile so the action bar stays a
+       compact 1-2 rows. The disclosure button spans full width; the expanded
+       panel is capped and scrolls internally as a safety net. */
+    .pk-raise-open {
+        grid-column: 1 / -1;
+    }
+    .pk-actions {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+    .pk-raise-open-panel {
+        max-height: 44vh;
+        overflow-y: auto;
+    }
+
     .pk-act {
         min-height: 42px;
         height: auto;

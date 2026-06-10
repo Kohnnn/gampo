@@ -257,6 +257,7 @@ export const gameDefinitions = [
         path: '/poker',
         category: 'Card room',
         status: 'new',
+        tag: 'Live',
         rtp: 0.97,
         houseEdge: 0.03,
         volatility: 'Skill dependent',

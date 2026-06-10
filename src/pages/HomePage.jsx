@@ -236,6 +236,7 @@ function CategoryRow({ icon, title, link, games }) {
                     <Link key={game.id} to={game.path} className="category-card" style={{ '--accent': game.accent || '#00e701' }} data-ux-surface="card">
                         <div className="category-art">
                             {game.image ? <img src={game.image} alt="" loading="lazy" decoding="async" width="320" height="320" /> : <span>{game.name.slice(0, 2)}</span>}
+                            {game.tag ? <span className="casino-game-tag">{game.tag}</span> : null}
                             <i className="category-glow" />
                         </div>
                         <h3>{game.name}</h3>
@@ -271,6 +272,7 @@ export function GameGrid({ games = [] }) {
                     <Link key={game.id} to={game.path} className="casino-game-card" style={{ '--accent': game.accent || '#00e701' }} data-ux-surface="card">
                         <div className="casino-game-art">
                             {game.image ? <img src={game.image} alt="" loading="lazy" decoding="async" width="320" height="320" /> : <span>{game.name.slice(0, 2)}</span>}
+                            {game.tag ? <span className="casino-game-tag">{game.tag}</span> : null}
                             <div className="casino-game-titlemark">
                                 <span>{game.category?.split(' ')[0] || 'Game'}</span>
                                 <strong>{game.name}</strong>
