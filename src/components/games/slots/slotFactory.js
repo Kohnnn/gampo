@@ -87,6 +87,8 @@ export const SLOT_TEMPLATES = [
             },
             anticipation: { scatterMin: 2 },
             sideCharacter: true,
+            // S3: any line win that uses a wild substitute pays double.
+            wildMultiplier: { multiplier: 2 },
         },
         symbols: [
             symbol('catcher', 'HOOK', `${mythic}/slot-mythic-sword.png`, 5, 9),
@@ -123,6 +125,8 @@ export const SLOT_TEMPLATES = [
             },
             anticipation: { scatterMin: 2 },
             expandingWilds: true,
+            // S3: line wins using an expanded wild badge pay double.
+            wildMultiplier: { multiplier: 2 },
         },
         symbols: [
             symbol('revolver', 'GUN', `${cyber}/slot-cyber-core.png`, 6, 7.5),
@@ -152,6 +156,8 @@ export const SLOT_TEMPLATES = [
             anticipation: { scatterMin: 2 },
             totalWinBanner: true,
             expandingWilds: true,
+            // S3: ways wins carried by an expanded wild reel pay triple.
+            wildMultiplier: { multiplier: 3 },
         },
         symbols: [
             symbol('valkyrie', 'HERO', `${mythic}/slot-mythic-shield.png`, 5, 8),
@@ -1231,7 +1237,38 @@ function applyMultiplierZones(wins, config) {
     return { wins: out, zoneHits }
 }
 
-// ---- multiplier wheel resolve (Wave 9) ----
+// ---- wild multiplier (S3) ----
+// `features.wildMultiplier = { multiplier: number }` (e.g. 2 or 3). Any winning
+// line/way/cluster whose winning cells include a wild gets its multiplier scaled
+// by that factor — the classic "wild win pays double/triple" mechanic. Stacking:
+// when multiple distinct wilds land in one win we use a single flat multiplier
+// (matches most real titles); set `perWild: true` to instead multiply by
+// multiplier^(#wilds in the win), capped by `maxStack`.
+function applyWildMultiplier(wins, cells, config) {
+    const cfg = config.features?.wildMultiplier
+    if (!cfg || !(cfg.multiplier > 1)) return { wins, wildBoostHits: 0 }
+    const isWild = (index) => cells[index]?.type === 'wild'
+    let wildBoostHits = 0
+    const out = wins.map(win => {
+        const indexes = win.indexes || []
+        const wildCount = indexes.reduce((n, index) => n + (isWild(index) ? 1 : 0), 0)
+        if (wildCount <= 0) return win
+        wildBoostHits += 1
+        let factor = cfg.multiplier
+        if (cfg.perWild) {
+            const maxStack = cfg.maxStack || wildCount
+            factor = Math.pow(cfg.multiplier, Math.min(wildCount, maxStack))
+        }
+        return {
+            ...win,
+            multiplier: round2(win.multiplier * factor),
+            wildBoost: factor,
+        }
+    })
+    return { wins: out, wildBoostHits }
+}
+
+
 // `features.multiplierWheel = { values: number[], weights: number[] }`. When 3+ scatters
 // trigger the feature, we resolve a wheel pick deterministically via the round-keyed roll.
 // The wheel award is added to the spin multiplier and surfaced as a feature event so the
@@ -1511,6 +1548,10 @@ export function resolveSlotSpin(config, options = {}) {
     const { wins: zonedWins, zoneHits } = applyMultiplierZones(wins, config)
     wins = zonedWins
 
+    // Wild multiplier (S3): wins whose cells include a wild pay x2/x3.
+    const { wins: wildBoostedWins, wildBoostHits } = applyWildMultiplier(wins, cells, config)
+    wins = wildBoostedWins
+
     // Stacked-wild line boost: scale wins when a full wild reel formed.
     if (lineBoost > 1) {
         wins = wins.map(win => ({ ...win, multiplier: round2(win.multiplier * lineBoost) }))
@@ -1556,6 +1597,15 @@ export function resolveSlotSpin(config, options = {}) {
             label: `${config.features.multiplierZones.multiplier}x zone × ${zoneHits}`,
             zoneHits,
             multiplier: config.features.multiplierZones.multiplier,
+        })
+    }
+
+    if (wildBoostHits > 0) {
+        featureEvents.push({
+            type: 'wild-multiplier',
+            label: `Wild win ×${config.features.wildMultiplier.multiplier}`,
+            wildBoostHits,
+            multiplier: config.features.wildMultiplier.multiplier,
         })
     }
 
@@ -1741,6 +1791,7 @@ export function resolveSlotSpin(config, options = {}) {
         cascadeSteps,
         cascadeFrames,
         zoneHits,
+        wildBoostHits,
         wheel,
         holdAndRespin,
         wildIndexes,

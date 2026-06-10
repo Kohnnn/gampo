@@ -38,6 +38,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             { name: '20 paylines', detail: 'Wins are evaluated left-to-right across 20 fixed paylines.' },
             { name: 'Hook hero', detail: 'The catcher symbol pays the headline 9x and substitutes nothing — line pay only.' },
             { name: 'Wild', detail: 'Substitutes for any non-scatter symbol on a payline.' },
+            { name: 'Wild multiplier', detail: 'Any line win that uses a wild substitute pays double (x2).' },
             { name: 'Anticipation', detail: 'Reels slow on 2+ scatters in a single spin.' },
         ],
         bonusEntry: '3+ shell scatters anywhere on the reels.',
@@ -53,6 +54,7 @@ export const SLOT_FEATURE_CONTRACTS = {
         summary: 'Western-themed expanding-wild slot with sheriff badges.',
         mechanics: [
             { name: 'Expanding wilds', detail: 'When a wild lands on reel 2-5 it expands to cover the full reel for the spin.' },
+            { name: 'Wild multiplier', detail: 'Any line win using an expanded wild badge pays double (x2).' },
             { name: 'Lines', detail: '20 paylines, left-to-right.' },
             { name: 'Bonus badges', detail: '3+ badges trigger 5 free spins. Expanding wilds stay active during the bonus.' },
         ],
@@ -70,6 +72,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             { name: 'Ways pays', detail: 'No paylines — pays anywhere a matching symbol appears in 3+ adjacent reels left-to-right.' },
             { name: 'Total win banner', detail: 'When a win lands, a centered banner draws in showing the total credits.' },
             { name: 'Expanding wilds', detail: 'Wilds expand to fill the reel they land on.' },
+            { name: 'Wild multiplier', detail: 'Any ways win carried by an expanded wild reel pays triple (x3).' },
         ],
         bonusEntry: '3+ rune scatters.',
         bonusFlow: [
