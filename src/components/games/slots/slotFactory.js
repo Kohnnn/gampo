@@ -1,6 +1,6 @@
-import { pickWeighted, round2 } from '../../../utils/simulationMath'
-import { nextRoll } from '../../../utils/fairRng'
-import { SLOT_RTP_SCALARS } from './slotRtpScalars'
+import { pickWeighted, round2 } from '../../../utils/simulationMath.js'
+import { nextRoll } from '../../../utils/fairRng.js'
+import { SLOT_RTP_SCALARS } from './slotRtpScalars.js'
 
 const classic = '/assets/games/slots/classic'
 const cyber = '/assets/games/slots/cyber'
@@ -182,6 +182,14 @@ export const SLOT_TEMPLATES = [
             anticipation: { scatterMin: 2 },
             introOverlay: true,
             cascade: { tumbleMultiplierLadder: [1, 2, 3, 5, 10] },
+            // Multiplier orbs (Gates-style) — tuned tighter than gummy-drops
+            // since this 4x5 cluster has a smaller board / fewer orb landings.
+            multiplierOrbs: {
+                symbolId: 'orb',
+                values: [2, 3, 5, 10, 25, 100],
+                weights: [40, 26, 18, 10, 5, 1],
+            },
+            maxWinMultiplier: 5000,
         },
         symbols: [
             symbol('guitar', 'GTR', `${cyber}/slot-cyber-wave.png`, 5, 7),
@@ -190,6 +198,7 @@ export const SLOT_TEMPLATES = [
             symbol('light', 'LITE', `${classic}/slot-classic-bell.png`, 15, 1),
             symbol('ace', 'A', `${classic}/slot-classic-7.png`, 18, 0.65),
             symbol('queen', 'Q', `${mythic}/slot-mythic-orb.png`, 20, 0.45),
+            symbol('orb', 'ORB', `${mythic}/slot-mythic-rune.png`, 3, 0, { type: 'orb' }),
             symbol('wild', 'WILD', `${classic}/slot-classic-coin.png`, 5, 0, { type: 'wild' }),
             symbol('ticket', 'BONUS', `${mythic}/slot-mythic-rune.png`, 4, 0, { type: 'scatter' }),
         ],
@@ -705,6 +714,14 @@ export const SLOT_TEMPLATES = [
             clusterMin: 6,
             cascade: { tumbleMultiplierLadder: [1, 2, 3, 4, 6, 8] },
             persistentMultiplier: 1,
+            // Multiplier orbs (Gates-style): orb cells carry a random ×; on any
+            // winning tumble the orb sum multiplies the win total. Low landing
+            // weight keeps the fat tail bounded; maxWinMultiplier caps the rest.
+            multiplierOrbs: {
+                symbolId: 'orb',
+                values: [2, 3, 5, 10, 25, 50, 100, 250],
+                weights: [42, 26, 16, 9, 4, 2, 0.8, 0.2],
+            },
             // Max-win cap (player-facing multiplier). Bounds the 8x8 cluster +
             // cascade + persistent-multiplier fat tail so the displayed RTP is
             // actually experienced and verifiable.
@@ -726,6 +743,7 @@ export const SLOT_TEMPLATES = [
             symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
             symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
             symbol('rank-j', 'J', `${classic}/slot-classic-cherry.png`, 22, 0.32),
+            symbol('orb', 'ORB', `${mythic}/slot-mythic-orb.png`, 3, 0, { type: 'orb' }),
             symbol('lollipop', 'BONUS', `${gummy}/gummy-drops-bonus.png`, 4, 0, { type: 'scatter' }),
         ],
     },
@@ -943,7 +961,7 @@ function forceGuaranteedScatters(cells, config, count) {
 }
 
 function isPaySymbol(item) {
-    return item && item.type !== 'scatter' && item.type !== 'coin' && item.type !== 'money' && item.type !== 'mystery'
+    return item && item.type !== 'scatter' && item.type !== 'coin' && item.type !== 'money' && item.type !== 'mystery' && item.type !== 'orb'
 }
 
 // ---- mystery symbol pre-reveal ----
@@ -1309,8 +1327,41 @@ function resolveHoldAndRespin(config, cells) {
     }
 }
 
-// ---- money symbol resolve ----
+// ---- multiplier orb resolve (Gates-style) ----
+// `features.multiplierOrbs = { symbolId, values: number[], weights?: number[] }`.
+// Orb cells are a non-paying special symbol (type 'orb'). Each orb that lands
+// carries a multiplier picked from the weighted `values` table. When the spin
+// produces ANY win (including across the full cascade chain), the orb values are
+// SUMMED and the running win total is multiplied by that sum. No win => orbs do
+// nothing (classic tumble behaviour). Purely engine-side; the value per cell is
+// returned so the UI can render the orb face + a coin-shower on apply.
+function resolveMultiplierOrbs(cells, config, rng) {
+    const cfg = config.features?.multiplierOrbs
+    if (!cfg || !cfg.symbolId || !Array.isArray(cfg.values) || !cfg.values.length) {
+        return { orbValues: [], orbTotal: 0 }
+    }
+    const weights = Array.isArray(cfg.weights) && cfg.weights.length === cfg.values.length
+        ? cfg.weights
+        : cfg.values.map(() => 1)
+    const weightTotal = weights.reduce((sum, w) => sum + w, 0)
+    const orbValues = []
+    let orbTotal = 0
+    cells.forEach((item, index) => {
+        if (!item || item.id !== cfg.symbolId) return
+        const r = roll(config, `orb:${index}`, rng) * weightTotal
+        let cumulative = 0
+        let value = cfg.values[cfg.values.length - 1]
+        for (let i = 0; i < cfg.values.length; i += 1) {
+            cumulative += weights[i]
+            if (r < cumulative) { value = cfg.values[i]; break }
+        }
+        orbValues.push({ index, value })
+        orbTotal += value
+    })
+    return { orbValues, orbTotal }
+}
 
+// ---- money symbol resolve ----
 function resolveMoneyValues(cells, config) {
     const moneyDefs = config.symbols.filter(item => item.type === 'money')
     if (!moneyDefs.length) return { moneyValues: [], moneyTotal: 0 }
@@ -1472,6 +1523,22 @@ export function resolveSlotSpin(config, options = {}) {
 
     let multiplier = wins.reduce((sum, item) => sum + item.multiplier, 0)
     const featureEvents = []
+
+    // Multiplier orbs (Gates-style): orb cells on the settled board carry random
+    // multipliers. They only matter when the spin produced a win — the SUM of all
+    // orb values then scales the win-derived multiplier. Applied before scatter /
+    // wheel / hold flat awards so those bonus add-ons aren't double-multiplied.
+    const { orbValues, orbTotal } = resolveMultiplierOrbs(cells, config, rng)
+    const orbsApplied = orbValues.length > 0 && multiplier > 0 && orbTotal > 0
+    if (orbsApplied) {
+        multiplier = round2(multiplier * orbTotal)
+        orbValues.forEach(({ index }) => winningIndexes.add(index))
+        // NOTE: the 'multiplier-orbs' feature event is pushed at the end of the
+        // resolver (after the RTP scalar + max-win cap) and only if the FINAL
+        // paid multiplier is still > 0. On extreme-variance templates the scalar
+        // can round a small win to 0, and a feature event must never claim a win
+        // that the player did not actually receive.
+    }
 
     if (expandedColumns.length) {
         featureEvents.push({ type: 'expanding-wilds', label: `Expanding wild × ${expandedColumns.length}`, columns: expandedColumns })
@@ -1648,6 +1715,17 @@ export function resolveSlotSpin(config, options = {}) {
     // (no options.rtpScalar override) so calibration sees the same bounded math.
     const maxWin = Number(config.features?.maxWinMultiplier) || 0
     if (maxWin > 0 && multiplier > maxWin) multiplier = maxWin
+    // Surface the multiplier-orbs feature event only when the FINAL paid
+    // multiplier is positive (see note at orb application above). orbValues /
+    // orbTotal are always returned for UI rendering regardless.
+    if (orbsApplied && multiplier > 0) {
+        featureEvents.push({
+            type: 'multiplier-orbs',
+            label: `Orbs ×${orbTotal}`,
+            orbValues,
+            orbTotal,
+        })
+    }
     return {
         cells,
         wins,
@@ -1657,6 +1735,8 @@ export function resolveSlotSpin(config, options = {}) {
         coinHits,
         moneyValues,
         moneyTotal,
+        orbValues,
+        orbTotal,
         mysteryReveal,
         cascadeSteps,
         cascadeFrames,

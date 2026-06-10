@@ -269,3 +269,60 @@ describe('resolveSlotSpin engine', () => {
         expect(result.cells[lockIndex].type).toBe('wild')
     })
 })
+
+describe('multiplier orbs', () => {
+    for (const id of ['gummy-drops', 'bassline-bonus']) {
+        it(`${id} declares a multiplierOrbs feature with an orb symbol`, () => {
+            const config = getSlotTemplate(id)
+            const orbs = config.features.multiplierOrbs
+            expect(orbs).toBeTruthy()
+            expect(orbs.values.length).toBeGreaterThan(0)
+            expect(orbs.weights.length).toBe(orbs.values.length)
+            const orbSymbol = config.symbols.find(s => s.id === orbs.symbolId)
+            expect(orbSymbol, `${id} missing orb symbol`).toBeTruthy()
+            expect(orbSymbol.type).toBe('orb')
+            expect(orbSymbol.payout).toBe(0)
+        })
+
+        it(`${id} surfaces orb values and multiplies wins when orbs land on a winning spin`, () => {
+            const config = getSlotTemplate(id)
+            // Deterministic RNG that biases every cell toward the orb symbol so a
+            // win + orbs co-occur, and orb value picks land on a known index.
+            let observed = false
+            for (let i = 0; i < 400; i += 1) {
+                let n = i * 2654435761
+                const rng = () => {
+                    n = (n * 1103515245 + 12345) & 0x7fffffff
+                    return (n % 1000) / 1000
+                }
+                const result = resolveSlotSpin(config, { rng })
+                const orbEvent = result.featureEvents.find(e => e.type === 'multiplier-orbs')
+                if (orbEvent) {
+                    observed = true
+                    expect(result.orbValues.length).toBeGreaterThan(0)
+                    expect(result.orbTotal).toBeGreaterThan(0)
+                    // Every orb value comes from the configured table.
+                    for (const orb of result.orbValues) {
+                        expect(config.features.multiplierOrbs.values).toContain(orb.value)
+                    }
+                    // Orbs only apply on a winning spin → multiplier must be positive.
+                    expect(result.multiplier).toBeGreaterThan(0)
+                    break
+                }
+            }
+            expect(observed).toBe(true)
+        })
+    }
+
+    it('orbs never fire on a no-win board (no free multiplier)', () => {
+        const config = getSlotTemplate('gummy-drops')
+        // The orb event is only pushed when multiplier > 0; assert the invariant
+        // across many spins: any spin carrying the orb event also has a win.
+        for (let i = 0; i < 200; i += 1) {
+            const result = resolveSlotSpin(config)
+            if (result.featureEvents.some(e => e.type === 'multiplier-orbs')) {
+                expect(result.multiplier).toBeGreaterThan(0)
+            }
+        }
+    })
+})

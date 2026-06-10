@@ -13,8 +13,18 @@
 import { writeFileSync } from 'node:fs'
 import { SLOT_TEMPLATES, resolveSlotSpin, __setSlotCalibrationRng } from '../src/components/games/slots/slotFactory.js'
 import { MAX_FREE_SPINS_PER_SESSION } from '../src/components/games/slots/slotConstants.js'
+import { SLOT_RTP_SCALARS as EXISTING_SCALARS } from '../src/components/games/slots/slotRtpScalars.js'
 
 const SPINS = Number(process.env.SLOT_CAL_SPINS) || 200000
+// Optional comma-separated allowlist of template ids to (re)calibrate. When set,
+// every other template keeps its existing scalar (merge mode), so a single
+// payout-affecting template change doesn't require re-running the whole grid.
+// Usage: SLOT_CAL_ONLY=gummy-drops,bassline-bonus node scripts/calibrateSlots.mjs
+const ONLY = (process.env.SLOT_CAL_ONLY || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+const ONLY_SET = ONLY.length ? new Set(ONLY) : null
 
 function hashId(id) {
     let h = 2166136261
@@ -93,6 +103,12 @@ function fmtScalar(value) {
 const scalars = {}
 const report = []
 for (const config of SLOT_TEMPLATES) {
+    // Merge mode: keep the previously-calibrated scalar for any template not in
+    // the allowlist so we only spend simulation budget on what actually changed.
+    if (ONLY_SET && !ONLY_SET.has(config.id)) {
+        scalars[config.id] = EXISTING_SCALARS[config.id] ?? 1
+        continue
+    }
     // Average raw RTP across several independent seeds so the scalar is not
     // overfit to a single stream (critical for high-variance cluster/wheel
     // templates whose tail dominates the mean).

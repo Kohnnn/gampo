@@ -85,6 +85,7 @@ export const SLOT_FEATURE_CONTRACTS = {
         mechanics: [
             { name: 'Cluster pays', detail: '5+ matching symbols touching orthogonally form a cluster. Larger clusters = bigger pay.' },
             { name: 'Cascade', detail: 'Winning symbols disappear and new ones tumble in. Each cascade bumps the multiplier ladder: 1x → 2x → 3x → 5x → 10x.' },
+            { name: 'Multiplier orbs', detail: 'Orb symbols carry a random 2x–100x value. On any winning tumble the orb values are summed and multiply the whole win.' },
             { name: 'Intro overlay', detail: 'First spin shows a neon intro card with the volatility cue.' },
         ],
         bonusEntry: '3+ ticket scatters.',
@@ -313,6 +314,7 @@ export const SLOT_FEATURE_CONTRACTS = {
         mechanics: [
             { name: 'Cluster pays', detail: '6+ touching symbols on an 8×8 (64-cell) grid form a cluster; bigger clusters pay more.' },
             { name: 'Cascade ladder', detail: 'Winning clusters clear and new candy tumbles in. Each cascade bumps a 1x → 2x → 3x → 5x → 8x → 12x multiplier ladder (capped to keep the swing fair).' },
+            { name: 'Multiplier orbs', detail: 'Orb symbols carry a random 2x–250x value. On any winning tumble the orb values are summed and multiply the whole win.' },
             { name: 'Persistent multiplier', detail: 'During the bonus the ladder seeds at 1x and persists across free spins.' },
         ],
         bonusEntry: '5+ lollipop scatters award 12 free spins.',

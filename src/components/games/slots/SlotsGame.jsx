@@ -1416,14 +1416,16 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                 const winning = winningCells.includes(index)
                                                 const popping = cascadePopCells.includes(index)
                                                 const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
+                                                const orbValue = lastResult?.orbValues?.find(o => o.index === index)?.value
                                                 return (
                                                     <div
                                                         key={`${index}-${item?.id || 'na'}`}
-                                                        className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''}`}
+                                                        className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''}`}
                                                     >
                                                         <Asset src={item?.asset} alt={item?.label} fallback={<strong>{item?.label}</strong>} />
                                                         <em>{item?.label}</em>
                                                         {moneyValue ? <i className="money-chip">{formatCredits(moneyValue)}</i> : null}
+                                                        {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
                                                     </div>
                                                 )
                                             })}
@@ -1447,16 +1449,18 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     const popping = cascadePopCells.includes(index)
                                     const inAnticipationCol = anticipating && col >= config.layout.cols - 2 && spinning
                                     const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
+                                    const orbValue = lastResult?.orbValues?.find(o => o.index === index)?.value
                                     const isSticky = stickyWilds.includes(index)
                                     return (
                                         <div
                                             key={`${index}-${item.id}`}
-                                            className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''} ${!spinning && wildColumns.has(col) ? 'wild-column' : ''}`}
+                                            className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''} ${!spinning && wildColumns.has(col) ? 'wild-column' : ''}`}
                                             style={{ animationDelay: `${col * 45}ms` }}
                                         >
                                             <Asset src={item.asset} alt={item.label} fallback={<strong>{item.label}</strong>} />
                                             <em>{item.label}</em>
                                             {moneyValue ? <i className="money-chip">{formatCredits(moneyValue)}</i> : null}
+                                            {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
                                             {isSticky && <span className="slot-cell-sticky-badge" aria-hidden>★</span>}
                                         </div>
                                     )
