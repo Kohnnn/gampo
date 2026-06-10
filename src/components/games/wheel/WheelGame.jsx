@@ -6,7 +6,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -225,7 +225,7 @@ export default function WheelGame() {
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim wheel" />
                     <div className="wheel-pointer" />
-                    <div className={`wheel-disc ${spinning ? 'spinning' : ''}`} style={{ transform: `rotate(${rotation}deg)` }}>
+                    <div data-mobile-critical-surface className={`wheel-disc ${spinning ? 'spinning' : ''}`} style={{ transform: `rotate(${rotation}deg)` }}>
                         {segments.map((segment, i) => (
                             <span key={`${segment}-${i}`} className={segment > 0 ? 'paying' : 'blank'} style={{ transform: `rotate(${i * (360 / segments.length)}deg)` }}>
                                 {segment}×
@@ -240,7 +240,7 @@ export default function WheelGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('wheel')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={hitChance} payoutMultiplier={avgMultiplier} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

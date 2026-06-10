@@ -16,7 +16,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -240,7 +240,7 @@ export default function MolesGame() {
             <CoreStageFrame minHeight={520} maxWidth={840} loading={!preloader.ready} className="moles-stage-frame">
                 <div className="moles-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="moles-grid">
+                    <div className="moles-grid" data-mobile-critical-surface>
                         {Array.from({ length: GRID }, (_, i) => {
                             const isPicked = picks.includes(i)
                             const isMole = moles?.has(i)
@@ -265,7 +265,7 @@ export default function MolesGame() {
                     <MultiplierBadge label="Picks" value={picks.length} suffix="" size="sm" state={running ? 'active' : 'idle'} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('moles')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={(GRID - moleCount) / GRID} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

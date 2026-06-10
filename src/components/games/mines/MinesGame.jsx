@@ -8,6 +8,7 @@
 // future deterministic replay can read the round transcript.
 
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -15,7 +16,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -85,6 +86,9 @@ export default function MinesGame() {
     const [autoCashoutPicks, setAutoCashoutPicks] = useState(3)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('mines', { bombs: 3, count: 9, cap: 10 }))
     const simSeqRef = useRef(0)
+    const stageRef = useRef(null)
+    // Bring the mine grid into view when a round starts (mobile reachability).
+    useScrollActionIntoView(stageRef, phase === 'playing', [phase], { block: 'nearest' })
     const { schedule, cancelAll } = useCancellableTimeouts()
 
     // Imperative round machine. Mines emits events as the player interacts
@@ -330,7 +334,7 @@ export default function MinesGame() {
                         <MultiplierBadge label="Current" value={currentMult} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="sm" />
                         <MultiplierBadge label="Next pick" value={nextMult} size="sm" />
                     </div>
-                    <div className="mines-grid" data-mobile-critical-surface>
+                    <div className="mines-grid" data-mobile-critical-surface ref={stageRef}>
                         {Array.from({ length: GRID }, (_, i) => {
                             const isRevealed = revealed.includes(i)
                             const isBomb = bombSet?.has(i)
@@ -365,7 +369,7 @@ export default function MinesGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('mines')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={(GRID - bombs) / GRID} payoutMultiplier={currentMult} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

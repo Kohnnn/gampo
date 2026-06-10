@@ -12,7 +12,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -231,7 +231,7 @@ export default function DartsGame() {
             <CoreStageFrame minHeight={520} maxWidth={840} loading={!preloader.ready} className="darts-stage-frame">
                 <div className="darts-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="darts-board" aria-label="Dart board">
+                    <div className="darts-board" data-mobile-critical-surface aria-label="Dart board">
                         <span className="darts-bull" />
                         <span className="darts-pointer" style={{ transform: `translate(${pointer.x}px, ${pointer.y}px)` }} />
                     </div>
@@ -242,7 +242,7 @@ export default function DartsGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('darts')} />
             {/* Win odds derived from the engine's sampleHit thresholds for the
                 currently-selected target. Only the chosen sector (or the bull)
                 pays — neighbor lands at NEIGHBOR_PAYOUT=0 — so the paying chance

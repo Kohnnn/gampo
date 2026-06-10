@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const coreSource = readFileSync(new URL('./CoreStageFrame.jsx', import.meta.url), 'utf8')
@@ -201,5 +203,22 @@ describe('QA layout and loader contracts', () => {
         expect(casesCss).toContain('display: flex')
         expect(casesCss).toContain('flex-direction: column')
         expect(casesCss).toContain('min-height: 48px')
+    })
+
+    it('keeps the desktop playfield the single scroll surface (Patch 5)', () => {
+        // Desktop scroll contract: shell clamps to viewport, grid does not
+        // scroll, .gs-playfield is the one scrollable surface. If content
+        // outgrows the grid track it must scroll, never clip.
+        expect(primitivesCss).toMatch(/\.gs-playfield\s*\{[^}]*overflow-y:\s*auto/s)
+        expect(primitivesCss).toMatch(/\.gs-playfield\s*\{[^}]*overflow-x:\s*hidden/s)
+        expect(primitivesCss).toMatch(/\.gs-playfield\s*\{[^}]*min-height:\s*0/s)
+        expect(primitivesCss).toMatch(/\.gs-layout\s*\{[^}]*overflow:\s*hidden/s)
+        // Run the static audit inline so any game CSS that re-hides the
+        // playfield or caps+clips a stage wrapper fails the suite.
+        const out = execFileSync(process.execPath, ['scripts/auditPlayfieldOverflow.mjs'], {
+            cwd: fileURLToPath(new URL('../../../..', import.meta.url)),
+            encoding: 'utf8',
+        })
+        expect(out).toContain('OK: no playfield clipping risks found.')
     })
 })

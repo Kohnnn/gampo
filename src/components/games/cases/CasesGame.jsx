@@ -32,7 +32,7 @@ import { recordCaseDrop as recordProgressCaseDrop } from '../../../hooks/useProg
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
-import {
+import { getBigWinThreshold,
     BigWinOverlay,
     GameShell,
     RecentResultsStrip,
@@ -1887,7 +1887,7 @@ export default function CasesGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('cases')} />
             <EducationPanel definition={definition} betAmount={casePrice} winProbability={educationMetrics.winProbability} payoutMultiplier={educationMetrics.payoutMultiplier} balance={balance} recentProfit={recentProfit} />
             {dockPortal && view === 'open' && createPortal(
                 <div className="cases-mobile-dock" data-cases-mobile-dock data-ux-surface="dock">

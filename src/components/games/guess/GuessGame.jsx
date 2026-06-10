@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { NumberRoll, Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './guess.css'
@@ -15,6 +16,7 @@ export default function GuessGame() {
     const definition = findGameDefinition('guess')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('guess')
     const session = useGameSession('guess')
 
     const [choice, setChoice] = useState(7)
@@ -24,12 +26,14 @@ export default function GuessGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
     const payout = 9.4
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Guess Number')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
         setLastBet(betAmount)
         playSound('tick')
+        setToast(null)
         setSpinning(true)
         const next = Math.floor(nextRoll('guess').roll * 10)
         const won = next === choice
@@ -43,10 +47,18 @@ export default function GuessGame() {
             setSpinning(false)
             if (won) {
                 playSound('bigwin')
+                sfx.play('win')
                 setBigWin({ trigger: Date.now(), profit, multiplier: payout })
             } else {
                 playSound('loss')
+                sfx.play('lose')
             }
+            setToast({
+                kind: won ? 'win' : 'lose',
+                multiplier: won ? payout : null,
+                amount: profit,
+                message: won ? `Hit ${next}` : `Rolled ${next} — you picked ${choice}`,
+            })
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: String(next), profit, betAmount, multiplier: won ? payout : 0, meta: { picked: choice } })
             showToast(won ? 'win' : 'loss', won ? 'Number hit' : 'Number missed', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -79,14 +91,16 @@ export default function GuessGame() {
             <CoreStageFrame minHeight={460} maxWidth={760} className="guess-stage-frame">
             <div className={`guess-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                 <RecentResultsStrip results={session.stats.lastResults} />
-                <div className={`guess-orb ${spinning ? 'spinning' : ''} ${lastWon === true ? 'won' : lastWon === false ? 'lost' : ''}`}>
+                <div data-mobile-critical-surface className={`guess-orb ${spinning ? 'spinning' : ''} ${lastWon === true ? 'won' : lastWon === false ? 'lost' : ''}`}>
                     <NumberRoll value={result === null ? '?' : result} format={v => v === '?' ? '?' : String(v)} />
                 </div>
                 <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>You picked <strong>{choice}</strong> — hit chance 10%</p>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={18} color="#41d6ff" />}
+                <ActionLockOverlay active={spinning} label="Revealing..." />
+                <ResultToast result={toast} onDismiss={() => setToast(null)} />
             </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('guess')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.1} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

@@ -434,7 +434,7 @@
     }
 }
 
-@media (max-width: 500px) {
+@media (max-width: 480px) {
     .game-shell:has(.tarot-stage-frame) .bp-panel > .bp-section {
         display: none;
     }

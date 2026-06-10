@@ -5,7 +5,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { dicePayout, formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -264,7 +264,7 @@ export default function DiceGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('dice')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={winChance / 100} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

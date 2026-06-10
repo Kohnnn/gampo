@@ -1,4 +1,5 @@
 .color-stage {
+    position: relative; /* anchors ResultToast/ActionLockOverlay */
     /* QA v4: scope decorative gradients to the panel so they never bleed
        into the sidebar / right rail. */
     contain: layout paint;

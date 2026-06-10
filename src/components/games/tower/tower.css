@@ -121,39 +121,8 @@
     max-width: 440px;
 }
 
-.tower-action-btns button {
-    flex: 1;
-    height: 52px;
-    border-radius: 10px;
-    border: 2px solid var(--border-color);
-    background: linear-gradient(160deg, var(--bg-tertiary), rgba(15, 33, 46, 0.9));
-    color: var(--text-primary);
-    font-weight: 950;
-    font-size: 14px;
-    cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    transition: all 0.15s;
-}
-
-.tower-action-btns button:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
-}
-
-.tower-action-btns button.cashout {
-    background: linear-gradient(160deg, rgba(0, 231, 1, 0.3), rgba(0, 100, 0, 0.2));
-    border-color: var(--accent-green);
-    color: var(--accent-green);
-    text-shadow: 0 0 12px rgba(0, 231, 1, 0.4);
-}
-
-.tower-action-btns button.cashout.fx-pulse {
-    animation: fxPulse 1.6s ease-in-out infinite;
-    box-shadow: 0 0 16px rgba(0, 231, 1, 0.4);
-}
-
-.tower-action-btns button:disabled { opacity: 0.4; cursor: not-allowed; }
+/* CTA uses the shared StageActionButton primitive; only layout stays local. */
+.tower-action-btns .stage-action-btn { flex: 1; }
 
 @media (prefers-reduced-motion: reduce) {
     .tower-tile.current,

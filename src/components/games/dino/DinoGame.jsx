@@ -13,7 +13,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import DinoEngine from './engine/DinoEngine'
@@ -180,7 +180,7 @@ export default function DinoGame() {
             <div className={`dino-stage phase-${phase}`}>
                 <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                 <div className="dino-scene">
-                    <canvas ref={canvasRef} className="dino-canvas" aria-label="Dino runner" />
+                    <canvas ref={canvasRef} className="dino-canvas" data-mobile-critical-surface aria-label="Dino runner" />
                 </div>
                 <div className="dino-action-row">
                     <button className="dino-jump" disabled={!inRound} onClick={jump}>Jump · safe {(config.safe * 100).toFixed(0)}%</button>
@@ -188,7 +188,7 @@ export default function DinoGame() {
                 {phase === 'cashed' && burstKey > 0 && <Particles key={burstKey} count={16} color="#9bf08a" />}
             </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('dino')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={config.safe} payoutMultiplier={multiplier || config.growth} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

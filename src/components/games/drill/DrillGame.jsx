@@ -24,7 +24,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -38,6 +38,7 @@ import {
     CoreStageFrame,
     ROUND_EVENTS,
     useRoundMachine,
+    StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
@@ -226,7 +227,7 @@ export default function DrillGame() {
             <CoreStageFrame minHeight={620} maxWidth={760} loading={!preloader.ready} className="drill-stage-frame">
                 <div className="drill-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="drill-shaft">
+                    <div className="drill-shaft" data-mobile-critical-surface>
                         {LAYERS.map((layer, idx) => {
                             const cleared = idx < depth
                             const current = inRound && idx === depth
@@ -245,9 +246,9 @@ export default function DrillGame() {
                         })}
                     </div>
                     <div className="drill-actions">
-                        <button className="drill-action-chip" disabled={!inRound} onClick={drillStep}>
+                        <StageActionButton disabled={!inRound} onClick={drillStep}>
                             {inRound && nextLayer ? `Drill (${(nextLayer.bustChance * 100).toFixed(0)}%)` : 'Drill'}
-                        </button>
+                        </StageActionButton>
                     </div>
                     <div>
                         <MultiplierBadge label="Current" value={currentMult} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="md" />
@@ -261,7 +262,7 @@ export default function DrillGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('drill')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={(LAYERS[0] ? 1 - LAYERS[0].bustChance : 0.94)} payoutMultiplier={currentMult || 1} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

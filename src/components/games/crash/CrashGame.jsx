@@ -15,7 +15,7 @@ import { formatCredits, clamp } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useTremor, triggerTremor } from '../../../utils/tremor'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -527,7 +527,7 @@ export default function CrashGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('crash')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={(1 - HOUSE_EDGE) / target} payoutMultiplier={target} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

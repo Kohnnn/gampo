@@ -17,7 +17,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -243,7 +243,7 @@ export default function PacksGame() {
             }
         >
             <CoreStageFrame minHeight={600} maxWidth={760} loading={!preloader.ready} className="packs-stage-frame">
-                <div className="packs-stage">
+                <div className="packs-stage" data-mobile-critical-surface>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <div className="packs-tier-row">
                         {(['common', 'rare', 'mythic']).map(t => (
@@ -283,7 +283,7 @@ export default function PacksGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('packs')} />
             {/* Win chance + payout derived from the selected tier's weighted pool
                 (see tierMetrics). winProbability = P(mean of 3 picks > 1); the
                 expected return multiple equals E[pick mult] = tier RTP, so we

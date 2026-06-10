@@ -16,6 +16,7 @@ export { default as ResultToast } from './ResultToast'
 export { default as ActionLockOverlay } from './ActionLockOverlay'
 export { default as CoreStageFrame } from './CoreStageFrame'
 export { default as StageActionButton } from './StageActionButton'
+export { BIG_WIN_THRESHOLDS, DEFAULT_BIG_WIN_THRESHOLD, getBigWinThreshold } from './bigWinThresholds'
 export { default as AudioToggle } from './AudioToggle'
 export { default as SimBetStrip } from './SimBetStrip'
 export {

@@ -15,7 +15,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -29,6 +29,7 @@ import {
     CoreStageFrame,
     ROUND_EVENTS,
     useRoundMachine,
+    StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
@@ -259,7 +260,7 @@ export default function TomeOfLifeGame() {
             <CoreStageFrame minHeight={620} maxWidth={760} loading={!preloader.ready} className="tome-stage-frame">
                 <div className="tome-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="tome-pages">
+                    <div className="tome-pages" data-mobile-critical-surface>
                         {pages.map((p, idx) => {
                             const isActive = inRound && idx === pageIndex && p === null
                             const isRevealed = p !== null
@@ -290,9 +291,9 @@ export default function TomeOfLifeGame() {
                         })}
                     </div>
                     <div className="tome-actions">
-                        <button className="tome-action" disabled={!inRound || running || pageIndex >= PAGE_COUNT} onClick={readNextPage}>
+                        <StageActionButton disabled={!inRound || running || pageIndex >= PAGE_COUNT} onClick={readNextPage}>
                             {pageIndex >= PAGE_COUNT ? 'Reading complete' : `Read page ${pageIndex + 1}`}
-                        </button>
+                        </StageActionButton>
                     </div>
                     <div className="tome-paytable">
                         <span>☀️ Sun +1.4×</span>
@@ -305,7 +306,7 @@ export default function TomeOfLifeGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('tomeoflife')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.78} payoutMultiplier={currentMult || 1} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

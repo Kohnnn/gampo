@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
-import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset } from '../primitives'
+import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './rps.css'
@@ -22,6 +23,7 @@ export default function RpsGame() {
     const definition = findGameDefinition('rps')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('rps')
     const session = useGameSession('rps')
 
     const [choice, setChoice] = useState('rock')
@@ -31,6 +33,7 @@ export default function RpsGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
     // RTP-lock: P(win)=P(push)=1/3. A push refunds the stake (EV-neutral 1/3),
     // so RTP = payout/3 + 1/3. Solving for 97% RTP → payout = 1.91 (was 2.91,
     // which combined with the push refund gave a player-favourable 130% RTP).
@@ -47,6 +50,7 @@ export default function RpsGame() {
         const returnAmount = push ? betAmount : won ? betAmount * payout : 0
         const profit = returnAmount - betAmount
         playSound('tick')
+        setToast(null)
         setPhase('slamming')
         window.setTimeout(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'RPS return')
@@ -56,10 +60,18 @@ export default function RpsGame() {
             setPhase(push ? 'push' : won ? 'won' : 'lost')
             if (won) {
                 playSound('bigwin')
+                sfx.play('win')
                 setBigWin({ trigger: Date.now(), profit, multiplier: payout })
             } else {
                 playSound(push ? 'click' : 'loss')
+                if (!push) sfx.play('lose')
             }
+            setToast({
+                kind: won ? 'win' : push ? 'push' : 'lose',
+                multiplier: won ? payout : null,
+                amount: profit,
+                message: push ? 'Push — stake returned' : won ? 'RPS win' : 'RPS miss',
+            })
             session.record({
                 id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                 label: push ? 'Push' : won ? 'Win' : 'Miss',
@@ -126,9 +138,11 @@ export default function RpsGame() {
                     </div>
                 </div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={14} color="#00e701" />}
+                <ActionLockOverlay active={phase === 'slamming'} label="Throwing..." />
+                <ResultToast result={toast} onDismiss={() => setToast(null)} />
             </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={2.5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('rps')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={1 / 3} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

@@ -4,13 +4,14 @@
 // round event machine. Math (kenoPayout) is unchanged.
 
 import { useCallback, useRef, useState } from 'react'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, kenoPayout, sampleUniqueNumbers } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -58,6 +59,9 @@ export default function KenoGame() {
     const [lastMultiplier, setLastMultiplier] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('keno', { count: 9, cap: 10 }))
     const simSeqRef = useRef(0)
+    const stageRef = useRef(null)
+    // Bring the draw grid into view when a round starts (mobile reachability).
+    useScrollActionIntoView(stageRef, drawing, [drawing], { block: 'nearest' })
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return
@@ -175,7 +179,7 @@ export default function KenoGame() {
             aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
             <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="keno-stage-frame" mobileScrollable>
-                <div className="keno-stage">
+                <div className="keno-stage" ref={stageRef}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim keno" />
                     <div className="keno-grid" data-mobile-critical-surface>
@@ -197,7 +201,7 @@ export default function KenoGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('keno')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={estimatedChance} payoutMultiplier={kenoPayout(Math.max(1, selected.length), Math.max(1, Math.ceil(selected.length / 2)))} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

@@ -1,4 +1,5 @@
 .guess-stage {
+    position: relative; /* anchors ResultToast/ActionLockOverlay */
     width: 100%;
     display: flex;
     flex-direction: column;

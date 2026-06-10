@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset } from '../primitives'
+import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset, ResultToast, ActionLockOverlay, getBigWinThreshold } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './coinflip.css'
@@ -18,6 +19,7 @@ export default function CoinFlipGame() {
     const definition = findGameDefinition('coinflip')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('coinflip')
     const session = useGameSession('coinflip')
 
     const [choice, setChoice] = useState('head')
@@ -25,11 +27,14 @@ export default function CoinFlipGame() {
     const [lastWon, setLastWon] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
+    const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const payout = 1.96
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Coin Flip')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
         setLastBet(betAmount)
+        setToast(null)
         playSound('flip')
         setFlipping(true)
         const next = nextRoll('coinflip').roll < 0.5 ? 'head' : 'tail'
@@ -42,6 +47,14 @@ export default function CoinFlipGame() {
             setBurstKey(k => k + 1)
             setFlipping(false)
             playSound(won ? 'win' : 'loss')
+            if (won) sfx.play('win'); else sfx.play('lose')
+            if (won) setBigWin({ trigger: Date.now(), profit, multiplier: payout })
+            setToast({
+                kind: won ? 'win' : 'lose',
+                multiplier: won ? payout : null,
+                amount: profit,
+                message: won ? 'Coin matched' : 'Coin missed',
+            })
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: next, profit, betAmount, multiplier: won ? payout : 0 })
             showToast(won ? 'win' : 'loss', won ? 'Coin matched' : 'Coin missed', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -93,8 +106,11 @@ export default function CoinFlipGame() {
                     </div>
                 </div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={16} color="#ffcf5a" />}
+                <ActionLockOverlay active={flipping} label="Flipping..." />
+                <ResultToast result={toast} onDismiss={() => setToast(null)} />
             </div>
             </CoreStageFrame>
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('coinflip')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.5} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
