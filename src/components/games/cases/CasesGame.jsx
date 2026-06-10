@@ -84,6 +84,10 @@ const ROW_OPTIONS = [1, 3, 5, 10]
 const REEL_PREVIEW_ROWS = 5
 const REEL_PREVIEW_TILES = 18
 const CASE_REEL_START_OFFSET = -((CASE_TILE_PX + CASE_TILE_GAP_PX) * 4)
+// C2: the reel travels this many px PAST its final resting offset, then eases
+// back, so the landing reads as momentum rather than a hard stop.
+const CASE_REEL_OVERSHOOT_PX = 46
+const CASE_REEL_SETTLE_MS = 360
 const RARE_TIERS = new Set(['Restricted', 'Classified', 'Covert', 'Remarkable', 'Exotic', 'Extraordinary', 'Contraband', '★'])
 const RARITY_FILTERS = [
     { value: 'all', label: 'All', selectLabel: 'All rarities' },
@@ -590,6 +594,7 @@ export default function CasesGame() {
     const [trackOffsets, setTrackOffsets] = useState([])
     const [results, setResults] = useState([]) // resolved drops list (with wear/statTrak)
     const [casePhase, setCasePhase] = useState('idle') // idle | arming | lid | spin | slowdown | land | reveal | settled
+    const [settling, setSettling] = useState(false) // C2: reel easing back from overshoot
     const [quickOpen, setQuickOpen] = useState(false)
     const [autoOpen, setAutoOpen] = useState(false)
     const [autoPanelOpen, setAutoPanelOpen] = useState(false)
@@ -869,6 +874,7 @@ export default function CasesGame() {
         setResults([])
         setTracks([])
         setTrackOffsets([])
+        setSettling(false)
         setCasePhase('arming')
         // C-P1-2: opening also commits to the reel-first stage. Collapse the
         // browser (the auto-selected first case never fires selectCase).
@@ -929,7 +935,12 @@ export default function CasesGame() {
             sfx.play('multispin', { volume: rows >= 3 ? 0.62 : 0.36 })
             queueRevealTimer(() => {
                 if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
-                setTrackOffsets(finalOffsets)
+                // C2: aim PAST the resting offset (further negative) so the reel
+                // carries momentum. Reduced-motion lands flat on the final offset.
+                setSettling(false)
+                setTrackOffsets(reducedMotion
+                    ? finalOffsets
+                    : finalOffsets.map(o => o - CASE_REEL_OVERSHOOT_PX))
             }, 32)
             scheduleTickSfx(revealMs)
         }, lidMs)
@@ -942,6 +953,11 @@ export default function CasesGame() {
         queueRevealTimer(() => {
             if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
             setCasePhase('land')
+            // C2: ease back from the overshoot to the exact resting offset.
+            if (!reducedMotion) {
+                setSettling(true)
+                setTrackOffsets(finalOffsets)
+            }
         }, lidMs + Math.max(80, revealMs - sweepLeadMs))
 
         queueRevealTimer(() => {
@@ -1589,7 +1605,7 @@ export default function CasesGame() {
                                     {tracks.map((track, ti) => (
                                         <div key={ti} className="cases-carousel-frame" data-case-row-index={ti}>
                                             <div
-                                                className="cases-carousel-track"
+                                                className={`cases-carousel-track${settling ? ' is-settling' : ''}`}
                                                 style={{ transform: `translate(${trackOffsets[ti] || 0}px, -50%)` }}
                                             >
                                                 {track.map((item, idx) => {
