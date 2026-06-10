@@ -386,3 +386,75 @@ describe('wild multipliers (S3)', () => {
         expect(sawBoost || sawPlain).toBe(true)
     })
 })
+
+describe('random base-game feature (S4)', () => {
+    for (const id of ['blue-samurai', 'ghostblade-strike']) {
+        it(`${id} declares a randomFeature with a chance in (0,1) and a wild symbol`, () => {
+            const config = getSlotTemplate(id)
+            const rf = config.features.randomFeature
+            expect(rf).toBeTruthy()
+            expect(rf.chance).toBeGreaterThan(0)
+            expect(rf.chance).toBeLessThan(1)
+            expect(['wilds', 'wildReel']).toContain(rf.mode)
+            expect(config.symbols.some(s => s.type === 'wild')).toBe(true)
+        })
+
+        it(`${id} fires the random feature and injects wilds when the roll lands under chance`, () => {
+            const config = getSlotTemplate(id)
+            let fired = false
+            for (let i = 0; i < 3000; i += 1) {
+                let n = i * 2246822519 + 3
+                const rng = () => {
+                    n = (n * 1103515245 + 12345) & 0x7fffffff
+                    return (n % 1000000) / 1000000
+                }
+                const result = resolveSlotSpin(config, { rng })
+                const ev = result.featureEvents.find(e => e.type === 'random-feature')
+                if (ev) {
+                    fired = true
+                    expect(result.randomFeature).toBeTruthy()
+                    expect(result.randomFeature.wildIndexes.length).toBeGreaterThan(0)
+                    expect(ev.mode).toBe(config.features.randomFeature.mode)
+                    // Every injected index must actually be a wild on the board
+                    // (allowing for downstream expansion/stacking only adding more).
+                    for (const idx of result.randomFeature.wildIndexes) {
+                        expect(result.cells[idx]?.type).toBe('wild')
+                    }
+                    break
+                }
+            }
+            expect(fired, `${id} random feature never fired in 3000 spins`).toBe(true)
+        })
+    }
+
+    it('never fires when chance is 0 / feature absent', () => {
+        // scarab-spin has no randomFeature → the event must never appear.
+        const config = getSlotTemplate('scarab-spin')
+        for (let i = 0; i < 300; i += 1) {
+            const result = resolveSlotSpin(config)
+            expect(result.featureEvents.some(e => e.type === 'random-feature')).toBe(false)
+            expect(result.randomFeature == null).toBe(true)
+        }
+    })
+
+    it('wildReel mode turns a full column wild', () => {
+        const config = getSlotTemplate('ghostblade-strike')
+        const { cols, rows } = config.layout
+        let sawReel = false
+        for (let i = 0; i < 4000 && !sawReel; i += 1) {
+            let n = i * 2654435761 + 11
+            const rng = () => {
+                n = (n * 1103515245 + 12345) & 0x7fffffff
+                return (n % 1000000) / 1000000
+            }
+            const result = resolveSlotSpin(config, { rng })
+            if (result.randomFeature?.mode === 'wildReel') {
+                sawReel = true
+                // The injected indexes form a contiguous full column.
+                expect(result.randomFeature.wildIndexes.length).toBe(rows)
+            }
+        }
+        expect(sawReel).toBe(true)
+        expect(cols).toBeGreaterThan(0)
+    })
+})

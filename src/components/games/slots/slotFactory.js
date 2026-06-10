@@ -276,6 +276,9 @@ export const SLOT_TEMPLATES = [
         features: {
             stackedWildReel: { wildSymbolId: 'samurai', minStack: 4, lineBoost: 1.3 },
             anticipation: { scatterMin: 2 },
+            // S4: ~3% of base spins drop 2-4 random samurai wilds onto the reels
+            // before evaluation (announced via the random-feature event).
+            randomFeature: { chance: 0.03, mode: 'wilds', minWilds: 2, maxWilds: 4 },
         },
         symbols: [
             symbol('shogun', 'SHGN', `${mythic}/slot-mythic-shield.png`, 5, 7.5),
@@ -526,6 +529,9 @@ export const SLOT_TEMPLATES = [
             anticipation: { scatterMin: 2 },
             stackedWildReel: { wildSymbolId: 'ghost', minStack: 3, lineBoost: 1.6 },
             multiplierZones: { columns: [1, 2, 3], multiplier: 3 },
+            // S4: ~2.5% of base spins turn one random reel fully wild before
+            // evaluation (announced via the random-feature event).
+            randomFeature: { chance: 0.025, mode: 'wildReel' },
             buyBonus: {
                 costMultiplier: 80,
                 guaranteedScatters: 3,
@@ -1052,6 +1058,68 @@ function applyStackedWildReels(cells, config) {
     }
 }
 
+// ---- random base-game feature (S4) ----
+// `features.randomFeature = { chance, mode, count?, minWilds?, maxWilds? }`.
+// With probability `chance` (per base spin), inject extra wilds onto the board
+// BEFORE evaluation — the classic "random wilds / wild reel drops in" base-game
+// surprise. Two modes:
+//   'wilds'   -> scatter a random number of wilds (minWilds..maxWilds) onto
+//                non-special cells.
+//   'wildReel'-> turn one random full column wild.
+// Returns the mutated cells plus a descriptor for the announce animation, or
+// null when it did not fire. Pure function of the injected rng/roll so it stays
+// deterministic for calibration + tests.
+function applyRandomFeature(cells, config, rng) {
+    const cfg = config.features?.randomFeature
+    if (!cfg || !(cfg.chance > 0)) return { cells, randomFeature: null }
+    const wildSymbol = config.symbols.find(item => item.type === 'wild')
+    if (!wildSymbol) return { cells, randomFeature: null }
+    if (roll(config, 'randomFeature', rng) >= cfg.chance) return { cells, randomFeature: null }
+
+    const next = [...cells]
+    const mode = cfg.mode === 'wildReel' ? 'wildReel' : 'wilds'
+    const placed = []
+
+    if (mode === 'wildReel') {
+        const ranges = columnIndexRanges(config)
+        if (!ranges.length) return { cells, randomFeature: null }
+        const pick = Math.floor(roll(config, 'randomFeatureCol', rng) * ranges.length)
+        const { start, rows } = ranges[Math.min(pick, ranges.length - 1)]
+        for (let r = 0; r < rows; r += 1) {
+            next[start + r] = wildSymbol
+            placed.push(start + r)
+        }
+        return {
+            cells: next,
+            randomFeature: { mode, label: 'Wild reel drop', wildIndexes: placed },
+        }
+    }
+
+    // 'wilds' mode: scatter count wilds onto random non-special cells.
+    const minW = Math.max(1, cfg.minWilds || 2)
+    const maxW = Math.max(minW, cfg.maxWilds || 4)
+    const span = maxW - minW
+    const count = minW + Math.round(roll(config, 'randomFeatureCount', rng) * span)
+    // Candidate cells: anything that is a normal pay symbol (don't overwrite
+    // scatters / existing wilds / money / coin / mystery — those drive other
+    // features).
+    const candidates = []
+    next.forEach((item, index) => {
+        if (item && item.type !== 'wild' && isPaySymbol(item)) candidates.push(index)
+    })
+    for (let i = 0; i < count && candidates.length; i += 1) {
+        const pickAt = Math.floor(roll(config, `randomFeatureWild:${i}`, rng) * candidates.length)
+        const cellIndex = candidates.splice(pickAt, 1)[0]
+        next[cellIndex] = wildSymbol
+        placed.push(cellIndex)
+    }
+    if (!placed.length) return { cells, randomFeature: null }
+    return {
+        cells: next,
+        randomFeature: { mode, label: `${placed.length} random wilds`, wildIndexes: placed },
+    }
+}
+
 // ---- evaluation modes ----
 
 function evaluateLines(cells, config) {
@@ -1493,6 +1561,12 @@ export function resolveSlotSpin(config, options = {}) {
         }
     }
 
+    // Random base-game feature (S4): low-probability surprise injection of extra
+    // wilds (or a full wild reel) BEFORE expanding/stacking/evaluation, so the
+    // injected wilds also benefit from expansion + wild multipliers downstream.
+    const { cells: randomFeatureCells, randomFeature } = applyRandomFeature(cells, config, rng)
+    cells = randomFeatureCells
+
     // Expanding wilds: a column containing a wild becomes a full wild column.
     const { cells: expandedCells, expandedColumns } = applyExpandingWilds(cells, config)
     cells = expandedCells
@@ -1606,6 +1680,15 @@ export function resolveSlotSpin(config, options = {}) {
             label: `Wild win ×${config.features.wildMultiplier.multiplier}`,
             wildBoostHits,
             multiplier: config.features.wildMultiplier.multiplier,
+        })
+    }
+
+    if (randomFeature) {
+        featureEvents.push({
+            type: 'random-feature',
+            label: randomFeature.label,
+            mode: randomFeature.mode,
+            wildIndexes: randomFeature.wildIndexes,
         })
     }
 
@@ -1792,6 +1875,7 @@ export function resolveSlotSpin(config, options = {}) {
         cascadeFrames,
         zoneHits,
         wildBoostHits,
+        randomFeature,
         wheel,
         holdAndRespin,
         wildIndexes,
