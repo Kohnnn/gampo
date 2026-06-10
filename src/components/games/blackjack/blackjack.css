@@ -350,7 +350,6 @@
     .bj-stage {
         align-items: stretch;
         overflow: visible;
-        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .bj-table-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }

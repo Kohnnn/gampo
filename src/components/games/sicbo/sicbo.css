@@ -174,7 +174,6 @@
     .sb-stage {
         align-items: stretch;
         gap: 10px;
-        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .sb-dice {

@@ -2714,7 +2714,6 @@
 }
 
 .cases-view-switch,
-.cases-mode-switch,
 .cases-row-switch,
 .cases-quick-auto,
 .cases-side-actions,
@@ -2723,8 +2722,7 @@
     gap: 5px;
 }
 
-.cases-view-switch,
-.cases-mode-switch {
+.cases-view-switch {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     padding: 4px;
     border-radius: 12px;
@@ -2739,12 +2737,17 @@
     margin-top: 8px;
 }
 
+/* Merged open-mode control: Single / Multi x3 / Multi x5 / Bulk x10 in one
+   labeled 2x2 segmented group (replaces the old separate mode + rows pair). */
 .cases-row-switch {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 4px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .cases-view-switch button,
-.cases-mode-switch button,
 .cases-row-switch button,
 .cases-quick-auto button,
 .cases-side-actions button,
@@ -2769,14 +2772,13 @@
 }
 
 .cases-view-switch button,
-.cases-mode-switch button {
+.cases-row-switch button {
     border-radius: 8px;
     border-color: transparent;
     background: transparent;
 }
 
 .cases-view-switch button.active,
-.cases-mode-switch button.active,
 .cases-row-switch button.active,
 .cases-quick-auto button.active,
 .cases-auto-presets button.active,
@@ -2806,7 +2808,6 @@
 
 .cases-right-cta:disabled,
 .cases-view-switch button:disabled,
-.cases-mode-switch button:disabled,
 .cases-row-switch button:disabled,
 .cases-quick-auto button:disabled,
 .cases-side-actions button:disabled,
@@ -3371,17 +3372,16 @@
         height: 34px;
     }
 
-    .cases-row-switch,
+    .cases-row-switch {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .cases-auto-status {
         grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .cases-view-switch {
         order: 2;
-    }
-
-    .cases-mode-switch {
-        order: 3;
     }
 
     .cases-row-switch {
@@ -3560,7 +3560,6 @@
     }
 
     .cases-view-switch button,
-    .cases-mode-switch button,
     .cases-row-switch button,
     .cases-quick-auto button,
     .cases-side-actions button {

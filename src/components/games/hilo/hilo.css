@@ -85,7 +85,7 @@
 @media (max-width: 768px) {
     .hilo-stage {
         gap: 14px;
-        padding: 14px 6px calc(var(--mobile-action-height, 74px) + 18px);
+        padding: 14px 6px;
     }
 
     .hilo-cards {

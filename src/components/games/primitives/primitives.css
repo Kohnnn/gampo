@@ -2297,6 +2297,34 @@ input:focus-visible,
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    .bp-mobile-dock-extras {
+        grid-column: 1 / -1;
+        display: flex;
+        gap: 6px;
+        justify-content: flex-end;
+        pointer-events: auto;
+    }
+    .bp-mobile-dock-extras > button,
+    .bp-mobile-dock-extras .bp-bet-btn {
+        appearance: none;
+        min-height: 36px;
+        padding: 0 14px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.32);
+        color: var(--text-primary);
+        font-size: 11px;
+        font-weight: 950;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+    .bp-mobile-dock-extras > button:disabled,
+    .bp-mobile-dock-extras .bp-bet-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
     .bp-mobile-play {
         min-width: 0;
         border: 0;
@@ -2727,6 +2755,9 @@ input:focus-visible,
 @media (max-width: 768px) {
     .core-stage {
         min-height: clamp(260px, 42dvh, 360px) !important;
+        /* Shared dock clearance: keep stage content from hiding behind the
+           fixed mobile action dock. Replaces per-game hand-rolled copies. */
+        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -2840,4 +2871,74 @@ input:focus-visible,
     font-weight: 950;
     text-align: right;
     font-variant-numeric: tabular-nums;
+}
+
+/* === StageActionButton (shared in-stage progression CTA) === */
+.stage-action-btn {
+    appearance: none;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 1px solid color-mix(in srgb, var(--accent, #00e701), transparent 45%);
+    border-radius: 12px;
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent, #00e701), transparent 78%),
+        color-mix(in srgb, var(--accent, #00e701), transparent 90%));
+    color: var(--text-primary, #fff);
+    font-size: 13px;
+    font-weight: 950;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    touch-action: manipulation;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 140ms ease, border-color 140ms ease, transform 100ms ease, box-shadow 140ms ease;
+}
+.stage-action-btn:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent, #00e701), transparent 20%);
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent, #00e701), transparent 66%),
+        color-mix(in srgb, var(--accent, #00e701), transparent 82%));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--accent, #00e701), transparent 78%);
+}
+.stage-action-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+.stage-action-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+.stage-action-btn:focus-visible {
+    outline: 2px solid var(--accent, #00e701);
+    outline-offset: 2px;
+}
+.stage-action-btn.danger {
+    border-color: color-mix(in srgb, var(--accent-red, #ed4245), transparent 40%);
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent-red, #ed4245), transparent 74%),
+        color-mix(in srgb, var(--accent-red, #ed4245), transparent 88%));
+}
+.stage-action-btn.danger:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent-red, #ed4245), transparent 16%);
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent-red, #ed4245), transparent 62%),
+        color-mix(in srgb, var(--accent-red, #ed4245), transparent 80%));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--accent-red, #ed4245), transparent 76%);
+}
+.stage-action-btn.danger:focus-visible {
+    outline-color: var(--accent-red, #ed4245);
+}
+.stage-action-btn.secondary {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-secondary, #b1bad3);
+}
+.stage-action-btn.secondary:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary, #fff);
+    box-shadow: none;
 }

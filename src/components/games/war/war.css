@@ -87,3 +87,49 @@
     text-shadow: 0 0 20px rgba(0, 231, 1, 0.5);
 }
 
+@media (max-width: 768px) {
+    .war-stage {
+        gap: 14px;
+        padding: 14px 6px;
+    }
+
+    .war-row {
+        gap: 14px;
+    }
+
+    .war-card {
+        width: min(132px, 34vw);
+        font-size: clamp(36px, 9vw, 56px);
+        border-width: 3px;
+    }
+
+    .war-versus {
+        font-size: 24px;
+    }
+
+    .war-side span {
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .war-stage {
+        gap: 10px;
+        padding: 10px 4px;
+    }
+
+    .war-row {
+        gap: 8px;
+    }
+
+    .war-card {
+        width: min(104px, 32vw);
+        font-size: clamp(28px, 8vw, 44px);
+        border-radius: 10px;
+    }
+
+    .war-versus {
+        font-size: 18px;
+    }
+}
+

@@ -821,7 +821,6 @@
         overflow: visible;
         align-items: stretch;
         gap: 8px;
-        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .rou-top-deck {
