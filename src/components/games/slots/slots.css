@@ -849,6 +849,33 @@
     100% { opacity: 0; transform: scale(1.4); }
 }
 
+/* Cascade tumble: winning cells "pop" (shrink + fade) before the next frame
+   refills the board above them. Short, single-shot so it reads as the symbol
+   being cleared out of the grid. Reduced-motion disables it (the timeline jumps
+   straight to the final board, so no cell is ever marked .cascade-pop). */
+.slot-cell.cascade-pop {
+    z-index: 3;
+    animation: slotCascadePop 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.slot-cell.cascade-pop img,
+.slot-cell.cascade-pop strong {
+    animation: none;
+}
+
+@keyframes slotCascadePop {
+    0% { transform: scale(1.06); filter: brightness(1.5); opacity: 1; }
+    60% { transform: scale(0.7); opacity: 0.55; }
+    100% { transform: scale(0.32); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .slot-cell.cascade-pop {
+        animation: none;
+    }
+}
+
+
 /* Idle parallax bob applies a subtle motion to non-spinning, non-winning cells. */
 .slot-cell:not(.spinning):not(.winning) img,
 .slot-cell:not(.spinning):not(.winning) strong {

@@ -38,6 +38,8 @@ import {
     buildHoldTileStates,
     buildRetriggerFlyers,
     buildSlotFeatureDemoState,
+    buildCascadeTimeline,
+    cascadeTimelineDurationMs,
 } from './slotsMotion'
 import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
 import { winTier, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, rollupDurationMs, rollupFrame } from './slotWinPresentation'
@@ -244,6 +246,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [spinPhase, setSpinPhase] = useState('idle')
     const [stoppedCols, setStoppedCols] = useState(startTemplate.layout.cols)
     const [winningCells, setWinningCells] = useState([])
+    // Cells currently mid-pop during a cascade tumble replay (visual only).
+    const [cascadePopCells, setCascadePopCells] = useState([])
     const [lastResult, setLastResult] = useState(null)
     const [lastStake, setLastStake] = useState(5)
     // Spin resolve mode: 'normal' (full animation), 'turbo' (sped-up reels),
@@ -339,12 +343,16 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const persistentMultiplierRef = useRef(0)
     const reelFrameRef = useRef(null)
     const templateResetRef = useRef(startTemplate.id)
+    // Mirror turbo into a ref so finishRound (a stable callback) can read the
+    // current spin speed when building the cascade tumble timeline.
+    const turboRef = useRef(false)
     // rAF handle + start timestamp for the win-tier rollup count-up.
     const rollupRafRef = useRef(null)
 
     useEffect(() => { stopsRef.current = advancedStops }, [advancedStops])
     useEffect(() => { buyTierIdRef.current = bonusBuyTierId }, [bonusBuyTierId])
     useEffect(() => { persistentMultiplierRef.current = persistentMultiplier }, [persistentMultiplier])
+    useEffect(() => { turboRef.current = turbo }, [turbo])
 
     // Wave 10: when the free-spin counter drops to 0 mid-session, emit the end banner
     // and reset the session. This fires after finishRound has decremented freeSpins.
@@ -571,8 +579,41 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const returnAmount = round2(baseBet * result.multiplier)
         const profit = round2(returnAmount - stake)
 
-        setGrid(result.cells)
-        setWinningCells(result.winningIndexes)
+        // Cascade tumble replay: when the engine recorded multiple cascadeFrames
+        // (pop -> collapse -> refill chain), animate them on the grid instead of
+        // snapping straight to the final board. Reduced-motion / instant collapse
+        // to a single jump (handled inside buildCascadeTimeline). Each frame's
+        // board is applied at its scheduled time; the final frame lands the
+        // engine's resolved cells, so this is purely presentational.
+        const cascadeTimeline = buildCascadeTimeline(result.cascadeFrames, {
+            turbo: turboRef.current,
+            reduceMotion,
+        })
+        if (cascadeTimeline.length > 1) {
+            // Start on the first (pre-tumble) board with its winning cells lit.
+            const first = cascadeTimeline[0]
+            setGrid(first.cells)
+            setWinningCells(first.winCells)
+            setCascadePopCells(first.popCells)
+            slotSfx.play('cascadeStep', { volume: 0.7 })
+            for (let i = 1; i < cascadeTimeline.length; i += 1) {
+                const frame = cascadeTimeline[i]
+                timers.current.push(window.setTimeout(() => {
+                    setGrid(frame.cells)
+                    setWinningCells(frame.winCells)
+                    setCascadePopCells(frame.popCells)
+                    if (!frame.isFinal && frame.winCells.length) {
+                        slotSfx.play('cascadeStep', { volume: 0.72 })
+                    }
+                }, frame.atMs))
+            }
+            // Clear the pop highlight shortly after the last frame settles.
+            timers.current.push(window.setTimeout(() => setCascadePopCells([]), cascadeTimelineDurationMs(cascadeTimeline) + 120))
+        } else {
+            setGrid(result.cells)
+            setWinningCells(result.winningIndexes)
+            setCascadePopCells([])
+        }
         setLastResult({ ...result, profit, returnAmount, stake, baseBet, usedFreeSpin, usedBonusBuy })
         setRunning(false)
         setSpinPhase(result.multiplier > 0 ? 'win' : 'settled')
@@ -866,6 +907,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 setRunning(true)
                 setSpinPhase(source === 'stage' ? 'stage-spin' : 'spinning')
                 setWinningCells([])
+                setCascadePopCells([])
                 setLastResult(null)
                 setMysteryReveal(null)
                 setRetriggerFlyers([])
@@ -919,7 +961,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setRunning(true)
             setSpinPhase(source === 'stage' ? 'stage-spin' : 'spinning')
             setWinningCells([])
-            setLastResult(null)
+            setCascadePopCells([])
             setStoppedColumnState(0)
             setMysteryReveal(null)
             setRetriggerFlyers([])
@@ -1372,11 +1414,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                 const item = displayGrid[index] || config.symbols?.[0]
                                                 const spinning = running && col >= stoppedCols
                                                 const winning = winningCells.includes(index)
+                                                const popping = cascadePopCells.includes(index)
                                                 const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
                                                 return (
                                                     <div
                                                         key={`${index}-${item?.id || 'na'}`}
-                                                        className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''}`}
+                                                        className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''}`}
                                                     >
                                                         <Asset src={item?.asset} alt={item?.label} fallback={<strong>{item?.label}</strong>} />
                                                         <em>{item?.label}</em>
@@ -1401,13 +1444,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     if (!item) return null
                                     const spinning = running && col >= stoppedCols
                                     const winning = winningCells.includes(index)
+                                    const popping = cascadePopCells.includes(index)
                                     const inAnticipationCol = anticipating && col >= config.layout.cols - 2 && spinning
                                     const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
                                     const isSticky = stickyWilds.includes(index)
                                     return (
                                         <div
                                             key={`${index}-${item.id}`}
-                                            className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''} ${!spinning && wildColumns.has(col) ? 'wild-column' : ''}`}
+                                            className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''} ${!spinning && wildColumns.has(col) ? 'wild-column' : ''}`}
                                             style={{ animationDelay: `${col * 45}ms` }}
                                         >
                                             <Asset src={item.asset} alt={item.label} fallback={<strong>{item.label}</strong>} />
