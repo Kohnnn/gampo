@@ -412,3 +412,64 @@ Follow-up to Track E: with the provider tokens set, the feed was connected but t
 - `npm test -- --run` green at 266 tests across 60 files (+1 live-feed test).
 - `npm run build` clean.
 - Deployed to production and confirmed live: Top Matches / Popular Events / Title Contenders all show real MLB + CS2 teams (Miami Marlins, Tampa Bay Rays, QUAZAR, ReThink, NY Yankees…); header reads "optional feed connected · API quota 2460". Zero "Harbor United" / "River City" / "Practice XI" anywhere. Synthetic fallback still intact when no tokens/network.
+
+## Repo Audit + Hardening (2026-06-10)
+
+Principal-level repo audit. High-confidence findings only, each verified against source; fixes shipped same-pass. Health: **B** — strong test discipline (453 tests / 88 files) and clean build, but had leaked API keys in source, known-vulnerable deps, no CI gate, and two dead heavyweight dependencies.
+
+### Findings (verified)
+
+| # | Sev | Finding | Evidence | Status |
+|---|-----|---------|----------|--------|
+| 1 | **Critical** | 3 hardcoded Odds API keys committed in `FALLBACK_KEYS` and shipped in the client bundle; anyone could extract and burn the quota | `src/services/sportsApi.js:6-10` (pre-fix) | **Fixed** |
+| 2 | **High** | `npm audit`: react-router-dom open-redirect (GHSA-2j2x-hqr9-3h42, moderate ×2) + vitest≤3 chain incl. 1 critical (Vitest UI arbitrary file read/execute) + esbuild/vite dev-server advisories | `package.json:31,45,46` (pre-fix); `npm audit` output | **Fixed** |
+| 3 | **High** | No CI: no `.github/`, no lint config, nothing enforces the README's "Required Verification" — regressions only caught manually | repo root (no `.github`, no eslint/prettier config) | **Fixed** (CI added; lint still open) |
+| 4 | **Medium** | `phaser` (~1.4MB) and `matter-js` in `dependencies` but unused — only a comment mentions Phaser (`DinoEngine.js:1` says "no Phaser"); build emitted empty `phaser`/`matter` chunks every run (the long-standing warning noted since 2026-05-25) | `package.json:25-26`, `vite.config.js:32-33` (pre-fix) | **Fixed** |
+| 5 | **Medium** | 112 `Math.random()` call sites in `src/` — audited top files: all are presentational (sim-crowd targets `CrashGame.jsx:77-86`, particles, fake feeds), not payout paths; payouts route through `nextRoll` (`CrashGame.jsx:15,202`). Risk is drift: nothing structurally prevents a future payout path using `Math.random()` | grep count; `CrashGame.jsx:77-86` | Open (M2) |
+| 6 | **Medium** | 9 plinko outcome tables ~1.8MB each (~16MB total) as JS source in `src/components/games/plinko/engine/outcomes/rows-*.js`; slows transform/collect, inflates repo; already chunk-split at runtime so only a build/DX cost | `outcomes/rows-8..16.js` (1776-1805 KB each) | Open (M3) |
+| 7 | **Low** | `vite.config.js:18` hardcodes a personal zrok tunnel host in `allowedHosts` | `vite.config.js:18` | Open (M3) |
+| 8 | **Low** | `netlify/functions/sportsbook-free-feed.mjs:24` swallows the provider error (`catch {}` → generic 502), making prod feed failures hard to diagnose | `sportsbook-free-feed.mjs:24-30` | Open (M3) |
+
+Healthy areas (verified, no findings): test suite green and meaningful (math/RTP/engine contracts, not just smoke); `netlify.toml` minimal and correct; `.gitignore` covers env/logs/artifacts and `.env.local` is untracked (`git ls-files` + `git log --all -- .env.local` both empty); server-side provider proxy keeps tokens off the client; README accurate.
+
+### Shipped this pass
+
+1. **Secret removal** — deleted `FALLBACK_KEYS` from `src/services/sportsApi.js`; `getKeys()` now returns env keys or `[]` (graceful no-feed fallback already existed downstream). `src/utils/sportsApi.test.js` stubs `VITE_ODDS_API_KEYS` via `vi.stubEnv`. ⚠️ The 3 keys remain in git history and were publicly served — **rotate/revoke them at the provider** (manual step, see Open Items).
+2. **Dependency security** — `npm audit fix` cleared the react-router advisory; upgraded `vite` 5→7.3.5, `vitest` 1→4.1.8, `@vitejs/plugin-react` 4→5 to clear the esbuild/vite/vitest chain. `npm audit`: **0 vulnerabilities** (was 3 moderate + 1 critical). Added `testTimeout: 60000` to `vite.config.js` (vitest 4 default 5s broke the ~20s Monte Carlo `slotRtp.test.js`).
+3. **Dead deps removed** — uninstalled `phaser` + `matter-js`, dropped their `manualChunks` entries. Empty-chunk build warnings gone.
+4. **CI gate** — new `.github/workflows/ci.yml`: Node 20, `npm ci` → `npm test` → `npm run build` → `npm audit --omit=dev --audit-level=high` on push/PR to main/master.
+
+### Verification
+
+- `npm test` green: **453 tests / 88 files** on vitest 4 (pre-audit baseline 453/88 — no regressions).
+- `npm run build` clean on vite 7 in 11.5s; only the pre-existing large `rows-*` chunk note remains; empty `phaser`/`matter` chunk warnings eliminated.
+- `npm audit`: 0 vulnerabilities (was 2 moderate prod + 1 critical dev-chain).
+
+### Files modified
+
+- `src/services/sportsApi.js` — `FALLBACK_KEYS` removed; env-only keys.
+- `src/utils/sportsApi.test.js` — `vi.stubEnv('VITE_ODDS_API_KEYS', …)` in setup.
+- `vite.config.js` — phaser/matter chunks removed; `testTimeout: 60000`.
+- `package.json` / `package-lock.json` — phaser + matter-js removed; vite 7 / vitest 4 / plugin-react 5; react-router-dom patched.
+- `.github/workflows/ci.yml` — new CI gate.
+
+### Remaining plan (by milestone)
+
+**M1 — Critical follow-ups (manual / next session)**
+- [ ] **Rotate the 3 exposed Odds API keys** at the-odds-api.com and update Netlify env + `.env.local`. The keys are in git history and previously shipped in public bundles; removal from HEAD is not revocation. (S, manual)
+- [ ] Push a commit so the new CI workflow runs once; confirm green on GitHub. (S)
+
+**M2 — High-leverage guardrails**
+- [ ] Add ESLint (flat config) + a `no-restricted-properties` rule banning `Math.random` under `src/**/games/**` outside an allowlist (sim/visual modules), wired into CI. Locks in the payout-RNG boundary from finding #5. (M)
+- [ ] Add a wording-scan CI step (the project's own real-money-language constraint) if `scripts/` already has one; otherwise a simple grep gate. (S)
+
+**M3 — Quality & polish**
+- [ ] Convert plinko `rows-*.js` tables to fetched static JSON (or precision-reduced binary) to cut ~16MB of JS source and speed transforms. (L)
+- [ ] Parameterize `allowedHosts` zrok entry via env (`vite.config.js:18`). (S)
+- [ ] Log the caught error in `netlify/functions/sportsbook-free-feed.mjs` before returning 502. (S)
+
+### Open items needing a human decision
+
+- Key rotation (M1) requires provider-dashboard access — cannot be done from the repo.
+- `package.json:3` version is still `1.0.0` with no tagging/release convention; decide whether versioning matters for this project.
+- Uncommitted `SlotsGame.jsx`/`slots.css` changes predate this audit (in-progress work, left untouched).

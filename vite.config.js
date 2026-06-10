@@ -29,8 +29,6 @@ export default defineConfig(({ mode }) => {
                 output: {
                     manualChunks: {
                         'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-                        'phaser': ['phaser'],
-                        'matter': ['matter-js'],
                         'chart': ['chart.js'],
                     },
                 },
@@ -38,7 +36,9 @@ export default defineConfig(({ mode }) => {
         },
         test: {
             include: ['src/**/*.test.{js,jsx,ts,tsx}'],
-            environment: 'node'
+            environment: 'node',
+            // slotRtp.test.js runs Monte Carlo sims (~20s); vitest 4 default is 5s
+            testTimeout: 60000,
         }
     }
 })
