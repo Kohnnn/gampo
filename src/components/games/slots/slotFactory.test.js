@@ -458,3 +458,27 @@ describe('random base-game feature (S4)', () => {
         expect(cols).toBeGreaterThan(0)
     })
 })
+
+describe('S-anim feature animations are wired', () => {
+    it('SlotsGame renders the feature-announce + coin-shower overlays and clears them on spin', () => {
+        // State hooks exist.
+        expect(slotsGameSource).toContain('setFeatureAnnounce')
+        expect(slotsGameSource).toContain('setCoinShower')
+        // Render blocks exist.
+        expect(slotsGameSource).toContain('slot-feature-announce')
+        expect(slotsGameSource).toContain('slot-coin-shower')
+        // Triggered off the new feature events.
+        expect(slotsGameSource).toMatch(/multiplier-orbs[\s\S]*wild-multiplier[\s\S]*random-feature/)
+        // Coin shower is gated on big win + reduced-motion off.
+        expect(slotsGameSource).toMatch(/!reduceMotion && result\.multiplier >= SLOT_BIG_WIN_THRESHOLD/)
+    })
+
+    it('slots.css defines the announce + coin-shower styles with reduced-motion fallbacks', () => {
+        expect(slotsCssSource).toContain('.slot-feature-announce')
+        expect(slotsCssSource).toContain('.slot-coin-shower')
+        expect(slotsCssSource).toContain('@keyframes slotCoinFall')
+        expect(slotsCssSource).toContain('@keyframes slotFeatureAnnounce')
+        // Reduced-motion: coin shower suppressed, announce static.
+        expect(slotsCssSource).toMatch(/gampo-reduce-motion \.slot-coin-shower[\s\S]*display: none/)
+    })
+})

@@ -297,6 +297,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [eventFlash, setEventFlash] = useState(null)
     const [bonusCine, setBonusCine] = useState(null)
     const [nearMiss, setNearMiss] = useState(null)
+    // S-anim: transient announce banner for the new base-game features
+    // (multiplier orbs, wild multiplier, random wilds). { trigger, label, kind }.
+    const [featureAnnounce, setFeatureAnnounce] = useState(null)
+    // S-anim: coin-shower particle burst keyed by trigger; rendered on big wins.
+    const [coinShower, setCoinShower] = useState(null)
     const [showInfo, setShowInfo] = useState(false)
     // a11y: polite live-region message announcing the latest spin outcome
     // (win tier + multiplier, or "No win").
@@ -722,6 +727,36 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         if (result.cascadeSteps > 0) slotSfx.play('cascadeStep', { volume: 0.72 })
         if (result.featureEvents.some(item => item.type === 'money-collect')) slotSfx.play('moneyCollect', { volume: 0.85 })
 
+        // S-anim: announce the new base-game features (orbs / wild multiplier /
+        // random wilds). First matching event wins the banner so we don't stack
+        // overlays; the banner auto-clears. Reduced-motion still shows the text.
+        const announceEvent = result.featureEvents.find(item => (
+            item.type === 'multiplier-orbs'
+            || item.type === 'wild-multiplier'
+            || item.type === 'random-feature'
+        ))
+        if (announceEvent && !usedFreeSpin) {
+            setFeatureAnnounce({ trigger: revealTrigger, label: announceEvent.label, kind: announceEvent.type })
+            if (announceEvent.type === 'random-feature') slotSfx.play('anticipation', { volume: 0.6 })
+            else slotSfx.play('cascadeStep', { volume: 0.7 })
+            timers.current.push(window.setTimeout(() => {
+                setFeatureAnnounce(current => (current && current.trigger === revealTrigger ? null : current))
+            }, reduceMotion ? 900 : 1600))
+        } else {
+            setFeatureAnnounce(null)
+        }
+
+        // S-anim: coin-shower particle burst on a big win (reduced-motion skips
+        // the particles — the BigWinOverlay still announces the amount).
+        if (!reduceMotion && result.multiplier >= SLOT_BIG_WIN_THRESHOLD) {
+            setCoinShower({ trigger: revealTrigger })
+            timers.current.push(window.setTimeout(() => {
+                setCoinShower(current => (current && current.trigger === revealTrigger ? null : current))
+            }, 1800))
+        } else {
+            setCoinShower(null)
+        }
+
         // Wave 9: sticky-wild lock — accumulate wild positions during free-spin sessions, drop on session end.
         if (config.features?.stackedWildReel?.sticky || config.features?.stickyWild) {
             if (usedFreeSpin || result.triggeredFreeSpins) {
@@ -912,6 +947,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 setMysteryReveal(null)
                 setRetriggerFlyers([])
                 setEventFlash(null)
+                setFeatureAnnounce(null)
+                setCoinShower(null)
                 setNearMiss(null)
                 setAnticipating(false)
                 // Snap every reel straight to its resolved cell — no scrolling.
@@ -966,6 +1003,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setMysteryReveal(null)
             setRetriggerFlyers([])
             setEventFlash(null)
+            setFeatureAnnounce(null)
+            setCoinShower(null)
             setNearMiss(null)
             setAnticipating(false)
             playSound('tick')
@@ -1635,6 +1674,32 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 {eventFlash && !running && (
                     <div className="slot-event-flash" key={`flash-${eventFlash.trigger}`} aria-hidden="true">
                         <strong>{eventFlash.label}</strong>
+                    </div>
+                )}
+
+                {featureAnnounce && !running && (
+                    <div
+                        className={`slot-feature-announce kind-${featureAnnounce.kind}`}
+                        key={`feat-${featureAnnounce.trigger}`}
+                        aria-hidden="true"
+                    >
+                        <strong>{featureAnnounce.label}</strong>
+                    </div>
+                )}
+
+                {coinShower && !running && (
+                    <div className="slot-coin-shower" key={`coins-${coinShower.trigger}`} aria-hidden="true">
+                        {Array.from({ length: 18 }).map((_, i) => (
+                            <i
+                                key={i}
+                                className="slot-coin"
+                                style={{
+                                    '--coin-x': `${(i * 53) % 100}%`,
+                                    '--coin-delay': `${(i % 6) * 80}ms`,
+                                    '--coin-dur': `${900 + (i % 5) * 130}ms`,
+                                }}
+                            />
+                        ))}
                     </div>
                 )}
 
