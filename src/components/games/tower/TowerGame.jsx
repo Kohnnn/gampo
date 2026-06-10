@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -6,7 +7,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -20,6 +21,7 @@ import {
     CoreStageFrame,
     ROUND_EVENTS,
     useRoundMachine,
+    StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
@@ -52,6 +54,9 @@ export default function TowerGame() {
     const [level, setLevel] = useState(0)
     const [activeBet, setActiveBet] = useState(0)
     const [phase, setPhase] = useState('idle') // idle | climbing
+    const stageRef = useRef(null)
+    // Bring the tower into view when a climb starts (mobile reachability).
+    useScrollActionIntoView(stageRef, phase === 'climbing', [phase], { block: 'nearest' })
     const [fellAt, setFellAt] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
@@ -185,9 +190,9 @@ export default function TowerGame() {
             }
         >
             <CoreStageFrame minHeight={620} maxWidth={760} loading={!preloader.ready} className="tower-stage-frame">
-                <div className={`tower-stage ${fellAt !== null ? 'loss-flash' : ''}`}>
+                <div ref={stageRef} className={`tower-stage ${fellAt !== null ? 'loss-flash' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="tower-stack" style={{ transform: `translateY(${level * 4}px)` }}>
+                    <div className="tower-stack" data-mobile-critical-surface style={{ transform: `translateY(${level * 4}px)` }}>
                         {Array.from({ length: HEIGHT }, (_, index) => {
                             const tileLevel = HEIGHT - index
                             const isCurrent = tileLevel === level + 1 && phase === 'climbing'
@@ -207,14 +212,14 @@ export default function TowerGame() {
                     <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>Level <strong>{level}</strong> · Multiplier <strong>{multiplier.toFixed(2)}×</strong></p>
                     <MultiplierBadge label="Climb" value={multiplier} state={phase === 'climbing' ? 'active' : fellAt !== null ? 'bust' : 'idle'} size="sm" />
                     <div className="tower-action-btns">
-                        <button disabled={phase !== 'climbing'} onClick={climb}>Climb up</button>
+                        <StageActionButton disabled={phase !== 'climbing'} onClick={climb}>Climb up</StageActionButton>
                     </div>
                     {burstKey > 0 && phase === 'idle' && session.history[0]?.profit > 0 && <Particles key={burstKey} count={18} color="#41d6ff" />}
                     <ActionLockOverlay active={fellAt !== null} label="Fell" />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('tower')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={Math.pow(config.safe, Math.max(1, level + 1))} payoutMultiplier={Math.max(1.28, multiplier)} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

@@ -6,7 +6,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
-import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast } from '../primitives'
 import { BOARD_NUMBERS, WHEEL_ORDER, buildRouletteCoverage, colorOf, makeBet } from './layout'
 import EducationPanel from '../../EducationPanel'
 import './roulette.css'
@@ -90,6 +90,7 @@ export default function RouletteGame() {
     const [history, setHistory] = useState([])
     const [lastWon, setLastWon] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [toast, setToast] = useState(null)
     const [simPlayers, setSimPlayers] = useState(() => makeSimPlayers())
     // Snapshot of last placed chips, kept across spins for Rebet + Auto re-bet.
     const [lastChips, setLastChips] = useState([])
@@ -151,6 +152,7 @@ export default function RouletteGame() {
         setLastTotal(stake)
         playSound('tick')
         sfx.play('click', { volume: 0.35 })
+        setToast(null)
 
         // Pre-roll: simulated bettors are populated immediately so the
         // table feels live during the betting countdown. The actual wheel
@@ -208,6 +210,12 @@ export default function RouletteGame() {
                     playSound(profit > 0 ? 'win' : 'loss')
                 }
                 sfx.play(profit > 0 ? 'win' : 'lose', { volume: profit > 0 ? 0.72 : 0.5 })
+                setToast({
+                    kind: profit > 0 ? 'win' : profit === 0 ? 'push' : 'lose',
+                    multiplier: effectiveMult > 0 ? effectiveMult : null,
+                    amount: profit,
+                    message: `Landed ${number} ${colorOf(number)}`,
+                })
                 session.record({
                     id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                     label: `${number} ${colorOf(number)}`,
@@ -394,6 +402,7 @@ export default function RouletteGame() {
                         <div className={`rou-num-pop ${meta?.color || ''} ${result === null ? 'idle' : ''}`}>
                             {result === null ? <span aria-hidden="true">⟳</span> : result}
                         </div>
+                        <ResultToast result={toast} onDismiss={() => setToast(null)} />
                     </div>
                     <div className="rou-recent-rail-col">
                         <div className="rou-live-head"><span>Recent spins</span><strong>{spinning ? spinPhaseText : bettingMs > 0 ? `Betting ${(bettingMs / 1000).toFixed(1)}s` : result === null ? 'Open' : `${result} ${colorOf(result)}`}</strong></div>
@@ -514,7 +523,7 @@ export default function RouletteGame() {
                 </details>
             </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('roulette')} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={18 / 37} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

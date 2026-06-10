@@ -60,17 +60,5 @@
     display: flex;
     gap: 8px;
 }
-.drill-action-chip {
-    padding: 10px 16px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(0, 0, 0, 0.32);
-    color: var(--text-primary, #fff);
-    font-weight: 800;
-    font-size: 13px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    cursor: pointer;
-}
-.drill-action-chip.cashout { background: rgba(0, 231, 1, 0.16); border-color: rgba(0, 231, 1, 0.5); }
-.drill-action-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+/* CTA uses the shared StageActionButton primitive. */
+.drill-actions .stage-action-btn { flex: 1; max-width: 240px; }

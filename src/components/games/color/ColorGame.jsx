@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './color.css'
@@ -22,6 +23,7 @@ export default function ColorGame() {
     const definition = findGameDefinition('color')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('color')
     const session = useGameSession('color')
 
     const [choice, setChoice] = useState('red')
@@ -32,12 +34,14 @@ export default function ColorGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
     const payout = 3.84
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Color Pick')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
         setLastBet(betAmount)
         playSound('tick')
+        setToast(null)
         setSpinning(true)
         const idx = Math.floor(nextRoll('color').roll * COLORS.length)
         const next = COLORS[idx]
@@ -55,10 +59,18 @@ export default function ColorGame() {
             setSpinning(false)
             if (won) {
                 playSound('bigwin')
+                sfx.play('win')
                 setBigWin({ trigger: Date.now(), profit, multiplier: payout })
             } else {
                 playSound('loss')
+                sfx.play('lose')
             }
+            setToast({
+                kind: won ? 'win' : 'lose',
+                multiplier: won ? payout : null,
+                amount: profit,
+                message: `Landed ${next.label}`,
+            })
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: next.label, profit, betAmount, multiplier: won ? payout : 0 })
             showToast(won ? 'win' : 'loss', `Color ${next.label}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -92,12 +104,14 @@ export default function ColorGame() {
             <div className={`color-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`} style={{ '--result-color': result?.color }}>
                 <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="color-pointer" />
-                <div className="color-spectrum" style={{ transform: `rotate(${rotation}deg)` }} />
+                <div className="color-spectrum" data-mobile-critical-surface style={{ transform: `rotate(${rotation}deg)` }} />
                 <div className="color-result-label">{result?.label || 'Pick'}</div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={20} color={result?.color || '#fff'} />}
+                <ActionLockOverlay active={spinning} label="Spinning..." />
+                <ResultToast result={toast} onDismiss={() => setToast(null)} />
             </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={3} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('color')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.25} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

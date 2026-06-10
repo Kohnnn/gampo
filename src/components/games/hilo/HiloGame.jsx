@@ -6,7 +6,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -238,7 +238,7 @@ export default function HiloGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('hilo')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={winChance || 0.01} payoutMultiplier={payout || 1} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

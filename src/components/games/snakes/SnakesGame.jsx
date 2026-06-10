@@ -15,7 +15,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -236,7 +236,7 @@ export default function SnakesGame() {
             <CoreStageFrame minHeight={620} maxWidth={840} loading={!preloader.ready} className="snakes-stage-frame">
                 <div className="snakes-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="snakes-ladder">
+                    <div className="snakes-ladder" data-mobile-critical-surface>
                         {ladderRows.map(realRow => (
                             Array.from({ length: COLS }, (_, c) => {
                                 const isCurrent = inRound && (ROWS - 1 - rung) === realRow
@@ -274,7 +274,7 @@ export default function SnakesGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('snakes')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={(COLS - snakesPerRow) / COLS} payoutMultiplier={currentMult || 1} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

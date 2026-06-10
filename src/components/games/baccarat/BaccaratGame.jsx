@@ -1,11 +1,12 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -125,6 +126,9 @@ export default function BaccaratGame() {
         return seed
     })
     const [running, setRunning] = useState(false)
+    const tableRef = useRef(null)
+    // Bring the dealt hands into view when a coup starts (mobile reachability).
+    useScrollActionIntoView(tableRef, running, [running], { block: 'nearest' })
     const [lastWon, setLastWon] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [burstKey, setBurstKey] = useState(0)
@@ -329,7 +333,7 @@ export default function BaccaratGame() {
                             </span>
                         ))}
                     </div>
-                    <div className="bac-table">
+                    <div className="bac-table" ref={tableRef}>
                         <div className={`bac-side ${winner === 'player' ? 'winner' : ''}`}>
                             <h3>Player</h3>
                             <div className="bac-score">{playerScore ?? '--'}</div>
@@ -407,7 +411,7 @@ export default function BaccaratGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('baccarat')} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={0.4586} payoutMultiplier={1.95} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

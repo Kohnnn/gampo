@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, sampleUniqueNumbers } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './lottery.css'
@@ -21,6 +22,7 @@ export default function LotteryGame() {
     const definition = findGameDefinition('lottery')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('lottery')
     const session = useGameSession('lottery')
 
     const [selected, setSelected] = useState([3, 9, 14, 21, 32])
@@ -30,6 +32,7 @@ export default function LotteryGame() {
     const [lastWon, setLastWon] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [toast, setToast] = useState(null)
     const [settling, setSettling] = useState(false)
     const settleTimer = useRef(null)
 
@@ -47,6 +50,7 @@ export default function LotteryGame() {
         if (!placeBet(betAmount, 'Lottery')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
         setLastBet(betAmount)
         playSound('tick')
+        setToast(null)
         setDrawing(true); setDrawAnim([])
         const next = sampleUniqueNumbers({ max: 36, count: 5, random: () => nextRoll('lottery').roll })
         next.forEach((n, i) => window.setTimeout(() => { playSound('flip'); setDrawAnim(prev => [...prev, n]) }, 400 + i * 350))
@@ -64,10 +68,18 @@ export default function LotteryGame() {
             settleTimer.current = window.setTimeout(() => setSettling(false), 220)
             if (multiplier >= 8) {
                 playSound('bigwin')
+                sfx.play('win')
                 setBigWin({ trigger: Date.now(), profit, multiplier })
             } else {
                 playSound(returnAmount > 0 ? 'win' : 'loss')
+                if (returnAmount > 0) sfx.play('win'); else sfx.play('lose')
             }
+            setToast({
+                kind: profit >= 0 ? 'win' : 'lose',
+                multiplier: multiplier > 0 ? multiplier : null,
+                amount: profit,
+                message: `${hits}/5 numbers hit`,
+            })
             session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${hits}/5`, profit, betAmount, multiplier, meta: { picked: selected, drawn: next } })
             showToast(profit >= 0 ? 'win' : 'loss', `Lottery ${hits} hits`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
@@ -106,7 +118,7 @@ export default function LotteryGame() {
                     )}
                     {drawAnim.map((n, i) => <span key={`${n}-${i}`} className="lot-ball">{n}</span>)}
                 </div>
-                <div className="lot-grid">
+                <div className="lot-grid" data-mobile-critical-surface>
                     {Array.from({ length: 36 }, (_, i) => i + 1).map(n => {
                         const isSel = selected.includes(n)
                         const isDr = drawAnim.includes(n)
@@ -120,9 +132,11 @@ export default function LotteryGame() {
                     })}
                 </div>
                 {burstKey > 0 && lastWon && <Particles key={burstKey} count={20} color="#ffcf5a" />}
+                <ActionLockOverlay active={drawing} label="Drawing..." interactive />
+                <ResultToast result={toast} onDismiss={() => setToast(null)} />
             </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('lottery')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={1 / 376992} payoutMultiplier={5000} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

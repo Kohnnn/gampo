@@ -10,7 +10,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { clamp, formatCredits, limboWinChance } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -211,7 +211,7 @@ export default function LimboGame() {
                         <span>Hit chance {(chance * 100).toFixed(2)}%</span>
                     </div>
                     <div className="limbo-rocket-row">
-                        <div className="limbo-gauge">
+                        <div className="limbo-gauge" data-mobile-critical-surface>
                             <div className="limbo-gauge-fill" style={{ height: `${gaugePct}%`, background: lastWon === false ? 'linear-gradient(0deg, #ed4245, #ffcf5a)' : 'linear-gradient(0deg, #00e701, #41d6ff)' }} />
                             <div className="limbo-gauge-target" />
                         </div>
@@ -224,7 +224,7 @@ export default function LimboGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('limbo')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={chance} payoutMultiplier={target} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

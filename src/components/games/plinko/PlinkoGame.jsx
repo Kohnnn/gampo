@@ -6,13 +6,14 @@
 // dropped beside a Sapphire ball keeps its own art.
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -92,6 +93,9 @@ export default function PlinkoGame() {
     const [rows, setRows] = useState(12)
     const [ballType, setBallType] = useState('normal')
     const [activeDrops, setActiveDrops] = useState(0)
+    const boardRef = useRef(null)
+    // Bring the board into view when balls are in flight (mobile reachability).
+    useScrollActionIntoView(boardRef, activeDrops > 0, [activeDrops > 0], { block: 'nearest' })
     const [lastBet, setLastBet] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [highlightBin, setHighlightBin] = useState(null)
@@ -342,7 +346,7 @@ export default function PlinkoGame() {
             }
         >
             <CoreStageFrame minHeight={580} maxWidth={920} loading={!preloader.ready || !engineReady} className="plinko-stage-frame">
-                <div className="plinko-stage">
+                <div className="plinko-stage" ref={boardRef}>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim drops" />
                     <div className="plinko-canvas-wrap" data-mobile-critical-surface>
@@ -371,7 +375,7 @@ export default function PlinkoGame() {
                     <ActionLockOverlay active={!engineReady} label="Loading..." />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={15} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('plinko')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.5} payoutMultiplier={expected} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

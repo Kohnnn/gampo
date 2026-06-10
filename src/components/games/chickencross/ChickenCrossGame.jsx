@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -6,7 +7,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -20,6 +21,7 @@ import {
     CoreStageFrame,
     ROUND_EVENTS,
     useRoundMachine,
+    StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
@@ -50,6 +52,9 @@ export default function ChickenCrossGame() {
     const [lane, setLane] = useState(0)
     const [activeBet, setActiveBet] = useState(0)
     const [phase, setPhase] = useState('idle') // idle | crossing
+    const roadRef = useRef(null)
+    // Bring the road into view when a crossing starts (mobile reachability).
+    useScrollActionIntoView(roadRef, phase === 'crossing', [phase], { block: 'nearest' })
     const [splat, setSplat] = useState(false)
     const [carKey, setCarKey] = useState(0)
     const [burstKey, setBurstKey] = useState(0)
@@ -171,7 +176,7 @@ export default function ChickenCrossGame() {
             <CoreStageFrame minHeight={580} maxWidth={920} loading={!preloader.ready} className="cc-stage-frame">
                 <div className="cc-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="cc-road">
+                    <div className="cc-road" ref={roadRef} data-mobile-critical-surface>
                         {Array.from({ length: LANES + 1 }, (_, i) => {
                             const isFadeFrom = laneFx.key > 0 && i === laneFx.from
                             const isFadeTo = laneFx.key > 0 && i === laneFx.to
@@ -193,7 +198,7 @@ export default function ChickenCrossGame() {
                         {carKey > 0 && phase === 'crossing' && <span key={`car-${carKey}`} className="cc-car" />}
                     </div>
                     <div className="cc-action-btns">
-                        <button disabled={phase !== 'crossing'} onClick={cross}>Cross next</button>
+                        <StageActionButton disabled={phase !== 'crossing'} onClick={cross}>Cross next</StageActionButton>
                     </div>
                     <p className="bp-bal-line" style={{ color: 'var(--text-secondary)' }}>Lane <strong>{lane}/{LANES}</strong></p>
                     <MultiplierBadge label="Current" value={multiplier} state={phase === 'crossing' ? 'active' : 'idle'} size="sm" />
@@ -202,7 +207,7 @@ export default function ChickenCrossGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('chickencross')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={Math.pow(config.safe, Math.max(1, lane + 1))} payoutMultiplier={Math.max(1, multiplier)} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

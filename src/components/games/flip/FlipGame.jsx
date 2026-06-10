@@ -10,7 +10,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -192,7 +192,7 @@ export default function FlipGame() {
             }
         >
             <CoreStageFrame minHeight={520} maxWidth={840} loading={!preloader.ready} className="flip-stage-frame">
-                <div className="flip-stage">
+                <div className="flip-stage" data-mobile-critical-surface>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <div className={`flip-coin ${showSide} ${spinning ? 'spin' : ''}`} aria-label={`Coin showing ${showSide}`}>
                         <span>{showSide === 'heads' ? 'H' : 'T'}</span>
@@ -208,7 +208,7 @@ export default function FlipGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('flip')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.5} payoutMultiplier={PAYOUT} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

@@ -6,7 +6,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -200,7 +200,7 @@ export default function CasinoWarGame() {
                 <div className={`war-stage ${hand?.outcome === 'win' || hand?.outcome === 'tie-win' ? 'win-flash' : (hand?.outcome === 'loss' || hand?.outcome === 'tie-loss') ? 'loss-flash' : ''}`}>
                     <RecentResultsStrip results={session.stats.lastResults} />
                     <div className={`war-row ${slamming ? 'slamming' : ''}`}>
-                        <div className="war-side">
+                        <div className="war-side" data-mobile-critical-surface>
                             <span>You</span>
                             <div className={`war-card-slot ${hand?.outcome === 'win' || hand?.outcome === 'tie-win' ? 'win' : (hand?.outcome === 'loss' || hand?.outcome === 'tie-loss') ? 'loss' : ''}`}>
                                 {hand?.player
@@ -209,7 +209,7 @@ export default function CasinoWarGame() {
                             </div>
                         </div>
                         <strong className="war-versus">VS</strong>
-                        <div className="war-side">
+                        <div className="war-side" data-mobile-critical-surface>
                             <span>Dealer</span>
                             <div className={`war-card-slot ${hand?.outcome === 'loss' || hand?.outcome === 'tie-loss' ? 'win' : (hand?.outcome === 'win' || hand?.outcome === 'tie-win') ? 'loss' : ''}`}>
                                 {hand?.dealer
@@ -225,7 +225,7 @@ export default function CasinoWarGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={3} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('war')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.467} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

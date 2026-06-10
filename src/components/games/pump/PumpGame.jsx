@@ -12,7 +12,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -26,6 +26,7 @@ import {
     CoreStageFrame,
     ROUND_EVENTS,
     useRoundMachine,
+    StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import EducationPanel from '../../EducationPanel'
@@ -185,7 +186,7 @@ export default function PumpGame() {
             <CoreStageFrame minHeight={520} maxWidth={840} loading={!preloader.ready} className="pump-stage-frame">
                 <div className="pump-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className={`pump-balloon ${busted ? 'busted' : ''}`} style={{ width: `${balloonSize}px`, height: `${balloonSize}px` }}>
+                    <div data-mobile-critical-surface className={`pump-balloon ${busted ? 'busted' : ''}`} style={{ width: `${balloonSize}px`, height: `${balloonSize}px` }}>
                         {pumps === 0 ? '0' : `${pumps}`}
                     </div>
                     <div className="pump-meter">
@@ -194,7 +195,7 @@ export default function PumpGame() {
                         ))}
                     </div>
                     <div className="pump-actions">
-                        <button className="pump-action-chip" disabled={!inRound || busted} onClick={pumpOnce}>Pump</button>
+                        <StageActionButton disabled={!inRound || busted} onClick={pumpOnce}>Pump</StageActionButton>
                     </div>
                     <div>
                         <MultiplierBadge label={inRound ? 'Current' : 'Ready'} value={inRound ? currentMult : 1} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="md" />
@@ -208,7 +209,7 @@ export default function PumpGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('pump')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={1 - STEP_BUST_CHANCE} payoutMultiplier={STEP_RAMP} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

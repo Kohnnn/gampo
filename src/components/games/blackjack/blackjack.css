@@ -215,26 +215,9 @@
     grid-template-columns: repeat(5, 1fr);
     gap: 6px;
 }
-.bj-actions button {
-    appearance: none;
-    background: rgba(0, 0, 0, 0.3);
-    color: var(--text-primary);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 12px 0;
-    border-radius: 8px;
-    font-weight: 950;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 12px;
-    cursor: pointer;
-}
-.bj-actions button:hover:not(:disabled) {
-    border-color: var(--accent);
-    color: var(--accent);
-}
-.bj-actions button:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.bj-actions button.recommended:not(:disabled) {
+/* Buttons now use the shared StageActionButton primitive; only the
+   blackjack-specific "recommended" hint accent remains local. */
+.bj-actions .stage-action-btn.recommended:not(:disabled) {
     border-color: rgba(138, 206, 255, 0.95);
     background: linear-gradient(180deg, rgba(138, 206, 255, 0.28), rgba(20, 117, 225, 0.18));
     box-shadow: 0 0 22px rgba(138, 206, 255, 0.24);

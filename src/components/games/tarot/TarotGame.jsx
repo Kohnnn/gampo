@@ -11,7 +11,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -197,7 +197,7 @@ export default function TarotGame() {
                             </button>
                         ))}
                     </div>
-                    <div className="tarot-spread">
+                    <div className="tarot-spread" data-mobile-critical-surface>
                         {revealed.map((entry, i) => {
                             const card = entry?.card
                             const matched = entry?.matched
@@ -268,7 +268,7 @@ export default function TarotGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('tarot')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.42} payoutMultiplier={TARGET_RTP / 0.42} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

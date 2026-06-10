@@ -12,7 +12,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, scoreBlackjackHand } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -25,6 +25,7 @@ import {
     CoreStageFrame,
     ROUND_EVENTS,
     useRoundMachine,
+    StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
@@ -583,11 +584,11 @@ export default function BlackjackGame() {
                         />
                     )}
                     <div className="bj-actions" data-mobile-critical-surface>
-                        <button className={`bj-primary-action ${hintAction === 'hit' ? 'recommended' : ''}`} disabled={phase !== 'playing' || activeHand.status !== 'active' || activeHand.isSplitAces} onClick={hit}>Hit</button>
-                        <button className={`bj-primary-action ${hintAction === 'stand' ? 'recommended' : ''}`} disabled={phase !== 'playing' || activeHand.status !== 'active'} onClick={stand}>Stand</button>
-                        <button disabled={phase !== 'playing' || !canSplitActive} onClick={split}>Split</button>
-                        <button disabled={phase !== 'playing' || !canDoubleActive} onClick={doubleDown}>Double</button>
-                        <button disabled={phase !== 'playing' || !canSurrenderActive} onClick={surrender}>Surrender</button>
+                        <StageActionButton className={`bj-primary-action ${hintAction === 'hit' ? 'recommended' : ''}`} disabled={phase !== 'playing' || activeHand.status !== 'active' || activeHand.isSplitAces} onClick={hit}>Hit</StageActionButton>
+                        <StageActionButton className={`bj-primary-action ${hintAction === 'stand' ? 'recommended' : ''}`} disabled={phase !== 'playing' || activeHand.status !== 'active'} onClick={stand}>Stand</StageActionButton>
+                        <StageActionButton variant="secondary" disabled={phase !== 'playing' || !canSplitActive} onClick={split}>Split</StageActionButton>
+                        <StageActionButton variant="secondary" disabled={phase !== 'playing' || !canDoubleActive} onClick={doubleDown}>Double</StageActionButton>
+                        <StageActionButton variant="danger" disabled={phase !== 'playing' || !canSurrenderActive} onClick={surrender}>Surrender</StageActionButton>
                     </div>
                     {insuranceOffered && (
                         <div className="bj-insurance">
@@ -608,7 +609,7 @@ export default function BlackjackGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={2.4} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('blackjack')} />
             {/* Basic-strategy hand-win frequency. Rounds resolve into win/push/
                 loss with 3:2 blackjacks, so the engine's true RTP lives in
                 blackjackRules/settleBlackjackHands, not a single multiplier. The

@@ -13,7 +13,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -259,7 +259,7 @@ export default function DiamondsGame() {
             <CoreStageFrame minHeight={520} maxWidth={840} loading={!preloader.ready} className="diamonds-stage-frame">
                 <div className="diamonds-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="diamonds-row">
+                    <div className="diamonds-row" data-mobile-critical-surface>
                         {slots.map((g, i) => {
                             const isMatch = Number.isInteger(matchedIndex) && g === matchedIndex
                             return (
@@ -279,7 +279,7 @@ export default function DiamondsGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={12} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('diamonds')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

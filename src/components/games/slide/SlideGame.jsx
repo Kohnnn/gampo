@@ -11,7 +11,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { clamp, formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import {
+import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
     GameShell,
@@ -193,7 +193,7 @@ export default function SlideGame() {
             <CoreStageFrame minHeight={520} maxWidth={840} loading={!preloader.ready} className="slide-stage-frame">
                 <div className="slide-stage">
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <div className="slide-track">
+                    <div className="slide-track" data-mobile-critical-surface>
                         <div className="slide-target" style={{ left: `${left}%`, width: `${right - left}%` }} />
                         <div className={`slide-marker ${lastWon === true ? 'win' : lastWon === false ? 'lose' : ''}`} style={{ left: `${marker}%` }} />
                     </div>
@@ -205,7 +205,7 @@ export default function SlideGame() {
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={5} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('slide')} />
             <EducationPanel definition={definition} betAmount={5} winProbability={winChance} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )

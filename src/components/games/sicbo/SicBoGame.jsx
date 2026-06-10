@@ -6,7 +6,8 @@ import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
-import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
+import { useSfx } from '../../../audio/useSfx'
+import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
 import { evaluate, rollDice } from './bets'
 import SicBoDie from './SicBoDie'
@@ -20,6 +21,7 @@ export default function SicBoGame() {
     const definition = findGameDefinition('sicbo')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('sicbo')
     const session = useGameSession('sicbo')
 
     const [chip, setChip] = useState(5)
@@ -35,6 +37,7 @@ export default function SicBoGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [lastChips, setLastChips] = useState({})
     const [lastTotal, setLastTotal] = useState(null)
+    const [toast, setToast] = useState(null)
     const { schedule, cancelAll } = useCancellableTimeouts()
     const stageRef = useRef(null)
 
@@ -81,6 +84,7 @@ export default function SicBoGame() {
         setLastChips({ ...activeBets })
         setLastTotal(stake)
         playSound('tick')
+        setToast(null)
         setRunning(true)
         setShaking(true)
         setRevealed([false, false, false])
@@ -106,10 +110,18 @@ export default function SicBoGame() {
                 setBurstKey(k => k + 1)
                 if (effectiveMult >= 8) {
                     playSound('bigwin')
+                    sfx.play('win')
                     setBigWin({ trigger: Date.now(), profit, multiplier: effectiveMult })
                 } else {
                     playSound(profit > 0 ? 'win' : 'loss')
+                    if (profit > 0) sfx.play('win'); else sfx.play('lose')
                 }
+                setToast({
+                    kind: profit > 0 ? 'win' : profit === 0 ? 'push' : 'lose',
+                    multiplier: effectiveMult > 0 ? effectiveMult : null,
+                    amount: profit,
+                    message: `Rolled ${next.join('+')} = ${next.reduce((a, b) => a + b, 0)}`,
+                })
                 session.record({
                     id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
                     label: `${next.join('+')}=${next.reduce((a, b) => a + b, 0)}`,
@@ -188,6 +200,8 @@ export default function SicBoGame() {
                     </div>
                 )}
                 <div className="sb-total">Total <strong>{dice.reduce((a, b) => a + b, 0)}</strong></div>
+                <ActionLockOverlay active={running} label="Rolling..." />
+                <ResultToast result={toast} onDismiss={() => setToast(null)} />
 
                 <div className="sb-board" data-mobile-critical-surface>
                     <div className="sb-row-label">Even-money / Odd-Even / Big-Small</div>
@@ -264,7 +278,7 @@ export default function SicBoGame() {
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={16} color="#ff8f3d" />}
             </div>
             </CoreStageFrame>
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={8} />
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('sicbo')} />
             <EducationPanel definition={definition} betAmount={chip} winProbability={0.486} payoutMultiplier={2} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
