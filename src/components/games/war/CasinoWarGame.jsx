@@ -184,6 +184,11 @@ export default function CasinoWarGame() {
                             Surrender (50%)
                         </button>
                     ) : null}
+                    dockExtras={phase === 'tied' ? (
+                        <button type="button" disabled={slamming} onClick={surrender}>
+                            Surrender (50%)
+                        </button>
+                    ) : null}
                 >
                     <div className="bp-bal-line"><span>Win</span><strong>2×</strong></div>
                     <div className="bp-bal-line"><span>Tie-win</span><strong>+1×</strong></div>

@@ -160,7 +160,7 @@
     .vp-stage {
         align-items: stretch;
         gap: 12px;
-        padding: 12px 6px calc(var(--mobile-action-height, 74px) + 18px);
+        padding: 12px 6px;
     }
 
     .vp-row {

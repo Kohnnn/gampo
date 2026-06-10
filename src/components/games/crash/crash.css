@@ -406,7 +406,6 @@
     .crash-stage {
         overflow: visible;
         align-items: stretch;
-        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
     }
 
     .crash-mobile-targets {

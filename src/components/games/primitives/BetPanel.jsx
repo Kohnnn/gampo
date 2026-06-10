@@ -30,6 +30,7 @@ export default function BetPanel({
     disableAuto = false,
     children, // game-specific controls injected into manual tab body
     afterPlayChildren, // optional lower-priority controls shown after the primary CTA
+    dockExtras = null, // optional compact controls rendered inside the portaled mobile dock
     autoChildren, // optional extra auto controls
     lastBet = null,
     // Mid-round CTA support: when playPhase is set, BetPanel hides the bet input
@@ -514,6 +515,11 @@ export default function BetPanel({
                 >
                     {mobilePlayContent}
                 </button>
+                {dockExtras && (
+                    <div className="bp-mobile-dock-extras" data-mobile-dock-extras>
+                        {dockExtras}
+                    </div>
+                )}
             </div>
 
             {showSetupNudge && (

@@ -157,7 +157,6 @@
 @media (max-width: 768px) {
     .mines-stage {
         gap: 8px;
-        padding-bottom: calc(var(--mobile-action-height, 74px) + 18px);
     }
     .mines-stage .rrs-strip {
         min-height: 30px;

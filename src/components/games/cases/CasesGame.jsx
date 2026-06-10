@@ -290,7 +290,6 @@ function CaseRightPanel({
     totalStake,
     view,
 }) {
-    const mode = rows === 1 ? 'single' : rows === 10 ? 'bulk' : 'multi'
     const caseQuery = caseSwitchSearch.trim().toLowerCase()
     const switcherCases = (allCases || [])
         .filter(c => !caseQuery || c.name.toLowerCase().includes(caseQuery) || (c.type || '').toLowerCase().includes(caseQuery))
@@ -311,15 +310,10 @@ function CaseRightPanel({
                     <button type="button" className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}>History</button>
                     <button type="button" className={view === 'pokedex' ? 'active' : ''} onClick={() => setView('pokedex')}>Inventory</button>
                 </div>
-                <div className="cases-mode-switch" role="group" aria-label="Open mode">
-                    <button type="button" className={mode === 'single' ? 'active' : ''} aria-pressed={mode === 'single'} disabled={running} onClick={() => selectRows(1)}>Single</button>
-                    <button type="button" className={mode === 'multi' ? 'active' : ''} aria-pressed={mode === 'multi'} disabled={running} onClick={() => selectRows(rows > 1 && rows < 10 ? rows : 5)}>Multi</button>
-                    <button type="button" className={mode === 'bulk' ? 'active' : ''} aria-pressed={mode === 'bulk'} disabled={running} onClick={() => selectRows(10)}>Bulk</button>
-                </div>
-                <div className="cases-row-switch" role="group" aria-label="Open rows">
+                <div className="cases-row-switch cases-row-switch-merged" role="group" aria-label="Open mode (rows per open)">
                     {ROW_OPTIONS.map(n => (
                         <button key={n} type="button" className={rows === n ? 'active' : ''} aria-pressed={rows === n} disabled={running} onClick={() => selectRows(n)}>
-                            ×{n}
+                            {n === 1 ? 'Single' : n === 10 ? 'Bulk ×10' : `Multi ×${n}`}
                         </button>
                     ))}
                 </div>
