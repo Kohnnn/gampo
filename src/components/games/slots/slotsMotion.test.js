@@ -3,8 +3,11 @@ import {
     SLOT_HOLD_NEW_TILE_PULSE_MS,
     SLOT_RETRIGGER_FLY_MS,
     SLOT_WHEEL_WOBBLE_MS,
+    CASCADE_STEP_MS,
     buildSlotFeatureDemoState,
     buildCascadeTraceCells,
+    buildCascadeTimeline,
+    cascadeTimelineDurationMs,
     buildHoldTileStates,
     buildRetriggerFlyers,
     getCellCenterPercent,
@@ -115,5 +118,56 @@ describe('slot motion helpers', () => {
         expect(demo.holdTiles.filter(tile => tile.fresh).map(tile => tile.index)).toEqual([2, 4, 5])
         expect(demo.retriggerFlyers.map(flyer => flyer.id)).toEqual(['99-0-0', '99-7-1', '99-14-2'])
         expect(demo.retriggerFlyers.every(flyer => flyer.amount === 8)).toBe(true)
+    })
+})
+
+describe('cascade tumble timeline', () => {
+    const frames = [
+        { cells: ['a', 'b', 'c', 'd'], winCells: [0, 1], stepPayout: 2, stepMultiplier: 1 },
+        { cells: ['x', 'y', 'c', 'd'], winCells: [0], stepPayout: 3, stepMultiplier: 2 },
+        { cells: ['z', 'y', 'c', 'd'], winCells: [], stepPayout: 0, stepMultiplier: 0 },
+    ]
+
+    it('returns empty for trivial (0 or 1 frame) chains', () => {
+        expect(buildCascadeTimeline([])).toEqual([])
+        expect(buildCascadeTimeline([frames[0]])).toEqual([])
+    })
+
+    it('conserves the final board: replaying lands exactly on the last frame cells', () => {
+        const timeline = buildCascadeTimeline(frames)
+        const settled = timeline[timeline.length - 1]
+        expect(settled.cells).toEqual(frames[frames.length - 1].cells)
+        expect(settled.isFinal).toBe(true)
+        // The final frame never marks cells as popping (nothing refills after it).
+        expect(settled.popCells).toEqual([])
+    })
+
+    it('marks each non-final frame win cells as popping and schedules monotonically', () => {
+        const timeline = buildCascadeTimeline(frames)
+        expect(timeline).toHaveLength(3)
+        expect(timeline[0].popCells).toEqual([0, 1])
+        expect(timeline[1].popCells).toEqual([0])
+        let prev = -1
+        for (const frame of timeline) {
+            expect(frame.atMs).toBeGreaterThan(prev)
+            prev = frame.atMs
+        }
+        expect(cascadeTimelineDurationMs(timeline)).toBe(timeline[timeline.length - 1].atMs)
+    })
+
+    it('turbo halves the per-step interval', () => {
+        const normal = buildCascadeTimeline(frames)
+        const fast = buildCascadeTimeline(frames, { turbo: true })
+        expect(fast[1].atMs).toBeLessThan(normal[1].atMs)
+        expect(normal[1].atMs).toBe(CASCADE_STEP_MS)
+    })
+
+    it('reduced-motion collapses to a single instant jump to the final board', () => {
+        const timeline = buildCascadeTimeline(frames, { reduceMotion: true })
+        expect(timeline).toHaveLength(1)
+        expect(timeline[0].atMs).toBe(0)
+        expect(timeline[0].cells).toEqual(frames[frames.length - 1].cells)
+        expect(timeline[0].popCells).toEqual([])
+        expect(timeline[0].isFinal).toBe(true)
     })
 })

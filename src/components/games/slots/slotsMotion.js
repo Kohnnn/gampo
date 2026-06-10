@@ -3,6 +3,11 @@ export const SLOT_HOLD_NEW_TILE_PULSE_MS = 200
 export const SLOT_RETRIGGER_FLY_MS = 320
 export const SLOT_CASCADE_TRACE_MS = 520
 
+// Per-step duration of a real tumble (pop winning symbols -> collapse -> refill).
+// Turbo halves it; reduced-motion skips the stepping entirely (jump to final).
+export const CASCADE_STEP_MS = 620
+export const CASCADE_POP_FRACTION = 0.42 // portion of a step spent on the pop before refill
+
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value))
 }
@@ -97,6 +102,59 @@ function defaultCellPositions(layout = {}) {
         col: index % cols,
         row: Math.floor(index / cols),
     }))
+}
+
+// Turn the engine's cascadeFrames into a playable UI timeline. Each step in the
+// returned timeline tells the renderer which board to show, which cells are
+// "popping" (about to clear), the running payout, and the absolute clock time
+// at which to apply it. The renderer just walks the timeline with setTimeout.
+//
+// Conservation guarantee: the final timeline entry's `cells` is always the last
+// frame's board (the settled grid), so replaying the timeline lands exactly on
+// the engine's resolved cells. Reduced-motion / instant callers can ignore the
+// timing and jump straight to the last entry.
+export function buildCascadeTimeline(frames = [], { stepMs = CASCADE_STEP_MS, turbo = false, reduceMotion = false } = {}) {
+    const list = Array.isArray(frames) ? frames.filter(Boolean) : []
+    if (list.length <= 1) return []
+    // reduced-motion: a single jump to the final board, no intermediate pops.
+    if (reduceMotion) {
+        const finalFrame = list[list.length - 1]
+        return [{
+            index: list.length - 1,
+            atMs: 0,
+            cells: [...(finalFrame.cells || [])],
+            winCells: [],
+            popCells: [],
+            stepPayout: 0,
+            stepMultiplier: finalFrame.stepMultiplier ?? 0,
+            isFinal: true,
+        }]
+    }
+    const perStep = Math.max(120, Math.round((turbo ? stepMs / 2 : stepMs)))
+    const timeline = []
+    let clock = 0
+    for (let i = 0; i < list.length; i += 1) {
+        const frame = list[i]
+        const winCells = uniqueNumbers(frame.winCells || [])
+        timeline.push({
+            index: i,
+            atMs: clock,
+            cells: [...(frame.cells || [])],
+            // Cells that win on THIS board will pop, then the NEXT frame refills.
+            winCells,
+            popCells: i < list.length - 1 ? winCells : [],
+            stepPayout: toFiniteNumber(frame.stepPayout, 0),
+            stepMultiplier: toFiniteNumber(frame.stepMultiplier, 0),
+            isFinal: i === list.length - 1,
+        })
+        clock += perStep
+    }
+    return timeline
+}
+
+export function cascadeTimelineDurationMs(timeline = []) {
+    if (!Array.isArray(timeline) || !timeline.length) return 0
+    return timeline[timeline.length - 1].atMs
 }
 
 export function buildSlotFeatureDemoState({
