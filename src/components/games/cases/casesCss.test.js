@@ -27,4 +27,15 @@ describe('cases CSS polish', () => {
         expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.game-shell:has\(\.cases-stage-frame\) \.gs-aside\s*\{[^}]*order:\s*1/s)
         expect(css).toContain('.cases-inventory-grid')
     })
+
+    it('C2: defines the overshoot settle-back transition on the reel track', () => {
+        expect(css).toMatch(/\.cases-carousel-track\.is-settling\s*\{[^}]*transition:\s*transform\s*360ms/s)
+    })
+
+    it('C4: desaturates the reel during spin/slowdown and flashes the target on land', () => {
+        expect(css).toMatch(/case-phase-slowdown .cases-carousel-tile[\s\S]*saturate\(/s)
+        expect(css).toContain('@keyframes caseRarityFlash')
+        // Reduced-motion clears the pre-reveal desaturation filter.
+        expect(css).toMatch(/gampo-reduce-motion[\s\S]*case-phase-reveal .cases-carousel-tile[\s\S]*filter:\s*none/s)
+    })
 })

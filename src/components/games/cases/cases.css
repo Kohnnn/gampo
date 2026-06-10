@@ -736,6 +736,12 @@
     transition: transform var(--case-spin-ms, 5200ms) cubic-bezier(0.11, 0.84, 0.16, 1);
     will-change: transform;
 }
+/* C2: settle-back from the overshoot — a short ease-out that springs the reel
+   back onto its exact resting offset after it carried past the target. */
+.cases-carousel-track.is-settling {
+    transition: transform 360ms cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
 
 .cases-carousel-tile {
     width: var(--case-tile-px, 118px);
