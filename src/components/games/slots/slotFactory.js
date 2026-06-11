@@ -723,21 +723,33 @@ export const SLOT_TEMPLATES = [
         features: {
             scatter: { symbolId: 'lollipop', trigger: 5, awardFreeSpins: 12, pay: 1.5 },
             anticipation: { scatterMin: 4 },
-            clusterMin: 6,
+            // 8+ of a kind pays (Sweet-Bonanza style). On the 8x8 board a min of 6
+            // meant the common low symbols cleared the threshold nearly every spin
+            // (≈100% hit rate, degenerate scalar). 8 makes a paid cluster a real
+            // probabilistic event and matches the "Very high" volatility target.
+            clusterMin: 8,
             cascade: { tumbleMultiplierLadder: [1, 2, 3, 4, 6, 8] },
             persistentMultiplier: 1,
             // Multiplier orbs (Gates-style): orb cells carry a random ×; on any
-            // winning tumble the orb sum multiplies the win total. Low landing
-            // weight keeps the fat tail bounded; maxWinMultiplier caps the rest.
+            // winning tumble the orb sum multiplies the win total. The orb symbol
+            // must be RARE (low weight) so it reads as a feature, not wallpaper —
+            // an 8x8 board with a high orb weight lands orbs every spin, which
+            // forces a degenerate RTP scalar that rounds normal wins to 0 (the
+            // 2026-06-11 audit risk #1). Tuned so orbs appear on a minority of
+            // spins and the per-orb ceiling is bounded; the win then spreads
+            // across a real distribution instead of collapsing to ~1x.
             multiplierOrbs: {
                 symbolId: 'orb',
-                values: [2, 3, 5, 10, 25, 50, 100, 250],
-                weights: [42, 26, 16, 9, 4, 2, 0.8, 0.2],
+                values: [2, 3, 5, 8, 12, 20, 50, 100],
+                weights: [40, 26, 16, 9, 5, 2.5, 1, 0.5],
             },
             // Max-win cap (player-facing multiplier). Bounds the 8x8 cluster +
             // cascade + persistent-multiplier fat tail so the displayed RTP is
-            // actually experienced and verifiable.
-            maxWinMultiplier: 5000,
+            // actually experienced and verifiable. Lowered from 5000 -> 2000: the
+            // old ceiling was never reached once the scalar crushed the tail, so
+            // it was cosmetic. 2000x is a genuine, reachable top end for this
+            // very-high-volatility title.
+            maxWinMultiplier: 2000,
             buyBonus: {
                 costMultiplier: 100,
                 guaranteedScatters: 5,
@@ -755,7 +767,7 @@ export const SLOT_TEMPLATES = [
             symbol('rank-k', 'K', `${classic}/slot-classic-bar.png`, 20, 0.5),
             symbol('rank-q', 'Q', `${classic}/slot-classic-bell.png`, 22, 0.4),
             symbol('rank-j', 'J', `${classic}/slot-classic-cherry.png`, 22, 0.32),
-            symbol('orb', 'ORB', `${mythic}/slot-mythic-orb.png`, 3, 0, { type: 'orb' }),
+            symbol('orb', 'ORB', `${mythic}/slot-mythic-orb.png`, 0.12, 0, { type: 'orb' }),
             symbol('lollipop', 'BONUS', `${gummy}/gummy-drops-bonus.png`, 4, 0, { type: 'scatter' }),
         ],
     },

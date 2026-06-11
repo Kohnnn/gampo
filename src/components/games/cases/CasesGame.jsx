@@ -88,6 +88,10 @@ const CASE_REEL_START_OFFSET = -((CASE_TILE_PX + CASE_TILE_GAP_PX) * 4)
 // back, so the landing reads as momentum rather than a hard stop.
 const CASE_REEL_OVERSHOOT_PX = 46
 const CASE_REEL_SETTLE_MS = 360
+// C5: in a ×10 bulk open the rows settle in a staggered cascade (this many ms
+// apart) rather than all at once, so the grid resolves like a wave and the
+// best drop can finish with a finale pulse.
+const CASE_MULTI_SETTLE_STAGGER_MS = 110
 const RARE_TIERS = new Set(['Restricted', 'Classified', 'Covert', 'Remarkable', 'Exotic', 'Extraordinary', 'Contraband', '★'])
 const RARITY_FILTERS = [
     { value: 'all', label: 'All', selectLabel: 'All rarities' },
@@ -146,8 +150,11 @@ export function CaseMultiOpenGrid({
     results,
     trackOffsets,
     tracks,
+    settledRows = [],
+    finaleRow = -1,
 }) {
     const revealReady = hasReachedCasePhase(casePhase, 'reveal') || results.length > 0
+    const settledSet = new Set(settledRows)
     return (
         <div className="cases-multi-open-grid" data-case-layout="multi-grid" aria-label="Bulk case opening reels">
             {tracks.map((track, rowIndex) => {
@@ -155,10 +162,12 @@ export function CaseMultiOpenGrid({
                 const target = track[CASE_PRIZE_INDEX] || result || track[0]
                 const isRare = result && RARE_TIERS.has(result.rarity)
                 const profit = Number(result?.profitGc) || 0
+                const rowSettled = settledSet.has(rowIndex)
+                const isFinale = rowIndex === finaleRow
                 return (
                     <article
                         key={`bulk-${rowIndex}-${target?.variantKey || target?.id || rowIndex}`}
-                        className={`cases-multi-slot ${result ? 'is-settled' : ''} ${isRare ? 'rare' : ''} ${result?.statTrak ? 'stattrak' : ''} ${result?.souvenir ? 'souvenir' : ''}`}
+                        className={`cases-multi-slot ${result ? 'is-settled' : ''} ${rowSettled ? 'is-row-settled' : ''} ${isFinale ? 'is-finale' : ''} ${isRare ? 'rare' : ''} ${result?.statTrak ? 'stattrak' : ''} ${result?.souvenir ? 'souvenir' : ''}`}
                         style={{ '--rarity': result?.color || target?.color || '#ffd166' }}
                         data-case-row-index={rowIndex}
                         data-case-outcome-id={result?.skinId || result?.id || target?.skinId || target?.id || ''}
@@ -167,11 +176,11 @@ export function CaseMultiOpenGrid({
                         <header className="cases-multi-slot-head">
                             <span>#{rowIndex + 1}</span>
                             <strong>{activeCase?.name || 'Case'}</strong>
-                            <em>{result ? 'Landed' : casePhaseLabel(casePhase, 1)}</em>
+                            <em>{result ? (isFinale ? 'Top drop' : 'Landed') : casePhaseLabel(casePhase, 1)}</em>
                         </header>
                         <div className="cases-mini-reel-frame">
                             <div
-                                className="cases-carousel-track cases-mini-reel-track"
+                                className={`cases-carousel-track cases-mini-reel-track${rowSettled && !result ? ' is-settling' : ''}`}
                                 style={{ transform: `translate(${trackOffsets[rowIndex] || 0}px, -50%)` }}
                             >
                                 {track.map((item, tileIndex) => {
@@ -595,6 +604,9 @@ export default function CasesGame() {
     const [results, setResults] = useState([]) // resolved drops list (with wear/statTrak)
     const [casePhase, setCasePhase] = useState('idle') // idle | arming | lid | spin | slowdown | land | reveal | settled
     const [settling, setSettling] = useState(false) // C2: reel easing back from overshoot
+    const [nearMiss, setNearMiss] = useState(false) // C3: rare tile teased adjacent to target
+    const [settledRows, setSettledRows] = useState([]) // C5: per-row staggered settle flags (×10)
+    const [finaleRow, setFinaleRow] = useState(-1) // C5: best-drop row index for finale pulse
     const [quickOpen, setQuickOpen] = useState(false)
     const [autoOpen, setAutoOpen] = useState(false)
     const [autoPanelOpen, setAutoPanelOpen] = useState(false)
@@ -787,6 +799,17 @@ export default function CasesGame() {
         }
         const celebrate = pickCelebrationDrop(picks)
         setCelebrationDrop(celebrate)
+        // C5: in a bulk open, flag the single highest-value row so the grid can
+        // give it a finale pulse once everything has settled.
+        if (roundRows > 1 && picks.length > 1) {
+            let bestRow = 0
+            for (let i = 1; i < picks.length; i += 1) {
+                if ((Number(picks[i]?.valueGc) || 0) > (Number(picks[bestRow]?.valueGc) || 0)) bestRow = i
+            }
+            setFinaleRow(bestRow)
+        } else {
+            setFinaleRow(-1)
+        }
         if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
         if (celebrate) {
             celebrationTimerRef.current = window.setTimeout(() => setCelebrationDrop(null), 2600)
@@ -833,6 +856,7 @@ export default function CasesGame() {
         showToast(won ? 'win' : 'loss', `${caseData.name} ${won ? 'win' : 'miss'}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         setRunning(false)
         setCasePhase('settled')
+        setNearMiss(false)
         pendingRoundRef.current = null
         const scrollId = window.setTimeout(() => {
             const reducedMotion = Boolean(
@@ -875,6 +899,9 @@ export default function CasesGame() {
         setTracks([])
         setTrackOffsets([])
         setSettling(false)
+        setNearMiss(false)
+        setSettledRows([])
+        setFinaleRow(-1)
         setCasePhase('arming')
         // C-P1-2: opening also commits to the reel-first stage. Collapse the
         // browser (the auto-selected first case never fires selectCase).
@@ -894,6 +921,7 @@ export default function CasesGame() {
         const picks = round.outcomes
         const newTracks = round.tracks
         const finalOffsets = round.offsets
+        const roundNearMiss = Boolean(round.nearMiss)
         pendingRoundRef.current = {
             caseData: activeCase,
             entries: round.entries,
@@ -948,15 +976,43 @@ export default function CasesGame() {
         queueRevealTimer(() => {
             if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
             setCasePhase('slowdown')
+            // C3: when a rare tile is teased adjacent to the target, drive the
+            // slowdown heartbeat (CSS, scoped to .case-near-miss) + a gentle
+            // tactile pulse. Reduced-motion suppresses both (motion + vibration).
+            if (roundNearMiss && !reducedMotion) {
+                setNearMiss(true)
+                haptic('select', { enabled: hapticsEnabled })
+            }
         }, lidMs + Math.max(90, revealMs * 0.58))
 
         queueRevealTimer(() => {
             if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
             setCasePhase('land')
+            // C3: stop the near-miss heartbeat the moment the reel locks.
+            setNearMiss(false)
             // C2: ease back from the overshoot to the exact resting offset.
             if (!reducedMotion) {
                 setSettling(true)
+                // C5: in a ×10 bulk open, settle the rows in a staggered wave so
+                // the grid resolves like a cascade. Other layouts settle at once.
+                if (rows === 10) {
+                    finalOffsets.forEach((offset, ri) => {
+                        queueRevealTimer(() => {
+                            if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
+                            setTrackOffsets(prev => {
+                                const next = Array.isArray(prev) ? [...prev] : []
+                                next[ri] = offset
+                                return next
+                            })
+                            setSettledRows(prev => (prev.includes(ri) ? prev : [...prev, ri]))
+                        }, ri * CASE_MULTI_SETTLE_STAGGER_MS)
+                    })
+                } else {
+                    setTrackOffsets(finalOffsets)
+                }
+            } else {
                 setTrackOffsets(finalOffsets)
+                setSettledRows(finalOffsets.map((_, ri) => ri))
             }
         }, lidMs + Math.max(80, revealMs - sweepLeadMs))
 
@@ -1377,7 +1433,7 @@ export default function CasesGame() {
         >
             <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
                 <div
-                    className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}`}
+                    className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}${nearMiss ? ' case-near-miss' : ''}`}
                     style={{
                         '--case-spin-ms': `${quickOpen ? 1320 : CASE_REVEAL_MS}ms`,
                         '--case-tile-gap': `${CASE_TILE_GAP_PX}px`,
@@ -1598,6 +1654,8 @@ export default function CasesGame() {
                                     results={results}
                                     trackOffsets={trackOffsets}
                                     tracks={tracks}
+                                    settledRows={settledRows}
+                                    finaleRow={finaleRow}
                                 />
                             )}
                             {tracks.length > 0 && rows !== 10 && (

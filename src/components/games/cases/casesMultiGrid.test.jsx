@@ -64,4 +64,45 @@ describe('CaseMultiOpenGrid', () => {
         expect(html).toContain('ST™')
         expect(html).toContain('SV')
     })
+
+    it('marks the finale row and staggered settled rows (C5)', () => {
+        const results = Array.from({ length: 10 }, (_, index) => makeOutcome(index))
+        const tracks = results.map(makeTrack)
+        const html = renderToStaticMarkup(
+            <CaseMultiOpenGrid
+                activeCase={{ name: 'CS2 Test Case' }}
+                casePhase="settled"
+                results={results}
+                trackOffsets={tracks.map(() => -100)}
+                tracks={tracks}
+                settledRows={[0, 1, 2]}
+                finaleRow={4}
+            />,
+        )
+        // Exactly one finale row, and the "Top drop" label appears for it.
+        expect(html.match(/is-finale/g)).toHaveLength(1)
+        expect(html).toContain('Top drop')
+        // Only the three rows we flagged are marked settled in the staggered wave.
+        expect(html.match(/is-row-settled/g)).toHaveLength(3)
+        // The data-case contracts are still intact under the new props.
+        expect(html.match(/data-case-row-index="/g)).toHaveLength(10)
+        expect(html.match(/data-case-target="true"/g)).toHaveLength(10)
+    })
+
+    it('omits finale/settled markers when not provided (defaults)', () => {
+        const results = Array.from({ length: 10 }, (_, index) => makeOutcome(index))
+        const tracks = results.map(makeTrack)
+        const html = renderToStaticMarkup(
+            <CaseMultiOpenGrid
+                activeCase={{ name: 'CS2 Test Case' }}
+                casePhase="settled"
+                results={results}
+                trackOffsets={tracks.map(() => -100)}
+                tracks={tracks}
+            />,
+        )
+        expect(html).not.toContain('is-finale')
+        expect(html).not.toContain('is-row-settled')
+        expect(html).not.toContain('Top drop')
+    })
 })

@@ -798,6 +798,36 @@
     100% { box-shadow: 0 0 24px -5px var(--rarity, rgba(255, 209, 102, 0.75)); filter: none; }
 }
 
+/* C3: near-miss suspense. When a rare tile is teased adjacent to the target, the
+   stage gets `.case-near-miss` during the slowdown phase only. We pulse the
+   pointer + frame glow (box-shadow / transform channel ONLY — never `filter`,
+   which C4 owns to mask rarity colour) so the player FEELS a big drop sweeping
+   under the pointer without the tile colour leaking the real result. */
+.cases-stage.case-near-miss.case-phase-slowdown .cases-carousel-pointer,
+.cases-stage.case-near-miss.case-phase-slowdown .cases-mini-pointer {
+    animation: caseNearMissPulse 540ms ease-in-out infinite;
+}
+.cases-stage.case-near-miss.case-phase-slowdown .cases-carousel-frame,
+.cases-stage.case-near-miss.case-phase-slowdown .cases-mini-reel-frame {
+    animation: caseNearMissGlow 540ms ease-in-out infinite;
+}
+@keyframes caseNearMissPulse {
+    0%, 100% { transform: scaleY(1); box-shadow: 0 0 8px 1px rgba(255, 209, 102, 0.5); }
+    50% { transform: scaleY(1.18); box-shadow: 0 0 18px 4px rgba(255, 122, 89, 0.85); }
+}
+@keyframes caseNearMissGlow {
+    0%, 100% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+    50% { box-shadow: inset 0 0 24px -2px rgba(255, 122, 89, 0.45), inset 0 0 0 1px rgba(255, 122, 89, 0.5); }
+}
+/* C3 reduced-motion: never run the heartbeat (vibration + motion are both
+   suppressed elsewhere; this kills the visual pulse to match). */
+.gampo-reduce-motion .cases-stage.case-near-miss .cases-carousel-pointer,
+.gampo-reduce-motion .cases-stage.case-near-miss .cases-mini-pointer,
+.gampo-reduce-motion .cases-stage.case-near-miss .cases-carousel-frame,
+.gampo-reduce-motion .cases-stage.case-near-miss .cases-mini-reel-frame {
+    animation: none !important;
+}
+
 .cases-carousel-tile img {
     width: 100%;
     height: min(76px, calc(100% - 34px));
@@ -1467,9 +1497,6 @@
 .cases-stage.has-result .cases-selected-case aside strong {
     font-size: 18px;
 }
-.cases-stage.has-result .cases-rows {
-    max-height: 250px;
-}
 .cases-stage.has-result .cases-result-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 164px), 1fr));
@@ -1553,13 +1580,8 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 320px;
-    overflow-y: auto;
     padding-right: 4px;
-    scrollbar-width: thin;
 }
-.cases-rows::-webkit-scrollbar { width: 6px; }
-.cases-rows::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 4px; }
 
 .cases-multi-open-grid {
     display: grid;
@@ -1594,6 +1616,38 @@
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.07),
         0 0 24px -10px var(--rarity, rgba(255, 209, 102, 0.85));
+}
+
+/* C5: each row fades/lifts in as it settles in the staggered wave. */
+.cases-multi-slot {
+    transition: transform 240ms cubic-bezier(0.16, 0.92, 0.28, 1), box-shadow 240ms ease;
+}
+.cases-multi-slot.is-row-settled {
+    animation: caseRowSettle 300ms cubic-bezier(0.16, 0.92, 0.28, 1) both;
+}
+@keyframes caseRowSettle {
+    0% { transform: translateY(7px) scale(0.985); }
+    60% { transform: translateY(-2px) scale(1.008); }
+    100% { transform: translateY(0) scale(1); }
+}
+/* C5 best-drop finale: the single highest-value row gets a celebratory pulse +
+   intensified rarity glow once everything has settled. */
+.cases-multi-slot.is-finale {
+    z-index: 2;
+    border-color: var(--rarity, #ffd166);
+    animation: caseFinalePulse 1100ms cubic-bezier(0.22, 0.61, 0.36, 1) 2 both;
+}
+@keyframes caseFinalePulse {
+    0% { transform: scale(1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 0 0 var(--rarity, rgba(255, 209, 102, 0.7)); }
+    35% { transform: scale(1.035); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 30px -4px var(--rarity, rgba(255, 209, 102, 0.95)); }
+    100% { transform: scale(1); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 20px -8px var(--rarity, rgba(255, 209, 102, 0.7)); }
+}
+.gampo-reduce-motion .cases-multi-slot.is-row-settled,
+.gampo-reduce-motion .cases-multi-slot.is-finale {
+    animation: none !important;
+}
+.gampo-reduce-motion .cases-multi-slot.is-finale {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 18px -6px var(--rarity, rgba(255, 209, 102, 0.85));
 }
 
 .cases-multi-slot-head {

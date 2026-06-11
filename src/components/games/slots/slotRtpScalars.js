@@ -22,5 +22,5 @@ export const SLOT_RTP_SCALARS = {
     "coop-cluck": 0.0420588,
     "miko-spirit": 0.0536472,
     "forge-anvil": 2.18478,
-    "gummy-drops": 6.19572e-7
+    "gummy-drops": 0.000018251
 }
