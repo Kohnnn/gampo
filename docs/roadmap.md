@@ -1,5 +1,11 @@
 # Roadmap
 
+> **2026-06-11 — Latest status, slots feature waves & cases unbox polish, plus the
+> full audit/handoff for the next AI, live in
+> [`docs/roadmap-audit-handoff-2026-06-11.md`](./roadmap-audit-handoff-2026-06-11.md).**
+> Read that first for current state, verification steps, deferred work (C1/C3/C5,
+> S5/S6), and known risks.
+
 Tracking deferred work after Phase 7. Items marked **done** are addressed; the rest remain.
 
 The strategy from Phase 7 forward is **batch shipping**: each batch ships independently with build + tests + docs.
