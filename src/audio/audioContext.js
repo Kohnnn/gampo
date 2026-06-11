@@ -291,6 +291,11 @@ export async function playSample(url, { volume = 1, dedupeKey } = {}) {
     if (!url) return false
     if (masterMuted || sfxMuted) return false
     if (dedupeKey && !shouldFire(dedupeKey)) return false
+    // Auto per-URL dedupe: when a game fires the SAME sample twice in a very
+    // short window (e.g. legacy playSound('click') + useSfx sfx.play('click')
+    // now resolving to the same file after the 2026-06-11 migration), collapse
+    // it to one playback. Explicit dedupeKey callers already gated above.
+    if (!dedupeKey && !shouldFire(`url:${url}`, 40)) return false
     await unlockAudio()
     const c = getAudioCtx()
     const dest = getSfxGain() || getMasterGain()

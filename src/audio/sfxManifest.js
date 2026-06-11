@@ -289,17 +289,36 @@ export const sfxManifest = {
         win: '/audio/kenney/jingles/jingles_HIT03.ogg',
         lose: '/audio/common/lose.wav',
     },
+    dino: {
+        // 2026-06-11: dino was the only game still on the legacy playSound path
+        // with no useSfx manifest. Map its events onto shared samples.
+        click: '/audio/common/click.wav',
+        flip: '/audio/common/reveal.wav',
+        explode: '/audio/common/lose.wav',
+        cashout: '/audio/common/cashout.wav',
+        win: '/audio/common/win.wav',
+        bigwin: '/audio/common/bigwin.wav',
+        lose: '/audio/common/lose.wav',
+    },
 }
 
 export function resolveSfx(slug, role) {
     const game = sfxManifest[slug]
     if (game && Object.prototype.hasOwnProperty.call(game, role)) {
-        return game[role] || null
+        // A declared role with a real path wins. When a per-game role is
+        // explicitly null ("intentionally silent" placeholder), fall through to
+        // the shared `common` sample so the game still makes a sound through
+        // useSfx instead of going silent (2026-06-11 audio migration).
+        if (game[role]) return game[role]
     }
     const common = sfxManifest.common || {}
     if (Object.prototype.hasOwnProperty.call(common, role)) {
         return common[role] || null
     }
+    // Map a few legacy event names onto their nearest common sample so games
+    // migrating off playSound() keep their texture.
+    const ALIAS = { loss: 'lose', flip: 'reveal', deal: 'reveal', explode: 'lose', tick: 'click' }
+    if (ALIAS[role] && common[ALIAS[role]]) return common[ALIAS[role]]
     return null
 }
 
