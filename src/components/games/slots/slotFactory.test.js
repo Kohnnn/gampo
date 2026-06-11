@@ -288,6 +288,8 @@ describe('multiplier orbs', () => {
             const config = getSlotTemplate(id)
             // Deterministic RNG that biases every cell toward the orb symbol so a
             // win + orbs co-occur, and orb value picks land on a known index.
+            // rtpScalar:1 keeps the win in raw space — the live per-template scalar
+            // (e.g. gummy-drops ~6e-7) would round small wins to 0 after scaling.
             let observed = false
             for (let i = 0; i < 400; i += 1) {
                 let n = i * 2654435761
@@ -295,7 +297,7 @@ describe('multiplier orbs', () => {
                     n = (n * 1103515245 + 12345) & 0x7fffffff
                     return (n % 1000) / 1000
                 }
-                const result = resolveSlotSpin(config, { rng })
+                const result = resolveSlotSpin(config, { rng, rtpScalar: 1 })
                 const orbEvent = result.featureEvents.find(e => e.type === 'multiplier-orbs')
                 if (orbEvent) {
                     observed = true
@@ -305,7 +307,7 @@ describe('multiplier orbs', () => {
                     for (const orb of result.orbValues) {
                         expect(config.features.multiplierOrbs.values).toContain(orb.value)
                     }
-                    // Orbs only apply on a winning spin → multiplier must be positive.
+                    // Orbs only apply on a winning spin → raw multiplier positive.
                     expect(result.multiplier).toBeGreaterThan(0)
                     break
                 }
@@ -316,10 +318,11 @@ describe('multiplier orbs', () => {
 
     it('orbs never fire on a no-win board (no free multiplier)', () => {
         const config = getSlotTemplate('gummy-drops')
-        // The orb event is only pushed when multiplier > 0; assert the invariant
-        // across many spins: any spin carrying the orb event also has a win.
+        // The orb event is only pushed when the win multiplier > 0; assert the
+        // invariant across many spins in raw space (rtpScalar:1 so the tiny live
+        // scalar doesn't round a real win down to 0 and mask the check).
         for (let i = 0; i < 200; i += 1) {
-            const result = resolveSlotSpin(config)
+            const result = resolveSlotSpin(config, { rtpScalar: 1 })
             if (result.featureEvents.some(e => e.type === 'multiplier-orbs')) {
                 expect(result.multiplier).toBeGreaterThan(0)
             }
