@@ -38,4 +38,27 @@ describe('cases CSS polish', () => {
         // Reduced-motion clears the pre-reveal desaturation filter.
         expect(css).toMatch(/gampo-reduce-motion[\s\S]*case-phase-reveal .cases-carousel-tile[\s\S]*filter:\s*none/s)
     })
+
+    it('C3: near-miss heartbeat pulses pointer/frame (not filter) on slowdown only', () => {
+        expect(css).toContain('@keyframes caseNearMissPulse')
+        expect(css).toContain('@keyframes caseNearMissGlow')
+        // Scoped to the slowdown phase + near-miss class so it can never linger.
+        expect(css).toMatch(/\.case-near-miss\.case-phase-slowdown .cases-carousel-pointer/s)
+        // Heartbeat must NOT use the `filter` channel (that is C4's anti-leak mask).
+        expect(css).not.toMatch(/@keyframes caseNearMissPulse\s*\{[^}]*filter:/s)
+        // Reduced-motion kills the visual heartbeat.
+        expect(css).toMatch(/gampo-reduce-motion[\s\S]*case-near-miss[\s\S]*animation:\s*none/s)
+    })
+
+    it('C5: removes the multi-open scroll cage and defines the finale pulse', () => {
+        // The 320px scroll cage on .cases-rows is gone (no max-height clamp).
+        expect(css).not.toMatch(/\.cases-rows\s*\{[^}]*max-height:\s*320px/s)
+        expect(css).not.toMatch(/\.cases-stage\.has-result \.cases-rows\s*\{[^}]*max-height/s)
+        // Staggered settle + best-drop finale animations exist.
+        expect(css).toContain('@keyframes caseRowSettle')
+        expect(css).toContain('@keyframes caseFinalePulse')
+        expect(css).toMatch(/\.cases-multi-slot\.is-finale\s*\{/s)
+        // Reduced-motion disables both.
+        expect(css).toMatch(/gampo-reduce-motion[\s\S]*cases-multi-slot\.is-finale[\s\S]*animation:\s*none/s)
+    })
 })

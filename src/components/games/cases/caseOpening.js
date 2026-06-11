@@ -1,6 +1,7 @@
 import { nextRoll } from '../../../utils/fairRng'
 import { rarityDropWeight, roundGc, roundSignedGc } from './caseEconomy'
 import {
+    CASE_CELEBRATION_RARITIES,
     CASE_PRIZE_INDEX,
     CASE_TILE_GAP_PX,
     CASE_TILE_PX,
@@ -89,16 +90,39 @@ export function buildCaseOutcome(base = {}, {
     }
 }
 
+// A "rare" tile for cosmetic purposes is a knife/glove special-pool item
+// (`isRare`) or any celebration-tier rarity. Used by the C3 near-miss seeding to
+// pick a believable "so close" tile.
+export function isRareCaseItem(item) {
+    return Boolean(item && (item.isRare || CASE_CELEBRATION_RARITIES.has(item.rarity)))
+}
+
 export function buildCaseReelTrack(items = [], outcome, {
     length = CASE_CAROUSEL_VISIBLE,
     targetIndex = CASE_PRIZE_INDEX,
+    nearMiss = false,
 } = {}) {
     const safeItems = items.length ? items : [outcome].filter(Boolean)
     const track = Array.from({ length }, () => {
         const idx = Math.floor(nextRoll('cases').roll * safeItems.length)
         return safeItems[idx]
     })
+    // The forced outcome is the LAST write at targetIndex — it is the real,
+    // already-resolved drop and must never be overwritten by any cosmetic step.
     if (outcome) track[targetIndex] = outcome
+    // C3 near-miss (cosmetic only): when the real outcome is NOT rare, seed a
+    // rare tile DIRECTLY ADJACENT to the target so the reel teases a big drop
+    // that "just missed". Never writes targetIndex, so the settlement math is
+    // untouched. Opt-in (default false) keeps existing callers/tests stable.
+    if (nearMiss && outcome && !isRareCaseItem(outcome)) {
+        const rares = safeItems.filter(isRareCaseItem)
+        if (rares.length) {
+            const slot = nextRoll('cases').roll < 0.5 ? targetIndex - 1 : targetIndex + 1
+            if (slot !== targetIndex && slot >= 0 && slot < length) {
+                track[slot] = rares[Math.floor(nextRoll('cases').roll * rares.length)]
+            }
+        }
+    }
     return track
 }
 
@@ -117,6 +141,7 @@ export function createCaseOpeningRound({
     unitPrice = 1,
     stake = unitPrice * rows,
     targetIndex = CASE_PRIZE_INDEX,
+    nearMissChance = 0.34,
 } = {}) {
     const items = caseData?.items || []
     const entries = Array.from({ length: rows }, () => {
@@ -131,10 +156,20 @@ export function createCaseOpeningRound({
             serverSeedHash: pick.serverSeedHash,
             clientSeed: pick.clientSeed,
         }
-        const reelTrack = buildCaseReelTrack(items, outcome, { targetIndex })
+        // C3: only roll a near-miss for non-rare outcomes, on a minority of
+        // spins, so the tease stays special. Cosmetic — never alters `outcome`.
+        const wantNearMiss = !isRareCaseItem(outcome)
+            && nearMissChance > 0
+            && nextRoll('cases-nearmiss').roll < nearMissChance
+        const reelTrack = buildCaseReelTrack(items, outcome, { targetIndex, nearMiss: wantNearMiss })
+        // Detect whether a rare tile actually landed adjacent to the target so
+        // the UI can drive the slowdown heartbeat without rescanning the board.
+        const nearMiss = wantNearMiss && (
+            isRareCaseItem(reelTrack[targetIndex - 1]) || isRareCaseItem(reelTrack[targetIndex + 1])
+        )
         const jitter = (nextRoll('cases-jit').roll - 0.5) * 14
         const finalOffset = finalCaseReelOffset({ jitter, targetIndex })
-        return { outcome, reelTrack, targetIndex, finalOffset }
+        return { outcome, reelTrack, targetIndex, finalOffset, nearMiss }
     })
 
     return {
@@ -142,6 +177,7 @@ export function createCaseOpeningRound({
         entries,
         offsets: entries.map(entry => entry.finalOffset),
         outcomes: entries.map(entry => entry.outcome),
+        nearMiss: entries.some(entry => entry.nearMiss),
         rows,
         stake,
         targetIndex,

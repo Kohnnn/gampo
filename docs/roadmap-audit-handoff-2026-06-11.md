@@ -177,6 +177,12 @@ slots, one after the first cases batch, one after C2). All commits below are pus
    `maxWinMultiplier: 5000`. RTP verifies at 94.1%, but the scalar magnitude means
    typical small wins round toward 0 — **audit whether the player-facing win
    distribution still feels fair**, or lower orb top values / tighten weights.
+   > **RESOLVED 2026-06-11 (finish wave).** Diagnosed with `scripts/diagGummyDist.mjs`:
+   > orbs were landing on 100% of spins and max win never exceeded 1.51× — a flat,
+   > broken distribution. Fixed by making the orb symbol rare (weight 3→0.12),
+   > raising `clusterMin` 6→8, trimming orb values, and lowering the cap 5000→2000.
+   > Scalar lifted 6.2e-7 → 1.83e-5; orb landing now ~24%, max win ~3.15×, a real
+   > [2,5×) bucket appeared, RTP 93.9%. See `docs/roadmap-finish-wave-2026-06-11.md`.
 2. **Concurrent-writer hazard.** During this wave another automated process was
    editing the same files (notably `slotFactory.js`), producing duplicate blocks and
    a duplicate S2 commit (`2b24decb`). Before editing, check `git log` and file

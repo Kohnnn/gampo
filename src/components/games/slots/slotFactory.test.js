@@ -285,11 +285,18 @@ describe('multiplier orbs', () => {
         })
 
         it(`${id} surfaces orb values and multiplies wins when orbs land on a winning spin`, () => {
-            const config = getSlotTemplate(id)
-            // Deterministic RNG that biases every cell toward the orb symbol so a
-            // win + orbs co-occur, and orb value picks land on a known index.
-            // rtpScalar:1 keeps the win in raw space — the live per-template scalar
-            // (e.g. gummy-drops ~6e-7) would round small wins to 0 after scaling.
+            const base = getSlotTemplate(id)
+            // Orbs are intentionally RARE on the live templates (audit risk #1:
+            // a high orb weight lands orbs every spin and forces a degenerate
+            // RTP scalar). To verify the orb APPLICATION logic deterministically
+            // we clone the config and boost the orb symbol's weight so orbs land
+            // reliably, leaving the real template's rarity untouched. rtpScalar:1
+            // keeps wins in raw space so the live tiny scalar can't round to 0.
+            const orbId = base.features.multiplierOrbs.symbolId
+            const config = {
+                ...base,
+                symbols: base.symbols.map(s => (s.id === orbId ? { ...s, weight: 40 } : s)),
+            }
             let observed = false
             for (let i = 0; i < 400; i += 1) {
                 let n = i * 2654435761

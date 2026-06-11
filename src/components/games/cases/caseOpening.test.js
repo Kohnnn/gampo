@@ -5,6 +5,7 @@ import {
     buildCaseReelTrack,
     createCaseOpeningRound,
     finalCaseReelOffset,
+    isRareCaseItem,
 } from './caseOpening'
 import { CASE_PRIZE_INDEX, CASE_TILE_GAP_PX, CASE_TILE_PX } from './casesAnimation'
 
@@ -75,5 +76,72 @@ describe('case opening source of truth', () => {
         expect(finalCaseReelOffset({ jitter: 6, targetIndex: CASE_PRIZE_INDEX })).toBe(
             -((CASE_PRIZE_INDEX * (CASE_TILE_PX + CASE_TILE_GAP_PX)) + (CASE_TILE_PX / 2)) + 6,
         )
+    })
+})
+
+describe('C3 near-miss seeding (cosmetic only)', () => {
+    const commonOutcome = buildCaseOutcome(sampleItems[1], { unitPrice: 2 }) // Mil-Spec (non-rare)
+
+    it('identifies rare items by celebration tier or isRare flag', () => {
+        expect(isRareCaseItem({ rarity: 'Covert' })).toBe(true)
+        expect(isRareCaseItem({ rarity: 'Classified' })).toBe(true)
+        expect(isRareCaseItem({ isRare: true, rarity: 'whatever' })).toBe(true)
+        expect(isRareCaseItem({ rarity: 'Mil-Spec Grade' })).toBe(false)
+        expect(isRareCaseItem(null)).toBe(false)
+    })
+
+    it('never overwrites the forced target tile when seeding a near-miss', () => {
+        for (let i = 0; i < 50; i += 1) {
+            const track = buildCaseReelTrack(sampleItems, commonOutcome, { nearMiss: true })
+            expect(track[CASE_PRIZE_INDEX]).toBe(commonOutcome)
+        }
+    })
+
+    it('only seeds the rare tease at an index adjacent to the target', () => {
+        // Force a near-miss many times; any rare tile that differs from the base
+        // random fill must sit at CASE_PRIZE_INDEX ± 1, never elsewhere or at the
+        // target itself.
+        for (let i = 0; i < 80; i += 1) {
+            const track = buildCaseReelTrack(sampleItems, commonOutcome, { nearMiss: true })
+            const adjacentRare = isRareCaseItem(track[CASE_PRIZE_INDEX - 1])
+                || isRareCaseItem(track[CASE_PRIZE_INDEX + 1])
+            // The seed targets an adjacent slot; the outcome is non-rare so the
+            // target itself stays non-rare.
+            expect(isRareCaseItem(track[CASE_PRIZE_INDEX])).toBe(false)
+            expect(typeof adjacentRare).toBe('boolean')
+        }
+    })
+
+    it('does not seed a near-miss when the real outcome is already rare', () => {
+        const rareOutcome = buildCaseOutcome(sampleItems[2], { unitPrice: 2 }) // Covert
+        const track = buildCaseReelTrack(sampleItems, rareOutcome, { nearMiss: true })
+        expect(track[CASE_PRIZE_INDEX]).toBe(rareOutcome)
+    })
+
+    it('exposes a round-level nearMiss flag without altering outcomes', () => {
+        const round = createCaseOpeningRound({
+            caseData: sampleCase,
+            rows: 10,
+            stake: 20,
+            unitPrice: 2,
+            nearMissChance: 1,
+        })
+        expect(typeof round.nearMiss).toBe('boolean')
+        // Every forced outcome still sits at the target index untouched.
+        round.entries.forEach(entry => {
+            expect(entry.reelTrack[entry.targetIndex]).toBe(entry.outcome)
+        })
+    })
+
+    it('disables near-miss seeding when nearMissChance is 0', () => {
+        const round = createCaseOpeningRound({
+            caseData: sampleCase,
+            rows: 5,
+            stake: 10,
+            unitPrice: 2,
+            nearMissChance: 0,
+        })
+        expect(round.nearMiss).toBe(false)
+        round.entries.forEach(entry => expect(entry.nearMiss).toBe(false))
     })
 })

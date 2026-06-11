@@ -1,5 +1,11 @@
 # Roadmap
 
+> **2026-06-11 (finish wave) — gummy-drops orb economy retune (audit risk #1),
+> C5 multi-open finale, and C3 near-miss suspense are shipped. Detail in
+> [`docs/roadmap-finish-wave-2026-06-11.md`](./roadmap-finish-wave-2026-06-11.md).
+> 500 tests green, build clean, audits pass. C1 (rAF reel) and S5/S6 (new slot
+> games) remain consciously deferred / out of scope.**
+
 > **2026-06-11 — Latest status, slots feature waves & cases unbox polish, plus the
 > full audit/handoff for the next AI, live in
 > [`docs/roadmap-audit-handoff-2026-06-11.md`](./roadmap-audit-handoff-2026-06-11.md).**
