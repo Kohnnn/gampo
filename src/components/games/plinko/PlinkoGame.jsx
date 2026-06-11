@@ -103,12 +103,30 @@ export default function PlinkoGame() {
     const [binColors, setBinColors] = useState(null)
     const [engineReady, setEngineReady] = useState(false)
     const [toast, setToast] = useState(null)
-    const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('plinko', { count: 9, cap: 10 }))
+    const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('plinko', { count: 12, cap: 14 }))
 
     // Wave 2 lightweight machine. Emits round-start on each drop and
     // round-result on each ball settlement; sim feed and physics flow
     // unchanged.
     const machine = useRoundMachine({})
+
+    // 2026-06-11: keep the sim-drops feed alive even when the player is idle, so
+    // the board always feels busy. A new simulated drop ticks in every ~2.4–4s.
+    useEffect(() => {
+        let timer = null
+        const schedule = () => {
+            const delay = 2400 + Math.random() * 1600
+            timer = window.setTimeout(() => {
+                simSeqRef.current += 1
+                setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('plinko', {
+                    seed: `plinko-idle:${simSeqRef.current}:${Date.now()}`,
+                }), 14))
+                schedule()
+            }, delay)
+        }
+        schedule()
+        return () => { if (timer) window.clearTimeout(timer) }
+    }, [])
 
     useEffect(() => {
         if (!canvasRef.current) return
@@ -251,7 +269,7 @@ export default function PlinkoGame() {
             simSeqRef.current += 1
             setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('plinko', {
                 seed: `plinko:${simSeqRef.current}:${rows}:${risk}:${bi}:${mult}`,
-            }), 10))
+            }), 14))
             setActiveDrops(n => Math.max(0, n - 1))
             if (mode !== 'auto') resolve({ profit })
         })

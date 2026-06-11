@@ -2057,3 +2057,14 @@ body {
 @media (prefers-reduced-motion: reduce) {
     .main-content { animation: none; }
 }
+
+/* Master "Animations" off switch (Settings → Gameplay). Separate from the
+   accessibility reduce-motion flag: this is a player preference to quiet
+   decorative motion app-wide. Transitions are kept short (not killed) so
+   controls still feel responsive; looping/decorative animations are stopped. */
+.gampo-no-animations *,
+.gampo-no-animations *::before,
+.gampo-no-animations *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+}

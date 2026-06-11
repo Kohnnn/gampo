@@ -37,6 +37,8 @@ const DEFAULTS = {
     density: 'cozy',
     reduceMotion: false,
     haptics: true, // device vibration feedback (mobile only; also gated by reduce-motion)
+    quickSpin: false, // global "quick/turbo" preference; slots use it as default spin speed
+    animations: true, // master cosmetic-animation switch (separate from reduceMotion)
 }
 
 function readSettings() {
@@ -47,6 +49,8 @@ function readSettings() {
         density: parsed.density === 'compact' ? 'compact' : 'cozy',
         reduceMotion: Boolean(parsed.reduceMotion),
         haptics: parsed.haptics === undefined ? DEFAULTS.haptics : Boolean(parsed.haptics),
+        quickSpin: parsed.quickSpin === undefined ? DEFAULTS.quickSpin : Boolean(parsed.quickSpin),
+        animations: parsed.animations === undefined ? DEFAULTS.animations : Boolean(parsed.animations),
     }
 }
 
@@ -60,6 +64,11 @@ export function applySettingsToDom(s = settings) {
     const root = document.documentElement
     root.dataset.density = s.density
     root.classList.toggle('gampo-reduce-motion', !!s.reduceMotion)
+    // Master cosmetic-animation switch. When OFF (and not already reduce-motion)
+    // we add `gampo-no-animations` so heavy decorative loops can be suppressed
+    // independently of the accessibility reduce-motion flag.
+    root.classList.toggle('gampo-no-animations', !s.animations)
+    root.dataset.quickSpin = s.quickSpin ? 'on' : 'off'
     const theme = ACCENT_THEMES.find(t => t.id === s.accent)
     if (theme) {
         root.dataset.accent = theme.id
@@ -96,6 +105,16 @@ export function setHaptics(value) {
     persist()
 }
 
+export function setQuickSpin(value) {
+    settings = { ...settings, quickSpin: !!value }
+    persist()
+}
+
+export function setAnimations(value) {
+    settings = { ...settings, animations: !!value }
+    persist()
+}
+
 export function resetSettings() {
     settings = { ...DEFAULTS }
     removeKey(KEY)
@@ -124,6 +143,8 @@ export function useSettings() {
         setDensity,
         setReduceMotion,
         setHaptics,
+        setQuickSpin,
+        setAnimations,
         resetSettings,
     }
 }

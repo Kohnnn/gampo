@@ -219,7 +219,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const slotSfx = useSfx('slots')
-    const { reduceMotion } = useSettings()
+    const { reduceMotion, quickSpin } = useSettings()
     // "Fast bonus": reduced-motion players skip the full bonus-entry cinematic.
     const bonusCineMs = reduceMotion ? 450 : BONUS_CINEMATIC_MS
     const session = useGameSession('slots')
@@ -254,7 +254,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     // 'instant' (no reel animation — result lands immediately). Distinct from
     // slam-stop, which interrupts an in-flight animated spin. `turbo`/`instant`
     // are derived so the existing speed branches read unchanged.
-    const [spinMode, setSpinMode] = useState('normal')
+    const [spinMode, setSpinMode] = useState(quickSpin ? 'turbo' : 'normal')
     const turbo = spinMode === 'turbo' || spinMode === 'instant'
     const instant = spinMode === 'instant'
     // Graduated win-tier rollup: count-up of the banner total for nice/good/
@@ -373,14 +373,20 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             })
             setFreeSpinSession(null)
             setPersistentMultiplier(0)
-            // Auto-dismiss the banner after 6 seconds.
-            const id = window.setTimeout(() => {
-                setBonusEndBanner(null)
-            }, 6000)
-            return () => window.clearTimeout(id)
         }
-        return undefined
     }, [freeSpins, freeSpinSession])
+
+    // Auto-dismiss the bonus-end banner on its OWN effect, keyed only on the
+    // banner. Previously this timer lived in the [freeSpins, freeSpinSession]
+    // effect, but `setFreeSpinSession(null)` immediately re-ran that effect and
+    // its cleanup cleared the dismiss timer before it could fire — stranding the
+    // banner across subsequent autoplay spins. Keying on the banner alone means
+    // the timer is only torn down when a new banner replaces it or on unmount.
+    useEffect(() => {
+        if (!bonusEndBanner) return undefined
+        const id = window.setTimeout(() => setBonusEndBanner(null), 6000)
+        return () => window.clearTimeout(id)
+    }, [bonusEndBanner])
 
     const clearTimers = useCallback(() => {
         timers.current.forEach(id => window.clearTimeout(id))
@@ -950,6 +956,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 setFeatureAnnounce(null)
                 setCoinShower(null)
                 setNearMiss(null)
+                setBonusEndBanner(null)
                 setAnticipating(false)
                 // Snap every reel straight to its resolved cell — no scrolling.
                 setStoppedColumnState(cols)
@@ -1006,6 +1013,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setFeatureAnnounce(null)
             setCoinShower(null)
             setNearMiss(null)
+            setBonusEndBanner(null)
             setAnticipating(false)
             playSound('tick')
             slotSfx.play('spinStart', { volume: 0.85 })
@@ -1458,7 +1466,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                 const orbValue = lastResult?.orbValues?.find(o => o.index === index)?.value
                                                 return (
                                                     <div
-                                                        key={`${index}-${item?.id || 'na'}`}
+                                                        key={`mw-${index}`}
                                                         className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''}`}
                                                     >
                                                         <Asset src={item?.asset} alt={item?.label} fallback={<strong>{item?.label}</strong>} />
@@ -1492,7 +1500,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                     const isSticky = stickyWilds.includes(index)
                                     return (
                                         <div
-                                            key={`${index}-${item.id}`}
+                                            key={index}
                                             className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''} ${!spinning && wildColumns.has(col) ? 'wild-column' : ''}`}
                                             style={{ animationDelay: `${col * 45}ms` }}
                                         >
@@ -1540,7 +1548,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 ))}
                             </div>
                         )}
-                        {!running && lastResult?.wins?.length > 0 && (
+                        {!running && lastResult?.wins?.length > 0 && !(lastResult.cascadeSteps > 0) && (
                             <WinPathOverlay
                                 wins={lastResult.wins}
                                 cellPositions={cellPositions}

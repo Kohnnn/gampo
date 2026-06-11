@@ -105,6 +105,35 @@ describe('slotFactory layout helpers', () => {
         })
     })
 
+    it('cell positions are row-major for non-megaways so they match evaluateLines/Ways indexing', () => {
+        // The engine indexes line/ways/cluster cells as `row * cols + col`
+        // (row-major) and the standard reel grid auto-flows row-major. getCellPositions
+        // must agree, or WinPathOverlay traces the wrong cells (2026-06-11 win-line fix).
+        const tpl = getSlotTemplate('vault-rush') // 4x5 ways layout
+        const { rows, cols } = tpl.layout
+        const positions = getCellPositions(tpl)
+        expect(positions.length).toBe(rows * cols)
+        for (let row = 0; row < rows; row += 1) {
+            for (let col = 0; col < cols; col += 1) {
+                const index = row * cols + col
+                expect(positions[index]).toEqual({ col, row })
+            }
+        }
+    })
+
+    it('megaways cell positions stay column-major to match evaluateMegaways', () => {
+        const mw = SLOT_TEMPLATES.find(t => t.layout.evaluation === 'megaways')
+        if (!mw) return
+        const positions = getCellPositions(mw)
+        // Column-major: index 0 and 1 are the same column (col 0), different rows.
+        expect(positions[0].col).toBe(0)
+        expect(positions[1].col).toBe(0)
+        // Indexes are non-decreasing in column across the whole track.
+        for (let i = 1; i < positions.length; i += 1) {
+            expect(positions[i].col).toBeGreaterThanOrEqual(positions[i - 1].col)
+        }
+    })
+
     it('documents the Bars switch size mismatch that the renderer must guard', () => {
         const tall = getSlotTemplate('vault-rush')
         const bars = getSlotTemplate('bars')
@@ -122,6 +151,15 @@ describe('slotFactory layout helpers', () => {
         expect(slotsGameSource).toContain('slotAssetsReady')
         expect(slotsGameSource).toContain('Loading lab...')
         expect(slotsGameSource).toContain('data-route-fallback="loading"')
+    })
+
+    it('auto-dismisses the bonus-end banner on its own effect keyed only on the banner', () => {
+        // Regression: the dismiss setTimeout previously lived in the
+        // [freeSpins, freeSpinSession] effect, but setFreeSpinSession(null)
+        // re-ran that effect and its cleanup cleared the timer before it fired,
+        // stranding the banner across autoplay spins (2026-06-11 fix). The timer
+        // must live in an effect keyed ONLY on bonusEndBanner.
+        expect(slotsGameSource).toMatch(/if \(!bonusEndBanner\) return undefined[\s\S]*setBonusEndBanner\(null\), 6000\)[\s\S]*\}, \[bonusEndBanner\]\)/)
     })
 
     it('hides the in-flow panel spin on mobile so the fixed dock owns the single CTA', () => {

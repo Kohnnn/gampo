@@ -2258,12 +2258,15 @@
 }
 
 .cases-prize-popover {
-    position: absolute;
+    position: fixed;
     inset: 0;
     display: grid;
     place-items: center;
     pointer-events: none;
-    z-index: 16;
+    /* 2026-06-11: was absolute z-index:16 inside the stage, so the fixed mobile
+       dock (z 1400) painted over it. Promote to a fixed full-viewport overlay
+       above the dock so the rare-drop celebration is never hidden on mobile. */
+    z-index: var(--z-modal, 1500);
     animation: casePrizeOverlay 1800ms ease-out both;
 }
 .cases-prize-popover::before {

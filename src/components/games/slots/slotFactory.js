@@ -923,9 +923,26 @@ export function getColumnRows(config, col) {
 
 export function getCellPositions(config) {
     const positions = []
-    for (let col = 0; col < config.layout.cols; col += 1) {
-        const rows = getColumnRows(config, col)
-        for (let row = 0; row < rows; row += 1) {
+    // Megaways indexes cells COLUMN-major (see evaluateMegaways: cellOffset
+    // accumulates per column, and the megaways grid renders column-by-column),
+    // so per-column variable row counts must be walked column-first.
+    if (config.layout.evaluation === 'megaways') {
+        for (let col = 0; col < config.layout.cols; col += 1) {
+            const rows = getColumnRows(config, col)
+            for (let row = 0; row < rows; row += 1) {
+                positions.push({ col, row })
+            }
+        }
+        return positions
+    }
+    // All other layouts index cells ROW-major (`evaluateLines`/`evaluateWays`
+    // use `row * cols + col`) and the standard reel grid auto-flows row-major in
+    // the DOM. Returning column-major here desynced WinPathOverlay (and the
+    // cascade trace / retrigger flyers / anticipation column logic) from the
+    // engine's actual winning indexes — the win lines traced the wrong cells.
+    const { rows, cols } = config.layout
+    for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
             positions.push({ col, row })
         }
     }

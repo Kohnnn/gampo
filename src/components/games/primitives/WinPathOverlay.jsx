@@ -1,25 +1,29 @@
-// WinPathOverlay — Wave 27. Draws an SVG dotted polyline through the
-// centers of winning cells in a slot grid. Animates draw-on then fades.
+// WinPathOverlay — Wave 27 (win-line fix 2026-06-11). Draws SVG win indicators
+// over the winning cells of a slot grid. Animates draw-on then fades.
 //
 // Props:
 //   wins        Array of win objects from `resolveSlotSpin`. Each must have
-//               `indexes` (cell indexes into the grid) and `multiplier`.
+//               `indexes` (cell indexes into the grid), `type`, and `multiplier`.
 //   cellPositions  Array of { col, row } per cell index, from getCellPositions.
 //   layout      { cols, rows, evaluation } slot layout config.
 //   gridRef     ref to the grid DOM element so we can size the SVG to match.
-//   accent      hex string used for the line color.
+//   accent      hex string used for the line/halo color.
 //
 // Behavior:
-//   - One <path> per win. Stroke-dasharray + stroke-dashoffset animate the
-//     draw-on. Each line stays for ~1.4s then fades.
-//   - For megaways, computes a polyline from left-most matching cell to
-//     right-most across each column. For cluster, draws a halo around each
-//     winning cell.
-//   - Honors `prefers-reduced-motion`.
+//   - Line wins (`type:'line'`) trace a left-to-right polyline through one cell
+//     per column (sorted by column).
+//   - Ways / megaways / cluster / pay-anywhere wins highlight EACH winning cell
+//     with a rounded halo rect (these wins span many cells per column, so a
+//     single polyline would zig-zag through the wrong cells).
+//   - The index ordering now matches the engine: getCellPositions is row-major
+//     for non-megaways and column-major for megaways, so centers[i] is the cell
+//     the engine actually paid.
+//   - Honors `prefers-reduced-motion` via CSS.
 
 import { useEffect, useMemo, useState } from 'react'
 
 const FADE_MS = 1600
+const HALO_TYPES = new Set(['ways', 'megaways', 'cluster', 'pay-anywhere'])
 
 export default function WinPathOverlay({ wins = [], cellPositions = [], layout, gridRef, accent = '#ffd166' }) {
     const [size, setSize] = useState({ w: 0, h: 0 })
@@ -45,41 +49,59 @@ export default function WinPathOverlay({ wins = [], cellPositions = [], layout, 
         return () => window.clearTimeout(id)
     }, [wins])
 
-    const paths = useMemo(() => {
-        if (!wins.length || !size.w || !size.h || !layout) return []
+    const { lines, halos } = useMemo(() => {
+        if (!wins.length || !size.w || !size.h || !layout) return { lines: [], halos: [] }
         const cols = layout.cols
         const cellW = size.w / cols
-        // Compute per-column row counts (for megaways).
+        // Per-column row counts (megaways has variable rows per column).
         const colRows = []
         for (let c = 0; c < cols; c += 1) {
-            // count cells in column c
             let count = 0
             for (let i = 0; i < cellPositions.length; i += 1) {
                 if (cellPositions[i].col === c) count += 1
             }
             colRows.push(count || layout.rows)
         }
-        // Center coords for each cell index.
-        const centers = cellPositions.map(({ col, row }) => {
-            const rows = colRows[col] || layout.rows
-            const cellH = size.h / rows
-            return { x: col * cellW + cellW / 2, y: row * cellH + cellH / 2 }
+        const cellHFor = col => size.h / (colRows[col] || layout.rows)
+        const centers = cellPositions.map(({ col, row }) => ({
+            x: col * cellW + cellW / 2,
+            y: row * cellHFor(col) + cellHFor(col) / 2,
+        }))
+
+        const lineOut = []
+        const haloOut = []
+        wins.forEach((win, idx) => {
+            const indexes = (win.indexes || []).filter(i => centers[i])
+            if (!indexes.length) return
+            if (HALO_TYPES.has(win.type)) {
+                indexes.forEach(i => {
+                    const { col } = cellPositions[i]
+                    const cellH = cellHFor(col)
+                    haloOut.push({
+                        id: `${tick}-${idx}-${i}`,
+                        x: centers[i].x - cellW / 2,
+                        y: centers[i].y - cellH / 2,
+                        w: cellW,
+                        h: cellH,
+                    })
+                })
+            } else {
+                // Line win: one cell per column, traced left-to-right.
+                const sorted = indexes.slice().sort((a, b) => {
+                    const ca = cellPositions[a]?.col ?? 0
+                    const cb = cellPositions[b]?.col ?? 0
+                    if (ca !== cb) return ca - cb
+                    return (cellPositions[a]?.row ?? 0) - (cellPositions[b]?.row ?? 0)
+                })
+                const points = sorted.map(i => centers[i])
+                const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+                lineOut.push({ id: `${tick}-${idx}`, d })
+            }
         })
-        return wins.map((win, idx) => {
-            const indexes = (win.indexes || []).slice().sort((a, b) => {
-                const ca = cellPositions[a]?.col ?? 0
-                const cb = cellPositions[b]?.col ?? 0
-                if (ca !== cb) return ca - cb
-                return (cellPositions[a]?.row ?? 0) - (cellPositions[b]?.row ?? 0)
-            })
-            const points = indexes.map(i => centers[i]).filter(Boolean)
-            if (points.length === 0) return null
-            const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-            return { id: `${tick}-${idx}`, d, label: win.label, multiplier: win.multiplier }
-        }).filter(Boolean)
+        return { lines: lineOut, halos: haloOut }
     }, [wins, size, cellPositions, layout, tick])
 
-    if (!paths.length) return null
+    if (!lines.length && !halos.length) return null
 
     return (
         <svg
@@ -94,7 +116,22 @@ export default function WinPathOverlay({ wins = [], cellPositions = [], layout, 
                     <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
                 </filter>
             </defs>
-            {paths.map(p => (
+            {halos.map(h => (
+                <rect
+                    key={h.id}
+                    x={h.x.toFixed(1)}
+                    y={h.y.toFixed(1)}
+                    width={h.w.toFixed(1)}
+                    height={h.h.toFixed(1)}
+                    rx={Math.min(h.w, h.h) * 0.18}
+                    stroke={accent}
+                    strokeWidth={3}
+                    fill="none"
+                    filter="url(#slot-winpath-glow)"
+                    className="slot-winpath-halo"
+                />
+            ))}
+            {lines.map(p => (
                 <path
                     key={p.id}
                     d={p.d}
