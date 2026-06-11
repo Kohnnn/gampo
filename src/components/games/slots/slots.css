@@ -2666,10 +2666,21 @@
 @keyframes slotWinPathFade {
     to { opacity: 0.4; }
 }
+/* Per-cell halo for ways/megaways/cluster/pay-anywhere wins (2026-06-11 win-line fix). */
+.slot-winpath-halo {
+    opacity: 0;
+    animation: slotWinHaloPop 0.42s cubic-bezier(0.16, 1, 0.3, 1) both, slotWinPathFade 0.5s 1.1s linear forwards;
+}
+@keyframes slotWinHaloPop {
+    from { opacity: 0; }
+    to { opacity: 0.95; }
+}
 @media (prefers-reduced-motion: reduce) {
     .slot-winpath-line { animation: none; stroke-dashoffset: 0; opacity: 0.6; }
+    .slot-winpath-halo { animation: none; opacity: 0.6; }
 }
 .gampo-reduce-motion .slot-winpath-line { animation: none; stroke-dashoffset: 0; opacity: 0.6; }
+.gampo-reduce-motion .slot-winpath-halo { animation: none; opacity: 0.6; }
 .slot-reel-frame-v2 { position: relative; }
 
 /* === Wave 32: deeper feature-contract panel === */

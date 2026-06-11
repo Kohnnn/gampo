@@ -69,12 +69,18 @@ function solveBustTimeSec(bust) {
     return 5 + Math.log(bust / fiveSecPeak) / Math.log(1.10)
 }
 
-const SIM_NAMES = ['Lyra', 'Reno', 'Kaia', 'Ozzy', 'Nia', 'Vex', 'Mika', 'Juno', 'Sable', 'Rune', 'Pixie', 'Quark', 'Tess', 'Echo', 'Wynn', 'Zev', 'Mira', 'Lev', 'Kit', 'Rhea']
+const SIM_NAMES = ['Lyra', 'Reno', 'Kaia', 'Ozzy', 'Nia', 'Vex', 'Mika', 'Juno', 'Sable', 'Rune', 'Pixie', 'Quark', 'Tess', 'Echo', 'Wynn', 'Zev', 'Mira', 'Lev', 'Kit', 'Rhea', 'Bex', 'Cy', 'Dax', 'Fenn', 'Gio', 'Hux', 'Indi', 'Jax', 'Kol', 'Lux', 'Moss', 'Nox', 'Oda', 'Pia', 'Roux', 'Sol', 'Taj', 'Uma', 'Vance', 'Wren']
 const SIM_COLORS = ['#ff7ab6', '#6db7ff', '#ffcf5a', '#9bf08a', '#c08bff', '#ff9457', '#5be0d4', '#41d6ff', '#ffe680', '#7bd389']
 
-// Wave 28: bigger sim crowd (10–16 players) with persona biases.
+// Wave 28 / 2026-06-11: bigger sim crowd (18–30 players) with persona biases.
 function simulatePlayers(bust) {
-    const n = 10 + Math.floor(Math.random() * 7)
+    const n = 18 + Math.floor(Math.random() * 13)
+    // Unique names: shuffle the pool and take the first n (pool is large enough).
+    const namePool = [...SIM_NAMES]
+    for (let i = namePool.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[namePool[i], namePool[j]] = [namePool[j], namePool[i]]
+    }
     const out = []
     for (let i = 0; i < n; i++) {
         // Persona bias: roughly 30% cautious (low target), 50% mid, 15% gambler, 5% whale.
@@ -92,7 +98,7 @@ function simulatePlayers(bust) {
         const cashed = bust >= target
         out.push({
             id: `${i}-${Math.random().toString(16).slice(2, 6)}`,
-            name: SIM_NAMES[(i + Math.floor(Math.random() * SIM_NAMES.length)) % SIM_NAMES.length],
+            name: namePool[i % namePool.length],
             color: SIM_COLORS[i % SIM_COLORS.length],
             bet, target: Number(target.toFixed(2)), cashed, cashedAt: cashed ? Number(target.toFixed(2)) : 0,
         })

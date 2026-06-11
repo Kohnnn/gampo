@@ -6,6 +6,8 @@ import {
     setDensity,
     setReduceMotion,
     setHaptics,
+    setQuickSpin,
+    setAnimations,
     resetSettings,
     applySettingsToDom,
     useSettings,
@@ -65,6 +67,15 @@ describe('useSettings', () => {
         expect(readJson('gampo_settings_v1').haptics).toBe(true)
     })
 
+    it('persists quickSpin and animations (defaults off/on)', () => {
+        setQuickSpin(true)
+        expect(readJson('gampo_settings_v1').quickSpin).toBe(true)
+        setAnimations(false)
+        expect(readJson('gampo_settings_v1').animations).toBe(false)
+        setAnimations(true)
+        expect(readJson('gampo_settings_v1').animations).toBe(true)
+    })
+
     it('reset clears persisted settings', () => {
         setAccent('gold')
         resetSettings()
@@ -72,13 +83,15 @@ describe('useSettings', () => {
     })
 
     it('applies settings to the document element', () => {
-        let toggled = null
+        const toggles = []
         let prop = null
-        globalThis.document.documentElement.classList.toggle = (cls, on) => { toggled = [cls, on] }
+        globalThis.document.documentElement.classList.toggle = (cls, on) => { toggles.push([cls, on]) }
         globalThis.document.documentElement.style.setProperty = (k, v) => { prop = [k, v] }
-        applySettingsToDom({ accent: 'azure', density: 'compact', reduceMotion: true })
+        applySettingsToDom({ accent: 'azure', density: 'compact', reduceMotion: true, animations: true, quickSpin: true })
         expect(globalThis.document.documentElement.dataset.density).toBe('compact')
-        expect(toggled).toEqual(['gampo-reduce-motion', true])
+        expect(toggles).toContainEqual(['gampo-reduce-motion', true])
+        expect(toggles).toContainEqual(['gampo-no-animations', false])
+        expect(globalThis.document.documentElement.dataset.quickSpin).toBe('on')
         expect(prop[0]).toBe('--app-accent')
     })
 

@@ -145,7 +145,7 @@ export default function VolumeMixer() {
         <>
             <button
                 ref={triggerRef}
-                className={`gt-btn ${open ? 'open' : ''}`}
+                className={`gt-btn gt-volmix-trigger ${open ? 'open' : ''}`}
                 aria-label="Volume mixer"
                 aria-haspopup="dialog"
                 aria-expanded={open}

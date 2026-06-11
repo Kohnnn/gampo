@@ -2,8 +2,8 @@ import { fakePlayers, personaTemplates } from '../../../context/SocialContext'
 import { clamp, dicePayout, formatCredits, kenoPayout, round2 } from '../../../utils/simulationMath'
 import { createRoundRng } from '../../../utils/roundRng'
 
-export const SIM_BET_ROW_DEFAULT_CAP = 10
-export const SIM_BET_ROW_MAX_CAP = 12
+export const SIM_BET_ROW_DEFAULT_CAP = 12
+export const SIM_BET_ROW_MAX_CAP = 18
 
 const GRID_CELLS = 25
 const HOUSE_EDGE = 0.01

@@ -13,7 +13,7 @@ import './roulette.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
 const CHIP_VALUES = [1, 5, 25, 100, 500]
-const SIM_NAMES = ['Kira', 'Reno', 'Mika', 'Jules', 'Vex', 'Nia', 'Sable', 'Ozzy', 'Tess', 'Rune']
+const SIM_NAMES = ['Kira', 'Reno', 'Mika', 'Jules', 'Vex', 'Nia', 'Sable', 'Ozzy', 'Tess', 'Rune', 'Bex', 'Cy', 'Dax', 'Fenn', 'Gio', 'Hux', 'Indi', 'Jax', 'Kol', 'Lux', 'Moss', 'Nox', 'Oda', 'Pia', 'Roux', 'Sol']
 const BETTING_OPEN_MS = 6000
 
 const SPIN_PHASE_LABELS = {
@@ -26,7 +26,14 @@ const SPIN_PHASE_LABELS = {
 }
 
 function makeSimPlayers(number = null) {
-    return Array.from({ length: 8 }, (_, i) => {
+    // 2026-06-11: livelier table — 14–20 unique bettors per spin.
+    const n = 14 + Math.floor(Math.random() * 7)
+    const namePool = [...SIM_NAMES]
+    for (let i = namePool.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[namePool[i], namePool[j]] = [namePool[j], namePool[i]]
+    }
+    return Array.from({ length: n }, (_, i) => {
         const bet = [1, 5, 10, 25, 50][Math.floor(Math.random() * 5)]
         const pickType = Math.random()
         const type = pickType < 0.5 ? 'color' : pickType < 0.75 ? 'dozen' : 'straight'
@@ -37,7 +44,7 @@ function makeSimPlayers(number = null) {
         const payout = won ? bet * (type === 'straight' ? 35 : type === 'dozen' ? 3 : 2) : 0
         return {
             id: `${i}-${Math.random().toString(16).slice(2, 6)}`,
-            name: SIM_NAMES[(i + Math.floor(Math.random() * SIM_NAMES.length)) % SIM_NAMES.length],
+            name: namePool[i % namePool.length],
             bet,
             label,
             won,

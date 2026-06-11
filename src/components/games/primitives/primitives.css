@@ -1584,6 +1584,17 @@ input:focus-visible,
         display: none;
     }
 
+    /* 2026-06-11: the volume-mixer (slider) trigger lives in the first toolbar
+       group that is hidden on mobile, leaving the slider unreachable from the
+       toolbar. Re-show just the mixer trigger (and its group container) so the
+       master/music/effects sliders stay accessible on phones. */
+    .gt-toolbar > .gt-group:first-child {
+        display: flex;
+    }
+    .gt-toolbar > .gt-group:first-child > .gt-btn:not(.gt-volmix-trigger) {
+        display: none;
+    }
+
     .gt-popover-mobile-item {
         display: flex;
     }

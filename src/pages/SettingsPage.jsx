@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Settings as SettingsIcon, Palette, Maximize2, Eye, Download, Upload, RotateCcw, Volume2, ShieldCheck } from 'lucide-react'
+import { Settings as SettingsIcon, Palette, Maximize2, Eye, Download, Upload, RotateCcw, Volume2, ShieldCheck, Zap, Sparkles, Film } from 'lucide-react'
 import { useSettings } from '../hooks/useSettings'
 import { useLocalSave } from '../hooks/useLocalSave'
 import { useSessionGuard } from '../hooks/useSessionGuard'
 import { useOnboarding } from '../hooks/useOnboarding'
 import { useReduceMotion } from '../components/fx'
+import { useFunMode } from '../utils/funMode'
 import AudioSettings from '../components/AudioSettings'
 import '../styles/settings.css'
 
@@ -15,6 +16,7 @@ export default function SettingsPage() {
     const guard = useSessionGuard()
     const onboarding = useOnboarding()
     const [, setReduceMotionFx] = useReduceMotion()
+    const [funMode, setFunMode] = useFunMode()
     const fileRef = useRef(null)
     const [notice, setNotice] = useState(null)
 
@@ -128,6 +130,18 @@ export default function SettingsPage() {
                             <small>Vibration feedback on supported mobile devices. Off when reduce motion is on.</small>
                         </span>
                     </label>
+                    <label className="settings-switch">
+                        <input
+                            type="checkbox"
+                            checked={settings.animations}
+                            onChange={e => settings.setAnimations(e.target.checked)}
+                        />
+                        <span className="settings-switch-track" aria-hidden="true"><span className="settings-switch-thumb" /></span>
+                        <span className="settings-switch-label">
+                            <strong><Film size={13} style={{ verticalAlign: '-2px' }} /> Animations</strong>
+                            <small>Master switch for decorative animations and looping effects. Independent of reduce motion.</small>
+                        </span>
+                    </label>
                     <p className="settings-help">
                         <Volume2 size={13} style={{ verticalAlign: '-2px' }} /> Audio volume &amp; mute controls are below and in the in-game audio menu.
                     </p>
@@ -138,6 +152,34 @@ export default function SettingsPage() {
                     >
                         <RotateCcw size={13} /> Replay welcome intro
                     </button>
+                </section>
+
+                <section className="settings-card" data-ux-surface="controls">
+                    <h2><Zap size={16} /> Gameplay</h2>
+                    <label className="settings-switch">
+                        <input
+                            type="checkbox"
+                            checked={settings.quickSpin}
+                            onChange={e => settings.setQuickSpin(e.target.checked)}
+                        />
+                        <span className="settings-switch-track" aria-hidden="true"><span className="settings-switch-thumb" /></span>
+                        <span className="settings-switch-label">
+                            <strong>Quick spin</strong>
+                            <small>Faster spins/rounds by default (slots open in turbo). You can still change speed per game.</small>
+                        </span>
+                    </label>
+                    <label className="settings-switch">
+                        <input
+                            type="checkbox"
+                            checked={funMode}
+                            onChange={e => setFunMode(e.target.checked)}
+                        />
+                        <span className="settings-switch-track" aria-hidden="true"><span className="settings-switch-thumb" /></span>
+                        <span className="settings-switch-label">
+                            <strong><Sparkles size={13} style={{ verticalAlign: '-2px' }} /> Fun mode</strong>
+                            <small>Free-play-only luck boost for entertainment. Effective return can exceed 100% — never a real-casino mode.</small>
+                        </span>
+                    </label>
                 </section>
 
                 <AudioSettings />
