@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
+import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
@@ -39,6 +40,7 @@ export default function DinoGame() {
     const definition = findGameDefinition('dino') || { name: 'Dino', category: 'Originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
+    const sfx = useSfx('dino')
     const session = useGameSession('dino-shell')
 
     const canvasRef = useRef(null)
@@ -81,6 +83,7 @@ export default function DinoGame() {
         engineRef.current?.beginRun(config.speed)
         setPhase('running')
         playSound('click')
+        sfx.play('click')
         resolve({ profit: 0 })
     })
 
@@ -91,10 +94,12 @@ export default function DinoGame() {
         engineRef.current?.jump(survive ? 1.0 : 0.55)
         if (survive) {
             playSound('flip')
+            sfx.play('flip')
             setSteps(prev => prev + 1)
             return
         }
         playSound('explode')
+        sfx.play('explode')
         engineRef.current?.die()
         session.record({
             id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
@@ -117,9 +122,11 @@ export default function DinoGame() {
         addWinnings(stake * m, 'Dino return')
         if (m >= 5) {
             playSound('bigwin')
+            sfx.play('bigwin')
             setBigWin({ trigger: Date.now(), profit, multiplier: m })
         } else {
             playSound('win')
+            sfx.play('win')
         }
         setBurstKey(k => k + 1)
         session.record({
