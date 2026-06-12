@@ -339,6 +339,39 @@ body {
     cursor: default;
 }
 
+/* ===== Unified credit pill (replaces the split balance + Practice Credits btn) ===== */
+.credit-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.credit-pill:hover {
+    border-color: var(--accent-green);
+}
+
+.credit-pill.is-open {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-green), transparent 82%);
+}
+
+.credit-pill-caret {
+    color: var(--text-secondary);
+    transition: transform 0.18s ease;
+}
+
+.credit-pill.is-open .credit-pill-caret {
+    transform: rotate(180deg);
+}
+
 .credit-icon,
 .credit-currency-icon {
     display: inline-flex;
@@ -586,6 +619,26 @@ body {
 .credit-reset-btn:hover {
     color: #ed4245;
     border-color: #ed4245;
+}
+
+/* Settings shortcut at the foot of the credit dropdown */
+.credit-settings-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: color 0.15s, background 0.15s;
+}
+
+.credit-settings-link:hover {
+    color: var(--accent-green);
+    background: color-mix(in srgb, var(--accent-green), transparent 92%);
 }
 
 /* credit Transactions */
@@ -1858,8 +1911,7 @@ body {
     }
 
     .header-mode,
-    .header-center,
-    .credit-panel-btn {
+    .header-center {
         display: none;
     }
 
@@ -1873,6 +1925,11 @@ body {
         border-right: 1px solid var(--border-color);
         border-radius: 6px;
         padding: 8px;
+    }
+
+    .credit-pill {
+        padding: 0 10px;
+        gap: 6px;
     }
 
     .credit-balance-amount {
@@ -1892,8 +1949,7 @@ body {
 
 @media (max-width: 560px) {
     .header.header-play-surface .header-mode,
-    .header.header-play-surface .header-center,
-    .header.header-play-surface .credit-panel-btn {
+    .header.header-play-surface .header-center {
         display: none;
     }
 
@@ -2025,12 +2081,19 @@ body {
     display: grid;
     place-items: center;
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
+    text-decoration: none;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .header-toggle:hover {
     color: var(--accent-green);
     border-color: var(--accent-green);
+}
+
+.header-toggle.is-active {
+    color: var(--accent-green);
+    border-color: var(--accent-green);
+    background: color-mix(in srgb, var(--accent-green), transparent 88%);
 }
 
 .header-funmode.is-on {
