@@ -60,6 +60,27 @@ const DEFAULT_STATS = {
     // strategy sandbox runs). Drives the "learning" achievement group.
     oddsViewed: 0,
     sandboxRuns: 0,
+    // Daily play streak (consecutive calendar days with at least one settled
+    // round). `lastPlayDay` is a YYYY-MM-DD key; `currentDayStreak` resets to 1
+    // on a gap, `bestDayStreak` is the all-time high, `totalDaysPlayed` counts
+    // distinct days. Bumped via recordRound through markDailyActivity.
+    currentDayStreak: 0,
+    bestDayStreak: 0,
+    totalDaysPlayed: 0,
+    lastPlayDay: null,
+}
+
+function dayKey(ts = Date.now()) {
+    const d = new Date(ts)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function isYesterday(prevKey, todayKey) {
+    if (!prevKey) return false
+    const prev = new Date(`${prevKey}T00:00:00`)
+    const today = new Date(`${todayKey}T00:00:00`)
+    const diff = Math.round((today - prev) / 86400000)
+    return diff === 1
 }
 
 const listeners = new Set()
@@ -116,6 +137,19 @@ export function recordRound({ gameId, profit = 0, betAmount = 0, multiplier = 0 
     const nextWinStreak = won ? stats.currentWinStreak + 1 : 0
     const nextLossStreak = lost ? stats.currentLossStreak + 1 : 0
     const nextProfit = stats.totalProfit + (Number(profit) || 0)
+    // Daily play streak: first settled round of a new calendar day advances or
+    // resets the consecutive-day chain.
+    const today = dayKey()
+    let dayStreak = stats.currentDayStreak
+    let bestDay = stats.bestDayStreak
+    let totalDays = stats.totalDaysPlayed
+    let lastDay = stats.lastPlayDay
+    if (lastDay !== today) {
+        dayStreak = isYesterday(lastDay, today) ? stats.currentDayStreak + 1 : 1
+        bestDay = Math.max(stats.bestDayStreak, dayStreak)
+        totalDays = stats.totalDaysPlayed + 1
+        lastDay = today
+    }
     stats = {
         ...stats,
         totalRounds: stats.totalRounds + 1,
@@ -131,6 +165,10 @@ export function recordRound({ gameId, profit = 0, betAmount = 0, multiplier = 0 
         bestWinStreak: Math.max(stats.bestWinStreak, nextWinStreak),
         currentLossStreak: nextLossStreak,
         bestLossStreak: Math.max(stats.bestLossStreak, nextLossStreak),
+        currentDayStreak: dayStreak,
+        bestDayStreak: bestDay,
+        totalDaysPlayed: totalDays,
+        lastPlayDay: lastDay,
         lastGameId: gameId,
         uniqueGames: stats.uniqueGames.includes(gameId)
             ? stats.uniqueGames

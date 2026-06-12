@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Volume2, VolumeX, Sparkles, Settings as SettingsIcon } from 'lucide-react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
-import { useAudio } from '../audio/AudioProvider'
-import { useFunMode } from '../utils/funMode'
 import { fullGameCatalog } from '../data/casinoCatalog'
 import { searchGames } from '../utils/gameSearch'
 
@@ -54,8 +52,6 @@ function Header() {
         transactions,
         toasts,
     } = useCredits()
-    const { muted, toggle: toggleMute } = useAudio()
-    const [funMode, setFunMode] = useFunMode()
     const [showCredits, setShowCredits] = useState(false)
     const [grantAmount, setGrantAmount] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
@@ -194,30 +190,16 @@ function Header() {
             </div>
 
             <div className="header-right" ref={dropdownRef}>
-                <div className="header-toggles">
-                    <button
-                        className={`header-toggle header-funmode ${funMode ? 'is-on' : ''}`}
-                        onClick={() => setFunMode(!funMode)}
-                        aria-pressed={funMode}
-                        title={funMode
-                            ? 'Fun Mode ON — odds boosted for free play (not real casino math). Tap to turn off.'
-                            : 'Fun Mode — boost your odds in free play (entertainment only, not real casino math).'}
-                        aria-label={funMode ? 'Turn Fun Mode off' : 'Turn Fun Mode on'}
-                    >
-                        <Sparkles size={16} />
-                    </button>
-                    <button className="header-toggle" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'}>
-                        {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                    </button>
-                    <Link
-                        to="/settings"
-                        className={`header-toggle ${location.pathname.startsWith('/settings') ? 'is-active' : ''}`}
-                        aria-label="Settings"
-                        title="Settings"
-                    >
-                        <SettingsIcon size={16} />
-                    </Link>
-                </div>
+            <div className="header-toggles">
+                <Link
+                    to="/settings"
+                    className={`header-toggle ${location.pathname.startsWith('/settings') ? 'is-active' : ''}`}
+                    aria-label="Settings"
+                    title="Settings — audio, Fun Mode, appearance &amp; more"
+                >
+                    <SettingsIcon size={16} />
+                </Link>
+            </div>
                 <div className="header-credits">
                     <button
                         className={`credit-pill ${showCredits ? 'is-open' : ''}`}

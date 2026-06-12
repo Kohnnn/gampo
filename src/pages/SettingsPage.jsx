@@ -50,8 +50,8 @@ export default function SettingsPage() {
         <div className="settings-page" data-ux-surface="stage">
             <section className="settings-hero" data-ux-surface="stage">
                 <span className="settings-kicker"><SettingsIcon size={18} /> Settings</span>
-                <h1>Display, accessibility & save data</h1>
-                <p>Personalise the look, tune accessibility, and back up your local progress. Everything stays on this device.</p>
+                <h1>Audio, gameplay, appearance &amp; save data</h1>
+                <p>Tune sound, Fun Mode, the look, accessibility, and back up your local progress. Everything stays on this device.</p>
                 <div className="settings-hero-actions">
                     <button type="button" className="settings-btn primary" onClick={onExport} data-ux-primary-action>
                         <Download size={15} /> Export save
@@ -143,7 +143,7 @@ export default function SettingsPage() {
                         </span>
                     </label>
                     <p className="settings-help">
-                        <Volume2 size={13} style={{ verticalAlign: '-2px' }} /> Audio volume &amp; mute controls are below and in the in-game audio menu.
+                        <Volume2 size={13} style={{ verticalAlign: '-2px' }} /> Audio, Fun Mode &amp; gameplay toggles are grouped below.
                     </p>
                     <button
                         type="button"

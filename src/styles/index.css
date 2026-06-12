@@ -2117,17 +2117,6 @@ body {
     background: color-mix(in srgb, var(--accent-green), transparent 88%);
 }
 
-.header-funmode.is-on {
-    color: #ffd166;
-    border-color: #ffd166;
-    background: color-mix(in srgb, #ffd166, transparent 84%);
-    box-shadow: 0 0 12px color-mix(in srgb, #ffd166, transparent 60%);
-}
-.header-funmode.is-on:hover {
-    color: #ffe08a;
-    border-color: #ffe08a;
-}
-
 .main-content {
     animation: pageEnter 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 }

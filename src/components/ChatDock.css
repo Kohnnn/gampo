@@ -727,6 +727,31 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Personal bests board — mirrors the summary grid layout. */
+.prog-bests-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px 10px;
+}
+.prog-bests-grid span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.prog-bests-grid small {
+    color: var(--text-muted, #6f7a8d);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.prog-bests-grid strong {
+    font-size: 14px;
+    font-weight: 950;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
 .prog-section {
     display: flex;
     flex-direction: column;
@@ -893,6 +918,46 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
+}
+
+/* Daily rotating challenge card */
+.prog-challenge-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--accent-green, #00e701), transparent 90%);
+    border: 1px solid color-mix(in srgb, var(--accent-green, #00e701), transparent 72%);
+}
+.prog-challenge-card.is-complete {
+    border-color: color-mix(in srgb, var(--accent-green, #00e701), transparent 40%);
+}
+.prog-challenge-card.is-claimed {
+    opacity: 0.6;
+    filter: grayscale(0.3);
+}
+.prog-challenge-card .prog-ach-body { flex: 1; min-width: 0; }
+.prog-challenge-claim {
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 11px;
+    font-weight: 950;
+    color: #04140a;
+    background: var(--accent-green, #00e701);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s ease;
+}
+.prog-challenge-claim:hover { filter: brightness(1.1); }
+.prog-challenge-card em {
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--text-muted, #6f7a8d);
+    font-style: normal;
 }
 
 .prog-mission-summary span,
@@ -1089,5 +1154,6 @@
     .prog-ring { margin: 0 auto; }
     .prog-vip-card,
     .prog-mission-summary,
-    .prog-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .prog-summary-grid,
+    .prog-bests-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
