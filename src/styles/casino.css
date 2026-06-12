@@ -1174,6 +1174,18 @@
         padding: 14px;
     }
 
+    /* On mobile the workspace stacks main (toolbar + long game grid) then the
+       rail, burying Live Studio / Missions / Recent Activity below ~50 cards.
+       Lift the rail above the grid so the contextual discovery blocks are seen
+       without scrolling the whole catalogue. */
+    .casino-workspace {
+        display: flex;
+        flex-direction: column;
+    }
+    .casino-rail {
+        order: -1;
+    }
+
     .casino-hero-copy,
     .section-hero {
         padding: 24px;
@@ -1181,10 +1193,26 @@
 
     .casino-strip,
     .casino-toolbar,
-    .casino-rail,
     .casino-stat-grid,
     .activity-table > div {
         grid-template-columns: 1fr;
+    }
+
+    /* Rail sits above the grid (order:-1 above) as a horizontal-scroll strip so
+       the three discovery blocks stay compact instead of a tall stacked column
+       pushing the catalogue far down the page. */
+    .casino-rail {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(220px, 78%);
+        gap: 10px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        padding-bottom: 6px;
+        -webkit-overflow-scrolling: touch;
+    }
+    .casino-rail .rail-block {
+        scroll-snap-align: start;
     }
 
     .casino-game-grid {
