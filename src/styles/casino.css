@@ -241,6 +241,15 @@
     margin-bottom: 14px;
 }
 
+.casino-grid-heading {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 12px;
+}
+
 .casino-search {
     min-height: 44px;
     display: flex;

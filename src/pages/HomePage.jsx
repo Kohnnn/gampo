@@ -1,16 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Flame, Plus, RotateCcw, Search, ShieldCheck, Trophy, Sparkles, Dices, Spade, Coins, Clock, GraduationCap, Pin } from 'lucide-react'
+import { BookOpen, Flame, Plus, RotateCcw, Search, ShieldCheck, Trophy, Clock, GraduationCap, Pin } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { useSidebarPins } from '../hooks/useSidebarPins'
-import { gameDefinitions, findGameDefinition } from '../data/gameDefinitions'
+import { findGameDefinition } from '../data/gameDefinitions'
 import {
     featuredCollections,
     fullGameCatalog,
     liveStudioTables,
     lobbyStats,
     missions,
-    slotCatalog,
 } from '../data/casinoCatalog'
 import { formatCredits, rolloverProgress } from '../utils/simulationMath'
 import '../styles/casino.css'
@@ -92,13 +91,10 @@ function HomePage() {
             .slice(0, 12)
     ), [pins])
 
-    // Curated rows scroll horizontally, so we surface the full set per category
-    // (capped generously) rather than silently dropping entries like Cases past
-    // a 12-item slice. The "View all" link still routes to the full grid.
-    const originalsRow = gameDefinitions.filter(g => ['Arcade originals', 'Lottery math'].includes(g.category)).slice(0, 24)
-    const tablesRow = gameDefinitions.filter(g => ['Table math', 'Card room', 'Dice table', 'Decision games'].includes(g.category)).slice(0, 24)
-    const arcadeRow = gameDefinitions.filter(g => g.category === 'Arcade classics').slice(0, 24)
-    const slotsRow = slotCatalog.slice(0, 24)
+    // Curated rows scroll horizontally. Only the contextual rows remain
+    // (recently played, pinned, recommended starters); the per-category rows
+    // were removed because the filterable grid below is the canonical browse
+    // surface and duplicated them verbatim.
     const recommendedRow = useMemo(() => {
         // Pick a few games with low complexity / strong educational value first
         const priority = ['dice', 'coinflip', 'limbo', 'wheel', 'blackjack', 'baccarat', 'roulette', 'videopoker']
@@ -159,17 +155,19 @@ function HomePage() {
                 ))}
             </section>
 
+            {/* Contextual discovery rows only — the curated per-category rows
+                (Originals / Tables / Arcade / Slots) used to duplicate the
+                filterable grid below verbatim. The grid + filters are now the
+                single canonical browse surface, so we keep just the rows that
+                add context the grid can't: what you played, what you pinned, and
+                a beginner-friendly starter set. */}
             {recentlyPlayed.length > 0 && (
                 <CategoryRow icon={<Clock size={16} />} title="Recently played" link="/activity" games={recentlyPlayed} />
             )}
             {pinnedRow.length > 0 && (
                 <CategoryRow icon={<Pin size={16} />} title="Pinned games" link="/" games={pinnedRow} />
             )}
-            <CategoryRow icon={<GraduationCap size={16} />} title="Recommended lessons" link="/learn" games={recommendedRow} />
-            <CategoryRow icon={<Sparkles size={16} />} title="Originals" link="/originals" games={originalsRow} />
-            <CategoryRow icon={<Spade size={16} />} title="Casino Tables" link="/originals" games={tablesRow} />
-            <CategoryRow icon={<Dices size={16} />} title="Arcade Classics" link="/originals" games={arcadeRow} />
-            <CategoryRow icon={<Coins size={16} />} title="Slots" link="/slots-lobby" games={slotsRow} />
+            <CategoryRow icon={<GraduationCap size={16} />} title="New here? Start with these" link="/learn" games={recommendedRow} />
 
             <section className="casino-workspace" data-ux-surface="stage">
                 <main>
@@ -186,6 +184,7 @@ function HomePage() {
                             ))}
                         </div>
                     </div>
+                    <h2 className="casino-grid-heading">All games</h2>
                     <GameGrid games={games} />
                 </main>
                 <aside className="casino-rail">

@@ -1910,9 +1910,30 @@ body {
         font-size: 26px;
     }
 
-    .header-mode,
-    .header-center {
+    .header-mode {
         display: none;
+    }
+
+    /* Mobile search: instead of hiding it (it was unreachable from the top bar),
+       let the header wrap and drop the search onto a full-width second row. */
+    .header {
+        flex-wrap: wrap;
+        height: auto;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        row-gap: 8px;
+    }
+
+    .header-center {
+        order: 3;
+        flex: 1 1 100%;
+        max-width: none;
+        margin: 0;
+        min-width: 0;
+    }
+
+    .search-input-wrapper.is-game-search {
+        max-width: none;
     }
 
     .header-right {
