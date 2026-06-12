@@ -57,7 +57,7 @@ export default function AudioSettings() {
             <h2><Volume2 size={16} /> Audio</h2>
             <p className="settings-help">
                 Master mute silences everything. Music is off by default — toggle it on below.
-                Changes here sync with the header button and the in-game audio menu.
+                Changes here sync with the in-game audio menu.
             </p>
 
             <label className="settings-switch">

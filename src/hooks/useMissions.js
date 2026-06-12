@@ -24,7 +24,7 @@
 // thin re-export below).
 
 import { useEffect, useState } from 'react'
-import { MISSIONS, evaluateMissions } from '../data/missions'
+import { MISSIONS, evaluateMissions, evaluateDailyChallenge } from '../data/missions'
 import { readJson, writeJson, removeKey } from '../utils/storage'
 
 const STATE_KEY = 'gampo_missions_period_state'
@@ -144,6 +144,13 @@ function checkCompletes(stats) {
             newest = m
         }
     }
+    // Daily rotating challenge — track completion under a date-scoped id.
+    const chal = evaluateDailyChallenge(stats, stats.dayKey)
+    const chalId = `challenge:${stats.dayKey}:${chal.id}`
+    if (chal.complete && !completed[chalId]) {
+        completed[chalId] = { ts: Date.now(), claimed: false }
+        newest = { ...chal, id: chalId, period: 'daily' }
+    }
     if (newest) {
         recentComplete = newest
         writeCompleted()
@@ -178,6 +185,20 @@ export function dismissMissionToast() {
     if (!recentComplete) return
     recentComplete = null
     notify()
+}
+
+// Claim the rotating daily challenge by its date-scoped id. Returns the reward
+// descriptor so the caller can grant credits via CreditContext.
+export function claimChallenge(challengeId) {
+    const entry = completed[challengeId]
+    if (!entry || entry.claimed) return null
+    const chal = evaluateDailyChallenge(state, state.dayKey)
+    const expectedId = `challenge:${state.dayKey}:${chal.id}`
+    if (challengeId !== expectedId || !chal.complete) return null
+    completed = { ...completed, [challengeId]: { ...entry, claimed: true, claimedAt: Date.now() } }
+    writeCompleted()
+    notify()
+    return { ...chal, reward: chal.reward }
 }
 
 export function resetMissions() {
@@ -234,12 +255,27 @@ export function useMissions() {
         claimable: m.complete && !completed[m.id]?.claimed,
     }))
 
+    // Rotating daily challenge — deterministic per calendar day. Completion is
+    // tracked in the same `completed` map under a date-scoped id so it resets
+    // naturally each day (a new id) without extra persistence.
+    const rawChallenge = evaluateDailyChallenge(state, state.dayKey)
+    const challengeId = `challenge:${state.dayKey}:${rawChallenge.id}`
+    const challenge = {
+        ...rawChallenge,
+        challengeId,
+        completedAt: completed[challengeId]?.ts || null,
+        claimed: !!completed[challengeId]?.claimed,
+        claimable: rawChallenge.complete && !completed[challengeId]?.claimed,
+    }
+
     return {
         stats: state,
         missions,
+        challenge,
         summary,
         recentComplete,
         claim: claimMission,
+        claimChallenge,
         dismiss: dismissMissionToast,
         reset: resetMissions,
         resetVip: resetVipProgress,

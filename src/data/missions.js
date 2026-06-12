@@ -253,3 +253,35 @@ export function vipTierFor(wagered) {
     }
     return { current, next }
 }
+
+// ---- Rotating daily challenge (Wave 2026-06-12) ----
+// A single bonus challenge that rotates each calendar day, deterministically
+// picked from this pool by the date. It reads the same `daily` period counters
+// useMissions already tracks, so no new persistence is needed. Completing it is
+// a stretch goal on top of the fixed daily missions, with a richer reward.
+export const DAILY_CHALLENGE_POOL = [
+    { id: 'chal-spin-30', name: 'Marathon', detail: 'Settle 30 rounds today.', icon: 'flame', target: 30, reward: { credits: 600 }, evaluate: s => s.daily.rounds },
+    { id: 'chal-win-12', name: 'Dozen wins', detail: 'Win 12 rounds today.', icon: 'trophy', target: 12, reward: { credits: 600 }, evaluate: s => s.daily.wins },
+    { id: 'chal-streak-5', name: 'On a roll', detail: 'Hit a 5-win streak today.', icon: 'flame', target: 5, reward: { credits: 700 }, evaluate: s => s.daily.bestStreak },
+    { id: 'chal-mult-20', name: 'Catch a 20×', detail: 'Land a 20× win today.', icon: 'sparkles', target: 20, reward: { credits: 700 }, evaluate: s => s.daily.bestMultiplier },
+    { id: 'chal-games-5', name: 'Sampler', detail: 'Play 5 different games today.', icon: 'compass', target: 5, reward: { credits: 500 }, evaluate: s => (Array.isArray(s.daily.uniqueGames) ? s.daily.uniqueGames.length : 0) },
+    { id: 'chal-wager-2k', name: 'High roller', detail: 'Wager 2,000 GC today.', icon: 'coins', target: 2000, reward: { credits: 800 }, evaluate: s => s.daily.wagered },
+    { id: 'chal-mult-50', name: 'Big swing', detail: 'Land a 50× win today.', icon: 'sparkles', target: 50, reward: { credits: 900 }, evaluate: s => s.daily.bestMultiplier },
+]
+
+// Stable day index → deterministic challenge for the day.
+export function dailyChallengeFor(dateKey = '') {
+    let hash = 0
+    for (let i = 0; i < dateKey.length; i += 1) hash = (hash * 31 + dateKey.charCodeAt(i)) >>> 0
+    const pick = DAILY_CHALLENGE_POOL[hash % DAILY_CHALLENGE_POOL.length]
+    return pick
+}
+
+export function evaluateDailyChallenge(stats, dateKey) {
+    const c = dailyChallengeFor(dateKey)
+    const rawValue = c.evaluate(stats) || 0
+    const value = Array.isArray(rawValue) ? rawValue.length : rawValue
+    const progress = Math.min(value, c.target)
+    const ratio = c.target > 0 ? Math.min(1, progress / c.target) : 0
+    return { ...c, value, progress, ratio, complete: value >= c.target }
+}

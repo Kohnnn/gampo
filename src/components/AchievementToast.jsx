@@ -5,7 +5,7 @@
 // auto-dismisses after ~5 seconds. Reduced-motion compatible.
 
 import { useEffect } from 'react'
-import { Award, Compass, Flame, Gift, Play, Sparkles, Trophy, Coins } from 'lucide-react'
+import { Award, Compass, Flame, Gift, Play, Sparkles, Trophy, Coins, Zap, Calendar, Layers, Target, Crown } from 'lucide-react'
 import { useProgress } from '../hooks/useProgress'
 import { useXp } from '../hooks/useXp'
 import './AchievementToast.css'
@@ -19,6 +19,11 @@ const ICONS = {
     gift: Gift,
     coins: Coins,
     award: Award,
+    zap: Zap,
+    calendar: Calendar,
+    layers: Layers,
+    target: Target,
+    crown: Crown,
 }
 
 const AUTO_DISMISS_MS = 5200

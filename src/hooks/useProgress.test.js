@@ -92,4 +92,15 @@ describe('useProgress', () => {
         expect(unlocked['learn-odds-first']).toBeTypeOf('number')
         expect(unlocked['learn-sandbox-first']).toBeTypeOf('number')
     })
+
+    it('starts a daily play streak at 1 on the first round of a day', () => {
+        recordRound({ gameId: 'dice', profit: 1, betAmount: 1 })
+        recordRound({ gameId: 'dice', profit: -1, betAmount: 1 })
+        const stats = JSON.parse(globalThis.localStorage.getItem('gampo_progress_stats'))
+        // Same calendar day → streak stays 1, days played 1.
+        expect(stats.currentDayStreak).toBe(1)
+        expect(stats.bestDayStreak).toBe(1)
+        expect(stats.totalDaysPlayed).toBe(1)
+        expect(stats.lastPlayDay).toBeTypeOf('string')
+    })
 })

@@ -108,6 +108,41 @@ function SpinModeControl({ value, onChange, disabled = false, className = '' }) 
     )
 }
 
+// Plain-language "How it plays" steps, generated from the template config so
+// every slot gets a jargon-free explainer regardless of contract copy depth.
+// A template may override with an explicit `howToPlay: string[]` on its
+// contract; otherwise we derive 3-5 short sentences from the layout + features.
+function buildHowToPlay(config, contract) {
+    if (Array.isArray(contract?.howToPlay) && contract.howToPlay.length) return contract.howToPlay
+    const f = config.features || {}
+    const evalType = config.layout?.evaluation
+    const steps = []
+    steps.push('Pick your bet, then press spin — every spin is independent and uses the same odds a real machine would.')
+    if (evalType === 'cluster') {
+        steps.push(`Win by landing groups of ${config.features?.clusterMin || 5}+ matching symbols touching anywhere on the grid — no paylines.`)
+    } else if (evalType === 'ways') {
+        steps.push('Win when matching symbols line up from the left on adjacent reels — any position counts, so there are many ways to win.')
+    } else if (evalType === 'megaways') {
+        steps.push('Reel heights change every spin, so the number of ways to win shifts — match symbols left-to-right on adjacent reels.')
+    } else if (evalType === 'pay-anywhere') {
+        steps.push('Matching symbols pay from anywhere on the screen — you do not need them on a line.')
+    } else {
+        steps.push('Win when matching symbols land on a payline reading left-to-right.')
+    }
+    if (f.cascade) steps.push('Winning symbols clear and new ones drop in, so one spin can pay several times in a row.')
+    if (f.scatter) {
+        const n = f.scatter.trigger || 3
+        const fs = f.scatter.awardFreeSpins
+        steps.push(`Land ${n}+ scatter symbols to ${fs ? `trigger ${fs} free spins` : 'trigger the bonus feature'}.`)
+    }
+    if (f.coinMeter) steps.push('Collect coin symbols to fill the meter — filling it unlocks the bonus.')
+    if (f.holdAndRespin) steps.push('In the hold & respin feature, money symbols lock in place while the rest respin.')
+    if (f.multiplierWheel) steps.push('Trigger the wheel to win a random multiplier applied to your win.')
+    if (f.buyBonus) steps.push('Prefer not to wait? Buy the bonus directly for a fixed multiple of your bet.')
+    steps.push('The house edge is built in — over many spins you lose on average. Watch how variance behaves; that is the lesson.')
+    return steps
+}
+
 // Shared feature-contract body: full paytable ladder + mechanics + bonus flow.
 // Rendered both inside the desktop panel (gated behind the showInfo toggle) and
 // inside the mobile paytable modal, so both surfaces derive identical data from
@@ -129,6 +164,14 @@ function FeatureContractBody({ config, paylineMode }) {
     return (
         <div className="slot-feature-contract">
             <p className="slot-panel-note">{contract?.summary || config.featureText}</p>
+            <div className="slot-contract-block slot-howtoplay">
+                <h4>How it plays</h4>
+                <ol className="slot-howtoplay-steps">
+                    {buildHowToPlay(config, contract).map((step, i) => (
+                        <li key={i}>{step}</li>
+                    ))}
+                </ol>
+            </div>
             <div className="slot-contract-stats">
                 <span><small>RTP</small><strong>{Math.round(config.rtpTarget * 100)}%</strong></span>
                 <span><small>Volatility</small><strong>{config.volatility}</strong></span>
@@ -692,7 +735,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const jackpotEvent = result.featureEvents.find(item => item.type === 'jackpot')
         const burstEvent = result.featureEvents.find(item => item.type === 'coin-meter-fill')
         if (jackpotEvent) {
-            setEventFlash({ trigger: revealTrigger, label: 'JACKPOT' })
+            setEventFlash({ trigger: revealTrigger, label: 'JACKPOT', kind: 'jackpot' })
             slotSfx.play('bigwin', { volume: 0.95 })
         } else if (burstEvent) {
             setEventFlash({ trigger: revealTrigger, label: 'VAULT BURST' })
@@ -1680,7 +1723,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 )}
 
                 {eventFlash && !running && (
-                    <div className="slot-event-flash" key={`flash-${eventFlash.trigger}`} aria-hidden="true">
+                    <div className={`slot-event-flash ${eventFlash.kind === 'jackpot' ? 'is-jackpot' : ''}`} key={`flash-${eventFlash.trigger}`} aria-hidden="true">
+                        {eventFlash.kind === 'jackpot' && !reduceMotion && <span className="slot-event-flash-rays" />}
                         <strong>{eventFlash.label}</strong>
                     </div>
                 )}
@@ -1751,12 +1795,23 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 )}
 
                 {bonusEndBanner && (
-                    <div className="slot-bonus-end-banner" key={bonusEndBanner.trigger}>
-                        <span>Bonus complete</span>
+                    <div
+                        className={`slot-bonus-end-banner ${bonusEndBanner.baseBet > 0 && (bonusEndBanner.totalWin / bonusEndBanner.baseBet) >= 20 ? 'is-bigwin' : ''}`}
+                        key={bonusEndBanner.trigger}
+                        role="status"
+                    >
+                        {!reduceMotion && bonusEndBanner.baseBet > 0 && (bonusEndBanner.totalWin / bonusEndBanner.baseBet) >= 20 && (
+                            <span className="slot-bonus-end-coins" aria-hidden>
+                                {Array.from({ length: 14 }).map((_, i) => (
+                                    <i key={i} style={{ '--i': i, left: `${(i * 7 + 4) % 96}%`, animationDelay: `${(i % 7) * 90}ms` }} />
+                                ))}
+                            </span>
+                        )}
+                        <span className="slot-bonus-end-kicker">{(bonusEndBanner.baseBet > 0 && (bonusEndBanner.totalWin / bonusEndBanner.baseBet) >= 20) ? 'Huge bonus!' : 'Bonus complete'}</span>
                         <strong>{formatCredits(bonusEndBanner.totalWin)}</strong>
                         <em>{bonusEndBanner.played} of {bonusEndBanner.totalAwarded} spins{bonusEndBanner.retriggers > 0 ? ` · ${bonusEndBanner.retriggers}× retrigger` : ''}</em>
                         {bonusEndBanner.baseBet > 0 && (
-                            <i>{(bonusEndBanner.totalWin / bonusEndBanner.baseBet).toFixed(2)}× of bet</i>
+                            <i className="slot-bonus-end-mult">{(bonusEndBanner.totalWin / bonusEndBanner.baseBet).toFixed(2)}× of bet</i>
                         )}
                     </div>
                 )}

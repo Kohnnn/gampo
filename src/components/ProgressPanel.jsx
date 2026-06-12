@@ -23,6 +23,9 @@ import {
     Target,
     Trophy,
     Coins,
+    Zap,
+    Calendar,
+    Layers,
 } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { formatCredits } from '../utils/simulationMath'
@@ -45,6 +48,9 @@ const ICONS = {
     award: Award,
     target: Target,
     crown: Crown,
+    zap: Zap,
+    calendar: Calendar,
+    layers: Layers,
 }
 
 const MISSION_ROUTES = {
@@ -127,6 +133,14 @@ export default function ProgressPanel() {
         if (credits > 0) {
             grantPracticeCredits(credits)
             showToast?.('win', 'Progress pack', `+GC ${credits.toLocaleString()}`)
+        }
+    }
+    const handleChallengeClaim = () => {
+        const result = missions.claimChallenge(missions.challenge.challengeId)
+        const credits = result?.reward?.credits || 0
+        if (credits > 0) {
+            grantPracticeCredits(credits)
+            showToast?.('win', 'Daily challenge', `+GC ${credits.toLocaleString()}`)
         }
     }
 
@@ -216,7 +230,7 @@ export default function ProgressPanel() {
                 <div className="prog-summary-grid">
                     <span><small>Rounds</small><strong>{stats.totalRounds}</strong></span>
                     <span><small>Wins</small><strong>{stats.totalWins}</strong></span>
-                    <span><small>Best ×</small><strong>{stats.bestMultiplier.toFixed(1)}</strong></span>
+                    <span><small>Day streak</small><strong>{stats.currentDayStreak || 0}🔥</strong></span>
                     <span><small>Best streak</small><strong>{stats.bestWinStreak}</strong></span>
                     <span><small>Missions</small><strong>{missionComplete}/{missionTotal}</strong></span>
                     <span><small>VIP</small><strong>{currentVip.label}</strong></span>
@@ -240,6 +254,18 @@ export default function ProgressPanel() {
                 <div className="prog-xp-foot">
                     <span>{xp.totalXp.toLocaleString()} XP total</span>
                     {xp.rank.next && !xp.atMax && <span>Next: {xp.rank.next.label} · Lvl {xp.rank.next.minLevel}</span>}
+                </div>
+            </section>
+
+            <section className="prog-section prog-bests">
+                <header><Trophy size={13} /> Personal bests</header>
+                <div className="prog-bests-grid">
+                    <span><small>Biggest win ×</small><strong>{(stats.bestMultiplier || 0).toFixed(1)}×</strong></span>
+                    <span><small>Best win streak</small><strong>{stats.bestWinStreak || 0}</strong></span>
+                    <span><small>Best day streak</small><strong>{stats.bestDayStreak || 0}🔥</strong></span>
+                    <span><small>Days played</small><strong>{stats.totalDaysPlayed || 0}</strong></span>
+                    <span><small>Peak profit</small><strong>{Math.round(stats.bestProfit || 0).toLocaleString()}</strong></span>
+                    <span><small>Rare drops</small><strong>{stats.casesRareDrops || 0}</strong></span>
                 </div>
             </section>
 
@@ -355,6 +381,31 @@ export default function ProgressPanel() {
                         </div>
                     ))}
                 </div>
+            </section>
+
+            <section className="prog-section prog-challenge">
+                <header><Zap size={13} /> Daily challenge</header>
+                {(() => {
+                    const c = missions.challenge
+                    const ChalIcon = ICONS[c.icon] || Zap
+                    return (
+                        <div className={`prog-challenge-card ${c.complete ? 'is-complete' : ''} ${c.claimed ? 'is-claimed' : ''}`}>
+                            <span className="prog-ach-icon"><ChalIcon size={16} /></span>
+                            <div className="prog-ach-body">
+                                <strong>{c.name}</strong>
+                                <span>{c.detail}</span>
+                                <div className="prog-ach-bar" aria-hidden><i style={{ width: `${c.ratio * 100}%` }} /></div>
+                            </div>
+                            {c.claimable ? (
+                                <button type="button" className="prog-challenge-claim" onClick={handleChallengeClaim}>
+                                    Claim +GC {c.reward.credits}
+                                </button>
+                            ) : (
+                                <em>{c.claimed ? 'Claimed' : c.complete ? 'Ready' : `${formatMissionValue(c.progress)}/${c.target}`}</em>
+                            )}
+                        </div>
+                    )
+                })()}
             </section>
 
             <section className="prog-section">
