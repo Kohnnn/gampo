@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Volume2, VolumeX, ZapOff, Zap, Sparkles } from 'lucide-react'
+import { Volume2, VolumeX, Sparkles, Settings as SettingsIcon } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { useAudio } from '../audio/AudioProvider'
-import { useReduceMotion } from './fx'
 import { useFunMode } from '../utils/funMode'
 import { fullGameCatalog } from '../data/casinoCatalog'
 import { searchGames } from '../utils/gameSearch'
@@ -56,7 +55,6 @@ function Header() {
         toasts,
     } = useCredits()
     const { muted, toggle: toggleMute } = useAudio()
-    const [reduceMotion, setReduceMotion] = useReduceMotion()
     const [funMode, setFunMode] = useFunMode()
     const [showCredits, setShowCredits] = useState(false)
     const [grantAmount, setGrantAmount] = useState('')
@@ -197,12 +195,6 @@ function Header() {
 
             <div className="header-right" ref={dropdownRef}>
                 <div className="header-toggles">
-                    <button className="header-toggle" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
-                        {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                    </button>
-                    <button className="header-toggle" onClick={() => setReduceMotion(v => !v)} aria-label={reduceMotion ? 'Enable motion' : 'Reduce motion'}>
-                        {reduceMotion ? <ZapOff size={16} /> : <Zap size={16} />}
-                    </button>
                     <button
                         className={`header-toggle header-funmode ${funMode ? 'is-on' : ''}`}
                         onClick={() => setFunMode(!funMode)}
@@ -214,22 +206,31 @@ function Header() {
                     >
                         <Sparkles size={16} />
                     </button>
+                    <button className="header-toggle" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'} title={muted ? 'Unmute' : 'Mute'}>
+                        {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                    </button>
+                    <Link
+                        to="/settings"
+                        className={`header-toggle ${location.pathname.startsWith('/settings') ? 'is-active' : ''}`}
+                        aria-label="Settings"
+                        title="Settings"
+                    >
+                        <SettingsIcon size={16} />
+                    </Link>
                 </div>
                 <div className="header-credits">
                     <button
-                        className="credit-balance-display"
+                        className={`credit-pill ${showCredits ? 'is-open' : ''}`}
                         onClick={() => setShowCredits(prev => !prev)}
                         aria-expanded={showCredits}
-                        title="Practice sessions are tab-isolated. A second browser tab starts its own local balance."
+                        aria-label="Practice credits balance and top-up"
+                        title="Practice credits — fake balance, tab-isolated. Click to top up or review activity."
                     >
                         <CreditIcon size={18} />
                         <span className="credit-balance-amount">{formattedBalance}</span>
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                        <svg className="credit-pill-caret" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
                             <path d="M7 10l5 5 5-5z" />
                         </svg>
-                    </button>
-                    <button className="credit-panel-btn" onClick={() => setShowCredits(prev => !prev)}>
-                        Practice Credits
                     </button>
 
                     {showCredits && (
@@ -295,6 +296,10 @@ function Header() {
                                     </div>
                                 )}
                             </div>
+
+                            <Link to="/settings" className="credit-settings-link" onClick={() => setShowCredits(false)}>
+                                <SettingsIcon size={14} /> Settings &amp; preferences
+                            </Link>
                         </div>
                     )}
                 </div>
