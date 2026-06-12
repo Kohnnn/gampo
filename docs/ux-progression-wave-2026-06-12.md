@@ -33,7 +33,7 @@ Branch: `codex/gampo-polish-deploy`. Ships incrementally; this doc tracks plan +
 - [x] B2 Slot "How it plays" — auto-generated plain-language numbered steps on every template (buildHowToPlay), styled card above mechanics
 - [x] B3 Slot symbol sizing — base scale/caps raised; mansion-megaways + vault-rush/dust-rail/iron-fist added to bump groups; mansion rank symbols bumped
 - [x] B4 Progression — daily play streak (currentDayStreak/bestDayStreak/totalDaysPlayed), 16 new achievements incl. `daily` group, rotating daily challenge pool (deterministic per date) with claim, personal-best board in ProgressPanel
-- [x] B5 Bonus/animation — bonus-exit celebration (gold treatment + falling coins + pulse on ≥20× sessions), jackpot cinematic (rotating ray burst + gold), reduce-motion + no-animations fallbacks
+- [x] B5 Bonus/animation — bonus-exit celebration (gold treatment + falling coins + pulse on ≥20× sessions), jackpot cinematic (rotating ray burst + gold), retrigger pop banner (+N FREE SPINS, distinct from flyers), coin-meter fill build-up + burst; all with reduce-motion + no-animations fallbacks
 - [x] B6 QoL folded into B1-B5 (settings consolidation, plain-language explainers, streak, challenges, best board, celebration)
 - [x] Gates: 511 tests green (+4), build clean, audit:all pass, smoke 0 overflow / 0 errors on /,/settings,/slots,/mansion-megaways,/cases
 

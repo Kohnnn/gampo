@@ -549,6 +549,41 @@
     transition: width 0.4s ease;
 }
 
+/* Coin-meter build-up: pulse the pill as it nears full, then a bright burst the
+   moment it fills, so the meter has a payoff beat instead of a static bar. */
+.slot-pill-meter.is-near-full {
+    border-color: color-mix(in srgb, var(--slot-accent), white 18%);
+    animation: slotMeterNearFull 0.9s ease-in-out infinite;
+}
+.slot-pill-meter.is-near-full .slot-pill-fill {
+    height: 4px;
+    background: linear-gradient(90deg, var(--slot-accent), #fff8c8);
+}
+.slot-pill-meter.is-full {
+    border-color: #ffe08a;
+    animation: slotMeterBurst 0.6s ease-out;
+}
+.slot-pill-meter.is-full .slot-pill-fill {
+    height: 4px;
+    background: linear-gradient(90deg, #ffcf5a, #fff);
+    box-shadow: 0 0 18px rgba(255, 207, 90, 0.8);
+}
+@keyframes slotMeterNearFull {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--slot-accent), transparent 70%); }
+    50% { box-shadow: 0 0 14px 1px color-mix(in srgb, var(--slot-accent), transparent 40%); }
+}
+@keyframes slotMeterBurst {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 207, 90, 0.6); }
+    40% { transform: scale(1.08); box-shadow: 0 0 24px 4px rgba(255, 207, 90, 0.7); }
+    100% { transform: scale(1); box-shadow: 0 0 12px rgba(255, 207, 90, 0.4); }
+}
+.gampo-reduce-motion .slot-pill-meter.is-near-full,
+.gampo-reduce-motion .slot-pill-meter.is-full,
+.gampo-no-animations .slot-pill-meter.is-near-full,
+.gampo-no-animations .slot-pill-meter.is-full {
+    animation: none;
+}
+
 .slot-pill-cascade {
     border-color: rgba(255, 124, 74, 0.62);
     box-shadow: 0 0 18px rgba(255, 124, 74, 0.34);
@@ -2426,6 +2461,59 @@
         top: var(--to-y);
         transform: translate(-50%, -50%) scale(0.74);
     }
+}
+
+/* Retrigger pop — a celebratory "+N FREE SPINS" beat distinct from the flying
+   scatter badges, so an in-session retrigger reads as its own moment. */
+.slot-retrigger-pop {
+    position: absolute;
+    left: 50%;
+    top: 38%;
+    transform: translate(-50%, -50%);
+    z-index: 26;
+    pointer-events: none;
+    display: grid;
+    place-items: center;
+    gap: 1px;
+    padding: 10px 26px;
+    border-radius: 14px;
+    border: 2px solid rgba(255, 230, 128, 0.85);
+    background: radial-gradient(circle at 50% 20%, rgba(255, 207, 90, 0.4), transparent 65%), linear-gradient(180deg, rgba(28, 20, 6, 0.94), rgba(14, 10, 4, 0.95));
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 207, 90, 0.4);
+    animation: slotRetriggerPop 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.slot-retrigger-pop span {
+    color: #ffe08a;
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
+.slot-retrigger-pop strong {
+    color: #fff6cf;
+    font-size: clamp(28px, 5vw, 46px);
+    line-height: 1;
+    text-shadow: 0 0 24px rgba(255, 207, 90, 0.7);
+}
+.slot-retrigger-pop em {
+    color: #ffe08a;
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+@keyframes slotRetriggerPop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+    16% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
+    30% { transform: translate(-50%, -50%) scale(1); }
+    82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -55%) scale(0.96); }
+}
+.gampo-reduce-motion .slot-retrigger-pop,
+.gampo-no-animations .slot-retrigger-pop {
+    animation: none;
+    opacity: 1;
 }
 
 .slot-anticipation-callout,

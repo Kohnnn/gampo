@@ -368,6 +368,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [wheelReveal, setWheelReveal] = useState(null)
     const [holdReveal, setHoldReveal] = useState(null)
     const [retriggerFlyers, setRetriggerFlyers] = useState([])
+    const [retriggerPop, setRetriggerPop] = useState(null) // { trigger, amount } celebratory retrigger banner
     const [slotAssetsReady, setSlotAssetsReady] = useState(false)
     // Wave 10: free-spin session tracking
     const [freeSpinSession, setFreeSpinSession] = useState(null) // { totalAwarded, played, totalWin, baseBet }
@@ -880,6 +881,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     setRetriggerFlyers([])
                 }, SLOT_RETRIGGER_FLY_MS + 260))
             }
+            // Retrigger pop: a celebratory "+N FREE SPINS" banner distinct from the
+            // flying scatter badges, so an in-session retrigger has its own beat.
+            if (freeSpinSession) {
+                setRetriggerPop({ trigger: revealTrigger, amount: freeSpinEvent.freeSpins })
+                timers.current.push(window.setTimeout(() => {
+                    setRetriggerPop(current => (current && current.trigger === revealTrigger ? null : current))
+                }, 1500))
+            }
             setFreeSpins(value => value + freeSpinEvent.freeSpins)
             setFreeSpinSession(prev => {
                 if (prev) {
@@ -995,6 +1004,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 setLastResult(null)
                 setMysteryReveal(null)
                 setRetriggerFlyers([])
+                setRetriggerPop(null)
                 setEventFlash(null)
                 setFeatureAnnounce(null)
                 setCoinShower(null)
@@ -1052,6 +1062,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setStoppedColumnState(0)
             setMysteryReveal(null)
             setRetriggerFlyers([])
+            setRetriggerPop(null)
             setEventFlash(null)
             setFeatureAnnounce(null)
             setCoinShower(null)
@@ -1465,7 +1476,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             </div>
                         )}
                         {meterTarget > 0 && (
-                            <div className="slot-pill slot-pill-meter">
+                            <div className={`slot-pill slot-pill-meter ${meterPercent >= 80 && meterPercent < 100 ? 'is-near-full' : ''} ${meterPercent >= 100 ? 'is-full' : ''}`}>
                                 <Sparkles size={14} />
                                 <strong>{coinMeter}/{meterTarget}</strong>
                                 <small>coins</small>
@@ -1589,6 +1600,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                         +{flyer.amount}
                                     </span>
                                 ))}
+                            </div>
+                        )}
+                        {retriggerPop && (
+                            <div className="slot-retrigger-pop" key={`rp-${retriggerPop.trigger}`} role="status" aria-label={`Retrigger plus ${retriggerPop.amount} free spins`}>
+                                <span>Retrigger</span>
+                                <strong>+{retriggerPop.amount}</strong>
+                                <em>Free spins</em>
                             </div>
                         )}
                         {!running && lastResult?.wins?.length > 0 && !(lastResult.cascadeSteps > 0) && (

@@ -529,4 +529,22 @@ describe('S-anim feature animations are wired', () => {
         // Reduced-motion: coin shower suppressed, announce static.
         expect(slotsCssSource).toMatch(/gampo-reduce-motion \.slot-coin-shower[\s\S]*display: none/)
     })
+
+    it('bonus-exit celebration, jackpot rays, retrigger pop and coin-meter burst are wired with motion fallbacks', () => {
+        // Bonus-exit big-win celebration.
+        expect(slotsGameSource).toContain('slot-bonus-end-coins')
+        expect(slotsCssSource).toContain('@keyframes slotBonusEndCoinFall')
+        // Jackpot cinematic.
+        expect(slotsGameSource).toContain('slot-event-flash-rays')
+        expect(slotsCssSource).toContain('@keyframes slotJackpotRays')
+        // Retrigger pop banner.
+        expect(slotsGameSource).toContain('setRetriggerPop')
+        expect(slotsGameSource).toContain('slot-retrigger-pop')
+        expect(slotsCssSource).toContain('@keyframes slotRetriggerPop')
+        // Coin-meter fill build-up + burst.
+        expect(slotsGameSource).toContain('is-near-full')
+        expect(slotsCssSource).toContain('@keyframes slotMeterBurst')
+        // All four respect the no-animations master switch.
+        expect(slotsCssSource).toMatch(/gampo-no-animations[\s\S]*slot-retrigger-pop/)
+    })
 })
