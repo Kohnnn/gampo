@@ -16,7 +16,7 @@ export default function SettingsPage() {
     const guard = useSessionGuard()
     const onboarding = useOnboarding()
     const [, setReduceMotionFx] = useReduceMotion()
-    const [funMode, setFunMode] = useFunMode()
+    const [, setFunMode, funModeState] = useFunMode()
     const fileRef = useRef(null)
     const [notice, setNotice] = useState(null)
 
@@ -168,18 +168,30 @@ export default function SettingsPage() {
                             <small>Faster spins/rounds by default (slots open in turbo). You can still change speed per game.</small>
                         </span>
                     </label>
-                    <label className="settings-switch">
-                        <input
-                            type="checkbox"
-                            checked={funMode}
-                            onChange={e => setFunMode(e.target.checked)}
-                        />
-                        <span className="settings-switch-track" aria-hidden="true"><span className="settings-switch-thumb" /></span>
+                    <div className="settings-mode-field">
                         <span className="settings-switch-label">
-                            <strong><Sparkles size={13} style={{ verticalAlign: '-2px' }} /> Fun mode</strong>
-                            <small>Free-play-only luck boost for entertainment. Effective return can exceed 100% — never a real-casino mode.</small>
+                            <strong><Sparkles size={13} style={{ verticalAlign: '-2px' }} /> Play personality</strong>
+                            <small>Fun is the default free-play luck boost. Story keeps standard odds with richer flavour. Serious keeps the plainest experience.</small>
                         </span>
-                    </label>
+                        <div className="settings-mode-segment" role="radiogroup" aria-label="Play personality">
+                            {[
+                                ['fun', 'Fun'],
+                                ['story', 'Story'],
+                                ['serious', 'Serious'],
+                            ].map(([value, label]) => (
+                                <button
+                                    key={value}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={funModeState === value}
+                                    className={funModeState === value ? 'is-active' : ''}
+                                    onClick={() => setFunMode(value)}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </section>
 
                 <AudioSettings />

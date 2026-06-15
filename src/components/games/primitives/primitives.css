@@ -2209,7 +2209,7 @@ input:focus-visible,
         border-radius: 16px;
         background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(20, 39, 51, 0.98));
         box-shadow: 0 -14px 42px rgba(0, 0, 0, 0.62);
-        backdrop-filter: blur(12px);
+        backdrop-filter: blur(4px);
         pointer-events: auto;
     }
     .bp-mobile-settings,

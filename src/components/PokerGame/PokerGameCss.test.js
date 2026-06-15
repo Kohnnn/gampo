@@ -27,7 +27,7 @@ describe('poker layout CSS', () => {
         for (const action of ['fold', 'check', 'call', 'raise']) {
             expect(source).toContain(`data-poker-action="${action}"`)
         }
-        expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.pk-actions\s*\{[\s\S]*position:\s*sticky/s)
+        expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.pk-actions\s*\{[\s\S]*position:\s*fixed/s)
         expect(css).toContain('bottom: calc(var(--mobile-nav-height, 64px) + 8px)')
         expect(css).toContain('max-height: 340px')
         // GTO hand search is pinned (sticky) so it stays reachable while the grid scrolls.

@@ -16,6 +16,7 @@ import { clamp, round2 } from './simulationMath'
 import { useEffect, useState } from 'react'
 
 const FUN_KEY = 'gampo_fun_mode'
+export const FUN_MODE_STATES = ['fun', 'story', 'serious']
 
 // How much Fun Mode tilts the math. Win probability is multiplied by
 // FUN_WIN_BOOST (capped below 1.0 so a near-certain game stays valid) and
@@ -28,13 +29,16 @@ export const FUN_PAYOUT_BOOST = 1.06
 export const FUN_MAX_RTP = 1.0
 
 const listeners = new Set()
-let funMode = readFunMode()
+let funModeState = readFunModeState()
 
-function readFunMode() {
+function readFunModeState() {
     try {
-        return localStorage.getItem(FUN_KEY) === '1'
+        const value = localStorage.getItem(FUN_KEY)
+        if (FUN_MODE_STATES.includes(value)) return value
+        if (value === '0') return 'serious'
+        return 'fun'
     } catch {
-        return false
+        return 'fun'
     }
 }
 
@@ -43,13 +47,17 @@ function notify() {
 }
 
 export function isFunMode() {
-    return funMode
+    return funModeState === 'fun'
 }
 
 export function setFunMode(value) {
-    funMode = Boolean(value)
-    try { localStorage.setItem(FUN_KEY, funMode ? '1' : '0') } catch { /* ignore */ }
+    funModeState = value === false ? 'serious' : value === true ? 'fun' : (FUN_MODE_STATES.includes(value) ? value : 'fun')
+    try { localStorage.setItem(FUN_KEY, funModeState) } catch { /* ignore */ }
     notify()
+}
+
+export function getFunModeState() {
+    return funModeState
 }
 
 export function subscribeFunMode(fn) {
@@ -62,14 +70,14 @@ export function subscribeFunMode(fn) {
 // still feel earned.
 export function funWinChance(probability) {
     const p = clamp(Number(probability) || 0, 0, 1)
-    if (!funMode) return p
+    if (!isFunMode()) return p
     return clamp(p * FUN_WIN_BOOST, 0, 0.99)
 }
 
 // Boost a payout multiplier for Fun Mode. No-op when off.
 export function funPayout(multiplier) {
     const m = Number(multiplier) || 0
-    if (!funMode) return m
+    if (!isFunMode()) return m
     return round2(m * FUN_PAYOUT_BOOST)
 }
 
@@ -79,13 +87,13 @@ export function funPayout(multiplier) {
 // inflating the effective RTP (so the locked payout grows) in free play.
 export function rtpLockedMultiplier(winProbability, rtp) {
     const p = clamp(Number(winProbability) || 0, 0.0001, 1)
-    const targetRtp = funMode ? Math.min(FUN_MAX_RTP, Number(rtp) * FUN_PAYOUT_BOOST) : Number(rtp)
+    const targetRtp = isFunMode() ? Math.min(FUN_MAX_RTP, Number(rtp) * FUN_PAYOUT_BOOST) : Number(rtp)
     return round2(targetRtp / p)
 }
 
 // React hook for components that want to read/toggle Fun Mode reactively.
 export function useFunMode() {
-    const [on, setOn] = useState(funMode)
-    useEffect(() => subscribeFunMode(() => setOn(funMode)), [])
-    return [on, setFunMode]
+    const [state, setState] = useState(funModeState)
+    useEffect(() => subscribeFunMode(() => setState(funModeState)), [])
+    return [state === 'fun', setFunMode, state]
 }

@@ -501,11 +501,92 @@
     font-size: 14px;
 }
 
+.sb-featured,
 .sb-outrights,
 .sb-top-sports,
 .sb-event-list,
 .sb-my-bets-panel {
     margin-top: 8px;
+}
+
+.sb-featured {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.sb-featured-comp {
+    min-width: 0;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 9px;
+    background: linear-gradient(180deg, rgba(32, 63, 77, 0.92), rgba(16, 38, 50, 0.96));
+    padding: 12px;
+}
+
+.sb-featured-comp .sb-section-title {
+    margin-top: 0;
+}
+
+.sb-featured-live {
+    margin-left: auto;
+    border-radius: 999px;
+    background: rgba(0, 231, 1, 0.14);
+    color: var(--sb-green);
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 950;
+}
+
+.sb-featured-rows {
+    display: grid;
+    gap: 8px;
+}
+
+.sb-featured-row {
+    display: grid;
+    gap: 8px;
+}
+
+.sb-featured-teams {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    padding: 0;
+    text-align: left;
+    cursor: pointer;
+}
+
+.sb-featured-teams strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sb-featured-status {
+    flex: 0 0 auto;
+    border-radius: 4px;
+    background: rgba(202, 228, 239, 0.12);
+    color: #cae4ef;
+    padding: 2px 5px;
+    font-size: 10px;
+    font-weight: 950;
+    text-transform: uppercase;
+}
+
+.sb-featured-status.is-live {
+    background: rgba(0, 231, 1, 0.14);
+    color: var(--sb-green);
+}
+
+.sb-featured-odds {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
 }
 
 .sb-outright-grid,
@@ -1700,6 +1781,10 @@
     }
 
     .sb-top-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sb-featured {
         grid-template-columns: 1fr;
     }
 
