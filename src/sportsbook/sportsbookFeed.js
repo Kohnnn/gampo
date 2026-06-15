@@ -1,7 +1,5 @@
-import { fetchInSeasonSports, fetchUpcomingOdds, fixtureFromOddsApi, getQuotaSnapshot } from '../services/sportsApi'
 import { buildSyntheticSportsbookData, LEAGUES, SPORTS } from './sportsbookData'
 import { normalizeFreeProviderPayload } from './freeFeedAdapters'
-import { deVigProbabilities, roundCurrency } from './sportsbookMath'
 
 const SPORT_ALIASES = [
     ['soccer', ['soccer', 'football']],
@@ -19,76 +17,8 @@ const SPORT_ALIASES = [
 
 export function sportIdFromTitle(title = '') {
     const text = String(title).toLowerCase()
-    const found = SPORT_ALIASES.find(([, tokens]) => tokens.some(token => text.includes(token)))
+    const found = SPORT_ALIASES.find(([ tokens]) => tokens.some(token => text.includes(token)))
     return found?.[0] || 'soccer'
-}
-
-function leagueForSport(sportId, title = '') {
-    const existing = LEAGUES.find(league => league.sportId === sportId)
-    return existing || {
-        id: `${sportId}-feed`,
-        sportId,
-        region: 'Live Feed',
-        country: 'Feed',
-        label: title || 'Live Feed',
-        liveCount: 0,
-        eventCount: 0,
-    }
-}
-
-function marketGroupFromFixture(fixture) {
-    const probabilities = deVigProbabilities(fixture.markets.map(market => market.decimalOdds))
-    return {
-        id: 'winner',
-        label: fixture.markets.length > 2 ? '1x2' : 'Winner',
-        displayMode: 'compact',
-        collapsed: false,
-        selections: fixture.markets.map((market, index) => ({
-            id: `${fixture.id}-winner-${market.outcome}-${index}`,
-            eventId: fixture.id,
-            marketId: 'winner',
-            label: market.label,
-            side: market.outcome,
-            decimalOdds: roundCurrency(market.decimalOdds),
-            previousOdds: roundCurrency(market.openingOdds || market.decimalOdds),
-            suspended: market.decimalOdds <= 1,
-            boosted: false,
-            trueProbability: probabilities[index] || market.trueProbability || 0,
-            source: 'odds-api',
-            status: market.decimalOdds <= 1 ? 'suspended' : 'available',
-        })),
-    }
-}
-
-export function normalizeOddsApiEvent(event, region = 'us') {
-    const fixture = fixtureFromOddsApi(event, null, region)
-    if (!fixture?.markets?.length) return null
-    const sportId = sportIdFromTitle(`${fixture.sport} ${event.sport_key || ''}`)
-    const league = leagueForSport(sportId, fixture.league)
-    return {
-        id: `feed-${fixture.id}`,
-        sportId,
-        leagueId: league.id,
-        region: region.toUpperCase(),
-        startsAt: event.commence_time || new Date().toISOString(),
-        status: 'prematch',
-        clock: '',
-        period: '',
-        home: fixture.home,
-        away: fixture.away,
-        participants: [fixture.home, fixture.away].filter(Boolean),
-        score: null,
-        liveStats: {
-            tickets: 0,
-            possession: 50,
-            attack: 50,
-        },
-        popularity: 3200,
-        tags: ['feed'],
-        marketGroups: [marketGroupFromFixture({ ...fixture, id: `feed-${fixture.id}` })],
-        bookmakerTitle: fixture.bookmakerTitle,
-        source: 'odds-api',
-    }
 }
 
 function mergeSports(baseSports, events) {
@@ -196,23 +126,14 @@ export async function loadSportsbookFeed() {
     let providerSources = {}
 
     try {
-        const [freeFeed, us, uk, sports] = await Promise.all([
-            fetchFreeProviderFeed(),
-            fetchUpcomingOdds('us'),
-            fetchUpcomingOdds('uk'),
-            fetchInSeasonSports(),
-        ])
+        // All providers (including The Odds API) are fetched server-side by the
+        // free-feed proxy so no API keys are exposed to the client bundle.
+        const freeFeed = await fetchFreeProviderFeed()
         errors.push(...(freeFeed.errors || []))
         providerQuotas = freeFeed.quotas || {}
         providerSources = freeFeed.sources || {}
-        errors.push(...(us.errors || []), ...(uk.errors || []), ...(sports.errors || []))
-        inSeason = sports.data || []
-        const events = [
-            ...(freeFeed.events || []),
-            ...(us.data || []).map(event => normalizeOddsApiEvent(event, 'us')),
-            ...(uk.data || []).map(event => normalizeOddsApiEvent(event, 'uk')),
-        ].filter(Boolean)
-        feedEvents = uniqueEvents(events).slice(0, 60)
+        inSeason = freeFeed.inSeason || []
+        feedEvents = uniqueEvents(freeFeed.events || []).slice(0, 60)
     } catch (error) {
         errors.push(error?.message || String(error))
     }
@@ -233,7 +154,7 @@ export async function loadSportsbookFeed() {
         feedSource: hasLiveFeed ? 'live' : 'fallback',
         inSeason,
         errors: errors.filter(Boolean),
-        quotas: { ...providerQuotas, ...getQuotaSnapshot() },
+        quotas: providerQuotas,
         providerSources,
     }
 }

@@ -187,6 +187,75 @@ async function loadOddsApiIo(token) {
     return { events, odds, errors, quotas, configured: true }
 }
 
+// === The Odds API (server-side; keys never reach the client bundle) ===
+//
+// Previously this provider was called from the browser via
+// `import.meta.env.VITE_ODDS_API_KEYS`, which Vite inlines into the shipped JS
+// — leaking the real keys to anyone who views source. It now runs here, behind
+// the proxy, reading server-only env (`ODDS_API_KEYS`). Key rotation skips a
+// key for the rest of this process once it returns 401/403/429.
+const ODDS_API_COOLDOWN = new Map()
+
+function oddsApiKeys(env) {
+    const raw = envValue(env, ['ODDS_API_KEYS', 'VITE_ODDS_API_KEYS', 'odds_api_keys'])
+    return String(raw || '').split(',').map(part => part.trim()).filter(Boolean)
+}
+
+async function oddsApiFetch(env, pathAndQuery, label) {
+    const keys = oddsApiKeys(env)
+    if (!keys.length) return { ok: false, error: `${label} not configured`, data: null, quotas: {} }
+
+    const now = Date.now()
+    let lastError = `${label} unavailable`
+    for (const key of keys) {
+        const cooldownUntil = ODDS_API_COOLDOWN.get(key) || 0
+        if (cooldownUntil > now) continue
+        const sep = pathAndQuery.includes('?') ? '&' : '?'
+        const url = `https://api.the-odds-api.com${pathAndQuery}${sep}apiKey=${encodeURIComponent(key)}`
+        const result = await fetchJson(url, { label })
+        const remaining = Number(result.quotas?.[label]?.remaining)
+        const quotas = Number.isFinite(remaining) ? { [label]: { remaining } } : {}
+        if (result.ok) return { ok: true, data: result.data, quotas }
+        lastError = result.error || lastError
+        if (/auth rejected|rate limited|401|403|429/i.test(result.error || '')) {
+            ODDS_API_COOLDOWN.set(key, now + 30 * 60 * 1000)
+        }
+    }
+    return { ok: false, error: lastError, data: null, quotas: {} }
+}
+
+async function loadTheOddsApi(env) {
+    if (!oddsApiKeys(env).length) return { events: [], inSeason: [], errors: [], quotas: {}, configured: false }
+
+    const errors = []
+    const quotas = {}
+    const [us, uk, sports] = await Promise.all([
+        oddsApiFetch(env, '/v4/sports/upcoming/odds/?regions=us&markets=h2h&oddsFormat=decimal', 'theOddsApi'),
+        oddsApiFetch(env, '/v4/sports/upcoming/odds/?regions=uk&markets=h2h&oddsFormat=decimal', 'theOddsApi'),
+        oddsApiFetch(env, '/v4/sports', 'theOddsApi'),
+    ])
+
+    const events = []
+    for (const [region, result] of [['us', us], ['uk', uk]]) {
+        Object.assign(quotas, result.quotas)
+        if (result.ok && Array.isArray(result.data)) {
+            for (const event of result.data) events.push({ ...event, _gampoRegion: region })
+        } else if (!result.ok) {
+            errors.push(result.error)
+        }
+    }
+    Object.assign(quotas, sports.quotas)
+    if (!sports.ok && sports.error) errors.push(sports.error)
+
+    return {
+        events: events.slice(0, 40),
+        inSeason: Array.isArray(sports.data) ? sports.data : [],
+        errors,
+        quotas,
+        configured: true,
+    }
+}
+
 function todayIsoDate() {
     return new Date().toISOString().slice(0, 10)
 }
@@ -248,11 +317,12 @@ export async function loadProviderFeed(env) {
         apiFootball: envValue(env, ['API_FOOTBALL_TOKEN', 'api-football_token']),
     }
 
-    const [sportsGameOdds, pandascore, oddsApiIo, apiFootball] = await Promise.all([
+    const [sportsGameOdds, pandascore, oddsApiIo, apiFootball, theOddsApi] = await Promise.all([
         loadSportsGameOdds(tokens.sportsGameOdds),
         loadPandaScore(tokens.pandascore),
         loadOddsApiIo(tokens.oddsApiIo),
         loadApiFootball(tokens.apiFootball),
+        loadTheOddsApi(env),
     ])
 
     const value = {
@@ -278,22 +348,29 @@ export async function loadProviderFeed(env) {
                 eventCount: apiFootball.fixtures.length,
                 oddsCount: apiFootball.odds.length,
             },
+            theOddsApi: {
+                configured: theOddsApi.configured,
+                eventCount: theOddsApi.events.length,
+            },
         },
         sportsGameOdds: { events: sportsGameOdds.events },
         pandascore: { matches: pandascore.matches },
         oddsApiIo: { events: oddsApiIo.events, odds: oddsApiIo.odds },
         apiFootball: { fixtures: apiFootball.fixtures, odds: apiFootball.odds },
+        theOddsApi: { events: theOddsApi.events, inSeason: theOddsApi.inSeason },
         quotas: {
             ...sportsGameOdds.quotas,
             ...pandascore.quotas,
             ...oddsApiIo.quotas,
             ...apiFootball.quotas,
+            ...theOddsApi.quotas,
         },
         errors: [
             ...sportsGameOdds.errors,
             ...pandascore.errors,
             ...oddsApiIo.errors,
             ...apiFootball.errors,
+            ...theOddsApi.errors,
         ].filter(Boolean),
     }
 

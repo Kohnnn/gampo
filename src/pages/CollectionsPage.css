@@ -1,4 +1,7 @@
 .collections-page {
+    /* Own scroll viewport; .main-content clips overflow. See settings.css. */
+    height: 100%;
+    overflow-y: auto;
     width: min(1280px, calc(100vw - 28px));
     margin: 0 auto;
     padding: 22px 0 34px;
