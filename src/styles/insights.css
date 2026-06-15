@@ -1,4 +1,7 @@
 .insights-page {
+    /* Own scroll viewport; .main-content clips overflow. See settings.css. */
+    height: 100%;
+    overflow-y: auto;
     max-width: 1080px;
     margin: 0 auto;
     padding: 16px;

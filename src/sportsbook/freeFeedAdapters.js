@@ -1,5 +1,6 @@
 import { LEAGUES } from './sportsbookData'
 import { deVigProbabilities, roundCurrency } from './sportsbookMath'
+import { fixtureFromOddsApi } from '../services/sportsApi'
 
 function slugify(value) {
     return String(value || 'feed').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'feed'
@@ -462,6 +463,75 @@ export function normalizeApiFootballFixture(item, oddsByFixture = new Map()) {
     })
 }
 
+// === The Odds API ===
+// The proxy now fetches The Odds API server-side (keys stay off the client).
+// Each event carries `_gampoRegion` ('us'|'uk'). We reuse the pure
+// `fixtureFromOddsApi` helper to normalize the h2h markets, then map it into a
+// GamPo feed event with a real (de-vigged) winner market group.
+const ODDS_API_SPORT_ALIASES = [
+    ['soccer', ['soccer', 'football']],
+    ['tennis', ['tennis']],
+    ['basketball', ['basketball', 'nba', 'ncaab']],
+    ['football', ['american football', 'nfl', 'ncaaf']],
+    ['ice-hockey', ['hockey', 'nhl']],
+    ['baseball', ['baseball', 'mlb']],
+    ['cricket', ['cricket']],
+    ['dota-2', ['dota']],
+    ['cs2', ['counter', 'cs2', 'csgo']],
+    ['valorant', ['valorant']],
+    ['league-of-legends', ['league of legends', 'lol']],
+]
+
+function oddsApiSportId(title = '') {
+    const text = String(title).toLowerCase()
+    const found = ODDS_API_SPORT_ALIASES.find(([, tokens]) => tokens.some(token => text.includes(token)))
+    return found?.[0] || 'soccer'
+}
+
+export function normalizeTheOddsApiEvent(event, region = 'us') {
+    const fixture = fixtureFromOddsApi(event, null, region)
+    if (!fixture?.markets?.length) return null
+    const sportId = oddsApiSportId(`${fixture.sport} ${event.sport_key || ''}`)
+    const eventId = `theoddsapi-${fixture.id}`
+    const probabilities = deVigProbabilities(fixture.markets.map(market => market.decimalOdds))
+    const marketGroups = [{
+        id: 'winner',
+        label: fixture.markets.length > 2 ? '1x2' : 'Winner',
+        displayMode: 'compact',
+        collapsed: false,
+        selections: fixture.markets.map((market, index) => {
+            const decimalOdds = roundCurrency(market.decimalOdds)
+            return {
+                id: `${eventId}-winner-${market.outcome}-${index}`,
+                eventId,
+                marketId: 'winner',
+                label: market.label,
+                side: market.outcome,
+                decimalOdds,
+                previousOdds: roundCurrency(market.openingOdds || market.decimalOdds),
+                suspended: decimalOdds <= 1,
+                boosted: false,
+                trueProbability: probabilities[index] || market.trueProbability || 0,
+                source: 'the-odds-api',
+                status: decimalOdds <= 1 ? 'suspended' : 'available',
+            }
+        }),
+    }]
+    return normalizedEvent({
+        id: eventId,
+        sportId,
+        source: 'the-odds-api',
+        leagueName: fixture.league || `${region.toUpperCase()} Feed`,
+        region: region.toUpperCase(),
+        startsAt: event.commence_time || new Date().toISOString(),
+        status: 'prematch',
+        home: fixture.home,
+        away: fixture.away,
+        marketGroups,
+        tags: ['primary-odds'],
+    })
+}
+
 export function normalizeFreeProviderPayload(payload = {}) {
     const apiFootballOdds = apiFootballOddsMap(payload?.apiFootball?.odds || [])
     const events = [
@@ -469,6 +539,7 @@ export function normalizeFreeProviderPayload(payload = {}) {
         ...(payload?.pandascore?.matches || []).map(normalizePandaScoreMatch),
         ...(payload?.oddsApiIo?.events || []).map(event => normalizeOddsApiIoEvent(event, payload?.oddsApiIo?.odds || [])),
         ...(payload?.apiFootball?.fixtures || []).map(item => normalizeApiFootballFixture(item, apiFootballOdds)),
+        ...(payload?.theOddsApi?.events || []).map(event => normalizeTheOddsApiEvent(event, event?._gampoRegion || 'us')),
     ].filter(Boolean)
 
     const seen = new Set()
@@ -482,6 +553,7 @@ export function normalizeFreeProviderPayload(payload = {}) {
         errors: payload?.errors || [],
         quotas: payload?.quotas || {},
         sources: payload?.sources || {},
+        inSeason: payload?.theOddsApi?.inSeason || [],
         generatedAt: payload?.generatedAt || null,
         cached: Boolean(payload?.cached),
     }
