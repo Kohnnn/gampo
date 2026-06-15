@@ -28,8 +28,10 @@ describe('poker layout CSS', () => {
             expect(source).toContain(`data-poker-action="${action}"`)
         }
         expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.pk-actions\s*\{[\s\S]*position:\s*fixed/s)
-        expect(css).toContain('bottom: calc(var(--mobile-nav-height, 64px) + 8px)')
-        expect(css).toContain('max-height: 340px')
+        expect(css).toContain('bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)))')
+        expect(css).toMatch(/\.poker-table-felt\s*\{[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s)
+        expect(css).toMatch(/\.pk-seat\.is-human \.pk-seat-cards \.pk-card\s*\{[\s\S]*width:\s*54px/s)
+        expect(css).toMatch(/\.pk-seat:not\(\.is-human\) \.pk-seat-cards \.pk-card\s*\{[\s\S]*width:\s*22px/s)
         // GTO hand search is pinned (sticky) so it stays reachable while the grid scrolls.
         expect(css).toMatch(/\.gto-search-row\s*\{[^}]*position:\s*sticky/s)
         expect(css).toContain('.poker-mobile-gto-now')
