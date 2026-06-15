@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { BookOpen, Flame, Plus, RotateCcw, Search, ShieldCheck, Trophy, Clock, GraduationCap, Pin } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
+import { useMissions } from '../hooks/useMissions'
+import { useProgress } from '../hooks/useProgress'
 import { useSidebarPins } from '../hooks/useSidebarPins'
+import { useXp } from '../hooks/useXp'
 import { findGameDefinition } from '../data/gameDefinitions'
 import {
     featuredCollections,
@@ -64,6 +67,9 @@ function deriveRecentlyPlayed(transactions) {
 function HomePage() {
     const { balance, grantPracticeCredits, resetBalance, transactions } = useCredits()
     const { pins } = useSidebarPins()
+    const progress = useProgress()
+    const missionProgress = useMissions()
+    const xp = useXp()
     const [query, setQuery] = useState('')
     const [filter, setFilter] = useState('All')
 
@@ -83,6 +89,7 @@ function HomePage() {
     }), [filter, query])
 
     const recent = transactions.slice(0, 5)
+    const liveMissions = missionProgress.missions.filter(mission => !mission.claimed).slice(0, 3)
     const recentlyPlayed = useMemo(() => deriveRecentlyPlayed(transactions), [transactions])
     const pinnedRow = useMemo(() => (
         pins
@@ -197,12 +204,26 @@ function HomePage() {
                         ))}
                     </RailBlock>
                     <RailBlock icon={<Trophy size={16} />} title="Missions">
-                        {missions.slice(0, 3).map(mission => (
+                        {(liveMissions.length > 0 ? liveMissions : missions.slice(0, 3)).map(mission => (
                             <div key={mission.id} className="mini-progress">
                                 <span>{mission.title}</span>
-                                <div><i style={{ width: `${mission.progress * 100}%` }} /></div>
+                                <div><i style={{ width: `${Math.min(1, mission.ratio ?? mission.progress ?? 0) * 100}%` }} /></div>
                             </div>
                         ))}
+                    </RailBlock>
+                    <RailBlock icon={<Flame size={16} />} title="Daily Momentum">
+                        <div className="activity-mini">
+                            <span>Day streak</span>
+                            <strong>{progress.stats.currentDayStreak || 0} days</strong>
+                        </div>
+                        <div className="activity-mini">
+                            <span>{xp.rank?.current?.label || 'Level'} {xp.level}</span>
+                            <strong>{xp.intoLevel}/{xp.span} XP</strong>
+                        </div>
+                        <div className="mini-progress">
+                            <span>Achievements {progress.summary.unlockedCount}/{progress.summary.total}</span>
+                            <div><i style={{ width: `${progress.summary.percent || 0}%` }} /></div>
+                        </div>
                     </RailBlock>
                     <RailBlock icon={<ShieldCheck size={16} />} title="Recent Activity">
                         {recent.length === 0 ? (

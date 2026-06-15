@@ -168,6 +168,36 @@
 .settings-switch-label strong { color: var(--text-primary, #fff); font-size: 13px; font-weight: 950; }
 .settings-switch-label small { color: var(--text-muted, #909cb0); font-size: 11px; }
 
+.settings-mode-field {
+    display: grid;
+    gap: 10px;
+}
+
+.settings-mode-segment {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.settings-mode-segment button {
+    min-height: 38px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted, #909cb0);
+    font-weight: 950;
+    cursor: pointer;
+}
+
+.settings-mode-segment button.is-active {
+    background: var(--accent, #00e701);
+    color: #07130a;
+}
+
 .settings-limit-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

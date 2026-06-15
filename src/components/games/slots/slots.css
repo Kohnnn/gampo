@@ -2069,6 +2069,14 @@
 }
 
 @media (max-width: 768px) {
+    .slot-stage-v2::before {
+        filter: blur(6px) saturate(1.04);
+    }
+
+    .slot-cell.spinning {
+        filter: brightness(1.08);
+    }
+
     .slot-panel-spin {
         /* The fixed slot-mobile-dock owns the primary Spin on phones.
            Hiding this in-flow duplicate keeps a single, unambiguous CTA. */
@@ -3606,7 +3614,7 @@
             linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(7, 16, 24, 0.98)),
             radial-gradient(circle at 78% 0%, color-mix(in srgb, var(--slot-accent, #ffd166), transparent 70%), transparent 44%);
         box-shadow: 0 -16px 42px rgba(0, 0, 0, 0.66), 0 0 22px color-mix(in srgb, var(--slot-accent, #ffd166), transparent 78%);
-        backdrop-filter: blur(12px);
+        backdrop-filter: blur(4px);
         pointer-events: auto;
     }
 

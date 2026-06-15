@@ -2081,39 +2081,29 @@
 }
 
 /* ============================================================
-   Phase 4: Live Poker mobile flow rebuild (<= 760px)
-   The desktop felt positions 6 seats absolutely on a fixed oval. On phones
-   that oval shrinks but never re-lays-out, so seats overlap, cards become
-   unreadable chips, and the board collides with players. This block replaces
-   the absolute oval with a reflowing vertical stack:
-       opponents rail (grid)  ->  pot + board  ->  hero seat  ->  actions
-   It only applies on small screens; desktop is untouched.
+   Live Poker mobile rebuild. Desktop keeps the full oval table; phones switch
+   to a readable grid: opponents, pot/board, hero hand, fixed action dock.
    ============================================================ */
 @media (max-width: 768px) {
-    /* Dissolve the oval: the felt becomes a normal vertical flow container. */
     .poker-table-felt {
         aspect-ratio: auto !important;
         height: auto !important;
         min-height: 0 !important;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
         padding: 14px 12px 16px;
         border-radius: 22px;
         border-width: 4px;
         overflow: visible;
     }
 
-    /* Seats container stops being an absolute overlay and flows inline. Using
-       display:contents lets the seats themselves become direct flex items of
-       the felt so we can order them around the board. */
     .pk-seats {
         position: static;
         inset: auto;
         display: contents;
     }
 
-    /* All seats reset to in-flow cards in an opponents rail. */
     .pk-seat,
     .seat-0, .seat-1, .seat-2, .seat-3, .seat-4, .seat-5 {
         position: relative;
@@ -2121,51 +2111,45 @@
         transform: none;
     }
 
-    /* Opponents (seats 1-5) form a responsive grid above the board. */
-    .pk-seats {
-        /* placeholder so the selector list above stays valid */
-    }
     .poker-table-felt .pk-seat:not(.is-human) {
         order: 1;
-        flex: 0 0 auto;
         min-width: 0;
         max-width: none;
         width: 100%;
-        flex-direction: row;
+        min-height: 58px;
+        flex-direction: column;
         align-items: center;
-        justify-content: flex-start;
-        gap: 8px;
-        padding: 6px 9px;
+        justify-content: center;
+        gap: 4px;
+        padding: 6px;
         border-radius: 12px;
-    }
-
-    /* Wrap the five opponent cards into a tidy auto-fit grid. We can't add a
-       wrapper element without touching JSX, so we let them sit in the felt
-       flex column but cap their height and let the row layout read cleanly. */
-    .poker-table-felt {
-        /* opponents stack; board + hero get their own orders below */
     }
 
     .pk-pot {
         position: static;
         order: 2;
+        grid-column: 1 / -1;
         transform: none;
         align-self: center;
+        justify-self: center;
         font-size: 13px;
         padding: 5px 14px;
     }
 
     .pk-board {
         position: static;
-        order: 2;
+        order: 3;
+        grid-column: 1 / -1;
         transform: none;
         align-self: center;
+        justify-self: center;
         gap: 6px;
         flex-wrap: nowrap;
     }
 
     .poker-table-felt .pk-seat.is-human {
-        order: 3;
+        order: 4;
+        grid-column: 1 / -1;
         width: 100%;
         min-width: 0;
         max-width: none;
@@ -2177,16 +2161,23 @@
         margin-top: 2px;
     }
 
-    /* Opponent avatars/cards: legible but compact, laid horizontally. */
-    .pk-seat:not(.is-human) .pk-avatar { width: 30px; height: 30px; }
+    .pk-seat:not(.is-human) .pk-avatar { display: none; }
     .pk-seat:not(.is-human) .pk-seat-info {
         flex-direction: row;
         flex-wrap: wrap;
-        align-items: center;
-        gap: 4px 8px;
-        flex: 1;
+        justify-content: center;
+        gap: 2px 6px;
+        width: 100%;
     }
-    .pk-seat:not(.is-human) .pk-seat-cards { margin-left: auto; }
+    .pk-seat:not(.is-human) .pk-seat-info .pk-name {
+        max-width: 82px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .pk-seat:not(.is-human) .pk-last,
+    .pk-seat:not(.is-human) .pk-diff { display: none; }
+    .pk-seat:not(.is-human) .pk-seat-cards { margin-left: 0; }
     .pk-seat:not(.is-human) .pk-seat-cards .pk-card { width: 24px; height: 34px; }
 
     /* Hero row: big readable hole cards on the right, name/stack left. */
@@ -2211,7 +2202,26 @@
     .pk-speech { position: static; margin-top: 4px; }
     .pk-chip-motion { display: none; }
 
-    /* Bigger tap targets across action controls. */
+    .pk-actions {
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)));
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        z-index: var(--z-mobile-action, 1400);
+        max-height: 48vh;
+        overflow-y: auto;
+        margin: 0;
+        backdrop-filter: blur(4px);
+    }
+
+    .pk-action-status,
+    .pk-raise-open,
+    .pk-raise {
+        grid-column: 1 / -1;
+    }
+
     .pk-act { min-height: 46px; }
     .pk-raise-presets button { min-height: 34px; }
 
@@ -2231,4 +2241,3 @@
     .gto-cell-label { font-size: 9px; }
     .gto-context { position: static; }
 }
-

@@ -1,5 +1,6 @@
 import { Search, Star, Trophy } from 'lucide-react'
 import { OUTRIGHTS, PROMO_CARDS } from '../sportsbookData'
+import { buildFeaturedCompetitions, contendersFromCompetition, spotlightCompetition } from '../sportsbookFeatured'
 import EventList from './EventList'
 import OddsButton from './OddsButton'
 
@@ -40,11 +41,20 @@ function SportsHome({ events, sports, leagues, feedSource = 'fallback', selected
     const popularEvents = events.filter(event => event.tags?.includes('popular')).slice(0, 6)
     const isLive = feedSource === 'live'
 
-    // Outrights: only the synthetic fallback ships hardcoded "Practice XI"
-    // futures. With a live feed we derive a real "title contenders" board from
-    // the shortest-priced moneyline favourites across live events instead.
-    const liveOutrights = (() => {
+    // Group the live feed into ranked competitions so famous tournaments (World
+    // Cup, Champions League, EPL, NBA, ...) surface as their own shelves instead
+    // of one flat "latest" list. Synthetic fallback keeps its curated shelves.
+    const featured = isLive ? buildFeaturedCompetitions(events, leagues, { limit: 3, minEvents: 2 }) : []
+    const spotlight = isLive ? spotlightCompetition(events, leagues) : null
+
+    // Outrights: synthetic fallback ships hardcoded World Cup futures. With a
+    // live feed we build a "title contenders" board from the spotlight
+    // competition's favourites, or fall back to the global shortest prices.
+    const liveContenders = (() => {
         if (!isLive) return []
+        if (spotlight) {
+            return contendersFromCompetition(spotlight).map(row => [row.label, row.odds, row.eventId])
+        }
         const rows = []
         for (const event of events) {
             const market = event.marketGroups?.[0]
@@ -56,9 +66,11 @@ function SportsHome({ events, sports, leagues, feedSource = 'fallback', selected
         }
         return rows.sort((a, b) => a[1] - b[1]).slice(0, 8)
     })()
-    const showOutrights = isLive ? liveOutrights.length > 0 : OUTRIGHTS.length > 0
-    const outrightRows = isLive ? liveOutrights : OUTRIGHTS.map(([label, odds]) => [label, odds, null])
-    const outrightTitle = isLive ? 'Title Contenders - Live Favourites' : 'World Cup Winner - 2026'
+    const showOutrights = isLive ? liveContenders.length > 0 : OUTRIGHTS.length > 0
+    const outrightRows = isLive ? liveContenders : OUTRIGHTS.map(([label, odds]) => [label, odds, null])
+    const outrightTitle = isLive
+        ? (spotlight ? `${spotlight.label} - Title Contenders` : 'Title Contenders - Live Favourites')
+        : 'World Cup Winner - 2026'
 
     return (
         <div className="sb-home">
@@ -111,6 +123,49 @@ function SportsHome({ events, sports, leagues, feedSource = 'fallback', selected
                     ))}
                 </div>
             </section>
+
+            {featured.length > 0 && (
+                <section className="sb-featured" aria-label="Featured competitions">
+                    {featured.map(competition => (
+                        <div key={competition.leagueId} className="sb-featured-comp">
+                            <div className="sb-section-title">
+                                <Trophy size={18} />
+                                <h2>{competition.label}</h2>
+                                {competition.liveCount > 0 && (
+                                    <span className="sb-featured-live">{competition.liveCount} live</span>
+                                )}
+                            </div>
+                            <div className="sb-featured-rows">
+                                {competition.events.slice(0, 4).map(event => {
+                                    const market = event.marketGroups?.[0]
+                                    return (
+                                        <article key={event.id} className="sb-featured-row">
+                                            <button type="button" className="sb-featured-teams" onClick={() => onOpenEvent(event.id)}>
+                                                <span className={event.status === 'live' ? 'sb-featured-status is-live' : 'sb-featured-status'}>
+                                                    {event.status === 'live' ? 'Live' : 'Soon'}
+                                                </span>
+                                                <strong>{event.home} v {event.away}</strong>
+                                            </button>
+                                            <div className="sb-featured-odds">
+                                                {(market?.selections || []).slice(0, 3).map(selection => (
+                                                    <OddsButton
+                                                        key={selection.id}
+                                                        selection={selection}
+                                                        selected={selectedIds.has(selection.id)}
+                                                        onToggle={() => onToggleSelection(selection.id)}
+                                                        marketGroup={market}
+                                                        compact
+                                                    />
+                                                ))}
+                                            </div>
+                                        </article>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                </section>
+            )}
 
             {showOutrights && (
                 <section className="sb-outrights">
