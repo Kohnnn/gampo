@@ -1,4 +1,4 @@
-import { filterMarqueeItems, mergeMarqueeMetrics } from '../src/sportsbook/sportsbookMarquee.js'
+import { curateTopSportsbookItems, mergeMarqueeMetrics } from '../src/sportsbook/sportsbookMarquee.js'
 
 const CACHE_TTL_MS = 5 * 60 * 1000
 const PROVIDER_TIMEOUT_MS = 7000
@@ -110,7 +110,7 @@ async function loadPandaScore(token) {
     })
 
     const matches = Array.isArray(result.data) ? result.data : []
-    const filtered = filterMarqueeItems(matches, { fallbackLimit: 8 })
+    const filtered = curateTopSportsbookItems(matches, { perSport: 5, minimumVisible: 15, maximumVisible: 30 })
 
     return {
         matches: filtered.items,
@@ -143,7 +143,7 @@ async function loadSportsGameOdds(token) {
             ? result.data
             : []
 
-    const filtered = filterMarqueeItems(data, { fallbackLimit: 12 })
+    const filtered = curateTopSportsbookItems(data, { perSport: 5, minimumVisible: 15, maximumVisible: 30 })
 
     return {
         events: filtered.items,
@@ -177,7 +177,7 @@ async function loadOddsApiIo(token) {
         }
     }
 
-    const filtered = filterMarqueeItems(events, { fallbackLimit: 8 })
+    const filtered = curateTopSportsbookItems(events, { perSport: 5, minimumVisible: 16, maximumVisible: 28 })
     const eventIds = filtered.items.map(event => event?.id).filter(Boolean).slice(0, 10)
     let odds = []
     if (eventIds.length) {
@@ -257,7 +257,7 @@ async function loadTheOddsApi(env) {
     Object.assign(quotas, sports.quotas)
     if (!sports.ok && sports.error) errors.push(sports.error)
 
-    const filtered = filterMarqueeItems(events, { fallbackLimit: 16 })
+    const filtered = curateTopSportsbookItems(events, { perSport: 5, minimumVisible: 18, maximumVisible: 36 })
 
     return {
         events: filtered.items.slice(0, 40),
@@ -310,7 +310,7 @@ async function loadApiFootball(token) {
         })
         : []
 
-    const filtered = filterMarqueeItems(fixtures, { fallbackLimit: 12 })
+    const filtered = curateTopSportsbookItems(fixtures, { perSport: 5, minimumVisible: 15, maximumVisible: 30 })
 
     return {
         fixtures: filtered.items.slice(0, 30),

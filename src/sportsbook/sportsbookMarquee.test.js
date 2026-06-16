@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filterMarqueeItems, mergeMarqueeMetrics, scoreMarqueeItem } from './sportsbookMarquee'
+import { curateTopSportsbookItems, filterMarqueeItems, mergeMarqueeMetrics, scoreMarqueeItem } from './sportsbookMarquee'
 
 describe('sportsbook marquee curation', () => {
     it('scores world cup and famous-team events above low-tier fixtures', () => {
@@ -50,5 +50,31 @@ describe('sportsbook marquee curation', () => {
             marqueeCount: 2,
             bigMatchOnly: true,
         })
+    })
+
+    it('keeps marquee first while filling up to top games per sport', () => {
+        const soccer = Array.from({ length: 8 }, (_, index) => ({
+            id: `soccer-${index}`,
+            sportId: 'soccer',
+            leagueName: index === 0 ? 'FIFA World Cup' : 'Soccer Feed',
+            home: index === 0 ? 'France' : `Soccer Home ${index}`,
+            away: index === 0 ? 'Brazil' : `Soccer Away ${index}`,
+            popularity: 100 - index,
+        }))
+        const basketball = Array.from({ length: 6 }, (_, index) => ({
+            id: `basketball-${index}`,
+            sportId: 'basketball',
+            leagueName: 'Basketball Feed',
+            home: `Hoops Home ${index}`,
+            away: `Hoops Away ${index}`,
+            popularity: 90 - index,
+        }))
+
+        const result = curateTopSportsbookItems([...soccer, ...basketball], { perSport: 5, minimumVisible: 10 })
+
+        expect(result.items[0].id).toBe('soccer-0')
+        expect(result.items.filter(item => item.sportId === 'soccer')).toHaveLength(5)
+        expect(result.items.filter(item => item.sportId === 'basketball')).toHaveLength(5)
+        expect(result.metrics).toMatchObject({ shownCount: 10, fillCount: 9, perSport: 5 })
     })
 })

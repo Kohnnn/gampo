@@ -86,8 +86,8 @@ function SpendGuard({ marquee, feedSource }) {
 }
 
 function SportsHome({ events, sports, leagues, feedSource = 'fallback', marquee = null, selectedIds, onToggleSelection, onOpenEvent, onOpenSearch, onNavigate }) {
-    const topMatches = events.filter(event => event.tags?.includes('top') || event.tags?.includes('marquee')).slice(0, 3)
-    const popularEvents = events.filter(event => event.tags?.includes('popular')).slice(0, 6)
+    const topMatches = events.filter(event => event.tags?.includes('top') || event.tags?.includes('marquee')).slice(0, 6)
+    const popularEvents = events.filter(event => event.tags?.includes('popular') || event.tags?.includes('feed')).slice(0, 30)
     const isLive = feedSource === 'live'
 
     // Group the live feed into ranked competitions so famous tournaments (World
