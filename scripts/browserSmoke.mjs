@@ -228,6 +228,19 @@ async function waitForReady(client, sessionId, timeoutMs = 8000) {
     return false
 }
 
+async function assertBaseReachable(baseUrl) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3500)
+    try {
+        const res = await fetch(baseUrl, { signal: controller.signal })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch (error) {
+        throw new Error(`Browser smoke base URL is not reachable: ${baseUrl}. Start the dev/preview server first or pass --baseUrl=<url>. (${error?.message || error})`)
+    } finally {
+        clearTimeout(timeout)
+    }
+}
+
 function collectErrors(events) {
     const errors = []
     for (const event of events) {
@@ -637,6 +650,8 @@ async function run() {
     const userDataDir = join(tmpdir(), `gampo-smoke-${process.pid}`)
     const runDir = join(outDir, label)
     const screenshotDir = join(runDir, 'screenshots')
+
+    await assertBaseReachable(baseUrl)
 
     if (clean) await rm(runDir, { recursive: true, force: true })
     await mkdir(screenshotDir, { recursive: true })

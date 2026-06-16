@@ -483,6 +483,21 @@ Follow-up screenshots showed poker cards still looked unpolished and mobile acti
 - `rtk npx vitest run src/components/PokerGame/PokerGameCss.test.js src/sportsbook/sportsbookMarquee.test.js src/sportsbook/sportsbookFeed.test.js src/sportsbook/sportsbookProviderProxySource.test.js src/sportsbook/sportsbookFeatured.test.js` green: 22 tests / 5 files.
 - `rtk npm run build` clean; only existing large `rows-*` chunk warnings remain.
 
+## Verification Hardening (2026-06-16)
+
+User asked to continue improving and commit/deploy. Full verification showed app tests/build/audits were green, but broad browser smoke could hang for minutes and save misleading Edge `127.0.0.1 refused to connect` screenshots when no local server was running.
+
+### Changes
+
+- `scripts/browserSmoke.mjs`: added a preflight `assertBaseReachable(baseUrl)` check so smoke fails fast with a clear “start the dev/preview server” message instead of navigating every route to a browser error page.
+
+### Verification
+
+- `rtk npm test` green: 528 tests / 93 files.
+- `rtk npm run build` clean; only existing large `rows-*` chunk warnings remain.
+- `rtk npm run audit:all` green: a11y, contrast, playfield overflow, and bet-sheet checks pass.
+- Started local Vite server and reran changed-route smoke: `rtk node scripts/browserSmoke.mjs --routes=/poker,/sportsbook --viewports=390x844,1440x900` green: poker and sportsbook pass at mobile and desktop, overflow 0px, errors 0.
+
 ### Files modified
 
 - `src/services/sportsApi.js` — `FALLBACK_KEYS` removed; env-only keys.
