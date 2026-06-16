@@ -553,6 +553,7 @@ export function normalizeFreeProviderPayload(payload = {}) {
         errors: payload?.errors || [],
         quotas: payload?.quotas || {},
         sources: payload?.sources || {},
+        marquee: payload?.marquee || null,
         inSeason: payload?.theOddsApi?.inSeason || [],
         generatedAt: payload?.generatedAt || null,
         cached: Boolean(payload?.cached),

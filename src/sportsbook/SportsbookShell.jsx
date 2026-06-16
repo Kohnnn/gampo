@@ -74,6 +74,7 @@ function SportsbookShell() {
     const [feedErrors, setFeedErrors] = useState([])
     const [feedLoaded, setFeedLoaded] = useState(false)
     const [quotas, setQuotas] = useState({})
+    const [marquee, setMarquee] = useState(null)
     const driftTick = useRef(0)
     const settleTimer = useRef(null)
 
@@ -86,6 +87,7 @@ function SportsbookShell() {
             setEvents(feed.events)
             setFeedErrors(feed.errors || [])
             setQuotas(feed.quotas || {})
+            setMarquee(feed.marquee || null)
             setFeedLoaded(feed.feedSource === 'live' || feed.feedEvents?.length > 0)
         })
         return () => { mounted = false }
@@ -149,6 +151,7 @@ function SportsbookShell() {
         setEvents(feed.events)
         setFeedErrors(feed.errors || [])
         setQuotas(feed.quotas || {})
+        setMarquee(feed.marquee || null)
         setFeedLoaded(feed.feedSource === 'live' || feed.feedEvents?.length > 0)
     }
 
@@ -201,6 +204,7 @@ function SportsbookShell() {
                         sports={sports}
                         leagues={leagues}
                         feedSource={feedSource}
+                        marquee={marquee}
                         selectedIds={selectedIds}
                         onToggleSelection={handleToggleSelection}
                         onOpenEvent={openEvent}

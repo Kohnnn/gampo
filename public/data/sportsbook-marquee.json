@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-06-16T00:00:00.000Z",
+  "source": "manual-crawl-seed",
+  "note": "Crawler/snapshot input for big-match-only sportsbook curation. Runtime provider calls should use this as a shortlist guide, not scrape from the browser.",
+  "competitions": [
+    { "label": "FIFA World Cup", "sportId": "soccer", "priority": 100, "keywords": ["fifa", "world cup", "copa mundial"] },
+    { "label": "UEFA Champions League", "sportId": "soccer", "priority": 92, "keywords": ["champions league", "uefa"] },
+    { "label": "UEFA Euro", "sportId": "soccer", "priority": 90, "keywords": ["euro 202", "uefa euro"] },
+    { "label": "Copa America", "sportId": "soccer", "priority": 88, "keywords": ["copa america"] },
+    { "label": "Premier League", "sportId": "soccer", "priority": 82, "keywords": ["premier league", "epl"] },
+    { "label": "La Liga", "sportId": "soccer", "priority": 80, "keywords": ["la liga"] },
+    { "label": "Serie A", "sportId": "soccer", "priority": 78, "keywords": ["serie a"] },
+    { "label": "Bundesliga", "sportId": "soccer", "priority": 78, "keywords": ["bundesliga"] },
+    { "label": "NBA Finals", "sportId": "basketball", "priority": 86, "keywords": ["nba finals", "nba playoff", "nba"] },
+    { "label": "NFL Playoffs", "sportId": "football", "priority": 84, "keywords": ["nfl playoff", "super bowl", "nfl"] },
+    { "label": "UFC Main Card", "sportId": "mma", "priority": 76, "keywords": ["ufc", "main card"] },
+    { "label": "Grand Slam Tennis", "sportId": "tennis", "priority": 74, "keywords": ["wimbledon", "us open", "roland garros", "australian open", "grand slam"] }
+  ],
+  "teams": [
+    "Argentina", "Brazil", "France", "Germany", "Spain", "England", "Portugal", "Netherlands", "Italy", "Belgium",
+    "Manchester City", "Arsenal", "Liverpool", "Chelsea", "Real Madrid", "Barcelona", "Bayern Munich", "PSG",
+    "Lakers", "Celtics", "Warriors", "Knicks", "Chiefs", "Eagles", "49ers", "Cowboys"
+  ]
+}
