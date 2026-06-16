@@ -767,7 +767,11 @@ export default function PokerGame() {
                                     </span>
                                 ))}
                             </div>
-                            <div className="pk-actions" data-ux-surface="controls" ref={actionsRef}>
+                            <div
+                                className={`pk-actions ${isHumanTurn ? 'is-live' : 'is-waiting'} ${raiseOpen ? 'is-raise-open' : ''} ${state.street === 'showdown' ? 'is-showdown' : ''}`}
+                                data-ux-surface="controls"
+                                ref={actionsRef}
+                            >
                                 {state.street === 'showdown' ? (
                                     <>
                                         <div className="pk-winners">
@@ -784,7 +788,7 @@ export default function PokerGame() {
                                             <span>{isHumanTurn ? 'Decision ready' : 'Waiting'}</span>
                                             <strong>{isHumanTurn ? 'Choose fold, call/check, or size a raise.' : tableStateLabel}</strong>
                                         </div>
-                                        {acts.map(a => {
+                                        {isHumanTurn && acts.map(a => {
                                             if (a.type === 'fold') return <button key={a.type} className="pk-act fold" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'fold' })} data-poker-action="fold" data-ux-primary-action>Fold</button>
                                             if (a.type === 'check') return <button key={a.type} className="pk-act check" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'check' })} data-poker-action="check" data-ux-primary-action>Check</button>
                                             if (a.type === 'call') return <button key={a.type} className="pk-act call" disabled={!isHumanTurn} onClick={() => handleAction({ type: 'call' })} data-poker-action="call" data-ux-primary-action>Call {formatCredits(a.amount)}</button>
