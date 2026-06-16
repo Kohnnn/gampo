@@ -1,4 +1,4 @@
-import { Search, Star, Trophy } from 'lucide-react'
+import { Search, ShieldCheck, Star, Trophy, Zap } from 'lucide-react'
 import { OUTRIGHTS, PROMO_CARDS } from '../sportsbookData'
 import { buildFeaturedCompetitions, contendersFromCompetition, spotlightCompetition } from '../sportsbookFeatured'
 import EventList from './EventList'
@@ -36,16 +36,66 @@ function TopMatchCard({ event, selectedIds, onToggleSelection, onOpenEvent }) {
     )
 }
 
-function SportsHome({ events, sports, leagues, feedSource = 'fallback', selectedIds, onToggleSelection, onOpenEvent, onOpenSearch, onNavigate }) {
-    const topMatches = events.filter(event => event.tags?.includes('top')).slice(0, 3)
+function MatchdaySpotlight({ competition, event, onOpenEvent }) {
+    if (!event) return null
+    const label = competition?.label || event.region || 'Big Match Board'
+    const startsAt = event.status === 'live'
+        ? 'Live now'
+        : new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(event.startsAt))
+    return (
+        <section className="sb-matchday-hero" aria-label="Marquee match spotlight">
+            <div className="sb-matchday-copy">
+                <span><Zap size={14} /> Big Match Only</span>
+                <h2>{label}</h2>
+                <p>{event.home} vs {event.away} leads this refresh. Lower-signal fixtures are filtered before they can burn attention or quota.</p>
+                <button type="button" onClick={() => onOpenEvent(event.id)}>Open match board</button>
+            </div>
+            <button type="button" className="sb-matchday-card" onClick={() => onOpenEvent(event.id)}>
+                <small>{startsAt}</small>
+                <div className="sb-matchday-teams">
+                    <span>{event.home.slice(0, 3).toUpperCase()}</span>
+                    <b>vs</b>
+                    <span>{event.away.slice(0, 3).toUpperCase()}</span>
+                </div>
+                <strong>{event.home}<br />{event.away}</strong>
+            </button>
+        </section>
+    )
+}
+
+function SpendGuard({ marquee, feedSource }) {
+    const live = feedSource === 'live'
+    const candidates = Number(marquee?.candidateCount) || 0
+    const shown = Number(marquee?.shownCount) || 0
+    const skipped = Number(marquee?.skippedCount) || 0
+    const marqueeCount = Number(marquee?.marqueeCount) || 0
+    return (
+        <section className="sb-spend-guard" aria-label="Sportsbook API spend guard">
+            <div>
+                <ShieldCheck size={18} />
+                <span>{live ? 'Big-match feed guard active' : 'Synthetic fallback guard ready'}</span>
+            </div>
+            <dl>
+                <div><dt>Candidates</dt><dd>{candidates || '-'}</dd></div>
+                <div><dt>Shown</dt><dd>{shown || '-'}</dd></div>
+                <div><dt>Skipped</dt><dd>{skipped || '-'}</dd></div>
+                <div><dt>Marquee</dt><dd>{marqueeCount || '-'}</dd></div>
+            </dl>
+        </section>
+    )
+}
+
+function SportsHome({ events, sports, leagues, feedSource = 'fallback', marquee = null, selectedIds, onToggleSelection, onOpenEvent, onOpenSearch, onNavigate }) {
+    const topMatches = events.filter(event => event.tags?.includes('top') || event.tags?.includes('marquee')).slice(0, 3)
     const popularEvents = events.filter(event => event.tags?.includes('popular')).slice(0, 6)
     const isLive = feedSource === 'live'
 
     // Group the live feed into ranked competitions so famous tournaments (World
     // Cup, Champions League, EPL, NBA, ...) surface as their own shelves instead
     // of one flat "latest" list. Synthetic fallback keeps its curated shelves.
-    const featured = isLive ? buildFeaturedCompetitions(events, leagues, { limit: 3, minEvents: 2 }) : []
+    const featured = isLive ? buildFeaturedCompetitions(events, leagues, { limit: 3, minEvents: 1 }) : []
     const spotlight = isLive ? spotlightCompetition(events, leagues) : null
+    const spotlightEvent = spotlight?.events?.[0] || topMatches[0] || events[0]
 
     // Outrights: synthetic fallback ships hardcoded World Cup futures. With a
     // live feed we build a "title contenders" board from the spotlight
@@ -98,6 +148,9 @@ function SportsHome({ events, sports, leagues, feedSource = 'fallback', selected
                 <Search size={20} />
                 <span>Search your game or event</span>
             </button>
+
+            <MatchdaySpotlight competition={spotlight || featured[0]} event={spotlightEvent} onOpenEvent={onOpenEvent} />
+            <SpendGuard marquee={marquee} feedSource={feedSource} />
 
             <nav className="sb-subnav" aria-label="Sportsbook sections">
                 <button type="button" className="is-active" onClick={() => onNavigate({ view: 'home' })}>Sports Home</button>

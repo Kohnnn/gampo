@@ -5,6 +5,7 @@ import { fetchFreeProviderFeed, loadSportsbookFeed } from './sportsbookFeed'
 const shellSource = readFileSync(new URL('./SportsbookShell.jsx', import.meta.url), 'utf8')
 const netlifyToml = readFileSync(new URL('../../netlify.toml', import.meta.url), 'utf8')
 const netlifyFunction = readFileSync(new URL('../../netlify/functions/sportsbook-free-feed.mjs', import.meta.url), 'utf8')
+const sportsHomeSource = readFileSync(new URL('./components/SportsHome.jsx', import.meta.url), 'utf8')
 
 afterEach(() => {
     vi.restoreAllMocks()
@@ -65,6 +66,7 @@ describe('fetchFreeProviderFeed', () => {
             generatedAt: new Date().toISOString(),
             sources: { pandascore: { configured: true, eventCount: 2 } },
             quotas: {},
+            marquee: { candidateCount: 2, shownCount: 1, skippedCount: 1, marqueeCount: 1, bigMatchOnly: true },
             errors: [],
             pandascore: {
                 matches: [
@@ -112,5 +114,8 @@ describe('fetchFreeProviderFeed', () => {
         // Live events get curation tags so the home shelves render real teams.
         expect(feed.events.some(event => event.tags?.includes('top'))).toBe(true)
         expect(feed.events.some(event => event.tags?.includes('popular'))).toBe(true)
+        expect(feed.marquee).toMatchObject({ candidateCount: 2, shownCount: 1, skippedCount: 1, marqueeCount: 1 })
+        expect(sportsHomeSource).toContain('Big-match feed guard active')
+        expect(sportsHomeSource).toContain('Big Match Only')
     })
 })

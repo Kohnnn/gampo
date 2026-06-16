@@ -445,6 +445,25 @@ Healthy areas (verified, no findings): test suite green and meaningful (math/RTP
 - `npm run build` clean on vite 7 in 11.5s; only the pre-existing large `rows-*` chunk note remains; empty `phaser`/`matter` chunk warnings eliminated.
 - `npm audit`: 0 vulnerabilities (was 2 moderate prod + 1 critical dev-chain).
 
+## Sportsbook Big-Match Benchmark + Quota Guard (2026-06-16)
+
+User asked to benchmark/reinforce sportsbook so API calls do not waste quota on boring matches and the UI feels more like an online sportsbook. Approved option 1: snapshot-first quota guard.
+
+### Changes
+
+- Added plan doc: `docs/sportsbook-big-match-benchmark-plan-2026-06-16.md`.
+- Added crawl/snapshot seed: `public/data/sportsbook-marquee.json` with FIFA World Cup, UEFA/Champions League, major domestic leagues, NBA/NFL playoffs, UFC, and Grand Slam tennis keywords.
+- Added pure curation module: `src/sportsbook/sportsbookMarquee.js` with `scoreMarqueeItem`, `filterMarqueeItems`, and `mergeMarqueeMetrics`.
+- Reinforced `server/sportsbookProviderProxy.js`: provider payloads are filtered through marquee scoring; Odds API IO odds fanout now uses the filtered event IDs; source payload exposes aggregate `marquee` metrics.
+- Reinforced client curation: `sportsbookFeed.js` ranks live events by marquee score before live/popularity and passes `marquee` metrics to `SportsbookShell` / `SportsHome`.
+- UI polish: Sports Home now has a visual `Big Match Only` matchday spotlight and a `Big-match feed guard active` diagnostics strip showing candidates, shown, skipped, and marquee counts.
+- Updated sportsbook docs with the Big-Match Quota Guard architecture.
+
+### Verification
+
+- `rtk npx vitest run src/sportsbook/sportsbookMarquee.test.js src/sportsbook/sportsbookFeed.test.js src/sportsbook/sportsbookProviderProxySource.test.js src/sportsbook/sportsbookFeatured.test.js` green: 17 tests / 4 files.
+- `rtk npm run build` clean; only the existing large `rows-*` chunk warnings remain.
+
 ### Files modified
 
 - `src/services/sportsApi.js` — `FALLBACK_KEYS` removed; env-only keys.

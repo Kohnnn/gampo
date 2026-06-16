@@ -48,6 +48,17 @@ Roadmap reference: keep expanding SportsGameOdds coverage first because its even
 
 `sportsbookFeed.js` normalizes optional API events into the same event and market shape as synthetic events. If the feed fails, the sportsbook keeps rendering synthetic fixtures.
 
+### Big-Match Quota Guard
+
+The live feed is big-match-first by default so API quota is not wasted on low-signal fixtures.
+
+- Marquee seed: `public/data/sportsbook-marquee.json`
+- Shared scoring/filtering: `src/sportsbook/sportsbookMarquee.js`
+- Server-side filtering: `server/sportsbookProviderProxy.js`
+- UI diagnostics: Sports Home `Big-match feed guard active` strip
+
+The snapshot lists famous competitions and team keywords such as FIFA World Cup, UEFA/Champions League, top domestic soccer leagues, NBA/NFL playoffs, UFC main cards, and Grand Slam tennis. The proxy filters provider payloads through this shortlist and exposes `marquee` metrics (`candidateCount`, `shownCount`, `skippedCount`, `marqueeCount`, `bigMatchOnly`) so the UI can show how much noise was skipped. If no marquee match exists, the app falls back to a small capped feed slice instead of blanking the sportsbook.
+
 ## Betting Flow
 
 All betting is practice-credit only.

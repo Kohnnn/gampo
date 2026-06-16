@@ -1,5 +1,6 @@
 import { buildSyntheticSportsbookData, LEAGUES, SPORTS } from './sportsbookData'
 import { normalizeFreeProviderPayload } from './freeFeedAdapters'
+import { filterMarqueeItems, scoreMarqueeItem } from './sportsbookMarquee'
 
 const SPORT_ALIASES = [
     ['soccer', ['soccer', 'football']],
@@ -100,6 +101,8 @@ function uniqueEvents(events) {
 function curateLiveEvents(events) {
     const now = Date.now()
     const ranked = [...events].sort((a, b) => {
+        const marqueeDelta = (scoreMarqueeItem(b).score || 0) - (scoreMarqueeItem(a).score || 0)
+        if (marqueeDelta) return marqueeDelta
         const liveDelta = (b.status === 'live' ? 1 : 0) - (a.status === 'live' ? 1 : 0)
         if (liveDelta) return liveDelta
         return (b.popularity || 0) - (a.popularity || 0)
@@ -107,6 +110,7 @@ function curateLiveEvents(events) {
     return ranked.map((event, index) => {
         const tags = new Set(event.tags || [])
         if (event.status === 'live') tags.add('live')
+        if ((scoreMarqueeItem(event).score || 0) >= 60) tags.add('marquee')
         if (index < 3) tags.add('top')
         if (index < 9) tags.add('popular')
         if (event.status === 'prematch') {
@@ -124,6 +128,7 @@ export async function loadSportsbookFeed() {
     let inSeason = []
     let providerQuotas = {}
     let providerSources = {}
+    let marquee = null
 
     try {
         // All providers (including The Odds API) are fetched server-side by the
@@ -132,8 +137,11 @@ export async function loadSportsbookFeed() {
         errors.push(...(freeFeed.errors || []))
         providerQuotas = freeFeed.quotas || {}
         providerSources = freeFeed.sources || {}
+        marquee = freeFeed.marquee || null
         inSeason = freeFeed.inSeason || []
-        feedEvents = uniqueEvents(freeFeed.events || []).slice(0, 60)
+        const filtered = filterMarqueeItems(uniqueEvents(freeFeed.events || []), { fallbackLimit: 18 })
+        feedEvents = filtered.items.slice(0, 60)
+        marquee = marquee || filtered.metrics
     } catch (error) {
         errors.push(error?.message || String(error))
     }
@@ -156,5 +164,6 @@ export async function loadSportsbookFeed() {
         errors: errors.filter(Boolean),
         quotas: providerQuotas,
         providerSources,
+        marquee,
     }
 }

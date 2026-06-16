@@ -1,3 +1,5 @@
+import { filterMarqueeItems, mergeMarqueeMetrics } from '../src/sportsbook/sportsbookMarquee.js'
+
 const CACHE_TTL_MS = 5 * 60 * 1000
 const PROVIDER_TIMEOUT_MS = 7000
 
@@ -107,11 +109,15 @@ async function loadPandaScore(token) {
         headers: { authorization: `Bearer ${token}` },
     })
 
+    const matches = Array.isArray(result.data) ? result.data : []
+    const filtered = filterMarqueeItems(matches, { fallbackLimit: 8 })
+
     return {
-        matches: Array.isArray(result.data) ? result.data : [],
+        matches: filtered.items,
         errors: result.ok ? [] : [result.error],
         quotas: result.quotas || {},
         configured: true,
+        marquee: filtered.metrics,
     }
 }
 
@@ -137,11 +143,14 @@ async function loadSportsGameOdds(token) {
             ? result.data
             : []
 
+    const filtered = filterMarqueeItems(data, { fallbackLimit: 12 })
+
     return {
-        events: data,
+        events: filtered.items,
         errors: result.ok ? [] : [result.error],
         quotas: result.quotas || {},
         configured: true,
+        marquee: filtered.metrics,
     }
 }
 
@@ -168,7 +177,8 @@ async function loadOddsApiIo(token) {
         }
     }
 
-    const eventIds = events.map(event => event?.id).filter(Boolean).slice(0, 10)
+    const filtered = filterMarqueeItems(events, { fallbackLimit: 8 })
+    const eventIds = filtered.items.map(event => event?.id).filter(Boolean).slice(0, 10)
     let odds = []
     if (eventIds.length) {
         const oddsUrl = new URL('https://api.odds-api.io/v3/odds/multi')
@@ -184,7 +194,7 @@ async function loadOddsApiIo(token) {
         }
     }
 
-    return { events, odds, errors, quotas, configured: true }
+    return { events: filtered.items, odds, errors, quotas, configured: true, marquee: filtered.metrics }
 }
 
 // === The Odds API (server-side; keys never reach the client bundle) ===
@@ -247,12 +257,15 @@ async function loadTheOddsApi(env) {
     Object.assign(quotas, sports.quotas)
     if (!sports.ok && sports.error) errors.push(sports.error)
 
+    const filtered = filterMarqueeItems(events, { fallbackLimit: 16 })
+
     return {
-        events: events.slice(0, 40),
+        events: filtered.items.slice(0, 40),
         inSeason: Array.isArray(sports.data) ? sports.data : [],
         errors,
         quotas,
         configured: true,
+        marquee: filtered.metrics,
     }
 }
 
@@ -294,15 +307,18 @@ async function loadApiFootball(token) {
         ? fixturesResult.data.response.filter(item => {
             if (!oddsFixtureIds.size) return true
             return oddsFixtureIds.has(String(item?.fixture?.id || ''))
-        }).slice(0, 30)
+        })
         : []
 
+    const filtered = filterMarqueeItems(fixtures, { fallbackLimit: 12 })
+
     return {
-        fixtures,
+        fixtures: filtered.items.slice(0, 30),
         odds,
         errors,
         quotas,
         configured: true,
+        marquee: filtered.metrics,
     }
 }
 
@@ -333,26 +349,38 @@ export async function loadProviderFeed(env) {
                 configured: sportsGameOdds.configured,
                 eventCount: sportsGameOdds.events.length,
                 primary: true,
+                marquee: sportsGameOdds.marquee,
             },
             pandascore: {
                 configured: pandascore.configured,
                 eventCount: pandascore.matches.length,
+                marquee: pandascore.marquee,
             },
             oddsApiIo: {
                 configured: oddsApiIo.configured,
                 eventCount: oddsApiIo.events.length,
                 oddsCount: oddsApiIo.odds.length,
+                marquee: oddsApiIo.marquee,
             },
             apiFootball: {
                 configured: apiFootball.configured,
                 eventCount: apiFootball.fixtures.length,
                 oddsCount: apiFootball.odds.length,
+                marquee: apiFootball.marquee,
             },
             theOddsApi: {
                 configured: theOddsApi.configured,
                 eventCount: theOddsApi.events.length,
+                marquee: theOddsApi.marquee,
             },
         },
+        marquee: mergeMarqueeMetrics(
+            sportsGameOdds.marquee,
+            pandascore.marquee,
+            oddsApiIo.marquee,
+            apiFootball.marquee,
+            theOddsApi.marquee,
+        ),
         sportsGameOdds: { events: sportsGameOdds.events },
         pandascore: { matches: pandascore.matches },
         oddsApiIo: { events: oddsApiIo.events, odds: oddsApiIo.odds },
