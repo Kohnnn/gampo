@@ -213,7 +213,7 @@ async function loadOddsApiIo(token) {
     }
 
     const filtered = curateTopSportsbookItems(events, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
-    const eventIds = filtered.items.map(event => event?.id).filter(Boolean).slice(0, 24)
+    const eventIds = filtered.items.map(event => event?.id).filter(Boolean).slice(0, 10)
     let odds = []
     if (eventIds.length) {
         const oddsUrl = new URL('https://api.odds-api.io/v3/odds/multi')
