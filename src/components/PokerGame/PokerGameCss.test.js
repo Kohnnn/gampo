@@ -9,6 +9,9 @@ describe('poker layout CSS', () => {
         expect(css).toMatch(/\.poker-page\s*\{[^}]*overflow-y:\s*auto/s)
         expect(css).toMatch(/\.poker-layout\s*\{[^}]*align-items:\s*start/s)
         expect(css).toMatch(/\.poker-sidebar-body\s*\{[^}]*overflow-y:\s*auto/s)
+        expect(css).toMatch(/Mobile GTO scroll repair:[\s\S]*\.poker-sidebar-body\s*\{[\s\S]*overflow-y:\s*visible/s)
+        expect(css).toMatch(/Mobile GTO scroll repair:[\s\S]*\.gto-grid-wrap\s*\{[\s\S]*overflow-y:\s*visible/s)
+        expect(css).toContain('touch-action: pan-x pan-y')
     })
 
     it('keeps the GTO decision context sticky and cells keyboard reachable', () => {

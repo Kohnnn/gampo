@@ -29,6 +29,11 @@ function sportIdFromText(value = '') {
     if (text.includes('basket')) return 'basketball'
     if (text.includes('baseball') || text.includes('mlb')) return 'baseball'
     if (text.includes('hockey') || text.includes('nhl')) return 'ice-hockey'
+    if (text.includes('handball')) return 'handball'
+    if (text.includes('rugby')) return 'rugby'
+    if (text.includes('volleyball')) return 'volleyball'
+    if (text.includes('formula') || text.includes('f1')) return 'formula-1'
+    if (text.includes('mma') || text.includes('ufc')) return 'mma'
     if (text.includes('tennis')) return 'tennis'
     if (text.includes('cricket')) return 'cricket'
     if (text.includes('soccer') || text.includes('epl') || text.includes('uefa')) return 'soccer'
@@ -470,6 +475,78 @@ export function normalizeApiFootballFixture(item, oddsByFixture = new Map()) {
     })
 }
 
+const API_SPORT_LABELS = {
+    baseball: 'Baseball',
+    basketball: 'Basketball',
+    handball: 'Handball',
+    hockey: 'Hockey',
+    nfl: 'NFL',
+    rugby: 'Rugby',
+    volleyball: 'Volleyball',
+    'formula-1': 'Formula 1',
+    mma: 'MMA',
+}
+
+const API_SPORT_IDS = {
+    baseball: 'baseball',
+    basketball: 'basketball',
+    handball: 'handball',
+    hockey: 'ice-hockey',
+    nfl: 'football',
+    rugby: 'rugby',
+    volleyball: 'volleyball',
+    'formula-1': 'formula-1',
+    mma: 'mma',
+}
+
+function apiSportsName(value, fallback = '') {
+    if (!value) return fallback
+    if (typeof value === 'string') return value
+    return value.name || value.long || value.medium || value.short || value.displayName || fallback
+}
+
+function apiSportsStatus(value) {
+    const text = String(value?.short || value?.long || value?.status || value || '').toUpperCase()
+    if (['1H', '2H', 'Q1', 'Q2', 'Q3', 'Q4', 'HT', 'OT', 'LIVE', 'IN PLAY', 'IN_PLAY'].some(token => text.includes(token))) return 'live'
+    if (['FT', 'AET', 'ENDED', 'FINISHED', 'FINAL', 'CLOSED'].some(token => text.includes(token))) return 'settled'
+    return 'prematch'
+}
+
+export function normalizeApiSportsMultiSportEvent(item) {
+    const apiSport = item?._gampoApiSport || 'sport'
+    const sportId = API_SPORT_IDS[apiSport] || sportIdFromText(apiSport)
+    const label = API_SPORT_LABELS[apiSport] || apiSport
+    const isFormula = apiSport === 'formula-1'
+    const isMma = apiSport === 'mma'
+    const id = item?.id || item?.game?.id || item?.race?.id || item?.fight?.id || `${apiSport}-${hashString(JSON.stringify(item).slice(0, 400))}`
+    const home = isFormula
+        ? apiSportsName(item?.competition, item?.race?.name || item?.type || 'Formula 1 Race')
+        : isMma
+            ? apiSportsName(item?.fighters?.first || item?.fighter_1 || item?.home, 'Fighter 1')
+            : apiSportsName(item?.teams?.home || item?.home || item?.homeTeam, 'Home')
+    const away = isFormula
+        ? apiSportsName(item?.circuit, item?.circuit?.name || item?.country?.name || 'Field')
+        : isMma
+            ? apiSportsName(item?.fighters?.second || item?.fighter_2 || item?.away, 'Fighter 2')
+            : apiSportsName(item?.teams?.away || item?.away || item?.awayTeam, 'Away')
+    const homeScore = item?.scores?.home?.total ?? item?.scores?.home ?? item?.score?.home
+    const awayScore = item?.scores?.away?.total ?? item?.scores?.away ?? item?.score?.away
+
+    return normalizedEvent({
+        id: `apisports-${apiSport}-${id}`,
+        sportId,
+        source: `api-sports-${apiSport}`,
+        leagueName: item?.league?.name || item?.competition?.name || item?.championship?.name || `${label} Feed`,
+        region: item?.country?.name || item?.league?.country || item?.competition?.location?.country || 'API-SPORTS',
+        startsAt: item?.date || item?.game?.date?.date || item?.race?.date || item?.fight?.date || new Date().toISOString(),
+        status: apiSportsStatus(item?.status || item?.game?.status || item?.race?.status),
+        home,
+        away,
+        score: Number.isFinite(Number(homeScore)) && Number.isFinite(Number(awayScore)) ? { home: Number(homeScore), away: Number(awayScore) } : null,
+        tags: ['api-sports', apiSport],
+    })
+}
+
 // === The Odds API ===
 // The proxy now fetches The Odds API server-side (keys stay off the client).
 // Each event carries `_gampoRegion` ('us'|'uk'). We reuse the pure
@@ -546,6 +623,7 @@ export function normalizeFreeProviderPayload(payload = {}) {
         ...(payload?.pandascore?.matches || []).map(normalizePandaScoreMatch),
         ...(payload?.oddsApiIo?.events || []).map(event => normalizeOddsApiIoEvent(event, payload?.oddsApiIo?.odds || [])),
         ...(payload?.apiFootball?.fixtures || []).map(item => normalizeApiFootballFixture(item, apiFootballOdds)),
+        ...(payload?.apiFootball?.multiSport || []).map(normalizeApiSportsMultiSportEvent),
         ...(payload?.theOddsApi?.events || []).map(event => normalizeTheOddsApiEvent(event, event?._gampoRegion || 'us')),
     ].filter(Boolean)
 

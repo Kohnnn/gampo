@@ -116,6 +116,7 @@ describe('fetchFreeProviderFeed', () => {
         expect(feed.events.some(event => event.tags?.includes('top'))).toBe(true)
         expect(feed.events.some(event => event.tags?.includes('popular'))).toBe(true)
         expect(feed.marquee).toMatchObject({ candidateCount: 2, shownCount: 1, skippedCount: 1, marqueeCount: 1 })
+        expect(shellSource).not.toContain('<SportsRail')
         expect(sportsHomeSource).toContain('Real-event feed guard active')
         expect(sportsHomeSource).toContain('Big Match Only')
     })
