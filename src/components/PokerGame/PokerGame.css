@@ -2626,3 +2626,151 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
+
+/* Mobile poker repair: this final block is the source of truth for phones. */
+@media (max-width: 768px) {
+    .poker-page {
+        padding-bottom: calc(var(--mobile-nav-height, 64px) + 32px);
+        scroll-padding-bottom: calc(var(--mobile-nav-height, 64px) + 96px);
+    }
+
+    .poker-layout {
+        padding-bottom: 16px;
+    }
+
+    .poker-table-felt {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+        overflow: hidden;
+    }
+
+    .pk-board {
+        max-width: min(100%, 310px);
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .pk-board .pk-card {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        max-height: 58px;
+        aspect-ratio: 0.68;
+        padding: 3px;
+    }
+
+    .pk-board .pk-pip { font-size: 24px; }
+    .pk-board .pk-rank { font-size: 11px; }
+    .pk-board .pk-suit { font-size: 12px; }
+
+    .poker-table-felt .pk-seat:not(.is-human) {
+        min-height: 62px;
+        overflow: hidden;
+    }
+
+    .pk-seat:not(.is-human) .pk-seat-cards {
+        flex: 0 0 auto;
+        gap: 3px;
+    }
+
+    .pk-seat:not(.is-human) .pk-seat-cards .pk-card {
+        width: 22px;
+        height: 32px;
+        min-width: 22px;
+        min-height: 32px;
+        max-width: 22px;
+        max-height: 32px;
+        padding: 2px;
+        border-width: 1px;
+        border-radius: 5px;
+    }
+
+    .pk-seat:not(.is-human) .pk-seat-cards .pk-pip { font-size: 14px; }
+    .pk-seat:not(.is-human) .pk-seat-cards .pk-rank { font-size: 8px; }
+    .pk-seat:not(.is-human) .pk-seat-cards .pk-suit { font-size: 9px; }
+    .pk-seat:not(.is-human) .pk-card-back::after { font-size: 12px; }
+
+    .poker-table-felt .pk-seat.is-human {
+        overflow: hidden;
+    }
+
+    .pk-seat.is-human .pk-seat-cards .pk-card {
+        width: clamp(46px, 14vw, 54px);
+        height: clamp(66px, 20vw, 78px);
+        min-width: clamp(46px, 14vw, 54px);
+        max-width: 54px;
+        max-height: 78px;
+        padding: 4px;
+    }
+
+    .pk-seat.is-human .pk-seat-cards .pk-pip { font-size: clamp(28px, 8vw, 34px); }
+    .pk-seat.is-human .pk-seat-cards .pk-rank { font-size: clamp(14px, 4vw, 18px); }
+    .pk-seat.is-human .pk-seat-cards .pk-suit { font-size: clamp(16px, 5vw, 24px); }
+
+    .pk-actions {
+        position: sticky;
+        left: auto;
+        right: auto;
+        bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)));
+        z-index: 40;
+        max-height: min(46vh, 330px);
+        margin-top: 10px;
+        box-shadow: 0 -8px 26px rgba(0, 0, 0, 0.48);
+    }
+
+    .pk-actions.is-waiting:not(.is-showdown) {
+        grid-template-columns: 1fr;
+        padding: 7px;
+        max-height: 72px;
+    }
+
+    .pk-actions.is-waiting:not(.is-showdown) .pk-action-status {
+        min-height: 0;
+    }
+
+    .pk-actions.is-live {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pk-actions.is-live .pk-raise-open,
+    .pk-actions.is-live .pk-raise,
+    .pk-actions.is-live .pk-action-status {
+        grid-column: 1 / -1;
+    }
+
+    .pk-actions.is-live .pk-act.fold,
+    .pk-actions.is-live .pk-act.call,
+    .pk-actions.is-live .pk-act.check {
+        grid-column: auto;
+    }
+
+    .pk-actions.is-showdown {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pk-winners {
+        grid-column: 1 / -1;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 420px) {
+    .pk-board {
+        max-width: 292px;
+        padding: 6px;
+    }
+
+    .pk-board .pk-card {
+        min-height: 40px;
+        max-height: 54px;
+    }
+
+    .pk-board .pk-pip { font-size: 21px; }
+
+    .pk-seat:not(.is-human) .pk-seat-info .pk-name {
+        max-width: 72px;
+    }
+
+    .pk-seat.is-human .pk-seat-cards {
+        gap: 6px;
+    }
+}
