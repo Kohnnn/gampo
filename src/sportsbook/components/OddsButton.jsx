@@ -7,6 +7,7 @@ function OddsButton({ selection, selected = false, onToggle, compact = false, ma
     const movement = Number(selection.decimalOdds) - Number(selection.previousOdds)
     const direction = movement > 0.015 ? 'up' : movement < -0.015 ? 'down' : ''
     const analysis = analyzeSelection(selection, marketGroup)
+    const estimated = selection.estimated || selection.source === 'synthetic-estimate'
 
     return (
         <div className="sb-odds-cell">
@@ -18,6 +19,7 @@ function OddsButton({ selection, selected = false, onToggle, compact = false, ma
                     disabled ? 'is-disabled' : '',
                     direction ? `is-${direction}` : '',
                     compact ? 'is-compact' : '',
+                    estimated ? 'is-estimated' : '',
                 ].filter(Boolean).join(' ')}
                 onClick={(event) => {
                     event.stopPropagation()
@@ -32,6 +34,7 @@ function OddsButton({ selection, selected = false, onToggle, compact = false, ma
                     {!disabled && direction === 'up' ? <TrendingUp size={12} /> : null}
                     {!disabled && direction === 'down' ? <TrendingDown size={12} /> : null}
                 </strong>
+                {estimated ? <em>Est.</em> : null}
             </button>
             <OddsCoach analysis={analysis} label="Analyze odds" />
         </div>

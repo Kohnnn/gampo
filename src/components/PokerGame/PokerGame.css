@@ -3018,3 +3018,197 @@
         height: clamp(82px, 26vw, 98px);
     }
 }
+
+/* Poker desktop repair: final source of truth for non-phone table layout. */
+@media (min-width: 769px) {
+    .poker-page {
+        padding: 14px 16px 24px;
+    }
+
+    .poker-layout {
+        grid-template-columns: minmax(760px, 1fr) minmax(300px, 340px);
+        gap: 16px;
+        max-width: 1560px;
+    }
+
+    .poker-table {
+        padding: 14px;
+        border-radius: 18px;
+        background:
+            radial-gradient(circle at 50% -12%, rgba(0, 231, 1, 0.08), transparent 34%),
+            linear-gradient(180deg, rgba(12, 27, 38, 0.96), rgba(7, 16, 24, 0.96));
+    }
+
+    .poker-table-felt {
+        height: clamp(560px, 68vh, 720px);
+        min-height: 560px;
+        border-radius: 52% / 42%;
+        border-width: 10px;
+        overflow: visible;
+    }
+
+    .pk-pot {
+        top: 33%;
+        z-index: 3;
+    }
+
+    .pk-board {
+        top: 51%;
+        gap: 9px;
+        z-index: 2;
+    }
+
+    .poker-page .pk-board .pk-card {
+        width: 58px;
+        height: 84px;
+    }
+
+    .pk-seats {
+        position: absolute;
+        inset: 0;
+    }
+
+    .pk-seat {
+        width: 146px;
+        min-width: 0;
+        max-width: 146px;
+        min-height: 108px;
+        padding: 9px 10px;
+        gap: 5px;
+        border-radius: 15px;
+        background: linear-gradient(180deg, rgba(2, 12, 18, 0.84), rgba(2, 12, 18, 0.66));
+        border-width: 1px;
+    }
+
+    .pk-seat.is-human {
+        width: 188px;
+        max-width: 188px;
+        min-height: 140px;
+        padding: 11px 14px;
+        background:
+            radial-gradient(circle at 84% 16%, rgba(0, 231, 1, 0.16), transparent 44%),
+            linear-gradient(180deg, rgba(2, 15, 20, 0.94), rgba(2, 12, 18, 0.8));
+        border-color: rgba(0, 231, 1, 0.4);
+    }
+
+    .seat-0 { left: 50%; bottom: 18px; transform: translateX(-50%); }
+    .seat-1 { left: 13%; bottom: 18%; transform: translateX(-50%); }
+    .seat-2 { left: 10%; top: 22%; transform: translateX(-50%); }
+    .seat-3 { left: 50%; top: 16px; transform: translateX(-50%); }
+    .seat-4 { right: 10%; top: 22%; transform: translateX(50%); }
+    .seat-5 { right: 13%; bottom: 18%; transform: translateX(50%); }
+
+    .pk-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .pk-seat-info .pk-name {
+        max-width: 124px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+    }
+
+    .pk-seat-info .pk-stack {
+        font-size: 12px;
+    }
+
+    .pk-seat-info .pk-last {
+        min-height: 12px;
+    }
+
+    .poker-page .pk-seat:not(.is-human) .pk-seat-cards .pk-card {
+        width: 38px;
+        height: 55px;
+    }
+
+    .poker-page .pk-seat:not(.is-human) .pk-seat-cards .pk-pip { font-size: 20px; }
+    .poker-page .pk-seat:not(.is-human) .pk-seat-cards .pk-rank { font-size: 10px; }
+    .poker-page .pk-seat:not(.is-human) .pk-seat-cards .pk-suit { font-size: 9px; }
+
+    .poker-page .pk-seat.is-human .pk-seat-cards .pk-card {
+        width: 62px;
+        height: 90px;
+    }
+
+    .poker-page .pk-seat.is-human .pk-seat-cards .pk-pip { font-size: 38px; }
+    .poker-page .pk-seat.is-human .pk-seat-cards .pk-rank { font-size: 15px; }
+    .poker-page .pk-seat.is-human .pk-seat-cards .pk-suit { font-size: 13px; }
+
+    .pk-button-chip {
+        top: -8px;
+        right: -8px;
+    }
+
+    .pk-actions {
+        position: static;
+        bottom: auto;
+        z-index: 2;
+        margin-top: 14px;
+        padding: 12px;
+        backdrop-filter: blur(6px);
+    }
+
+    .pk-actions.is-waiting:not(.is-showdown) {
+        max-height: none;
+    }
+
+    .poker-sidebar {
+        max-height: calc(100vh - 160px);
+    }
+
+    .gto-grid-wrap {
+        max-height: 280px;
+    }
+}
+
+.pk-exit-guard {
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.66);
+    backdrop-filter: blur(5px);
+}
+
+.pk-exit-guard-card {
+    width: min(100%, 520px);
+    display: grid;
+    gap: 14px;
+    padding: 20px;
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(237, 66, 69, 0.18), transparent 45%),
+        linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(7, 16, 24, 0.98));
+    border: 1px solid rgba(237, 66, 69, 0.42);
+    box-shadow: 0 24px 72px rgba(0, 0, 0, 0.58);
+}
+
+.pk-exit-guard-card strong {
+    color: #ffd9da;
+    font-size: 20px;
+    font-weight: 950;
+}
+
+.pk-exit-guard-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.pk-exit-guard-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+@media (max-width: 640px) {
+    .pk-exit-guard-actions {
+        grid-template-columns: 1fr;
+    }
+}

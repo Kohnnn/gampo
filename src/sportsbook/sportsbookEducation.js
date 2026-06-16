@@ -87,6 +87,7 @@ function availableSelections(group) {
 
 function sourceLabel(source) {
     if (!source || source === 'synthetic') return 'Gampo synthetic'
+    if (source === 'synthetic-estimate') return 'Estimated odds'
     if (source === 'sportsgameodds') return 'SportsGameOdds'
     if (source === 'api-football') return 'API-Football'
     if (source === 'odds-api-io') return 'odds-api.io'
@@ -296,7 +297,9 @@ export function analyzeSelection(selection, marketGroup = null) {
                 'selection-source',
                 'advanced',
                 'Source caveat',
-                `${sourceLabel(selection?.source)} can populate the displayed price, but all ticket acceptance and settlement remain local fake-credit simulation.`,
+                selection?.estimated || selection?.source === 'synthetic-estimate'
+                    ? 'This is a GamPo-estimated learning price generated from real fixture context. It is not a bookmaker quote; all ticket acceptance and settlement remain local fake-credit simulation.'
+                    : `${sourceLabel(selection?.source)} can populate the displayed price, but all ticket acceptance and settlement remain local fake-credit simulation.`,
                 'Source',
                 sourceLabel(selection?.source),
             ),

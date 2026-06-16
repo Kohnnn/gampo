@@ -144,6 +144,7 @@ export default function PokerGame() {
     const [sngComplete, setSngComplete] = useState(false)
     const [bubbles, setBubbles] = useState({})
     const [confirmCashout, setConfirmCashout] = useState(false)
+    const [pendingExit, setPendingExit] = useState(null)
     const [rotationLog, setRotationLog] = useState([])
     // Wave 12: rebuy prompt for the human + chip motion + time bank
     const [rebuyPrompt, setRebuyPrompt] = useState(false)
@@ -321,6 +322,7 @@ export default function PokerGame() {
     const acts = state ? legalActions(state) : []
     const human = state ? state.players.find(p => p.isHuman) : null
     const isHumanTurn = state && state.toAct >= 0 && state.players[state.toAct]?.isHuman
+    const hasLiveTableStack = Boolean(seated && state && human && (human.stack || 0) > 0)
 
     // When it becomes the player's turn, bring the action bar into view so the
     // fold/call/raise controls aren't stranded below the fold on mobile.
@@ -333,20 +335,56 @@ export default function PokerGame() {
     }, [isHumanTurn, raiseOpen])
 
     useEffect(() => {
-        if (!seated || !state || !human || (human.stack || 0) <= 0) return undefined
+        if (!hasLiveTableStack) return undefined
         const warn = (event) => {
             event.preventDefault()
             event.returnValue = 'Cash out before leaving poker or your current table stack will not return to balance.'
         }
         window.addEventListener('beforeunload', warn)
         return () => window.removeEventListener('beforeunload', warn)
-    }, [seated, state, human])
+    }, [hasLiveTableStack])
+
+    useEffect(() => {
+        if (!hasLiveTableStack) return undefined
+        const blockAnchorExit = (event) => {
+            if (event.defaultPrevented) return
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+            const anchor = event.target.closest?.('a[href]')
+            if (!anchor) return
+            const href = anchor.getAttribute('href') || ''
+            if (!href || href.startsWith('#')) return
+            const url = new URL(href, window.location.href)
+            if (url.origin === window.location.origin && url.pathname === '/poker') return
+            event.preventDefault()
+            event.stopPropagation()
+            setPendingExit({ kind: 'link', href: url.href, internalPath: url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : null })
+        }
+        document.addEventListener('click', blockAnchorExit, true)
+        return () => document.removeEventListener('click', blockAnchorExit, true)
+    }, [hasLiveTableStack])
+
+    useEffect(() => {
+        if (!hasLiveTableStack) return undefined
+        window.history.pushState({ gampoPokerGuard: true }, '', window.location.href)
+        const blockBackExit = () => {
+            setPendingExit({ kind: 'back', internalPath: '/' })
+            window.history.pushState({ gampoPokerGuard: true }, '', window.location.href)
+        }
+        window.addEventListener('popstate', blockBackExit)
+        return () => window.removeEventListener('popstate', blockBackExit)
+    }, [hasLiveTableStack])
 
     const leaveToHub = (event) => {
-        if (!seated || !state || !human || (human.stack || 0) <= 0) return
+        if (!hasLiveTableStack) return
         event.preventDefault()
-        const ok = window.confirm('Cash out before leaving poker or your current table stack will not return to balance. Leave without cashing out?')
-        if (ok) navigate('/')
+        setPendingExit({ kind: 'hub', internalPath: '/' })
+    }
+
+    const completePendingExit = (target = pendingExit) => {
+        setPendingExit(null)
+        if (!target) return
+        if (target.internalPath) navigate(target.internalPath)
+        else if (target.href) window.location.assign(target.href)
     }
 
     useEffect(() => {
@@ -435,7 +473,7 @@ export default function PokerGame() {
         setConfirmCashout(false)
     }
 
-    const cashOut = (force = false) => {
+    const cashOut = (force = false, afterCashout = null) => {
         if (!state || !human) return
         const midHand = state.street !== 'showdown' && state.street !== 'idle' && human.status !== 'folded'
         if (midHand && !force) {
@@ -446,6 +484,19 @@ export default function PokerGame() {
         if (finalStack > 0) addWinnings(finalStack, 'Poker cashout')
         showToast('bet', 'Left the table', `Cashed out ${formatCredits(finalStack)}`)
         setState(null); setSeated(false); setSngComplete(false); setConfirmCashout(false); setRebuyPrompt(false)
+        if (afterCashout) window.setTimeout(afterCashout, 0)
+    }
+
+    const cashOutAndExit = () => {
+        const target = pendingExit
+        cashOut(true, () => completePendingExit(target))
+    }
+
+    const abandonAndExit = () => {
+        const target = pendingExit
+        showToast('loss', 'Left poker without cashing out', 'Table stack was abandoned')
+        setState(null); setSeated(false); setSngComplete(false); setConfirmCashout(false); setRebuyPrompt(false); setPendingExit(null)
+        window.setTimeout(() => completePendingExit(target), 0)
     }
 
     // Wave 12: cash-game top-up between hands.
@@ -679,6 +730,20 @@ export default function PokerGame() {
                             <div className="pk-cashout-actions">
                                 <button className="pk-act" onClick={declineRebuy}>Leave table</button>
                                 <button className="pk-act primary" disabled={balance < (initialBuyInRef.current || buyIn)} onClick={rebuy}>Rebuy {formatCredits(initialBuyInRef.current || buyIn)}</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {pendingExit && (
+                        <div className="pk-exit-guard" role="dialog" aria-modal="true" aria-label="Cash out before leaving poker">
+                            <div className="pk-exit-guard-card">
+                                <strong>Cash out before leaving?</strong>
+                                <p>Your current table stack is {formatCredits(human?.stack || 0)}. Leaving without cashing out abandons those table chips and they will not return to your practice balance.</p>
+                                <div className="pk-exit-guard-actions">
+                                    <button className="pk-act" onClick={() => setPendingExit(null)}>Stay seated</button>
+                                    <button className="pk-act fold" onClick={abandonAndExit}>Leave without cashout</button>
+                                    <button className="pk-act primary" onClick={cashOutAndExit}>Cash out & leave</button>
+                                </div>
                             </div>
                         </div>
                     )}

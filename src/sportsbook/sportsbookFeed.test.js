@@ -61,7 +61,7 @@ describe('fetchFreeProviderFeed', () => {
         expect(netlifyFunction).toContain('loadProviderFeed(process.env)')
     })
 
-    it('uses only live feed events (no synthetic Practice teams) when a feed is available', async () => {
+    it('uses blended real-event feed events with estimated odds when a feed is available', async () => {
         const payload = {
             generatedAt: new Date().toISOString(),
             sources: { pandascore: { configured: true, eventCount: 2 } },
@@ -105,17 +105,18 @@ describe('fetchFreeProviderFeed', () => {
 
         const feed = await loadSportsbookFeed()
 
-        expect(feed.feedSource).toBe('live')
+        expect(feed.feedSource).toBe('blended')
         expect(feed.events.length).toBeGreaterThan(0)
         // No synthetic source and no "Practice" teams should survive.
         expect(feed.events.every(event => event.source !== 'synthetic')).toBe(true)
+        expect(feed.events.some(event => event.tags?.includes('estimated-odds'))).toBe(true)
         const blob = feed.events.map(e => `${e.home} ${e.away}`).join(' ')
         expect(blob).not.toMatch(/Practice|Harbor United|River City/i)
         // Live events get curation tags so the home shelves render real teams.
         expect(feed.events.some(event => event.tags?.includes('top'))).toBe(true)
         expect(feed.events.some(event => event.tags?.includes('popular'))).toBe(true)
         expect(feed.marquee).toMatchObject({ candidateCount: 2, shownCount: 1, skippedCount: 1, marqueeCount: 1 })
-        expect(sportsHomeSource).toContain('Big-match feed guard active')
+        expect(sportsHomeSource).toContain('Real-event feed guard active')
         expect(sportsHomeSource).toContain('Big Match Only')
     })
 })

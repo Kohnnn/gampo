@@ -25,6 +25,9 @@ describe('free provider sportsbook adapters', () => {
         expect(event.status).toBe('prematch')
         expect(event.marketGroups[0].selections).toHaveLength(2)
         expect(event.marketGroups[0].selections[0].decimalOdds).toBeGreaterThan(1)
+        expect(event.tags).toContain('estimated-odds')
+        expect(event.marketGroups[0].selections[0].source).toBe('synthetic-estimate')
+        expect(event.bookmakerTitle).toBe('Estimated odds')
     })
 
     it('normalizes odds-api.io events and uses supplied market prices', () => {
@@ -103,6 +106,7 @@ describe('free provider sportsbook adapters', () => {
         expect(payload.events).toHaveLength(1)
         expect(normalizeApiFootballFixture).toBeTypeOf('function')
         expect(payload.events[0].marketGroups[0].selections.map(selection => selection.decimalOdds)).toEqual([1.9, 3.2, 4.1])
+        expect(payload.events[0].oddsMode).toBe('real')
     })
 
     it('normalizes SportsGameOdds moneyline, spread, and totals', () => {
@@ -161,5 +165,7 @@ describe('free provider sportsbook adapters', () => {
         expect(event.away).toBe('Miami-Tides FC')
         expect(event.participants).toEqual(['Denver PEAKS 2026', 'Miami-Tides FC'])
         expect(event.marketGroups[0].selections.map(selection => selection.label)).toEqual(['Denver PEAKS 2026', 'Miami-Tides FC'])
+        expect(event.tags).toContain('estimated-odds')
+        expect(event.marketGroups[0].selections[0].source).toBe('synthetic-estimate')
     })
 })
