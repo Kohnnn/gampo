@@ -18,7 +18,7 @@ function TopMatchCard({ event, selectedIds, onToggleSelection, onOpenEvent }) {
                     <strong>{event.home}<br />{event.away}</strong>
                     <span className="sb-team-mark is-away">{event.away.slice(0, 2).toUpperCase()}</span>
                 </div>
-                <small>{event.tags?.includes('live') ? 'Live market activity' : 'Popular 1x2 market'}</small>
+                <small>{event.tags?.includes('estimated-odds') ? 'Estimated odds' : event.tags?.includes('live') ? 'Live market activity' : 'Popular 1x2 market'}</small>
             </button>
             <div className="sb-top-match-odds">
                 {(market?.selections || []).slice(0, 3).map(selection => (
@@ -64,7 +64,7 @@ function MatchdaySpotlight({ competition, event, onOpenEvent }) {
 }
 
 function SpendGuard({ marquee, feedSource }) {
-    const live = feedSource === 'live'
+    const live = feedSource === 'live' || feedSource === 'blended'
     const candidates = Number(marquee?.candidateCount) || 0
     const shown = Number(marquee?.shownCount) || 0
     const skipped = Number(marquee?.skippedCount) || 0
@@ -73,7 +73,7 @@ function SpendGuard({ marquee, feedSource }) {
         <section className="sb-spend-guard" aria-label="Sportsbook API spend guard">
             <div>
                 <ShieldCheck size={18} />
-                <span>{live ? 'Big-match feed guard active' : 'Synthetic fallback guard ready'}</span>
+                <span>{live ? 'Real-event feed guard active' : 'Synthetic fallback guard ready'}</span>
             </div>
             <dl>
                 <div><dt>Candidates</dt><dd>{candidates || '-'}</dd></div>
@@ -88,7 +88,7 @@ function SpendGuard({ marquee, feedSource }) {
 function SportsHome({ events, sports, leagues, feedSource = 'fallback', marquee = null, selectedIds, onToggleSelection, onOpenEvent, onOpenSearch, onNavigate }) {
     const topMatches = events.filter(event => event.tags?.includes('top') || event.tags?.includes('marquee')).slice(0, 6)
     const popularEvents = events.filter(event => event.tags?.includes('popular') || event.tags?.includes('feed')).slice(0, 30)
-    const isLive = feedSource === 'live'
+    const isLive = feedSource === 'live' || feedSource === 'blended'
 
     // Group the live feed into ranked competitions so famous tournaments (World
     // Cup, Champions League, EPL, NBA, ...) surface as their own shelves instead

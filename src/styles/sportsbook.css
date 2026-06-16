@@ -648,6 +648,24 @@
     animation: sbOddsDown 1.25s ease;
 }
 
+.sb-odds-button.is-estimated {
+    border-color: rgba(255, 207, 90, 0.22);
+    background: linear-gradient(180deg, rgba(255, 207, 90, 0.08), rgba(12, 32, 43, 0.96));
+}
+
+.sb-odds-button em {
+    width: max-content;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: rgba(255, 207, 90, 0.14);
+    color: #ffe680;
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 950;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 .sb-odds-label {
     min-width: 0;
     overflow: hidden;

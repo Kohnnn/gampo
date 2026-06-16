@@ -539,3 +539,40 @@ Plan + live status board: `docs/uiux-wave-2026-06-10.md`. Shipped this session:
 Verification: 454 tests green on vitest 4; build clean; browser smoke 18 arcade routes x 2 viewports = 36 combos, 0 overflow / 0 console errors (`output/browser-smoke/arcade-wave`).
 
 Open: S1 UI half, S2-S4 mechanics (+calibration), S-anim pack, C1-C7 cases unbox, final deploy. All scoped with implementation notes in `docs/uiux-wave-2026-06-10.md`.
+
+## Poker + Sportsbook Shipping Batch (2026-06-16)
+
+Plan: `docs/poker-sportsbook-shipping-plan-2026-06-16.md`.
+
+User feedback:
+
+- Poker mobile is acceptable, but desktop poker UI/UX is poor and opponent readability still needs adjustment.
+- Leaving poker still can bypass cashout and lose the table stack.
+- Sportsbook should use more actual events from API-Football and PandaScore, prefer real odds, and fill missing odds with clearly marked estimated odds.
+
+Implemented:
+
+- Poker desktop final CSS override for `min-width: 769px`: larger felt, stable six-seat coordinates, larger board/hero cards, readable opponent cards, static action bar below the table, and smaller sidebar footprint.
+- Poker exit guard now covers document-level in-app links and browser back while seated with stack > 0, not only the local Hub link.
+- Poker exit modal gives three explicit choices: stay seated, leave without cashout, or cash out and leave. Cashout returns the current stack before navigation.
+- Browser/tab close still uses native `beforeunload` because custom unload dialogs are not allowed by browsers.
+- API-Football and PandaScore proxy loaders now support comma-separated server-side token rotation with temporary cooldown after auth/rate-limit errors.
+- PandaScore request expanded to `per_page=100` and `sort=begin_at`.
+- API-Football request expanded from today-only to a 7-day `/fixtures` + `/odds?bet=1` date scan.
+- Sportsbook feed mode changed from live-only to blended real-event mode. Real odds rank first; real fixtures without bookmaker odds receive deterministic estimated odds.
+- Estimated odds are marked with event tag `estimated-odds`, selection source `synthetic-estimate`, bookmaker title `Estimated odds`, odds-button `Est.` badge, and Odds Coach caveat copy.
+- Synthetic Gampo fixtures remain only as the offline/no-real-fixture fallback so fake practice teams do not appear when real fixtures exist.
+
+Documentation:
+
+- `docs/games/sportsbook.md` updated with provider endpoints, auth headers, token rotation env names, blended feed behavior, estimated-odds markers, and provider-doc notes.
+- PandaScore docs fetched successfully; API-Football public docs returned 403 to automated fetch, so the implementation follows the official endpoint contract already used in code.
+
+Verification:
+
+- Focused changed tests green: `rtk npx vitest run src/components/PokerGame/PokerGameCss.test.js src/sportsbook/sportsbookFeed.test.js src/sportsbook/freeFeedAdapters.test.js src/sportsbook/sportsbookProviderProxySource.test.js` — 15 tests / 4 files.
+- Full suite green: `rtk npm test` — 528 tests / 93 files.
+- Production build green: `rtk npm run build`.
+- Audits green: `rtk npm run audit:all` — a11y, contrast, playfield overflow, and bet-sheet checks.
+- Browser smoke green: `rtk node scripts/browserSmoke.mjs --routes=/poker,/sportsbook --viewports=390x844,1440x900` — poker/sportsbook mobile + desktop, overflow 0px, errors 0.
+- Extra inline Playwright check was attempted for the poker exit modal, but the direct `playwright` package is not installed in the project; rely on source contracts plus browser smoke until a dedicated wrapper scenario is added.

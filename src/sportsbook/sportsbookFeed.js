@@ -103,6 +103,8 @@ function curateLiveEvents(events) {
     const ranked = [...events].sort((a, b) => {
         const marqueeDelta = (scoreMarqueeItem(b).score || 0) - (scoreMarqueeItem(a).score || 0)
         if (marqueeDelta) return marqueeDelta
+        const realOddsDelta = (a.oddsMode === 'estimated' ? 1 : 0) - (b.oddsMode === 'estimated' ? 1 : 0)
+        if (realOddsDelta) return realOddsDelta
         const liveDelta = (b.status === 'live' ? 1 : 0) - (a.status === 'live' ? 1 : 0)
         if (liveDelta) return liveDelta
         return (b.popularity || 0) - (a.popularity || 0)
@@ -111,6 +113,7 @@ function curateLiveEvents(events) {
         const tags = new Set(event.tags || [])
         if (event.status === 'live') tags.add('live')
         if ((scoreMarqueeItem(event).score || 0) >= 60) tags.add('marquee')
+        if (event.oddsMode === 'estimated') tags.add('estimated-odds')
         if (index < 6) tags.add('top')
         if (index < 30) tags.add('popular')
         if (event.status === 'prematch') {
@@ -139,16 +142,16 @@ export async function loadSportsbookFeed() {
         providerSources = freeFeed.sources || {}
         marquee = freeFeed.marquee || null
         inSeason = freeFeed.inSeason || []
-        const filtered = curateTopSportsbookItems(uniqueEvents(freeFeed.events || []), { perSport: 5, minimumVisible: 24, maximumVisible: 50 })
-        feedEvents = filtered.items.slice(0, 60)
+        const filtered = curateTopSportsbookItems(uniqueEvents(freeFeed.events || []), { perSport: 7, minimumVisible: 36, maximumVisible: 80 })
+        feedEvents = filtered.items.slice(0, 80)
         marquee = marquee || filtered.metrics
     } catch (error) {
         errors.push(error?.message || String(error))
     }
 
-    // When real provider events are available, show ONLY real events so no
-    // simulated "Practice" teams or synthetic fixtures leak into the lobby.
-    // Synthetic data is a pure offline fallback (no tokens / network failure).
+    // When provider fixtures are available, show real-world events only. Events
+    // without bookmaker prices carry clearly marked estimated odds. Synthetic
+    // Gampo teams remain a pure offline fallback.
     const hasLiveFeed = feedEvents.length > 0
     const curatedFeed = hasLiveFeed ? curateLiveEvents(feedEvents) : []
     const events = hasLiveFeed ? curatedFeed : synthetic.events
@@ -159,7 +162,7 @@ export async function loadSportsbookFeed() {
         leagues: mergeLeagues(baseLeagues, events),
         events,
         feedEvents,
-        feedSource: hasLiveFeed ? 'live' : 'fallback',
+        feedSource: hasLiveFeed ? 'blended' : 'fallback',
         inSeason,
         errors: errors.filter(Boolean),
         quotas: providerQuotas,

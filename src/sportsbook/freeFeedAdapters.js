@@ -68,12 +68,13 @@ function selectionStatus(decimalOdds, previousOdds) {
     return 'available'
 }
 
-function makeWinnerMarket({ eventId, sportId, home, away, source, prices }) {
+function makeWinnerMarket({ eventId, sportId, home, away, source, prices, estimated = false }) {
     const hasDraw = sportId === 'soccer' || Boolean(prices?.draw)
     const resolved = {
         ...fallbackOdds(eventId, { hasDraw }),
         ...Object.fromEntries(Object.entries(prices || {}).filter(([, value]) => Number(value) > 1)),
     }
+    const selectionSource = estimated ? 'synthetic-estimate' : source
 
     const labels = hasDraw ? [
         ['home', home, resolved.home],
@@ -104,7 +105,8 @@ function makeWinnerMarket({ eventId, sportId, home, away, source, prices }) {
                 suspended: decimalOdds <= 1,
                 boosted: false,
                 trueProbability: probabilities[index] || 0,
-                source,
+                source: selectionSource,
+                estimated,
                 status: selectionStatus(decimalOdds, previousOdds),
             }
         }),
@@ -114,6 +116,10 @@ function makeWinnerMarket({ eventId, sportId, home, away, source, prices }) {
 function normalizedEvent({ id, sportId, source, leagueName, region, startsAt, status, home, away, score = null, prices = {}, marketGroups = null, tags = [] }) {
     if (!home || !away) return null
     const league = feedLeagueMeta({ sportId, source, leagueName, region })
+    const hasRealPrices = Object.values(prices || {}).some(value => Number(value) > 1)
+    const estimated = !marketGroups?.length && !hasRealPrices
+    const resolvedTags = ['feed', source, ...tags]
+    if (estimated) resolvedTags.push('estimated-odds')
     return {
         id,
         sportId,
@@ -133,10 +139,11 @@ function normalizedEvent({ id, sportId, source, leagueName, region, startsAt, st
             attack: 42 + (hashString(`${id}:attack`) % 22),
         },
         popularity: 2600 + (hashString(`${id}:popularity`) % 9000),
-        tags: ['feed', source, ...tags],
-        marketGroups: marketGroups?.length ? marketGroups : [makeWinnerMarket({ eventId: id, sportId, home, away, source, prices })],
-        bookmakerTitle: source,
+        tags: resolvedTags,
+        marketGroups: marketGroups?.length ? marketGroups : [makeWinnerMarket({ eventId: id, sportId, home, away, source, prices, estimated })],
+        bookmakerTitle: estimated ? 'Estimated odds' : source,
         source,
+        oddsMode: estimated ? 'estimated' : 'real',
     }
 }
 

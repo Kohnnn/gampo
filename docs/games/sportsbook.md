@@ -30,23 +30,37 @@ Optional live feed support remains:
 - `fetchInSeasonSports()`
 - `fixtureFromOddsApi(event)`
 
-Free provider support is layered through a local Vite proxy:
+Free provider support is layered through a local Vite/Netlify proxy:
 
 - Proxy endpoint: `/api/sportsbook/free-feed`
 - Proxy implementation: `server/sportsbookProviderProxy.js`
 - Client normalization: `src/sportsbook/freeFeedAdapters.js`
-- Supported `.env.local` names: `SportsGameOdds_token`, `pandascore_token`, `odds-api_token`, `api-football_token`
+- Supported `.env.local` / Netlify names: `SportsGameOdds_token`, `PANDASCORE_TOKEN`, `pandascore_token`, `ODDS_API_IO_TOKEN`, `odds-api_token`, `API_FOOTBALL_TOKEN`, `api-football_token`
+- API-Football and PandaScore accept comma-separated token rotation, for example `API_FOOTBALL_TOKEN=key1,key2` and `PANDASCORE_TOKEN=key1,key2`
 - Source roles:
   - SportsGameOdds: preferred free primary odds feed for NBA, NFL, MLB, NHL, NCAAB, and NCAAF moneyline, spread, and total markets
-  - PandaScore: esports schedules and matchup context
+  - PandaScore: esports schedules and matchup context from `https://api.pandascore.co/matches/upcoming`, authenticated with `Authorization: Bearer <token>`; requests use `per_page=100` and `sort=begin_at`
   - odds-api.io: free-tier sports/esports events and odds where available
-  - API-Football: soccer fixtures and match-winner odds where available; the proxy uses today's date and joins fixtures to odds because free plans can reject `next` and `ids` parameters
+  - API-Football: soccer fixtures and match-winner odds where available from `https://v3.football.api-sports.io`, authenticated with `x-apisports-key`; the proxy scans a 7-day date window and joins `/fixtures?date=YYYY-MM-DD` with `/odds?date=YYYY-MM-DD&bet=1`
 
-These provider tokens are server-side only. Do not move them into `VITE_` variables. If the proxy is unavailable, the app falls back to The Odds API if configured and then to synthetic Gampo fixtures.
+These provider tokens are server-side only. Do not move them into `VITE_` variables. If one rotated key returns auth/rate-limit errors, the proxy skips that key for the current process cooldown and tries the next configured key. If all real providers fail, the app falls back to synthetic Gampo fixtures.
 
 Roadmap reference: keep expanding SportsGameOdds coverage first because its event/market model is the closest fit for Gampo's normalized sportsbook data. Next useful additions are alternate lines, player props, and soccer league filters when the active SportsGameOdds tier supports EPL/UEFA-style leagues.
 
-`sportsbookFeed.js` normalizes optional API events into the same event and market shape as synthetic events. If the feed fails, the sportsbook keeps rendering synthetic fixtures.
+`sportsbookFeed.js` normalizes optional API events into the same event and market shape as synthetic events. If provider fixtures are available, the sportsbook uses a blended real-event mode: real bookmaker odds rank first, and real fixtures without bookmaker prices receive deterministic GamPo estimated odds. Synthetic Gampo-owned fixtures are only used as an offline/no-real-fixture fallback.
+
+### Estimated Odds
+
+Estimated odds exist to make real scheduled fixtures playable in the fake-credit simulator when the fixture provider supplies teams and timing but no bookmaker prices.
+
+- Event tags include `estimated-odds`.
+- Selection source is `synthetic-estimate`.
+- Event `bookmakerTitle` is `Estimated odds`.
+- Odds buttons show an `Est.` badge.
+- Odds Coach labels the price as a GamPo-estimated learning price and not a bookmaker quote.
+- Settlement remains local deterministic practice simulation.
+
+Estimated odds are generated deterministically from the normalized event id, sport, teams, and league context. They must never be described as real odds, sharp predictions, or wagering advice.
 
 ### Big-Match Quota Guard
 
@@ -55,9 +69,14 @@ The live feed is big-match-first by default so API quota is not wasted on low-si
 - Marquee seed: `public/data/sportsbook-marquee.json`
 - Shared scoring/filtering: `src/sportsbook/sportsbookMarquee.js`
 - Server-side filtering: `server/sportsbookProviderProxy.js`
-- UI diagnostics: Sports Home `Big-match feed guard active` strip
+- UI diagnostics: Sports Home `Real-event feed guard active` strip
 
-The snapshot lists famous competitions and team keywords such as FIFA World Cup, UEFA/Champions League, top domestic soccer leagues, NBA/NFL playoffs, UFC main cards, and Grand Slam tennis. The proxy filters provider payloads through this shortlist and exposes `marquee` metrics (`candidateCount`, `shownCount`, `skippedCount`, `marqueeCount`, `bigMatchOnly`) so the UI can show how much noise was skipped. If no marquee match exists, the app falls back to a small capped feed slice instead of blanking the sportsbook.
+The snapshot lists famous competitions and team keywords such as FIFA World Cup, UEFA/Champions League, top domestic soccer leagues, NBA/NFL playoffs, UFC main cards, and Grand Slam tennis. The proxy filters provider payloads through this shortlist and exposes `marquee` metrics (`candidateCount`, `shownCount`, `skippedCount`, `marqueeCount`, `bigMatchOnly`) so the UI can show how much noise was skipped. If no marquee match exists, the app fills from the best per-sport real-event candidates instead of blanking the sportsbook.
+
+### Provider Documentation Notes
+
+- PandaScore docs fetched successfully. Relevant documented behavior: REST API tokens are private and should not be used in client-side applications; REST supports Bearer token auth; `/matches/upcoming` is available to all customers; `per_page` / `page[size]` can request up to 100 items; sorting/filtering are URL query parameters; remaining quota is exposed through `X-Rate-Limit-Remaining`.
+- API-Football's public docs returned `403` to automated documentation fetches during this pass. The implementation follows the existing official API-SPORTS endpoint contract already used in the app: `https://v3.football.api-sports.io`, `x-apisports-key`, `/fixtures`, and `/odds` with match-winner `bet=1`.
 
 ## Betting Flow
 

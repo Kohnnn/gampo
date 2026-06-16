@@ -9,5 +9,8 @@ describe('sportsbook provider proxy source contract', () => {
         expect(proxySource).toContain('const filtered = curateTopSportsbookItems(events, { perSport: 5, minimumVisible: 16, maximumVisible: 28 })')
         expect(proxySource).toContain('const eventIds = filtered.items.map')
         expect(proxySource).toContain('marquee: mergeMarqueeMetrics')
+        expect(proxySource).toContain('fetchJsonWithRotatingKeys')
+        expect(proxySource).toContain("url.searchParams.set('per_page', '100')")
+        expect(proxySource).toContain('Array.from({ length: 7 }')
     })
 })

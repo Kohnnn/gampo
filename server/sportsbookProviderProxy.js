@@ -23,6 +23,7 @@ const ODDS_API_IO_SPORTS = ['football', 'basketball', 'tennis', 'esports']
 const ODDS_API_IO_BOOKMAKERS = ['Bet365', 'Unibet'].join(',')
 
 let cachedFeed = null
+const PROVIDER_KEY_COOLDOWN = new Map()
 
 function envValue(env, names) {
     for (const name of names) {
@@ -30,6 +31,11 @@ function envValue(env, names) {
         if (value) return value
     }
     return ''
+}
+
+function envValues(env, names) {
+    const raw = envValue(env, names)
+    return String(raw || '').split(',').map(part => part.trim()).filter(Boolean)
 }
 
 function quotaFromHeaders(headers, prefix) {
@@ -97,16 +103,34 @@ async function fetchJson(url, { headers = {}, label }) {
     }
 }
 
-async function loadPandaScore(token) {
-    if (!token) return { matches: [], errors: [], quotas: {}, configured: false }
+async function fetchJsonWithRotatingKeys(keys, { label, makeUrl, makeHeaders }) {
+    if (!keys.length) return { ok: false, error: `${label} not configured`, data: null, quotas: {} }
+    const now = Date.now()
+    let lastError = `${label} unavailable`
+    for (const key of keys) {
+        const cooldownKey = `${label}:${key}`
+        if ((PROVIDER_KEY_COOLDOWN.get(cooldownKey) || 0) > now) continue
+        const result = await fetchJson(makeUrl(key), { label, headers: makeHeaders(key) })
+        if (result.ok) return result
+        lastError = result.error || lastError
+        if (/auth rejected|rate limited|401|403|429/i.test(result.error || '')) {
+            PROVIDER_KEY_COOLDOWN.set(cooldownKey, now + 30 * 60 * 1000)
+        }
+    }
+    return { ok: false, error: lastError, data: null, quotas: {} }
+}
+
+async function loadPandaScore(keys) {
+    if (!keys.length) return { matches: [], errors: [], quotas: {}, configured: false }
 
     const url = new URL('https://api.pandascore.co/matches/upcoming')
-    url.searchParams.set('per_page', '30')
+    url.searchParams.set('per_page', '100')
     url.searchParams.set('sort', 'begin_at')
 
-    const result = await fetchJson(url, {
+    const result = await fetchJsonWithRotatingKeys(keys, {
         label: 'pandascore',
-        headers: { authorization: `Bearer ${token}` },
+        makeUrl: () => url,
+        makeHeaders: key => ({ authorization: `Bearer ${key}` }),
     })
 
     const matches = Array.isArray(result.data) ? result.data : []
@@ -269,46 +293,45 @@ async function loadTheOddsApi(env) {
     }
 }
 
-function todayIsoDate() {
-    return new Date().toISOString().slice(0, 10)
+function isoDateOffset(days = 0) {
+    const date = new Date()
+    date.setDate(date.getDate() + days)
+    return date.toISOString().slice(0, 10)
 }
 
-async function loadApiFootball(token) {
-    if (!token) return { fixtures: [], odds: [], errors: [], quotas: {}, configured: false }
+async function loadApiFootball(keys) {
+    if (!keys.length) return { fixtures: [], odds: [], errors: [], quotas: {}, configured: false }
 
-    const headers = { 'x-apisports-key': token }
     const errors = []
     const quotas = {}
-    const date = todayIsoDate()
+    const dates = Array.from({ length: 7 }, (_, index) => isoDateOffset(index))
+    const fixtures = []
+    const odds = []
 
-    const oddsUrl = new URL('https://v3.football.api-sports.io/odds')
-    oddsUrl.searchParams.set('date', date)
-    oddsUrl.searchParams.set('bet', '1')
-    const oddsResult = await fetchJson(oddsUrl, {
-        label: 'apiFootball',
-        headers,
-    })
-    Object.assign(quotas, oddsResult.quotas)
-    if (!oddsResult.ok) errors.push(oddsResult.error)
-
-    const odds = Array.isArray(oddsResult.data?.response) ? oddsResult.data.response : []
-    const oddsFixtureIds = new Set(odds.map(entry => String(entry?.fixture?.id || '')).filter(Boolean))
-
-    const fixturesUrl = new URL('https://v3.football.api-sports.io/fixtures')
-    fixturesUrl.searchParams.set('date', date)
-    const fixturesResult = await fetchJson(fixturesUrl, {
-        label: 'apiFootball',
-        headers,
-    })
-    Object.assign(quotas, fixturesResult.quotas)
-    if (!fixturesResult.ok) errors.push(fixturesResult.error)
-
-    const fixtures = Array.isArray(fixturesResult.data?.response)
-        ? fixturesResult.data.response.filter(item => {
-            if (!oddsFixtureIds.size) return true
-            return oddsFixtureIds.has(String(item?.fixture?.id || ''))
+    for (const date of dates) {
+        const fixturesUrl = new URL('https://v3.football.api-sports.io/fixtures')
+        fixturesUrl.searchParams.set('date', date)
+        const fixturesResult = await fetchJsonWithRotatingKeys(keys, {
+            label: 'apiFootball',
+            makeUrl: () => fixturesUrl,
+            makeHeaders: key => ({ 'x-apisports-key': key }),
         })
-        : []
+        Object.assign(quotas, fixturesResult.quotas)
+        if (fixturesResult.ok && Array.isArray(fixturesResult.data?.response)) fixtures.push(...fixturesResult.data.response)
+        else if (!fixturesResult.ok) errors.push(fixturesResult.error)
+
+        const oddsUrl = new URL('https://v3.football.api-sports.io/odds')
+        oddsUrl.searchParams.set('date', date)
+        oddsUrl.searchParams.set('bet', '1')
+        const oddsResult = await fetchJsonWithRotatingKeys(keys, {
+            label: 'apiFootball',
+            makeUrl: () => oddsUrl,
+            makeHeaders: key => ({ 'x-apisports-key': key }),
+        })
+        Object.assign(quotas, oddsResult.quotas)
+        if (oddsResult.ok && Array.isArray(oddsResult.data?.response)) odds.push(...oddsResult.data.response)
+        else if (!oddsResult.ok && !/returned 4(00|04|22)/.test(oddsResult.error || '')) errors.push(oddsResult.error)
+    }
 
     const filtered = curateTopSportsbookItems(fixtures, { perSport: 5, minimumVisible: 15, maximumVisible: 30 })
 
@@ -328,9 +351,9 @@ export async function loadProviderFeed(env) {
 
     const tokens = {
         sportsGameOdds: envValue(env, ['SPORTSGAMEODDS_TOKEN', 'SportsGameOdds_token', 'sportsGameOdds_token']),
-        pandascore: envValue(env, ['PANDASCORE_TOKEN', 'pandascore_token']),
+        pandascore: envValues(env, ['PANDASCORE_TOKEN', 'pandascore_token']),
         oddsApiIo: envValue(env, ['ODDS_API_IO_TOKEN', 'odds-api_token', 'ODDS_API_TOKEN']),
-        apiFootball: envValue(env, ['API_FOOTBALL_TOKEN', 'api-football_token']),
+        apiFootball: envValues(env, ['API_FOOTBALL_TOKEN', 'api-football_token']),
     }
 
     const [sportsGameOdds, pandascore, oddsApiIo, apiFootball, theOddsApi] = await Promise.all([
