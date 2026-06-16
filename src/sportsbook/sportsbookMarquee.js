@@ -22,6 +22,8 @@ export const MARQUEE_SNAPSHOT = {
     ],
 }
 
+const SPORT_PRIORITY = ['soccer', 'basketball', 'football', 'tennis', 'baseball', 'ice-hockey', 'cricket', 'dota-2', 'cs2', 'league-of-legends', 'horse-racing']
+
 function textBlob(value) {
     if (!value) return ''
     if (typeof value === 'string' || typeof value === 'number') return String(value)
@@ -111,12 +113,77 @@ export function filterMarqueeItems(items = [], { snapshot = MARQUEE_SNAPSHOT, mi
     }
 }
 
+export function curateTopSportsbookItems(items = [], {
+    snapshot = MARQUEE_SNAPSHOT,
+    minimumScore = 60,
+    perSport = 5,
+    minimumVisible = 18,
+    maximumVisible = 45,
+} = {}) {
+    const annotated = items.map((item, index) => ({
+        item,
+        index,
+        sportId: item?.sportId || item?.sport || 'other',
+        marquee: scoreMarqueeItem(item, snapshot),
+        popularity: Number(item?.popularity) || 0,
+        live: item?.status === 'live' ? 1 : 0,
+    })).sort((a, b) => (
+        (b.marquee.score - a.marquee.score)
+        || (b.live - a.live)
+        || (b.popularity - a.popularity)
+        || (a.index - b.index)
+    ))
+
+    const selected = []
+    const seen = new Set()
+    const add = (row) => {
+        const key = row.item?.id || `${row.item?.home}:${row.item?.away}:${row.item?.startsAt}` || row.index
+        if (seen.has(key)) return false
+        seen.add(key)
+        selected.push(row)
+        return true
+    }
+
+    for (const row of annotated.filter(row => row.marquee.score >= minimumScore)) add(row)
+
+    for (const sportId of SPORT_PRIORITY) {
+        let count = selected.filter(row => row.sportId === sportId).length
+        for (const row of annotated.filter(row => row.sportId === sportId)) {
+            if (count >= perSport || selected.length >= maximumVisible) break
+            if (add(row)) count += 1
+        }
+    }
+
+    for (const row of annotated) {
+        if (selected.length >= Math.min(maximumVisible, Math.max(minimumVisible, perSport))) break
+        add(row)
+    }
+
+    const trimmed = selected.slice(0, maximumVisible)
+    const marqueeCount = annotated.filter(row => row.marquee.score >= minimumScore).length
+    return {
+        items: trimmed.map(row => ({ ...row.item, marquee: row.marquee })),
+        metrics: {
+            candidateCount: items.length,
+            shownCount: trimmed.length,
+            skippedCount: Math.max(0, items.length - trimmed.length),
+            marqueeCount,
+            fillCount: Math.max(0, trimmed.length - Math.min(trimmed.length, marqueeCount)),
+            perSport,
+            minimumVisible,
+            bigMatchOnly: marqueeCount > 0,
+            snapshotGeneratedAt: snapshot.generatedAt,
+        },
+    }
+}
+
 export function mergeMarqueeMetrics(...metrics) {
     const totals = metrics.filter(Boolean).reduce((next, metric) => ({
         candidateCount: next.candidateCount + (Number(metric.candidateCount) || 0),
         shownCount: next.shownCount + (Number(metric.shownCount) || 0),
         skippedCount: next.skippedCount + (Number(metric.skippedCount) || 0),
         marqueeCount: next.marqueeCount + (Number(metric.marqueeCount) || 0),
+        fillCount: next.fillCount + (Number(metric.fillCount) || 0),
         bigMatchOnly: next.bigMatchOnly || Boolean(metric.bigMatchOnly),
         snapshotGeneratedAt: next.snapshotGeneratedAt || metric.snapshotGeneratedAt || null,
     }), {
@@ -124,6 +191,7 @@ export function mergeMarqueeMetrics(...metrics) {
         shownCount: 0,
         skippedCount: 0,
         marqueeCount: 0,
+        fillCount: 0,
         bigMatchOnly: false,
         snapshotGeneratedAt: null,
     })

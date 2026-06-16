@@ -1,6 +1,6 @@
 import { buildSyntheticSportsbookData, LEAGUES, SPORTS } from './sportsbookData'
 import { normalizeFreeProviderPayload } from './freeFeedAdapters'
-import { filterMarqueeItems, scoreMarqueeItem } from './sportsbookMarquee'
+import { curateTopSportsbookItems, scoreMarqueeItem } from './sportsbookMarquee'
 
 const SPORT_ALIASES = [
     ['soccer', ['soccer', 'football']],
@@ -111,8 +111,8 @@ function curateLiveEvents(events) {
         const tags = new Set(event.tags || [])
         if (event.status === 'live') tags.add('live')
         if ((scoreMarqueeItem(event).score || 0) >= 60) tags.add('marquee')
-        if (index < 3) tags.add('top')
-        if (index < 9) tags.add('popular')
+        if (index < 6) tags.add('top')
+        if (index < 30) tags.add('popular')
         if (event.status === 'prematch') {
             const startMs = new Date(event.startsAt).getTime()
             if (Number.isFinite(startMs) && startMs - now < 6 * 60 * 60 * 1000) tags.add('starting-soon')
@@ -139,7 +139,7 @@ export async function loadSportsbookFeed() {
         providerSources = freeFeed.sources || {}
         marquee = freeFeed.marquee || null
         inSeason = freeFeed.inSeason || []
-        const filtered = filterMarqueeItems(uniqueEvents(freeFeed.events || []), { fallbackLimit: 18 })
+        const filtered = curateTopSportsbookItems(uniqueEvents(freeFeed.events || []), { perSport: 5, minimumVisible: 24, maximumVisible: 50 })
         feedEvents = filtered.items.slice(0, 60)
         marquee = marquee || filtered.metrics
     } catch (error) {

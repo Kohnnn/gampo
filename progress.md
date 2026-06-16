@@ -464,6 +464,25 @@ User asked to benchmark/reinforce sportsbook so API calls do not waste quota on 
 - `rtk npx vitest run src/sportsbook/sportsbookMarquee.test.js src/sportsbook/sportsbookFeed.test.js src/sportsbook/sportsbookProviderProxySource.test.js src/sportsbook/sportsbookFeatured.test.js` green: 17 tests / 4 files.
 - `rtk npm run build` clean; only the existing large `rows-*` chunk warnings remain.
 
+## Poker Card Repair + Sportsbook Depth Fill (2026-06-16)
+
+Follow-up screenshots showed poker cards still looked unpolished and mobile actions visually split the hero hand. Sportsbook screenshot showed the new marquee guard collapsed the lobby to one France/Senegal match when providers were sparse/rate-limited.
+
+### Changes
+
+- Poker safe-exit: Hub navigation and browser close/refresh now warn seated players with chips to cash out first or the current table stack will not return to balance.
+- Poker visual repair: final CSS source-of-truth block replaces noisy neon card backs with calmer casino-style cards, clearer ranks/suits, cleaner placeholders, and role-specific card sizing for board/hero/opponents.
+- Poker mobile repair: phone felt flow is opponents → pot → board → hero → actions, and `.pk-actions` is in-flow/static instead of fixed over the table.
+- Sportsbook depth: added `curateTopSportsbookItems()` to keep marquee events first while filling up to the top 5 games per sport where provider data exists.
+- Sportsbook proxy/feed: provider payloads and client feed now use top-per-sport curation with visible-depth targets instead of strict marquee-only filtering.
+- Sportsbook UI: Top Matches can show 6, Popular Events can show up to 30 feed events, preventing a one-card sportsbook when live providers have more candidates.
+- Plan doc: `docs/poker-sportsbook-repair-plan-2026-06-16.md`.
+
+### Verification
+
+- `rtk npx vitest run src/components/PokerGame/PokerGameCss.test.js src/sportsbook/sportsbookMarquee.test.js src/sportsbook/sportsbookFeed.test.js src/sportsbook/sportsbookProviderProxySource.test.js src/sportsbook/sportsbookFeatured.test.js` green: 22 tests / 5 files.
+- `rtk npm run build` clean; only existing large `rows-*` chunk warnings remain.
+
 ### Files modified
 
 - `src/services/sportsApi.js` — `FALLBACK_KEYS` removed; env-only keys.

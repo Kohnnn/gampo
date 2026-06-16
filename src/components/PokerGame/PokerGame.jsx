@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useCredits } from '../../context/CreditContext'
 import { useAudio } from '../../audio/AudioProvider'
 import { useGameBgm } from '../../audio/useBgm'
@@ -123,6 +123,7 @@ function PokerCard({ card, hidden }) {
 
 export default function PokerGame() {
     useGameBgm('poker', 'idle')
+    const navigate = useNavigate()
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
 
@@ -330,6 +331,23 @@ export default function PokerGame() {
     useEffect(() => {
         if (!isHumanTurn && raiseOpen) setRaiseOpen(false)
     }, [isHumanTurn, raiseOpen])
+
+    useEffect(() => {
+        if (!seated || !state || !human || (human.stack || 0) <= 0) return undefined
+        const warn = (event) => {
+            event.preventDefault()
+            event.returnValue = 'Cash out before leaving poker or your current table stack will not return to balance.'
+        }
+        window.addEventListener('beforeunload', warn)
+        return () => window.removeEventListener('beforeunload', warn)
+    }, [seated, state, human])
+
+    const leaveToHub = (event) => {
+        if (!seated || !state || !human || (human.stack || 0) <= 0) return
+        event.preventDefault()
+        const ok = window.confirm('Cash out before leaving poker or your current table stack will not return to balance. Leave without cashing out?')
+        if (ok) navigate('/')
+    }
 
     useEffect(() => {
         if (!state || state.street !== 'showdown' || !human) return
@@ -540,9 +558,9 @@ export default function PokerGame() {
     })()
 
     return (
-        <div className="poker-page" data-ux-surface="shell">
+            <div className="poker-page" data-ux-surface="shell">
             <div className="poker-titlebar" data-ux-surface="shell">
-                <Link to="/" className="poker-back">‹ Hub</Link>
+                <Link to="/" className="poker-back" onClick={leaveToHub}>‹ Hub</Link>
                 <h1>Live Poker (No-Limit Hold'em, 6-max)</h1>
                 <div className="poker-balance"><span>Balance</span><strong>{formatCredits(balance)}</strong></div>
             </div>
