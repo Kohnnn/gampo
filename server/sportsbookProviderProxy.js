@@ -21,6 +21,17 @@ const SPORTSGAMEODDS_MAIN_MARKETS = [
 ].join(',')
 const ODDS_API_IO_SPORTS = ['football', 'basketball', 'tennis', 'esports']
 const ODDS_API_IO_BOOKMAKERS = ['Bet365', 'Unibet'].join(',')
+const API_SPORTS_MULTI_SPORTS = [
+    { key: 'baseball', host: 'v1.baseball.api-sports.io', path: '/games' },
+    { key: 'basketball', host: 'v1.basketball.api-sports.io', path: '/games' },
+    { key: 'handball', host: 'v1.handball.api-sports.io', path: '/games' },
+    { key: 'hockey', host: 'v1.hockey.api-sports.io', path: '/games' },
+    { key: 'nfl', host: 'v1.american-football.api-sports.io', path: '/games' },
+    { key: 'rugby', host: 'v1.rugby.api-sports.io', path: '/games' },
+    { key: 'volleyball', host: 'v1.volleyball.api-sports.io', path: '/games' },
+    { key: 'formula-1', host: 'v1.formula-1.api-sports.io', path: '/races' },
+    { key: 'mma', host: 'v1.mma.api-sports.io', path: '/fights' },
+]
 
 let cachedFeed = null
 const PROVIDER_KEY_COOLDOWN = new Map()
@@ -134,7 +145,7 @@ async function loadPandaScore(keys) {
     })
 
     const matches = Array.isArray(result.data) ? result.data : []
-    const filtered = curateTopSportsbookItems(matches, { perSport: 5, minimumVisible: 15, maximumVisible: 30 })
+    const filtered = curateTopSportsbookItems(matches, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
 
     return {
         matches: filtered.items,
@@ -154,7 +165,7 @@ async function loadSportsGameOdds(token) {
     url.searchParams.set('oddID', SPORTSGAMEODDS_MAIN_MARKETS)
     url.searchParams.set('includeOpposingOdds', 'true')
     url.searchParams.set('includeAltLines', 'false')
-    url.searchParams.set('limit', '30')
+    url.searchParams.set('limit', '100')
 
     const result = await fetchJson(url, {
         label: 'sportsGameOdds',
@@ -167,7 +178,7 @@ async function loadSportsGameOdds(token) {
             ? result.data
             : []
 
-    const filtered = curateTopSportsbookItems(data, { perSport: 5, minimumVisible: 15, maximumVisible: 30 })
+    const filtered = curateTopSportsbookItems(data, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
 
     return {
         events: filtered.items,
@@ -190,7 +201,7 @@ async function loadOddsApiIo(token) {
         url.searchParams.set('apiKey', token)
         url.searchParams.set('sport', sport)
         url.searchParams.set('status', 'pending,live')
-        url.searchParams.set('limit', sport === 'football' ? '8' : '5')
+        url.searchParams.set('limit', sport === 'football' ? '30' : '20')
 
         const result = await fetchJson(url, { label: 'oddsApiIo' })
         Object.assign(quotas, result.quotas)
@@ -201,8 +212,8 @@ async function loadOddsApiIo(token) {
         }
     }
 
-    const filtered = curateTopSportsbookItems(events, { perSport: 5, minimumVisible: 16, maximumVisible: 28 })
-    const eventIds = filtered.items.map(event => event?.id).filter(Boolean).slice(0, 10)
+    const filtered = curateTopSportsbookItems(events, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
+    const eventIds = filtered.items.map(event => event?.id).filter(Boolean).slice(0, 24)
     let odds = []
     if (eventIds.length) {
         const oddsUrl = new URL('https://api.odds-api.io/v3/odds/multi')
@@ -281,10 +292,10 @@ async function loadTheOddsApi(env) {
     Object.assign(quotas, sports.quotas)
     if (!sports.ok && sports.error) errors.push(sports.error)
 
-    const filtered = curateTopSportsbookItems(events, { perSport: 5, minimumVisible: 18, maximumVisible: 36 })
+    const filtered = curateTopSportsbookItems(events, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
 
     return {
-        events: filtered.items.slice(0, 40),
+        events: filtered.items.slice(0, 100),
         inSeason: Array.isArray(sports.data) ? sports.data : [],
         errors,
         quotas,
@@ -300,13 +311,14 @@ function isoDateOffset(days = 0) {
 }
 
 async function loadApiFootball(keys) {
-    if (!keys.length) return { fixtures: [], odds: [], errors: [], quotas: {}, configured: false }
+    if (!keys.length) return { fixtures: [], odds: [], multiSport: [], errors: [], quotas: {}, configured: false }
 
     const errors = []
     const quotas = {}
     const dates = Array.from({ length: 7 }, (_, index) => isoDateOffset(index))
     const fixtures = []
     const odds = []
+    const multiSport = []
 
     for (const date of dates) {
         const fixturesUrl = new URL('https://v3.football.api-sports.io/fixtures')
@@ -333,15 +345,39 @@ async function loadApiFootball(keys) {
         else if (!oddsResult.ok && !/returned 4(00|04|22)/.test(oddsResult.error || '')) errors.push(oddsResult.error)
     }
 
-    const filtered = curateTopSportsbookItems(fixtures, { perSport: 5, minimumVisible: 15, maximumVisible: 30 })
+    const multiSportDates = dates.slice(0, 3)
+    const multiSportRequests = API_SPORTS_MULTI_SPORTS.flatMap(sport => {
+        const scanDates = sport.key === 'formula-1' ? [isoDateOffset(0)] : multiSportDates
+        return scanDates.map(date => ({ sport, date }))
+    })
+    await Promise.all(multiSportRequests.map(async ({ sport, date }) => {
+        const url = new URL(`https://${sport.host}${sport.path}`)
+        if (sport.key === 'formula-1') url.searchParams.set('season', String(new Date().getFullYear()))
+        else url.searchParams.set('date', date)
+        const result = await fetchJsonWithRotatingKeys(keys, {
+            label: `apiSports-${sport.key}`,
+            makeUrl: () => url,
+            makeHeaders: key => ({ 'x-apisports-key': key }),
+        })
+        Object.assign(quotas, result.quotas)
+        if (result.ok && Array.isArray(result.data?.response)) {
+            multiSport.push(...result.data.response.map(item => ({ ...item, _gampoApiSport: sport.key })))
+        } else if (!result.ok && !/returned 4(00|04|22)/.test(result.error || '')) {
+            errors.push(result.error)
+        }
+    }))
+
+    const filtered = curateTopSportsbookItems(fixtures, { perSport: 60, minimumVisible: 80, maximumVisible: 180 })
+    const multiSportFiltered = curateTopSportsbookItems(multiSport, { perSport: 30, minimumVisible: 80, maximumVisible: 220 })
 
     return {
-        fixtures: filtered.items.slice(0, 30),
+        fixtures: filtered.items.slice(0, 180),
         odds,
+        multiSport: multiSportFiltered.items.slice(0, 220),
         errors,
         quotas,
         configured: true,
-        marquee: filtered.metrics,
+        marquee: mergeMarqueeMetrics(filtered.metrics, multiSportFiltered.metrics),
     }
 }
 
@@ -388,6 +424,7 @@ export async function loadProviderFeed(env) {
             apiFootball: {
                 configured: apiFootball.configured,
                 eventCount: apiFootball.fixtures.length,
+                multiSportCount: apiFootball.multiSport.length,
                 oddsCount: apiFootball.odds.length,
                 marquee: apiFootball.marquee,
             },
@@ -407,7 +444,7 @@ export async function loadProviderFeed(env) {
         sportsGameOdds: { events: sportsGameOdds.events },
         pandascore: { matches: pandascore.matches },
         oddsApiIo: { events: oddsApiIo.events, odds: oddsApiIo.odds },
-        apiFootball: { fixtures: apiFootball.fixtures, odds: apiFootball.odds },
+        apiFootball: { fixtures: apiFootball.fixtures, odds: apiFootball.odds, multiSport: apiFootball.multiSport },
         theOddsApi: { events: theOddsApi.events, inSeason: theOddsApi.inSeason },
         quotas: {
             ...sportsGameOdds.quotas,

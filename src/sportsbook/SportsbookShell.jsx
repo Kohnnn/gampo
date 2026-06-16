@@ -25,7 +25,6 @@ import MobileSportsNav from './components/MobileSportsNav'
 import MyBetsPanel from './components/MyBetsPanel'
 import SearchOverlay from './components/SearchOverlay'
 import SportsHome from './components/SportsHome'
-import SportsRail from './components/SportsRail'
 import '../styles/sportsbook.css'
 
 function initialFeed() {
@@ -180,13 +179,6 @@ function SportsbookShell() {
 
     return (
         <div className="sb-page" data-sportsbook-view={viewState.view} data-sportsbook-feed-source={feedSource} data-ux-surface="shell">
-            <SportsRail
-                sports={sports}
-                view={viewState.view}
-                activeSportId={viewState.sportId}
-                onNavigate={navigateSportsbook}
-            />
-
             <section className="sb-main" aria-labelledby="sportsbook-heading" data-ux-surface="stage">
                 <header className="sb-topbar" data-ux-surface="shell">
                     <div>

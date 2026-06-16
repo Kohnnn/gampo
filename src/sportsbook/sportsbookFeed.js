@@ -9,6 +9,11 @@ const SPORT_ALIASES = [
     ['football', ['american football', 'nfl', 'ncaaf']],
     ['ice-hockey', ['hockey', 'nhl']],
     ['baseball', ['baseball', 'mlb']],
+    ['handball', ['handball']],
+    ['rugby', ['rugby']],
+    ['volleyball', ['volleyball']],
+    ['formula-1', ['formula', 'f1']],
+    ['mma', ['mma', 'ufc']],
     ['cricket', ['cricket']],
     ['dota-2', ['dota']],
     ['cs2', ['counter', 'cs2', 'csgo']],
@@ -142,8 +147,8 @@ export async function loadSportsbookFeed() {
         providerSources = freeFeed.sources || {}
         marquee = freeFeed.marquee || null
         inSeason = freeFeed.inSeason || []
-        const filtered = curateTopSportsbookItems(uniqueEvents(freeFeed.events || []), { perSport: 7, minimumVisible: 36, maximumVisible: 80 })
-        feedEvents = filtered.items.slice(0, 80)
+        const filtered = curateTopSportsbookItems(uniqueEvents(freeFeed.events || []), { perSport: 30, minimumVisible: 120, maximumVisible: 260 })
+        feedEvents = filtered.items.slice(0, 260)
         marquee = marquee || filtered.metrics
     } catch (error) {
         errors.push(error?.message || String(error))

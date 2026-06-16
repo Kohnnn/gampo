@@ -11,7 +11,7 @@
     --sb-yellow: #ffcf5a;
     --sb-red: #ed4245;
     display: grid;
-    grid-template-columns: 254px minmax(520px, 1fr) 354px;
+    grid-template-columns: minmax(620px, 1fr) 354px;
     gap: 12px;
     height: 100%;
     min-height: 0;
@@ -1897,7 +1897,11 @@
 
 @media (max-width: 1260px) {
     .sb-page {
-        grid-template-columns: 72px minmax(420px, 1fr) 330px;
+        grid-template-columns: minmax(420px, 1fr) 330px;
+    }
+
+    .sb-rail {
+        display: none;
     }
 
     .sb-rail-row {

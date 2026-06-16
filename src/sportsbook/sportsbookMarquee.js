@@ -22,7 +22,43 @@ export const MARQUEE_SNAPSHOT = {
     ],
 }
 
-const SPORT_PRIORITY = ['soccer', 'basketball', 'football', 'tennis', 'baseball', 'ice-hockey', 'cricket', 'dota-2', 'cs2', 'league-of-legends', 'horse-racing']
+const SPORT_PRIORITY = ['soccer', 'basketball', 'football', 'tennis', 'baseball', 'ice-hockey', 'cricket', 'handball', 'rugby', 'volleyball', 'mma', 'formula-1', 'dota-2', 'cs2', 'league-of-legends', 'horse-racing']
+
+function rawItemKey(item, index) {
+    const id = item?.id
+        || item?.eventID
+        || item?.eventId
+        || item?.event_id
+        || item?.fixture?.id
+        || item?.game?.id
+        || item?.race?.id
+    if (id) return `id:${id}`
+
+    const home = item?.home
+        || item?.home_team
+        || item?.homeTeam
+        || item?.teams?.home?.name
+        || item?.teams?.home?.names?.long
+        || item?.teams?.home?.displayName
+        || item?.participants?.[0]?.name
+    const away = item?.away
+        || item?.away_team
+        || item?.awayTeam
+        || item?.teams?.away?.name
+        || item?.teams?.away?.names?.long
+        || item?.teams?.away?.displayName
+        || item?.participants?.[1]?.name
+    const startsAt = item?.startsAt
+        || item?.startTime
+        || item?.start_time
+        || item?.commence_time
+        || item?.fixture?.date
+        || item?.game?.date?.date
+        || item?.date
+    if (home || away || startsAt) return `${home || 'home'}:${away || 'away'}:${startsAt || index}`
+
+    return `index:${index}`
+}
 
 function textBlob(value) {
     if (!value) return ''
@@ -137,7 +173,7 @@ export function curateTopSportsbookItems(items = [], {
     const selected = []
     const seen = new Set()
     const add = (row) => {
-        const key = row.item?.id || `${row.item?.home}:${row.item?.away}:${row.item?.startsAt}` || row.index
+        const key = rawItemKey(row.item, row.index)
         if (seen.has(key)) return false
         seen.add(key)
         selected.push(row)

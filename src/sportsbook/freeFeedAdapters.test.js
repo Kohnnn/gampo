@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
     normalizeApiFootballFixture,
+    normalizeApiSportsMultiSportEvent,
     normalizeFreeProviderPayload,
     normalizeOddsApiIoEvent,
     normalizePandaScoreMatch,
@@ -107,6 +108,28 @@ describe('free provider sportsbook adapters', () => {
         expect(normalizeApiFootballFixture).toBeTypeOf('function')
         expect(payload.events[0].marketGroups[0].selections.map(selection => selection.decimalOdds)).toEqual([1.9, 3.2, 4.1])
         expect(payload.events[0].oddsMode).toBe('real')
+    })
+
+    it('normalizes API-SPORTS multi-sport games without dropping estimated odds', () => {
+        const event = normalizeApiSportsMultiSportEvent({
+            id: 8801,
+            _gampoApiSport: 'volleyball',
+            date: '2026-05-27T18:30:00Z',
+            status: { long: 'Not Started' },
+            league: { name: 'Nations League', country: 'World' },
+            country: { name: 'World' },
+            teams: {
+                home: { name: 'Italy' },
+                away: { name: 'Brazil' },
+            },
+        })
+
+        expect(event.sportId).toBe('volleyball')
+        expect(event.source).toBe('api-sports-volleyball')
+        expect(event.home).toBe('Italy')
+        expect(event.away).toBe('Brazil')
+        expect(event.tags).toContain('estimated-odds')
+        expect(event.marketGroups[0].selections[0].source).toBe('synthetic-estimate')
     })
 
     it('normalizes SportsGameOdds moneyline, spread, and totals', () => {

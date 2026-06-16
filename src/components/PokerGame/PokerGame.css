@@ -3212,3 +3212,28 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Mobile GTO scroll repair: page owns vertical scroll; the 13x13 grid keeps
+   horizontal pan only so swiping over GTO can still move the full poker page. */
+@media (max-width: 768px) {
+    .poker-page {
+        overscroll-behavior-y: auto;
+    }
+
+    .poker-sidebar {
+        max-height: none;
+        overflow: visible;
+    }
+
+    .poker-sidebar-body {
+        overflow-y: visible;
+        overscroll-behavior-y: auto;
+    }
+
+    .gto-grid-wrap {
+        overflow-x: auto;
+        overflow-y: visible;
+        max-height: none;
+        touch-action: pan-x pan-y;
+    }
+}

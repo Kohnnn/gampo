@@ -72,6 +72,11 @@ const sportsTopList = [
     { id: 'ice-hockey', icon: 'hockey', label: 'Ice Hockey' },
     { id: 'baseball', icon: 'baseball', label: 'Baseball' },
     { id: 'football', icon: 'football', label: 'Football' },
+    { id: 'handball', icon: 'sports', label: 'Handball' },
+    { id: 'rugby', icon: 'football', label: 'Rugby' },
+    { id: 'volleyball', icon: 'sports', label: 'Volleyball' },
+    { id: 'formula-1', icon: 'race', label: 'Formula 1' },
+    { id: 'mma', icon: 'sports', label: 'MMA' },
     { id: 'horse-racing', icon: 'racing', label: 'Horse Racing' },
 ]
 
