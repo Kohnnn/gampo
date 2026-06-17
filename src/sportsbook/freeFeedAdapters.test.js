@@ -17,8 +17,8 @@ describe('free provider sportsbook adapters', () => {
             videogame: { slug: 'valorant', name: 'Valorant' },
             league: { name: 'VCT Practice' },
             opponents: [
-                { opponent: { name: 'Alpha Five' } },
-                { opponent: { name: 'Beta Core' } },
+                { opponent: { name: 'Alpha Five', image_url: 'https://cdn.example.test/alpha.png' } },
+                { opponent: { name: 'Beta Core', image_url: 'https://cdn.example.test/beta.png' } },
             ],
         })
 
@@ -29,6 +29,8 @@ describe('free provider sportsbook adapters', () => {
         expect(event.tags).toContain('estimated-odds')
         expect(event.marketGroups[0].selections[0].source).toBe('synthetic-estimate')
         expect(event.bookmakerTitle).toBe('Estimated odds')
+        expect(event.homeLogo).toBe('https://cdn.example.test/alpha.png')
+        expect(event.awayLogo).toBe('https://cdn.example.test/beta.png')
     })
 
     it('normalizes odds-api.io events and uses supplied market prices', () => {
@@ -39,6 +41,8 @@ describe('free provider sportsbook adapters', () => {
                 league: 'Demo League',
                 home: 'Harbor United',
                 away: 'River City FC',
+                homeLogo: 'https://cdn.example.test/home.svg',
+                awayLogo: 'https://cdn.example.test/away.svg',
                 startTime: '2026-05-26T15:00:00Z',
             },
             [
@@ -65,6 +69,8 @@ describe('free provider sportsbook adapters', () => {
         const odds = event.marketGroups[0].selections.map(selection => selection.decimalOdds)
         expect(event.sportId).toBe('soccer')
         expect(odds).toEqual([2.15, 3.4, 2.95])
+        expect(event.homeLogo).toBe('https://cdn.example.test/home.svg')
+        expect(event.awayLogo).toBe('https://cdn.example.test/away.svg')
     })
 
     it('normalizes API-Football fixtures with match-winner odds', () => {
@@ -75,8 +81,8 @@ describe('free provider sportsbook adapters', () => {
                         fixture: { id: 77, date: '2026-05-26T18:00:00Z', status: { short: 'NS' } },
                         league: { name: 'Practice League', country: 'England' },
                         teams: {
-                            home: { name: 'Capital Albion' },
-                            away: { name: 'Westport SC' },
+                            home: { name: 'Capital Albion', logo: 'https://cdn.example.test/capital.png' },
+                            away: { name: 'Westport SC', logo: 'https://cdn.example.test/westport.png' },
                         },
                         goals: { home: null, away: null },
                     },
@@ -108,6 +114,8 @@ describe('free provider sportsbook adapters', () => {
         expect(normalizeApiFootballFixture).toBeTypeOf('function')
         expect(payload.events[0].marketGroups[0].selections.map(selection => selection.decimalOdds)).toEqual([1.9, 3.2, 4.1])
         expect(payload.events[0].oddsMode).toBe('real')
+        expect(payload.events[0].homeLogo).toBe('https://cdn.example.test/capital.png')
+        expect(payload.events[0].awayLogo).toBe('https://cdn.example.test/westport.png')
     })
 
     it('normalizes API-SPORTS multi-sport games without dropping estimated odds', () => {
@@ -119,8 +127,8 @@ describe('free provider sportsbook adapters', () => {
             league: { name: 'Nations League', country: 'World' },
             country: { name: 'World' },
             teams: {
-                home: { name: 'Italy' },
-                away: { name: 'Brazil' },
+                home: { name: 'Italy', logo: 'https://cdn.example.test/italy.png' },
+                away: { name: 'Brazil', logo: 'https://cdn.example.test/brazil.png' },
             },
         })
 
@@ -130,6 +138,8 @@ describe('free provider sportsbook adapters', () => {
         expect(event.away).toBe('Brazil')
         expect(event.tags).toContain('estimated-odds')
         expect(event.marketGroups[0].selections[0].source).toBe('synthetic-estimate')
+        expect(event.homeLogo).toBe('https://cdn.example.test/italy.png')
+        expect(event.awayLogo).toBe('https://cdn.example.test/brazil.png')
     })
 
     it('normalizes SportsGameOdds moneyline, spread, and totals', () => {

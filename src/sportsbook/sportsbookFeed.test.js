@@ -6,6 +6,7 @@ const shellSource = readFileSync(new URL('./SportsbookShell.jsx', import.meta.ur
 const netlifyToml = readFileSync(new URL('../../netlify.toml', import.meta.url), 'utf8')
 const netlifyFunction = readFileSync(new URL('../../netlify/functions/sportsbook-free-feed.mjs', import.meta.url), 'utf8')
 const sportsHomeSource = readFileSync(new URL('./components/SportsHome.jsx', import.meta.url), 'utf8')
+const sportsbookFeedSource = readFileSync(new URL('./sportsbookFeed.js', import.meta.url), 'utf8')
 
 afterEach(() => {
     vi.restoreAllMocks()
@@ -117,6 +118,8 @@ describe('fetchFreeProviderFeed', () => {
         expect(feed.events.some(event => event.tags?.includes('popular'))).toBe(true)
         expect(feed.marquee).toMatchObject({ candidateCount: 2, shownCount: 1, skippedCount: 1, marqueeCount: 1 })
         expect(shellSource).not.toContain('<SportsRail')
+        expect(sportsbookFeedSource).toContain('perSport: 12, minimumVisible: 60, maximumVisible: 120')
+        expect(sportsbookFeedSource).toContain('feedEvents = filtered.items.slice(0, 120)')
         expect(sportsHomeSource).toContain('Real-event feed guard active')
         expect(sportsHomeSource).toContain('Big Match Only')
     })

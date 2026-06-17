@@ -2,6 +2,9 @@ import { curateTopSportsbookItems, mergeMarqueeMetrics } from '../src/sportsbook
 
 const CACHE_TTL_MS = 5 * 60 * 1000
 const PROVIDER_TIMEOUT_MS = 7000
+const MIN_EVENTS_PER_SPORT = 5
+const MAX_EVENTS_PER_SPORT = 12
+const MAX_VISIBLE_EVENTS = 120
 
 const SPORTSGAMEODDS_FREE_TIER_LEAGUES = [
     'NBA',
@@ -145,7 +148,7 @@ async function loadPandaScore(keys) {
     })
 
     const matches = Array.isArray(result.data) ? result.data : []
-    const filtered = curateTopSportsbookItems(matches, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
+    const filtered = curateTopSportsbookItems(matches, { perSport: MAX_EVENTS_PER_SPORT, minimumVisible: MIN_EVENTS_PER_SPORT, maximumVisible: MAX_VISIBLE_EVENTS })
 
     return {
         matches: filtered.items,
@@ -165,7 +168,7 @@ async function loadSportsGameOdds(token) {
     url.searchParams.set('oddID', SPORTSGAMEODDS_MAIN_MARKETS)
     url.searchParams.set('includeOpposingOdds', 'true')
     url.searchParams.set('includeAltLines', 'false')
-    url.searchParams.set('limit', '100')
+    url.searchParams.set('limit', '60')
 
     const result = await fetchJson(url, {
         label: 'sportsGameOdds',
@@ -178,7 +181,7 @@ async function loadSportsGameOdds(token) {
             ? result.data
             : []
 
-    const filtered = curateTopSportsbookItems(data, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
+    const filtered = curateTopSportsbookItems(data, { perSport: MAX_EVENTS_PER_SPORT, minimumVisible: MIN_EVENTS_PER_SPORT, maximumVisible: MAX_VISIBLE_EVENTS })
 
     return {
         events: filtered.items,
@@ -201,7 +204,7 @@ async function loadOddsApiIo(token) {
         url.searchParams.set('apiKey', token)
         url.searchParams.set('sport', sport)
         url.searchParams.set('status', 'pending,live')
-        url.searchParams.set('limit', sport === 'football' ? '30' : '20')
+        url.searchParams.set('limit', String(MAX_EVENTS_PER_SPORT))
 
         const result = await fetchJson(url, { label: 'oddsApiIo' })
         Object.assign(quotas, result.quotas)
@@ -212,7 +215,7 @@ async function loadOddsApiIo(token) {
         }
     }
 
-    const filtered = curateTopSportsbookItems(events, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
+    const filtered = curateTopSportsbookItems(events, { perSport: MAX_EVENTS_PER_SPORT, minimumVisible: MIN_EVENTS_PER_SPORT, maximumVisible: MAX_VISIBLE_EVENTS })
     const eventIds = filtered.items.map(event => event?.id).filter(Boolean).slice(0, 10)
     let odds = []
     if (eventIds.length) {
@@ -274,14 +277,13 @@ async function loadTheOddsApi(env) {
 
     const errors = []
     const quotas = {}
-    const [us, uk, sports] = await Promise.all([
+    const [us, sports] = await Promise.all([
         oddsApiFetch(env, '/v4/sports/upcoming/odds/?regions=us&markets=h2h&oddsFormat=decimal', 'theOddsApi'),
-        oddsApiFetch(env, '/v4/sports/upcoming/odds/?regions=uk&markets=h2h&oddsFormat=decimal', 'theOddsApi'),
         oddsApiFetch(env, '/v4/sports', 'theOddsApi'),
     ])
 
     const events = []
-    for (const [region, result] of [['us', us], ['uk', uk]]) {
+    for (const [region, result] of [['us', us]]) {
         Object.assign(quotas, result.quotas)
         if (result.ok && Array.isArray(result.data)) {
             for (const event of result.data) events.push({ ...event, _gampoRegion: region })
@@ -292,10 +294,10 @@ async function loadTheOddsApi(env) {
     Object.assign(quotas, sports.quotas)
     if (!sports.ok && sports.error) errors.push(sports.error)
 
-    const filtered = curateTopSportsbookItems(events, { perSport: 20, minimumVisible: 50, maximumVisible: 100 })
+    const filtered = curateTopSportsbookItems(events, { perSport: MAX_EVENTS_PER_SPORT, minimumVisible: MIN_EVENTS_PER_SPORT, maximumVisible: MAX_VISIBLE_EVENTS })
 
     return {
-        events: filtered.items.slice(0, 100),
+        events: filtered.items.slice(0, MAX_VISIBLE_EVENTS),
         inSeason: Array.isArray(sports.data) ? sports.data : [],
         errors,
         quotas,
@@ -315,7 +317,7 @@ async function loadApiFootball(keys) {
 
     const errors = []
     const quotas = {}
-    const dates = Array.from({ length: 7 }, (_, index) => isoDateOffset(index))
+    const dates = Array.from({ length: 3 }, (_, index) => isoDateOffset(index))
     const fixtures = []
     const odds = []
     const multiSport = []
@@ -345,35 +347,37 @@ async function loadApiFootball(keys) {
         else if (!oddsResult.ok && !/returned 4(00|04|22)/.test(oddsResult.error || '')) errors.push(oddsResult.error)
     }
 
-    const multiSportDates = dates.slice(0, 3)
-    const multiSportRequests = API_SPORTS_MULTI_SPORTS.flatMap(sport => {
-        const scanDates = sport.key === 'formula-1' ? [isoDateOffset(0)] : multiSportDates
-        return scanDates.map(date => ({ sport, date }))
-    })
-    await Promise.all(multiSportRequests.map(async ({ sport, date }) => {
-        const url = new URL(`https://${sport.host}${sport.path}`)
-        if (sport.key === 'formula-1') url.searchParams.set('season', String(new Date().getFullYear()))
-        else url.searchParams.set('date', date)
-        const result = await fetchJsonWithRotatingKeys(keys, {
-            label: `apiSports-${sport.key}`,
-            makeUrl: () => url,
-            makeHeaders: key => ({ 'x-apisports-key': key }),
-        })
-        Object.assign(quotas, result.quotas)
-        if (result.ok && Array.isArray(result.data?.response)) {
-            multiSport.push(...result.data.response.map(item => ({ ...item, _gampoApiSport: sport.key })))
-        } else if (!result.ok && !/returned 4(00|04|22)/.test(result.error || '')) {
-            errors.push(result.error)
+    await Promise.all(API_SPORTS_MULTI_SPORTS.map(async sport => {
+        const scanDates = sport.key === 'formula-1' ? [isoDateOffset(0)] : dates
+        let sportCount = 0
+        for (const date of scanDates) {
+            if (sportCount >= MIN_EVENTS_PER_SPORT) break
+            const url = new URL(`https://${sport.host}${sport.path}`)
+            if (sport.key === 'formula-1') url.searchParams.set('season', String(new Date().getFullYear()))
+            else url.searchParams.set('date', date)
+            const result = await fetchJsonWithRotatingKeys(keys, {
+                label: `apiSports-${sport.key}`,
+                makeUrl: () => url,
+                makeHeaders: key => ({ 'x-apisports-key': key }),
+            })
+            Object.assign(quotas, result.quotas)
+            if (result.ok && Array.isArray(result.data?.response)) {
+                const rows = result.data.response.map(item => ({ ...item, _gampoApiSport: sport.key }))
+                sportCount += rows.length
+                multiSport.push(...rows)
+            } else if (!result.ok && !/returned 4(00|04|22)/.test(result.error || '')) {
+                errors.push(result.error)
+            }
         }
     }))
 
-    const filtered = curateTopSportsbookItems(fixtures, { perSport: 60, minimumVisible: 80, maximumVisible: 180 })
-    const multiSportFiltered = curateTopSportsbookItems(multiSport, { perSport: 30, minimumVisible: 80, maximumVisible: 220 })
+    const filtered = curateTopSportsbookItems(fixtures, { perSport: MAX_EVENTS_PER_SPORT, minimumVisible: MIN_EVENTS_PER_SPORT, maximumVisible: MAX_VISIBLE_EVENTS })
+    const multiSportFiltered = curateTopSportsbookItems(multiSport, { perSport: MAX_EVENTS_PER_SPORT, minimumVisible: MIN_EVENTS_PER_SPORT, maximumVisible: MAX_VISIBLE_EVENTS })
 
     return {
-        fixtures: filtered.items.slice(0, 180),
+        fixtures: filtered.items.slice(0, MAX_VISIBLE_EVENTS),
         odds,
-        multiSport: multiSportFiltered.items.slice(0, 220),
+        multiSport: multiSportFiltered.items.slice(0, MAX_VISIBLE_EVENTS),
         errors,
         quotas,
         configured: true,
