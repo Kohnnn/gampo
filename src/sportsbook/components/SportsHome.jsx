@@ -3,6 +3,7 @@ import { OUTRIGHTS, PROMO_CARDS } from '../sportsbookData'
 import { buildFeaturedCompetitions, contendersFromCompetition, spotlightCompetition } from '../sportsbookFeatured'
 import EventList from './EventList'
 import OddsButton from './OddsButton'
+import TeamLogo from './TeamLogo'
 
 function TopMatchCard({ event, selectedIds, onToggleSelection, onOpenEvent }) {
     const market = event.marketGroups?.[0]
@@ -14,9 +15,9 @@ function TopMatchCard({ event, selectedIds, onToggleSelection, onOpenEvent }) {
                     <b>{Number(event.popularity || 0).toLocaleString()}</b>
                 </div>
                 <div className="sb-team-line">
-                    <span className="sb-team-mark">{event.home.slice(0, 2).toUpperCase()}</span>
+                    <TeamLogo src={event.homeLogo} label={event.home} className="sb-team-mark" />
                     <strong>{event.home}<br />{event.away}</strong>
-                    <span className="sb-team-mark is-away">{event.away.slice(0, 2).toUpperCase()}</span>
+                    <TeamLogo src={event.awayLogo} label={event.away} className="sb-team-mark is-away" />
                 </div>
                 <small>{event.tags?.includes('estimated-odds') ? 'Estimated odds' : event.tags?.includes('live') ? 'Live market activity' : 'Popular 1x2 market'}</small>
             </button>
@@ -53,9 +54,9 @@ function MatchdaySpotlight({ competition, event, onOpenEvent }) {
             <button type="button" className="sb-matchday-card" onClick={() => onOpenEvent(event.id)}>
                 <small>{startsAt}</small>
                 <div className="sb-matchday-teams">
-                    <span>{event.home.slice(0, 3).toUpperCase()}</span>
+                    <span className="sb-matchday-team-badge"><TeamLogo src={event.homeLogo} label={event.home} />{event.home.slice(0, 3).toUpperCase()}</span>
                     <b>vs</b>
-                    <span>{event.away.slice(0, 3).toUpperCase()}</span>
+                    <span className="sb-matchday-team-badge"><TeamLogo src={event.awayLogo} label={event.away} />{event.away.slice(0, 3).toUpperCase()}</span>
                 </div>
                 <strong>{event.home}<br />{event.away}</strong>
             </button>
@@ -197,7 +198,7 @@ function SportsHome({ events, sports, leagues, feedSource = 'fallback', marquee 
                                                 <span className={event.status === 'live' ? 'sb-featured-status is-live' : 'sb-featured-status'}>
                                                     {event.status === 'live' ? 'Live' : 'Soon'}
                                                 </span>
-                                                <strong>{event.home} v {event.away}</strong>
+                                                <strong><TeamLogo src={event.homeLogo} label={event.home} />{event.home} v {event.away}<TeamLogo src={event.awayLogo} label={event.away} /></strong>
                                             </button>
                                             <div className="sb-featured-odds">
                                                 {(market?.selections || []).slice(0, 3).map(selection => (

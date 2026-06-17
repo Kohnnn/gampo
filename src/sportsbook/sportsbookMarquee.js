@@ -24,6 +24,27 @@ export const MARQUEE_SNAPSHOT = {
 
 const SPORT_PRIORITY = ['soccer', 'basketball', 'football', 'tennis', 'baseball', 'ice-hockey', 'cricket', 'handball', 'rugby', 'volleyball', 'mma', 'formula-1', 'dota-2', 'cs2', 'league-of-legends', 'horse-racing']
 
+function sportIdForItem(item = {}) {
+    const text = String(item?.sportId || item?.sport || item?._gampoApiSport || item?.sport_key || item?.sportID || item?.league?.sport || '').toLowerCase()
+    if (text.includes('soccer')) return 'soccer'
+    if (text === 'football' || text.includes('american') || text.includes('nfl')) return 'football'
+    if (text.includes('basket')) return 'basketball'
+    if (text.includes('baseball') || text.includes('mlb')) return 'baseball'
+    if (text.includes('hockey')) return 'ice-hockey'
+    if (text.includes('handball')) return 'handball'
+    if (text.includes('rugby')) return 'rugby'
+    if (text.includes('volleyball')) return 'volleyball'
+    if (text.includes('formula') || text.includes('f1')) return 'formula-1'
+    if (text.includes('mma') || text.includes('ufc')) return 'mma'
+    if (text.includes('tennis')) return 'tennis'
+    if (text.includes('cricket')) return 'cricket'
+    if (text.includes('dota')) return 'dota-2'
+    if (text.includes('counter') || text.includes('cs2') || text.includes('csgo')) return 'cs2'
+    if (text.includes('valorant')) return 'valorant'
+    if (text.includes('league of legends') || text.includes('lol')) return 'league-of-legends'
+    return text || 'other'
+}
+
 function rawItemKey(item, index) {
     const id = item?.id
         || item?.eventID
@@ -159,7 +180,7 @@ export function curateTopSportsbookItems(items = [], {
     const annotated = items.map((item, index) => ({
         item,
         index,
-        sportId: item?.sportId || item?.sport || 'other',
+        sportId: sportIdForItem(item),
         marquee: scoreMarqueeItem(item, snapshot),
         popularity: Number(item?.popularity) || 0,
         live: item?.status === 'live' ? 1 : 0,

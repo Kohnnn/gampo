@@ -19,6 +19,13 @@ function unitFromSeed(seed, offset = '') {
     return (hashString(`${seed}:${offset}`) % 10000) / 10000
 }
 
+const FAMOUS_NAME_TOKENS = [
+    'argentina', 'brazil', 'france', 'germany', 'spain', 'england', 'portugal', 'netherlands', 'italy', 'belgium',
+    'manchester', 'arsenal', 'liverpool', 'chelsea', 'real madrid', 'barcelona', 'bayern', 'psg', 'inter', 'milan',
+    'lakers', 'celtics', 'warriors', 'knicks', 'chiefs', 'eagles', 'cowboys', '49ers', 'yankees', 'dodgers', 'red sox',
+    'ufc', 'ferrari', 'mercedes', 'red bull', 'mclaren',
+]
+
 function sportIdFromText(value = '') {
     const text = String(value).toLowerCase()
     if (text === 'football' || text === 'nfl' || text.includes('american football') || text.includes('ncaaf')) return 'football'
@@ -54,15 +61,66 @@ function feedLeagueMeta({ sportId, source, leagueName, region = 'Live Feed' }) {
     }
 }
 
-function fallbackOdds(seed, { hasDraw }) {
-    const home = roundCurrency(1.55 + unitFromSeed(seed, 'home') * 2.35)
-    const away = roundCurrency(1.65 + unitFromSeed(seed, 'away') * 2.55)
-    if (!hasDraw) return { home, away }
-    return {
-        home,
-        draw: roundCurrency(2.85 + unitFromSeed(seed, 'draw') * 1.8),
-        away,
+function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value))
+}
+
+function nameStrength(name = '') {
+    const text = String(name).toLowerCase()
+    let score = 0
+    for (const token of FAMOUS_NAME_TOKENS) {
+        if (text.includes(token)) score += 0.08
     }
+    score += (hashString(text) % 1000) / 1000 * 0.18
+    return clamp(score, 0, 0.34)
+}
+
+function sportProfile(sportId) {
+    if (sportId === 'soccer') return { margin: 1.07, draw: 0.26, home: 0.04, min: 0.08, max: 0.72 }
+    if (sportId === 'ice-hockey') return { margin: 1.06, draw: 0.08, home: 0.035, min: 0.12, max: 0.78 }
+    if (sportId === 'baseball') return { margin: 1.055, draw: 0, home: 0.025, min: 0.16, max: 0.82 }
+    if (sportId === 'basketball' || sportId === 'football') return { margin: 1.055, draw: 0, home: 0.04, min: 0.12, max: 0.85 }
+    if (sportId === 'formula-1' || sportId === 'mma') return { margin: 1.08, draw: 0, home: 0.015, min: 0.1, max: 0.88 }
+    return { margin: 1.065, draw: 0, home: 0.03, min: 0.14, max: 0.84 }
+}
+
+function scoreLean(score) {
+    if (!score) return 0
+    const home = Number(score.home)
+    const away = Number(score.away)
+    if (!Number.isFinite(home) || !Number.isFinite(away) || home === away) return 0
+    return clamp((home - away) * 0.11, -0.28, 0.28)
+}
+
+function estimatedProbabilities(seed, { sportId, home, away, startsAt, score }) {
+    const profile = sportProfile(sportId)
+    const hoursUntilStart = (new Date(startsAt).getTime() - Date.now()) / 3600000
+    const timeLean = Number.isFinite(hoursUntilStart) && hoursUntilStart < 3 ? 0.015 : 0
+    const strengthLean = nameStrength(home) - nameStrength(away)
+    const seededLean = (unitFromSeed(seed, 'lean') - 0.5) * 0.16
+    const homeProbability = clamp(0.5 + profile.home + strengthLean + seededLean + scoreLean(score) + timeLean, profile.min, profile.max)
+
+    if (!profile.draw) return { home: homeProbability, away: 1 - homeProbability }
+
+    const draw = clamp(profile.draw + (unitFromSeed(seed, 'draw') - 0.5) * 0.06 - Math.abs(homeProbability - 0.5) * 0.12, 0.16, 0.34)
+    const remaining = 1 - draw
+    const homeShare = clamp(homeProbability, 0.18, 0.72)
+    return {
+        home: remaining * homeShare,
+        draw,
+        away: remaining * (1 - homeShare),
+    }
+}
+
+function fallbackOdds(seed, { hasDraw, sportId, home, away, startsAt, score }) {
+    const probabilities = estimatedProbabilities(seed, { sportId, home, away, startsAt, score })
+    const margin = sportProfile(sportId).margin
+    const odds = {
+        home: roundCurrency(1 / clamp(probabilities.home * margin, 0.03, 0.98)),
+        away: roundCurrency(1 / clamp(probabilities.away * margin, 0.03, 0.98)),
+    }
+    if (hasDraw) odds.draw = roundCurrency(1 / clamp((probabilities.draw || 0.24) * margin, 0.03, 0.98))
+    return odds
 }
 
 function selectionStatus(decimalOdds, previousOdds) {
@@ -73,10 +131,10 @@ function selectionStatus(decimalOdds, previousOdds) {
     return 'available'
 }
 
-function makeWinnerMarket({ eventId, sportId, home, away, source, prices, estimated = false }) {
+function makeWinnerMarket({ eventId, sportId, home, away, source, prices, estimated = false, startsAt, score }) {
     const hasDraw = sportId === 'soccer' || Boolean(prices?.draw)
     const resolved = {
-        ...fallbackOdds(eventId, { hasDraw }),
+        ...fallbackOdds(eventId, { hasDraw, sportId, home, away, startsAt, score }),
         ...Object.fromEntries(Object.entries(prices || {}).filter(([, value]) => Number(value) > 1)),
     }
     const selectionSource = estimated ? 'synthetic-estimate' : source
@@ -118,7 +176,7 @@ function makeWinnerMarket({ eventId, sportId, home, away, source, prices, estima
     }
 }
 
-function normalizedEvent({ id, sportId, source, leagueName, region, startsAt, status, home, away, score = null, prices = {}, marketGroups = null, tags = [] }) {
+function normalizedEvent({ id, sportId, source, leagueName, region, startsAt, status, home, away, homeLogo = null, awayLogo = null, score = null, prices = {}, marketGroups = null, tags = [] }) {
     if (!home || !away) return null
     const league = feedLeagueMeta({ sportId, source, leagueName, region })
     const hasRealPrices = Object.values(prices || {}).some(value => Number(value) > 1)
@@ -136,6 +194,8 @@ function normalizedEvent({ id, sportId, source, leagueName, region, startsAt, st
         period: '',
         home,
         away,
+        homeLogo,
+        awayLogo,
         participants: [home, away],
         score,
         liveStats: {
@@ -145,7 +205,7 @@ function normalizedEvent({ id, sportId, source, leagueName, region, startsAt, st
         },
         popularity: 2600 + (hashString(`${id}:popularity`) % 9000),
         tags: resolvedTags,
-        marketGroups: marketGroups?.length ? marketGroups : [makeWinnerMarket({ eventId: id, sportId, home, away, source, prices, estimated })],
+        marketGroups: marketGroups?.length ? marketGroups : [makeWinnerMarket({ eventId: id, sportId, home, away, source, prices, estimated, startsAt, score })],
         bookmakerTitle: estimated ? 'Estimated odds' : source,
         source,
         oddsMode: estimated ? 'estimated' : 'real',
@@ -230,6 +290,13 @@ function teamName(team, fallback) {
         || fallback
 }
 
+function imageUrl(...values) {
+    for (const value of values) {
+        if (typeof value === 'string' && /^https?:\/\//i.test(value)) return value
+    }
+    return null
+}
+
 function lineLabel(label, line) {
     if (line === undefined || line === null || line === '') return label
     return `${label} ${line}`
@@ -311,6 +378,8 @@ export function normalizeSportsGameOddsEvent(event) {
         status: sportsGameOddsStatus(event?.status),
         home,
         away,
+        homeLogo: imageUrl(event?.teams?.home?.logo, event?.teams?.home?.image, event?.homeTeam?.logo, event?.homeTeam?.image),
+        awayLogo: imageUrl(event?.teams?.away?.logo, event?.teams?.away?.image, event?.awayTeam?.logo, event?.awayTeam?.image),
         score: event?.score || null,
         marketGroups,
         tags: ['primary-odds'],
@@ -334,6 +403,7 @@ function opponentNames(match) {
 
 export function normalizePandaScoreMatch(match) {
     const [home, away] = opponentNames(match)
+    const opponents = match?.opponents || []
     const sportId = sportIdFromText(`${match?.videogame?.slug || ''} ${match?.videogame?.name || ''}`)
     const leagueName = match?.league?.name || match?.serie?.full_name || 'PandaScore Esports'
     return normalizedEvent({
@@ -346,6 +416,8 @@ export function normalizePandaScoreMatch(match) {
         status: statusFromPandaScore(match?.status),
         home,
         away,
+        homeLogo: imageUrl(opponents[0]?.opponent?.image_url, opponents[0]?.opponent?.logo, opponents[0]?.image_url),
+        awayLogo: imageUrl(opponents[1]?.opponent?.image_url, opponents[1]?.opponent?.logo, opponents[1]?.image_url),
         tags: ['esports'],
     })
 }
@@ -420,6 +492,8 @@ export function normalizeOddsApiIoEvent(event, oddsPayload = []) {
         status,
         home,
         away,
+        homeLogo: imageUrl(event?.homeLogo, event?.home_logo, event?.homeTeam?.logo, event?.participants?.[0]?.logo, event?.participants?.[0]?.image),
+        awayLogo: imageUrl(event?.awayLogo, event?.away_logo, event?.awayTeam?.logo, event?.participants?.[1]?.logo, event?.participants?.[1]?.image),
         score: event?.score || null,
         prices: extractOddsApiIoPrices(event, oddsPayload),
     })
@@ -470,6 +544,8 @@ export function normalizeApiFootballFixture(item, oddsByFixture = new Map()) {
         status: apiFootballStatus(item?.fixture?.status?.short),
         home,
         away,
+        homeLogo: imageUrl(item?.teams?.home?.logo),
+        awayLogo: imageUrl(item?.teams?.away?.logo),
         score: Number.isFinite(homeGoals) && Number.isFinite(awayGoals) ? { home: homeGoals, away: awayGoals } : null,
         prices: oddsByFixture.get(String(fixtureId)) || {},
     })
@@ -542,6 +618,8 @@ export function normalizeApiSportsMultiSportEvent(item) {
         status: apiSportsStatus(item?.status || item?.game?.status || item?.race?.status),
         home,
         away,
+        homeLogo: imageUrl(item?.teams?.home?.logo, item?.home?.logo, item?.homeTeam?.logo, item?.fighters?.first?.logo, item?.fighters?.first?.image),
+        awayLogo: imageUrl(item?.teams?.away?.logo, item?.away?.logo, item?.awayTeam?.logo, item?.fighters?.second?.logo, item?.fighters?.second?.image),
         score: Number.isFinite(Number(homeScore)) && Number.isFinite(Number(awayScore)) ? { home: Number(homeScore), away: Number(awayScore) } : null,
         tags: ['api-sports', apiSport],
     })
@@ -611,6 +689,8 @@ export function normalizeTheOddsApiEvent(event, region = 'us') {
         status: 'prematch',
         home: fixture.home,
         away: fixture.away,
+        homeLogo: imageUrl(event?.home_logo, event?.homeLogo),
+        awayLogo: imageUrl(event?.away_logo, event?.awayLogo),
         marketGroups,
         tags: ['primary-odds'],
     })

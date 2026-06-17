@@ -147,8 +147,8 @@ export async function loadSportsbookFeed() {
         providerSources = freeFeed.sources || {}
         marquee = freeFeed.marquee || null
         inSeason = freeFeed.inSeason || []
-        const filtered = curateTopSportsbookItems(uniqueEvents(freeFeed.events || []), { perSport: 30, minimumVisible: 120, maximumVisible: 260 })
-        feedEvents = filtered.items.slice(0, 260)
+        const filtered = curateTopSportsbookItems(uniqueEvents(freeFeed.events || []), { perSport: 12, minimumVisible: 60, maximumVisible: 120 })
+        feedEvents = filtered.items.slice(0, 120)
         marquee = marquee || filtered.metrics
     } catch (error) {
         errors.push(error?.message || String(error))

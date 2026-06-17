@@ -1,5 +1,6 @@
 import { BarChart3, ChevronRight, Radio, Tv } from 'lucide-react'
 import OddsButton from './OddsButton'
+import TeamLogo from './TeamLogo'
 
 function formatEventTime(startsAt) {
     const date = new Date(startsAt)
@@ -20,8 +21,8 @@ function EventRow({ event, league, selectedIds, onToggleSelection, onOpenEvent }
                     {live ? <small>{event.clock} {event.period}</small> : <small>{league?.region || event.region}</small>}
                 </div>
                 <div className="sb-event-teams">
-                    <span>{event.home}</span>
-                    <span>{event.away}</span>
+                    <span><TeamLogo src={event.homeLogo} label={event.home} />{event.home}</span>
+                    <span><TeamLogo src={event.awayLogo} label={event.away} />{event.away}</span>
                     <small>{league?.label || event.leagueId}</small>
                 </div>
                 <div className="sb-event-score" aria-label="Score">
