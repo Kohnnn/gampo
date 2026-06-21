@@ -33,9 +33,11 @@ import { useMissions } from '../hooks/useMissions'
 import { useProgress } from '../hooks/useProgress'
 import { useXp } from '../hooks/useXp'
 import { useRewards } from '../hooks/useRewards'
+import { useSettings } from '../hooks/useSettings'
 import { STARTER_PACKS, DAILY_CLAIM_CREDITS, PROGRESS_PACK_CREDITS } from '../data/rewards'
 import { ACHIEVEMENT_GROUPS } from '../data/achievements'
 import { MISSION_PERIODS, VIP_TIERS, vipTierFor } from '../data/missions'
+import { haptic } from '../utils/haptics'
 
 const ICONS = {
     play: Play,
@@ -102,6 +104,7 @@ export default function ProgressPanel() {
     const missions = useMissions()
     const xp = useXp()
     const rewards = useRewards()
+    const { haptics } = useSettings()
     const { resetBalance, grantPracticeCredits, showToast } = useCredits()
     const [confirming, setConfirming] = useState(null)
 
@@ -111,6 +114,7 @@ export default function ProgressPanel() {
         const credits = rewards.chooseStarterPack(id)
         if (credits > 0) {
             grantPracticeCredits(credits)
+            haptic('win', { enabled: haptics, force: true })
             showToast?.('win', 'Starter pack claimed', `+GC ${credits.toLocaleString()}`)
         }
     }
@@ -118,6 +122,7 @@ export default function ProgressPanel() {
         const credits = rewards.claimDaily()
         if (credits > 0) {
             grantPracticeCredits(credits)
+            haptic('win', { enabled: haptics, force: true })
             showToast?.('win', 'Daily reward', `+GC ${credits.toLocaleString()}`)
         }
     }
@@ -125,6 +130,7 @@ export default function ProgressPanel() {
         const credits = rewards.claimLevelRewards(xp.level)
         if (credits > 0) {
             grantPracticeCredits(credits)
+            haptic('rare', { enabled: haptics, force: true })
             showToast?.('win', 'Level rewards claimed', `+GC ${credits.toLocaleString()}`)
         }
     }
@@ -132,6 +138,7 @@ export default function ProgressPanel() {
         const credits = rewards.takeProgressPack()
         if (credits > 0) {
             grantPracticeCredits(credits)
+            haptic('win', { enabled: haptics, force: true })
             showToast?.('win', 'Progress pack', `+GC ${credits.toLocaleString()}`)
         }
     }
@@ -140,6 +147,7 @@ export default function ProgressPanel() {
         const credits = result?.reward?.credits || 0
         if (credits > 0) {
             grantPracticeCredits(credits)
+            haptic('rare', { enabled: haptics, force: true })
             showToast?.('win', 'Daily challenge', `+GC ${credits.toLocaleString()}`)
         }
     }

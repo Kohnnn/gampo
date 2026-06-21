@@ -15,6 +15,7 @@ import {
     missions,
 } from '../data/casinoCatalog'
 import { formatCredits, rolloverProgress } from '../utils/simulationMath'
+import { deriveSessionRecap } from '../utils/sessionRecap'
 import '../styles/casino.css'
 
 const filters = ['All', 'Originals', 'Slots', 'Table', 'Arcade', 'Sports']
@@ -90,6 +91,12 @@ function HomePage() {
 
     const recent = transactions.slice(0, 5)
     const liveMissions = missionProgress.missions.filter(mission => !mission.claimed).slice(0, 3)
+    const sessionRecap = deriveSessionRecap({
+        progressStats: progress.stats,
+        missionSummary: missionProgress.summary,
+        challenge: missionProgress.challenge,
+        xp,
+    })
     const recentlyPlayed = useMemo(() => deriveRecentlyPlayed(transactions), [transactions])
     const pinnedRow = useMemo(() => (
         pins
@@ -224,6 +231,28 @@ function HomePage() {
                             <span>Achievements {progress.summary.unlockedCount}/{progress.summary.total}</span>
                             <div><i style={{ width: `${progress.summary.percent || 0}%` }} /></div>
                         </div>
+                    </RailBlock>
+                    <RailBlock icon={<Trophy size={16} />} title="Session Recap">
+                        <div className="activity-mini">
+                            <span>{sessionRecap.mood}</span>
+                            <strong className={sessionRecap.profit >= 0 ? 'positive' : 'negative'}>
+                                {sessionRecap.profit >= 0 ? '+' : ''}{formatCredits(sessionRecap.profit)}
+                            </strong>
+                        </div>
+                        <div className="activity-mini">
+                            <span>Rounds / win rate</span>
+                            <strong>{sessionRecap.rounds} · {Math.round(sessionRecap.winRate * 100)}%</strong>
+                        </div>
+                        <div className="activity-mini">
+                            <span>{sessionRecap.rankLabel} level</span>
+                            <strong>Lvl {sessionRecap.level}</strong>
+                        </div>
+                        <div className="mini-progress">
+                            <span>{sessionRecap.challengeName}</span>
+                            <div><i style={{ width: `${Math.round(sessionRecap.challengeProgress * 100)}%` }} /></div>
+                        </div>
+                        <p className="session-recap-note">{sessionRecap.nextAction}</p>
+                        <p className="session-recap-note muted">{sessionRecap.educationNote}</p>
                     </RailBlock>
                     <RailBlock icon={<ShieldCheck size={16} />} title="Recent Activity">
                         {recent.length === 0 ? (
