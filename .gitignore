@@ -28,5 +28,14 @@ vite.config.js.timestamp-*.mjs
 plinko-game-main.zip
 .agent
 .claude
+.codex/
+.vc-installed-files
+.vc-version
+.vc-publish-config
+AGENTS.md
+CLAUDE.md
+process/
 rainbetclone/_quarantine/
 rainbetclone/
+.vibecode-backup*/
+docs/

@@ -1,5 +1,6 @@
 import { Search, ShieldCheck, Star, Trophy, Zap } from 'lucide-react'
 import { OUTRIGHTS, PROMO_CARDS } from '../sportsbookData'
+import { deriveSportsbookEnergy } from '../sportsbookEnergy'
 import { buildFeaturedCompetitions, contendersFromCompetition, spotlightCompetition } from '../sportsbookFeatured'
 import EventList from './EventList'
 import OddsButton from './OddsButton'
@@ -86,6 +87,26 @@ function SpendGuard({ marquee, feedSource }) {
     )
 }
 
+function SportsbookEnergy({ energy }) {
+    return (
+        <section className="sb-energy" aria-label="Sportsbook market energy">
+            <div className="sb-energy-meter" style={{ '--energy': `${energy.score}%` }}>
+                <span />
+            </div>
+            <div className="sb-energy-copy">
+                <span><Zap size={14} /> {energy.label}</span>
+                <p>{energy.note}</p>
+            </div>
+            <dl>
+                <div><dt>Live</dt><dd>{energy.liveCount}</dd></div>
+                <div><dt>Marquee</dt><dd>{energy.marqueeCount}</dd></div>
+                <div><dt>Moving</dt><dd>{energy.movingSelections}</dd></div>
+                <div><dt>Est.</dt><dd>{energy.estimatedCount}</dd></div>
+            </dl>
+        </section>
+    )
+}
+
 function SportsHome({ events, sports, leagues, feedSource = 'fallback', marquee = null, selectedIds, onToggleSelection, onOpenEvent, onOpenSearch, onNavigate }) {
     const topMatches = events.filter(event => event.tags?.includes('top') || event.tags?.includes('marquee')).slice(0, 6)
     const popularEvents = events.filter(event => event.tags?.includes('popular') || event.tags?.includes('feed')).slice(0, 30)
@@ -97,6 +118,7 @@ function SportsHome({ events, sports, leagues, feedSource = 'fallback', marquee 
     const featured = isLive ? buildFeaturedCompetitions(events, leagues, { limit: 3, minEvents: 1 }) : []
     const spotlight = isLive ? spotlightCompetition(events, leagues) : null
     const spotlightEvent = spotlight?.events?.[0] || topMatches[0] || events[0]
+    const energy = deriveSportsbookEnergy({ events, marquee, feedSource })
 
     // Outrights: synthetic fallback ships hardcoded World Cup futures. With a
     // live feed we build a "title contenders" board from the spotlight
@@ -151,6 +173,7 @@ function SportsHome({ events, sports, leagues, feedSource = 'fallback', marquee 
             </button>
 
             <MatchdaySpotlight competition={spotlight || featured[0]} event={spotlightEvent} onOpenEvent={onOpenEvent} />
+            <SportsbookEnergy energy={energy} />
             <SpendGuard marquee={marquee} feedSource={feedSource} />
 
             <nav className="sb-subnav" aria-label="Sportsbook sections">

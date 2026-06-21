@@ -21,7 +21,9 @@ import WinPathOverlay from '../primitives/WinPathOverlay'
 import { getFeatureContract } from '../../../data/slotFeatureContracts'
 import { recordFeatureEvent } from '../../../hooks/useProgress'
 import { useSettings } from '../../../hooks/useSettings'
+import { FEEDBACK_EVENTS, playFeedback } from '../../../utils/gameFeedback'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
+import { haptic } from '../../../utils/haptics'
 import {
     SLOT_TEMPLATES,
     getBuyTiers,
@@ -262,10 +264,16 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const slotSfx = useSfx('slots')
-    const { reduceMotion, quickSpin } = useSettings()
+    const { reduceMotion, quickSpin, haptics } = useSettings()
     // "Fast bonus": reduced-motion players skip the full bonus-entry cinematic.
     const bonusCineMs = reduceMotion ? 450 : BONUS_CINEMATIC_MS
     const session = useGameSession('slots')
+    const feedback = useCallback((event, options = {}) => playFeedback(event, {
+        sfx: slotSfx,
+        haptic,
+        hapticsEnabled: haptics,
+        ...options,
+    }), [haptics, slotSfx])
 
     const startId = useMemo(() => {
         if (initialTemplateId && SLOT_TEMPLATES.some(t => t.id === initialTemplateId)) return initialTemplateId
@@ -723,7 +731,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             const scatterHits = result.cells.reduce((n, cell) => n + (cell?.id === scatterCfg.symbolId ? 1 : 0), 0)
             if (scatterHits === scatterCfg.trigger - 1) {
                 setNearMiss({ trigger: Date.now(), hits: scatterHits, need: scatterCfg.trigger })
-                slotSfx.play('anticipation', { volume: 0.5 })
+                feedback(FEEDBACK_EVENTS.ANTICIPATION, { volume: 0.5 })
             } else {
                 setNearMiss(null)
             }
@@ -737,10 +745,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const burstEvent = result.featureEvents.find(item => item.type === 'coin-meter-fill')
         if (jackpotEvent) {
             setEventFlash({ trigger: revealTrigger, label: 'JACKPOT', kind: 'jackpot' })
-            slotSfx.play('bigwin', { volume: 0.95 })
+            feedback(FEEDBACK_EVENTS.BIG_WIN, { volume: 0.95 })
         } else if (burstEvent) {
             setEventFlash({ trigger: revealTrigger, label: 'VAULT BURST' })
-            slotSfx.play('bonusEnter', { volume: 0.9 })
+            feedback(FEEDBACK_EVENTS.BONUS_ENTER, { volume: 0.9 })
             // Bespoke bonus-entry cinematic for the vault-style burst entry.
             const burstFs = result.featureEvents.find(item => item.type === 'free-spins')?.freeSpins || 0
             setBonusCine({
@@ -846,7 +854,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
         const freeSpinEvent = result.featureEvents.find(item => item.type === 'free-spins')
         if (freeSpinEvent?.freeSpins) {
-            slotSfx.play('bonusEnter', { volume: 0.92 })
+            feedback(FEEDBACK_EVENTS.BONUS_ENTER, { volume: 0.92 })
             // Bespoke bonus-entry cinematic on the initial bonus open (not on
             // retriggers, and not when the vault-burst path already played it).
             if (!freeSpinSession && !burstEvent) {
@@ -942,11 +950,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         })
 
         if (profit > 0 && (result.multiplier >= SLOT_BIG_WIN_THRESHOLD || profit >= baseBet * SLOT_BIG_WIN_THRESHOLD)) {
-            slotSfx.play('bigwin', { volume: 0.9 })
+            feedback(FEEDBACK_EVENTS.BIG_WIN, { volume: 0.9 })
             playSound('bigwin')
             setBigWin({ trigger: Date.now(), profit, multiplier: result.multiplier })
         } else {
-            slotSfx.play(profit > 0 ? 'win' : 'lose', { volume: profit > 0 ? 0.78 : 0.66 })
+            feedback(profit > 0 ? FEEDBACK_EVENTS.WIN : FEEDBACK_EVENTS.LOSE, { volume: profit > 0 ? 0.78 : 0.66 })
             playSound(profit > 0 ? 'win' : 'loss')
         }
 
@@ -956,7 +964,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`,
         )
         resolve({ profit, multiplier: result.multiplier, featureEvents: result.featureEvents })
-    }, [addWinnings, cellPositions, clearTimers, config, freeSpinSession, playSound, reduceMotion, session, showToast, slotSfx])
+    }, [addWinnings, cellPositions, clearTimers, config, feedback, freeSpinSession, playSound, reduceMotion, session, showToast, slotSfx])
 
     const performSpin = useCallback(({ source = 'manual', bet = betAmount, free = canUseFreeSpin, tierId = null } = {}) => (
         new Promise(resolve => {
@@ -1015,7 +1023,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 setStoppedColumnState(cols)
                 setGrid(result.cells)
                 playSound('tick')
-                slotSfx.play('spinStart', { volume: 0.7 })
+                feedback(FEEDBACK_EVENTS.SPIN_START, { volume: 0.7 })
                 pendingFinishRef.current = () => {
                     finishRound({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
                 }
@@ -1070,7 +1078,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setBonusEndBanner(null)
             setAnticipating(false)
             playSound('tick')
-            slotSfx.play('spinStart', { volume: 0.85 })
+            feedback(FEEDBACK_EVENTS.SPIN_START, { volume: 0.85 })
             slotSfx.play('reelTick', { volume: 0.42 })
 
             ticker.current = window.setInterval(() => {
@@ -1090,9 +1098,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 const captureCol = col
                 timers.current.push(window.setTimeout(() => {
                     playSound('flip')
-                    slotSfx.play('reelStop', { volume: 0.62 })
+                    feedback(FEEDBACK_EVENTS.REEL_STOP, { volume: 0.62 })
                     if (willAnticipate && captureCol === anticipationFromCol + 1) {
-                        slotSfx.play('anticipation', { volume: 0.72 })
+                        feedback(FEEDBACK_EVENTS.ANTICIPATION, { volume: 0.72 })
                         setAnticipating(true)
                         setAnticipationScatters({ have: scatterEarlyCount, need: scatterTrigger })
                     }
@@ -1116,7 +1124,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 finish()
             }, totalDelay))
         })
-    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, finishRound, freeSpins, instant, placeBet, playSound, reduceMotion, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
+    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, feedback, finishRound, freeSpins, instant, placeBet, playSound, reduceMotion, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
 
     const slamStop = useCallback(() => {
         // Resolve an in-flight spin immediately: snap all reels to their final

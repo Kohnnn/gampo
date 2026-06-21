@@ -1014,6 +1014,13 @@
     background: var(--accent-green);
 }
 
+.session-recap-note {
+    margin: 8px 0 0;
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
 .studio-grid,
 .mission-grid,
 .lesson-grid,

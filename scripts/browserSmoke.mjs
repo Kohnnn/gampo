@@ -1,5 +1,5 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { createWriteStream, existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -125,23 +125,38 @@ function findBrowser() {
     return found
 }
 
+function debuggerHostForBrowser(browser) {
+    const explicit = argValue('debuggerHost', '')
+    if (explicit) return explicit
+    const normalized = browser.replaceAll('\\', '/')
+    if (!normalized.startsWith('/mnt/c/')) return '127.0.0.1'
+    try {
+        const resolv = readFileSync('/etc/resolv.conf', 'utf8')
+        const match = resolv.match(/^nameserver\s+(\S+)/m)
+        if (match?.[1]) return match[1]
+    } catch {
+        // Fall back to localhost for non-WSL environments.
+    }
+    return '127.0.0.1'
+}
+
 function routeSlug(route) {
     if (route === '/') return 'home'
     return route.replace(/^\//, '').replace(/[^a-z0-9-]+/gi, '-')
 }
 
-async function waitForDebugger(port, timeoutMs = 8000) {
+async function waitForDebugger(port, host = '127.0.0.1', timeoutMs = 8000) {
     const start = Date.now()
     while (Date.now() - start < timeoutMs) {
         try {
-            const res = await fetch(`http://127.0.0.1:${port}/json/version`)
+            const res = await fetch(`http://${host}:${port}/json/version`)
             if (res.ok) return await res.json()
         } catch {
             // Browser is still starting.
         }
         await sleep(120)
     }
-    throw new Error(`Timed out waiting for browser debugger on port ${port}`)
+    throw new Error(`Timed out waiting for browser debugger on ${host}:${port}`)
 }
 
 class CdpClient {
@@ -644,6 +659,7 @@ async function run() {
     const routes = parseListArg('routes', DEFAULT_ROUTES)
     const viewports = parseViewportArg(argValue('viewports', ''))
     const browser = findBrowser()
+    const debuggerHost = debuggerHostForBrowser(browser)
     const port = Number(argValue('port', String(9300 + Math.floor(Math.random() * 400))))
     const readyTimeoutMs = Number(argValue('readyTimeoutMs', '12000'))
     const settleMs = Number(argValue('settleMs', '700'))
@@ -656,21 +672,34 @@ async function run() {
     if (clean) await rm(runDir, { recursive: true, force: true })
     await mkdir(screenshotDir, { recursive: true })
 
+    const browserLogPath = join(runDir, 'browser-startup.log')
+    const browserLog = createWriteStream(browserLogPath, { flags: 'a' })
     const proc = spawn(browser, [
         '--headless=new',
         '--disable-gpu',
         '--no-first-run',
         '--no-default-browser-check',
         '--mute-audio',
+        '--remote-debugging-address=0.0.0.0',
         `--remote-debugging-port=${port}`,
         `--user-data-dir=${userDataDir}`,
         'about:blank',
-    ], { stdio: 'ignore' })
+    ], { stdio: ['ignore', browserLog, browserLog] })
     proc.unref()
 
     let client
     try {
-        const version = await waitForDebugger(port)
+        let version
+        try {
+            version = await waitForDebugger(port, debuggerHost)
+        } catch (error) {
+            let details = ''
+            try { details = readFileSync(browserLogPath, 'utf8').trim() } catch {}
+            throw new Error(`${error.message}${details ? `\nBrowser startup log (${browserLogPath}):\n${details}` : ''}`)
+        }
+        if (debuggerHost !== '127.0.0.1') {
+            version.webSocketDebuggerUrl = version.webSocketDebuggerUrl.replace('127.0.0.1', debuggerHost)
+        }
         client = new CdpClient(version.webSocketDebuggerUrl)
         await client.open()
         const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' })
@@ -808,6 +837,7 @@ async function run() {
             client.close()
         }
         proc.kill()
+        browserLog.end()
         await sleep(500)
         try {
             await rm(userDataDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 250 })
