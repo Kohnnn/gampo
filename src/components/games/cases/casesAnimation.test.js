@@ -7,6 +7,8 @@ import {
     casePhaseLabel,
     claimCaseSettlement,
     finalPrizeOffset,
+    getCaseReelMetrics,
+    getCaseReelStartOffset,
     hasReachedCasePhase,
     pickCelebrationDrop,
     shouldCelebrateDrop,
@@ -19,6 +21,44 @@ describe('cases animation helpers', () => {
         expect(CASE_TILE_GAP_PX).toBe(4)
         expect(finalPrizeOffset(0)).toBe(-((CASE_PRIZE_INDEX * (CASE_TILE_PX + CASE_TILE_GAP_PX)) + (CASE_TILE_PX / 2)))
         expect(finalPrizeOffset(6)).toBe(finalPrizeOffset(0) + 6)
+    })
+
+    it('reads reel metrics from rendered CSS custom properties', () => {
+        const el = { nodeType: 1 }
+        const originalWindow = globalThis.window
+        globalThis.window = {
+            getComputedStyle: () => ({
+                getPropertyValue: (prop) => {
+                    if (prop === '--case-tile-px') return '92px'
+                    if (prop === '--case-tile-gap') return '6px'
+                    return ''
+                },
+            }),
+        }
+        const metrics = getCaseReelMetrics(el)
+        expect(metrics.tilePx).toBe(92)
+        expect(metrics.gapPx).toBe(6)
+        globalThis.window = originalWindow
+    })
+
+    it('falls back to constants when element is missing or properties are empty', () => {
+        expect(getCaseReelMetrics(null)).toEqual({ tilePx: CASE_TILE_PX, gapPx: CASE_TILE_GAP_PX })
+        expect(getCaseReelMetrics(undefined)).toEqual({ tilePx: CASE_TILE_PX, gapPx: CASE_TILE_GAP_PX })
+        const el = { nodeType: 1 }
+        const originalWindow = globalThis.window
+        globalThis.window = {
+            getComputedStyle: () => ({
+                getPropertyValue: () => '',
+            }),
+        }
+        expect(getCaseReelMetrics(el)).toEqual({ tilePx: CASE_TILE_PX, gapPx: CASE_TILE_GAP_PX })
+        globalThis.window = originalWindow
+    })
+
+    it('computes start offset from tile and gap metrics', () => {
+        expect(getCaseReelStartOffset(118, 4)).toBe(-488)
+        expect(getCaseReelStartOffset(92, 4)).toBe(-384)
+        expect(getCaseReelStartOffset()).toBe(-((CASE_TILE_PX + CASE_TILE_GAP_PX) * 4))
     })
 
     it('labels the visible phase for the lock overlay', () => {

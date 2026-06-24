@@ -77,6 +77,30 @@ describe('case opening source of truth', () => {
             -((CASE_PRIZE_INDEX * (CASE_TILE_PX + CASE_TILE_GAP_PX)) + (CASE_TILE_PX / 2)) + 6,
         )
     })
+
+    it('SC-CAS-001: centers target with desktop tile metrics (118px + 4px)', () => {
+        const round = createCaseOpeningRound({
+            caseData: sampleCase,
+            rows: 1,
+            tilePx: 118,
+            gapPx: 4,
+        })
+        const expected = -((CASE_PRIZE_INDEX * (118 + 4)) + (118 / 2))
+        expect(round.entries[0].finalOffset).toBeGreaterThanOrEqual(expected - 8)
+        expect(round.entries[0].finalOffset).toBeLessThanOrEqual(expected + 8)
+    })
+
+    it('SC-CAS-002: centers target with mobile tile metrics (92px + 4px)', () => {
+        const round = createCaseOpeningRound({
+            caseData: sampleCase,
+            rows: 1,
+            tilePx: 92,
+            gapPx: 4,
+        })
+        const expected = -((CASE_PRIZE_INDEX * (92 + 4)) + (92 / 2))
+        expect(round.entries[0].finalOffset).toBeGreaterThanOrEqual(expected - 8)
+        expect(round.entries[0].finalOffset).toBeLessThanOrEqual(expected + 8)
+    })
 })
 
 describe('C3 near-miss seeding (cosmetic only)', () => {

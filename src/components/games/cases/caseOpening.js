@@ -142,6 +142,8 @@ export function createCaseOpeningRound({
     stake = unitPrice * rows,
     targetIndex = CASE_PRIZE_INDEX,
     nearMissChance = 0.34,
+    tilePx = CASE_TILE_PX,
+    gapPx = CASE_TILE_GAP_PX,
 } = {}) {
     const items = caseData?.items || []
     const entries = Array.from({ length: rows }, () => {
@@ -168,7 +170,7 @@ export function createCaseOpeningRound({
             isRareCaseItem(reelTrack[targetIndex - 1]) || isRareCaseItem(reelTrack[targetIndex + 1])
         )
         const jitter = (nextRoll('cases-jit').roll - 0.5) * 14
-        const finalOffset = finalCaseReelOffset({ jitter, targetIndex })
+        const finalOffset = finalCaseReelOffset({ jitter, targetIndex, tilePx, gapPx })
         return { outcome, reelTrack, targetIndex, finalOffset, nearMiss }
     })
 
