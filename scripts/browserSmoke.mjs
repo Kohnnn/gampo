@@ -1,5 +1,5 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { createWriteStream, existsSync, readFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -673,7 +673,7 @@ async function run() {
     await mkdir(screenshotDir, { recursive: true })
 
     const browserLogPath = join(runDir, 'browser-startup.log')
-    const browserLog = createWriteStream(browserLogPath, { flags: 'a' })
+    const browserLogFd = openSync(browserLogPath, 'a')
     const proc = spawn(browser, [
         '--headless=new',
         '--disable-gpu',
@@ -684,7 +684,7 @@ async function run() {
         `--remote-debugging-port=${port}`,
         `--user-data-dir=${userDataDir}`,
         'about:blank',
-    ], { stdio: ['ignore', browserLog, browserLog] })
+    ], { stdio: ['ignore', browserLogFd, browserLogFd] })
     proc.unref()
 
     let client
@@ -702,77 +702,86 @@ async function run() {
         }
         client = new CdpClient(version.webSocketDebuggerUrl)
         await client.open()
-        const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' })
-        const { sessionId } = await client.send('Target.attachToTarget', { targetId, flatten: true })
-        await client.send('Page.enable', {}, sessionId)
-        await client.send('Runtime.enable', {}, sessionId)
-        await client.send('Log.enable', {}, sessionId)
-
-        // Pre-seed first-visit onboarding as already seen so the one-time
-        // WelcomeModal doesn't gate every route during steady-state benchmarking
-        // (the modal is verified separately). Runs before any page script on
-        // each fresh navigation, surviving the per-route storage clear.
-        try {
-            await client.send('Page.addScriptToEvaluateOnNewDocument', {
-                source: "try { localStorage.setItem('gampo_onboarding_v1', JSON.stringify({ seen: true, seenAt: new Date().toISOString() })); } catch (e) {}",
-            }, sessionId)
-        } catch {
-            // Older Chromium may reject; harness still works, modal may show.
-        }
 
         const results = []
         for (const viewport of viewports) {
-            await client.send('Emulation.setDeviceMetricsOverride', {
-                width: viewport.width,
-                height: viewport.height,
-                deviceScaleFactor: 1,
-                mobile: viewport.width < 768,
-            }, sessionId)
             for (const route of routes) {
-                client.drainEvents(sessionId)
                 const url = `${baseUrl}${route}`
+                const { targetId } = await client.send('Target.createTarget', { url: 'about:blank' })
+                const { sessionId } = await client.send('Target.attachToTarget', { targetId, flatten: true })
                 try {
-                    await client.send('Storage.clearDataForOrigin', {
-                        origin,
-                        storageTypes: 'local_storage,session_storage,indexeddb',
+                    await client.send('Page.enable', {}, sessionId)
+                    await client.send('Runtime.enable', {}, sessionId)
+                    await client.send('Log.enable', {}, sessionId)
+
+                    // Pre-seed first-visit onboarding as already seen so the one-time
+                    // WelcomeModal doesn't gate every route during steady-state benchmarking
+                    // (the modal is verified separately). Runs before any page script on
+                    // each fresh navigation, surviving the per-route storage clear.
+                    try {
+                        await client.send('Page.addScriptToEvaluateOnNewDocument', {
+                            source: "try { localStorage.setItem('gampo_onboarding_v1', JSON.stringify({ seen: true, seenAt: new Date().toISOString() })); } catch (e) {}",
+                        }, sessionId)
+                    } catch {
+                        // Older Chromium may reject; harness still works, modal may show.
+                    }
+
+                    await client.send('Emulation.setDeviceMetricsOverride', {
+                        width: viewport.width,
+                        height: viewport.height,
+                        deviceScaleFactor: 1,
+                        mobile: viewport.width < 768,
                     }, sessionId)
-                } catch {
-                    // Older Chromium builds can reject Storage.clearDataForOrigin
-                    // before a target is fully warmed. The route still gets a hard
-                    // navigation below, so this is a best-effort isolation step.
-                }
-                await client.send('Page.navigate', { url }, sessionId)
-                await waitForLoad(client, sessionId)
-                let ready = await waitForReady(client, sessionId, readyTimeoutMs)
-                if (!ready) {
-                    await client.send('Page.reload', { ignoreCache: true }, sessionId)
+                    client.drainEvents(sessionId)
+                    try {
+                        await client.send('Storage.clearDataForOrigin', {
+                            origin,
+                            storageTypes: 'local_storage,session_storage,indexeddb',
+                        }, sessionId)
+                    } catch {
+                        // Older Chromium builds can reject Storage.clearDataForOrigin
+                        // before a target is fully warmed. The route still gets a hard
+                        // navigation below, so this is a best-effort isolation step.
+                    }
+                    await client.send('Page.navigate', { url }, sessionId)
                     await waitForLoad(client, sessionId)
-                    ready = await waitForReady(client, sessionId, Math.max(readyTimeoutMs, 12000))
+                    let ready = await waitForReady(client, sessionId, readyTimeoutMs)
+                    if (!ready) {
+                        await client.send('Page.reload', { ignoreCache: true }, sessionId)
+                        await waitForLoad(client, sessionId)
+                        ready = await waitForReady(client, sessionId, Math.max(readyTimeoutMs, 12000))
+                    }
+                    await sleep(settleMs)
+                    const events = client.drainEvents(sessionId)
+                    const metrics = await evaluatePage(client, sessionId, route)
+                    const interaction = await runMobileInteraction(client, sessionId, route, viewport)
+                    const interactionEvents = client.drainEvents(sessionId)
+                    const screenshotName = `${viewport.width}x${viewport.height}-${routeSlug(route)}.png`
+                    const screenshotPath = join(screenshotDir, screenshotName)
+                    const shot = await client.send('Page.captureScreenshot', {
+                        format: 'png',
+                        fromSurface: true,
+                    }, sessionId)
+                    await writeFile(screenshotPath, Buffer.from(shot.data, 'base64'))
+                    results.push({
+                        route,
+                        url,
+                        viewport,
+                        screenshot: screenshotPath,
+                        errors: collectErrors([...events, ...interactionEvents]),
+                        interaction,
+                        ...metrics,
+                    })
+                    const blocked = metrics.mobileActionHit?.blocked ? ' blocked' : ''
+                    const score = isUxMode && metrics.ux ? ` ux=${metrics.ux.score}` : ''
+                    console.log(`${viewport.width}x${viewport.height} ${route} overflow=${metrics.overflowDelta}px action=${metrics.keyActionVisible ? 'yes' : 'no'}${blocked}${score} interaction=${interaction.status} errors=${collectErrors([...events, ...interactionEvents]).length}`)
+                } finally {
+                    try {
+                        await client.send('Target.closeTarget', { targetId })
+                    } catch {
+                        // Browser shutdown will reclaim the target if route cleanup races.
+                    }
                 }
-                await sleep(settleMs)
-                const events = client.drainEvents(sessionId)
-                const metrics = await evaluatePage(client, sessionId, route)
-                const interaction = await runMobileInteraction(client, sessionId, route, viewport)
-                const interactionEvents = client.drainEvents(sessionId)
-                const screenshotName = `${viewport.width}x${viewport.height}-${routeSlug(route)}.png`
-                const screenshotPath = join(screenshotDir, screenshotName)
-                const shot = await client.send('Page.captureScreenshot', {
-                    format: 'png',
-                    fromSurface: true,
-                }, sessionId)
-                await writeFile(screenshotPath, Buffer.from(shot.data, 'base64'))
-                results.push({
-                    route,
-                    url,
-                    viewport,
-                    screenshot: screenshotPath,
-                    errors: collectErrors([...events, ...interactionEvents]),
-                    interaction,
-                    ...metrics,
-                })
-                const blocked = metrics.mobileActionHit?.blocked ? ' blocked' : ''
-                const score = isUxMode && metrics.ux ? ` ux=${metrics.ux.score}` : ''
-                console.log(`${viewport.width}x${viewport.height} ${route} overflow=${metrics.overflowDelta}px action=${metrics.keyActionVisible ? 'yes' : 'no'}${blocked}${score} interaction=${interaction.status} errors=${collectErrors([...events, ...interactionEvents]).length}`)
             }
         }
 
@@ -837,7 +846,7 @@ async function run() {
             client.close()
         }
         proc.kill()
-        browserLog.end()
+        try { closeSync(browserLogFd) } catch {}
         await sleep(500)
         try {
             await rm(userDataDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 250 })
