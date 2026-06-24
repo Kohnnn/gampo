@@ -65,10 +65,13 @@ export function haptic(pattern = 'tick', { enabled, force = false } = {}) {
 
     const spec = typeof pattern === 'string' ? HAPTIC_PATTERNS[pattern] : pattern
     if (spec == null) return false
+    // Chromium blocks vibrate without user activation.
+    // When userActivation is absent (Safari/Firefox) fall through to the call.
+    if (typeof navigator.userActivation !== 'undefined' && !navigator.userActivation.hasBeenActive) return false
     try {
-        navigator.vibrate(spec)
-        lastFiredAt = now
-        return true
+        const ok = navigator.vibrate(spec)
+        if (ok) lastFiredAt = now
+        return ok
     } catch {
         return false
     }
