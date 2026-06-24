@@ -8,6 +8,12 @@ export const SLOT_CASCADE_TRACE_MS = 520
 export const CASCADE_STEP_MS = 620
 export const CASCADE_POP_FRACTION = 0.42 // portion of a step spent on the pop before refill
 
+export const SLOT_REEL_TICKER_MS = Object.freeze({ normal: 85, turbo: 55 })
+export const SLOT_REEL_SPIN_DURATION_MS = Object.freeze({ normal: 85, turbo: 55 })
+export const SLOT_REEL_SETTLE_MS = Object.freeze({ normal: 360, turbo: 180 })
+export const SLOT_REEL_BASE_STOP_MS = Object.freeze({ normal: 200, turbo: 80 })
+export const SLOT_REEL_ANTICIPATION_MULTIPLIER = 1.65
+
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value))
 }
@@ -19,6 +25,76 @@ function toFiniteNumber(value, fallback = 0) {
 
 function uniqueNumbers(values = []) {
     return Array.from(new Set(values.map(value => Number(value)).filter(Number.isFinite)))
+}
+
+function normalizeSpinMode(mode = 'normal') {
+    return mode === 'turbo' || mode === 'instant' ? mode : 'normal'
+}
+
+function getMotionSpeedKey({ mode = 'normal', reduceMotion = false } = {}) {
+    return normalizeSpinMode(mode) === 'turbo' || reduceMotion ? 'turbo' : 'normal'
+}
+
+export function getSlotTickerIntervalMs({ mode = 'normal', reduceMotion = false } = {}) {
+    const nextMode = normalizeSpinMode(mode)
+    if (nextMode === 'instant' || reduceMotion) return 0
+    return SLOT_REEL_TICKER_MS[getMotionSpeedKey({ mode: nextMode, reduceMotion })]
+}
+
+export function getSlotReelSpinDurationMs({ mode = 'normal', reduceMotion = false } = {}) {
+    const nextMode = normalizeSpinMode(mode)
+    if (nextMode === 'instant' || reduceMotion) return 0
+    return SLOT_REEL_SPIN_DURATION_MS[getMotionSpeedKey({ mode: nextMode, reduceMotion })]
+}
+
+export function buildSlotAnticipationTiming({ cols = 5, enabled = false, multiplier = SLOT_REEL_ANTICIPATION_MULTIPLIER } = {}) {
+    const reelCount = Math.max(1, Math.floor(toFiniteNumber(cols, 1)))
+    if (!enabled || reelCount < 3) return null
+    return {
+        fromCol: Math.max(1, reelCount - 2),
+        multiplier: Math.max(1, toFiniteNumber(multiplier, SLOT_REEL_ANTICIPATION_MULTIPLIER)),
+    }
+}
+
+export function buildSlotStopSchedule({ cols = 5, mode = 'normal', reduceMotion = false, anticipation = null } = {}) {
+    const reelCount = Math.max(0, Math.floor(toFiniteNumber(cols, 0)))
+    if (!reelCount) return { stops: [], settleDelayMs: 0, totalDelayMs: 0, anticipation: null }
+
+    const nextMode = normalizeSpinMode(mode)
+    if (nextMode === 'instant' || reduceMotion) {
+        return {
+            stops: [{ col: reelCount, atMs: 0, deltaMs: 0, anticipating: false }],
+            settleDelayMs: 0,
+            totalDelayMs: 0,
+            anticipation: null,
+        }
+    }
+
+    const speedKey = getMotionSpeedKey({ mode: nextMode, reduceMotion })
+    const settleDelayMs = SLOT_REEL_SETTLE_MS[speedKey]
+    const baseStopMs = SLOT_REEL_BASE_STOP_MS[speedKey]
+    const activeAnticipation = anticipation?.fromCol ? anticipation : null
+    const stops = []
+    let cumulative = 0
+    let previousStopAt = 0
+
+    for (let col = 1; col <= reelCount; col += 1) {
+        const ratio = col / reelCount
+        const targetStopAt = Math.round(baseStopMs * reelCount * (1 - Math.pow(1 - ratio, 3)))
+        const deltaMs = targetStopAt - previousStopAt
+        const isAnticipating = Boolean(activeAnticipation && col > activeAnticipation.fromCol)
+        const adjustedDeltaMs = isAnticipating ? Math.round(deltaMs * activeAnticipation.multiplier) : deltaMs
+        cumulative += adjustedDeltaMs
+        previousStopAt = targetStopAt
+        stops.push({ col, atMs: cumulative, deltaMs: adjustedDeltaMs, anticipating: isAnticipating })
+    }
+
+    return {
+        stops,
+        settleDelayMs,
+        totalDelayMs: cumulative + settleDelayMs,
+        anticipation: activeAnticipation,
+    }
 }
 
 export function buildHoldTileStates(board = {}) {
