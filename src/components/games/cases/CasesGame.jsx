@@ -61,6 +61,8 @@ import {
     CASE_VISIBLE_PHASES,
     casePhaseLabel,
     claimCaseSettlement,
+    getCaseReelMetrics,
+    getCaseReelStartOffset,
     hasReachedCasePhase,
     pickCelebrationDrop,
     summarizeCaseSettlement,
@@ -83,7 +85,6 @@ import { useGameBgm } from '../../../audio/useBgm'
 const ROW_OPTIONS = [1, 3, 5, 10]
 const REEL_PREVIEW_ROWS = 5
 const REEL_PREVIEW_TILES = 18
-const CASE_REEL_START_OFFSET = -((CASE_TILE_PX + CASE_TILE_GAP_PX) * 4)
 // C2: the reel travels this many px PAST its final resting offset, then eases
 // back, so the landing reads as momentum rather than a hard stop.
 const CASE_REEL_OVERSHOOT_PX = 46
@@ -650,6 +651,7 @@ export default function CasesGame() {
     const celebrationTimerRef = useRef(null)
     const resultsPanelRef = useRef(null)
     const reelAreaRef = useRef(null)
+    const stageRef = useRef(null)
     const initialCaseIdRef = useRef(searchParams.get('caseId'))
     const [dockPortal, setDockPortal] = useState(null)
     useEffect(() => { setDockPortal(document.body) }, [])
@@ -911,12 +913,15 @@ export default function CasesGame() {
         sfx.play('click')
         setView('open')
 
+        const { tilePx, gapPx } = getCaseReelMetrics(stageRef.current)
         const round = createCaseOpeningRound({
             caseData: activeCase,
             rows,
             stake,
             unitPrice,
             targetIndex: CASE_PRIZE_INDEX,
+            tilePx,
+            gapPx,
         })
         const picks = round.outcomes
         const newTracks = round.tracks
@@ -959,7 +964,7 @@ export default function CasesGame() {
             if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
             setCasePhase('spin')
             setTracks(newTracks)
-            setTrackOffsets(newTracks.map(() => CASE_REEL_START_OFFSET))
+            setTrackOffsets(newTracks.map(() => getCaseReelStartOffset(tilePx, gapPx)))
             sfx.play('multispin', { volume: rows >= 3 ? 0.62 : 0.36 })
             queueRevealTimer(() => {
                 if (!pendingRoundRef.current || pendingRoundRef.current.settled) return
@@ -1433,6 +1438,7 @@ export default function CasesGame() {
         >
             <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
                 <div
+                    ref={stageRef}
                     className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}${nearMiss ? ' case-near-miss' : ''}`}
                     style={{
                         '--case-spin-ms': `${quickOpen ? 1320 : CASE_REVEAL_MS}ms`,
