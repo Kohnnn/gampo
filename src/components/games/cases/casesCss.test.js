@@ -17,6 +17,12 @@ describe('cases CSS polish', () => {
         expect(css).toContain('animation: casePrizeZoom 760ms')
     })
 
+    it('defines responsive --case-tile-px with 92px on mobile and 118px fallback', () => {
+        expect(css).toMatch(/@media\s*\(\s*max-width:\s*768px\s*\)[\s\S]*?--case-tile-px:\s*92px/s)
+        expect(css).toContain('width: var(--case-tile-px, 118px)')
+        expect(css).toContain('flex: 0 0 var(--case-tile-px, 118px)')
+    })
+
     it('defines the x10 mini-grid layout and keeps case stats readable', () => {
         expect(css).toContain('.cases-multi-open-grid')
         expect(css).toMatch(/\.cases-multi-open-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax/s)
