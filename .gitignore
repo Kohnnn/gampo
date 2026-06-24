@@ -27,6 +27,7 @@ zrok*.log
 vite.config.js.timestamp-*.mjs
 plinko-game-main.zip
 .agent
+.omo/
 .claude
 .codex/
 .vc-installed-files
