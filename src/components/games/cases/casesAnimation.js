@@ -23,6 +23,20 @@ export function finalPrizeOffset(jitter = 0, prizeIndex = CASE_PRIZE_INDEX, tile
     return -((prizeIndex * stride) + (tilePx / 2)) + jitter
 }
 
+export function getCaseReelMetrics(element) {
+    if (!element || typeof window === 'undefined') {
+        return { tilePx: CASE_TILE_PX, gapPx: CASE_TILE_GAP_PX }
+    }
+    const style = window.getComputedStyle(element)
+    const tilePx = parseFloat(style.getPropertyValue('--case-tile-px')) || CASE_TILE_PX
+    const gapPx = parseFloat(style.getPropertyValue('--case-tile-gap')) || CASE_TILE_GAP_PX
+    return { tilePx, gapPx }
+}
+
+export function getCaseReelStartOffset(tilePx = CASE_TILE_PX, gapPx = CASE_TILE_GAP_PX) {
+    return -((tilePx + gapPx) * 4)
+}
+
 export function casePhaseLabel(phase, rows = 1) {
     const rowText = rows > 1 ? `${rows} rows` : 'case'
     if (phase === 'arming') return 'Preparing drop...'
