@@ -797,7 +797,7 @@
 }
 
 .slot-cell.spinning {
-    animation: slotReelMotion 0.09s linear infinite;
+    animation: slotReelMotion var(--slot-reel-spin-duration, 0.09s) linear infinite;
     filter: blur(1.4px) brightness(1.1);
 }
 

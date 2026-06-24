@@ -4,10 +4,16 @@ import {
     SLOT_RETRIGGER_FLY_MS,
     SLOT_WHEEL_WOBBLE_MS,
     CASCADE_STEP_MS,
+    SLOT_REEL_SPIN_DURATION_MS,
+    SLOT_REEL_TICKER_MS,
+    buildSlotAnticipationTiming,
     buildSlotFeatureDemoState,
+    buildSlotStopSchedule,
     buildCascadeTraceCells,
     buildCascadeTimeline,
     cascadeTimelineDurationMs,
+    getSlotReelSpinDurationMs,
+    getSlotTickerIntervalMs,
     buildHoldTileStates,
     buildRetriggerFlyers,
     getCellCenterPercent,
@@ -118,6 +124,93 @@ describe('slot motion helpers', () => {
         expect(demo.holdTiles.filter(tile => tile.fresh).map(tile => tile.index)).toEqual([2, 4, 5])
         expect(demo.retriggerFlyers.map(flyer => flyer.id)).toEqual(['99-0-0', '99-7-1', '99-14-2'])
         expect(demo.retriggerFlyers.every(flyer => flyer.amount === 8)).toBe(true)
+    })
+})
+
+describe('slot reel cadence', () => {
+    it('SC-SLOT-001 builds a deterministic monotonic normal stop schedule', () => {
+        // Given: five columns in normal motion.
+        const schedule = buildSlotStopSchedule({ cols: 5, mode: 'normal' })
+
+        // When: the schedule is built.
+        const delays = schedule.stops.map(stop => stop.atMs)
+
+        // Then: each stop lands after the previous stop and total delay includes settle time.
+        expect(delays).toEqual([...delays].sort((a, b) => a - b))
+        expect(new Set(delays).size).toBe(delays.length)
+        expect(schedule.stops.map(stop => stop.col)).toEqual([1, 2, 3, 4, 5])
+        expect(schedule.totalDelayMs).toBe(delays[delays.length - 1] + schedule.settleDelayMs)
+    })
+
+    it('SC-SLOT-001 makes turbo shorter than normal while preserving every column stop', () => {
+        // Given: matching normal and turbo schedules.
+        const normal = buildSlotStopSchedule({ cols: 5, mode: 'normal' })
+        const turbo = buildSlotStopSchedule({ cols: 5, mode: 'turbo' })
+
+        // When: comparing stop and total timings.
+        const normalLast = normal.stops[normal.stops.length - 1].atMs
+        const turboLast = turbo.stops[turbo.stops.length - 1].atMs
+
+        // Then: turbo is strictly shorter but keeps the same stop columns.
+        expect(turboLast).toBeLessThan(normalLast)
+        expect(turbo.totalDelayMs).toBeLessThan(normal.totalDelayMs)
+        expect(turbo.stops.map(stop => stop.col)).toEqual(normal.stops.map(stop => stop.col))
+    })
+
+    it('SC-SLOT-001 collapses reduced-motion and instant schedules to the final state', () => {
+        // Given: reduced-motion and instant callers.
+        const reduced = buildSlotStopSchedule({ cols: 5, mode: 'normal', reduceMotion: true })
+        const instant = buildSlotStopSchedule({ cols: 5, mode: 'instant' })
+
+        // When: timing is generated.
+        const reducedDelays = reduced.stops.map(stop => stop.atMs)
+        const instantDelays = instant.stops.map(stop => stop.atMs)
+
+        // Then: both skip staggered reel timing and finish at once.
+        expect(reducedDelays).toEqual([0])
+        expect(instantDelays).toEqual([0])
+        expect(reduced.stops[0].col).toBe(5)
+        expect(instant.stops[0].col).toBe(5)
+        expect(reduced.totalDelayMs).toBe(0)
+        expect(instant.totalDelayMs).toBe(0)
+    })
+
+    it('SC-SLOT-001 extends anticipation only for final columns', () => {
+        // Given: anticipation begins on the penultimate reel.
+        const schedule = buildSlotStopSchedule({
+            cols: 5,
+            mode: 'normal',
+            anticipation: buildSlotAnticipationTiming({ cols: 5, enabled: true }),
+        })
+        const normal = buildSlotStopSchedule({ cols: 5, mode: 'normal' })
+
+        // When: stop deltas are compared.
+        const deltas = schedule.stops.map((stop, index) => stop.atMs - (schedule.stops[index - 1]?.atMs || 0))
+        const normalDeltas = normal.stops.map((stop, index) => stop.atMs - (normal.stops[index - 1]?.atMs || 0))
+
+        // Then: only the last two columns are stretched.
+        expect(deltas.slice(0, 3)).toEqual(normalDeltas.slice(0, 3))
+        expect(deltas[3]).toBeGreaterThan(normalDeltas[3])
+        expect(deltas[4]).toBeGreaterThan(normalDeltas[4])
+        expect(schedule.anticipation?.fromCol).toBe(3)
+    })
+
+    it('SC-SLOT-002 maps ticker interval and CSS spin duration to normal/turbo cadence', () => {
+        // Given: normal, turbo, reduced-motion, and instant modes.
+        const normalTicker = getSlotTickerIntervalMs({ mode: 'normal' })
+        const turboTicker = getSlotTickerIntervalMs({ mode: 'turbo' })
+        const normalDuration = getSlotReelSpinDurationMs({ mode: 'normal' })
+        const turboDuration = getSlotReelSpinDurationMs({ mode: 'turbo' })
+
+        // When: comparing cadence tokens.
+        // Then: turbo ticks and visible reel motion are faster; reduced/instant collapse.
+        expect(normalTicker).toBe(SLOT_REEL_TICKER_MS.normal)
+        expect(turboTicker).toBe(SLOT_REEL_TICKER_MS.turbo)
+        expect(getSlotTickerIntervalMs({ mode: 'normal', reduceMotion: true })).toBe(0)
+        expect(getSlotTickerIntervalMs({ mode: 'instant' })).toBe(0)
+        expect(normalDuration).toBe(SLOT_REEL_SPIN_DURATION_MS.normal)
+        expect(turboDuration).toBeLessThan(normalDuration)
+        expect(getSlotReelSpinDurationMs({ mode: 'instant' })).toBe(0)
     })
 })
 

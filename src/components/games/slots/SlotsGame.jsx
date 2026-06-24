@@ -40,8 +40,12 @@ import {
     buildHoldTileStates,
     buildRetriggerFlyers,
     buildSlotFeatureDemoState,
+    buildSlotAnticipationTiming,
+    buildSlotStopSchedule,
     buildCascadeTimeline,
     cascadeTimelineDurationMs,
+    getSlotReelSpinDurationMs,
+    getSlotTickerIntervalMs,
 } from './slotsMotion'
 import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
 import { winTier, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, rollupDurationMs, rollupFrame } from './slotWinPresentation'
@@ -74,11 +78,6 @@ const AUTOPLAY_COUNTS = [10, 25, 50, 100]
 // Instant (no reel animation, immediate result).
 const SPIN_MODE_ORDER = ['normal', 'turbo', 'instant']
 const SPIN_MODE_LABELS = { normal: 'Normal', turbo: 'Turbo', instant: 'Instant' }
-
-// Cubic-out easing for per-column stop delays.
-function cubicOut(t) {
-    return 1 - Math.pow(1 - t, 3)
-}
 
 // Segmented spin-speed control: Normal / Turbo / Instant shown as three labeled
 // options with an active state, so the current mode AND the alternatives are
@@ -1035,16 +1034,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 }, 0))
                 return
             }
-            // Reduced-motion shortens the reel spin/settle the same way turbo
-            // does, so motion-sensitive players get a quick, low-movement spin.
-            const fast = turbo || reduceMotion
-            const totalSettleDelay = fast ? 180 : 360
-            const baseStop = fast ? 80 : 200
-            const colDelays = []
-            for (let col = 1; col <= cols; col += 1) {
-                const ratio = col / cols
-                colDelays.push(Math.round(baseStop * cols * cubicOut(ratio)))
-            }
             const scatterId = config.features?.scatter?.symbolId
             const scatterMin = config.features?.anticipation?.scatterMin ?? 2
             let scatterEarlyCount = 0
@@ -1059,7 +1048,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 }
             }
             const willAnticipate = scatterEarlyCount >= scatterMin
-            const anticipationFromCol = cols - 2
+            const anticipation = buildSlotAnticipationTiming({ cols, enabled: willAnticipate })
+            const stopSchedule = buildSlotStopSchedule({
+                cols,
+                mode: turbo ? 'turbo' : 'normal',
+                reduceMotion,
+                anticipation,
+            })
             const scatterTrigger = config.features?.scatter?.triggerCount ?? config.features?.freeSpins?.triggerCount ?? (scatterMin + 1)
 
             setLastStake(stake)
@@ -1081,38 +1076,35 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             feedback(FEEDBACK_EVENTS.SPIN_START, { volume: 0.85 })
             slotSfx.play('reelTick', { volume: 0.42 })
 
-            ticker.current = window.setInterval(() => {
-                setGrid(prev => prev.map((cell, index) => {
-                    const { col } = cellPositions[index]
-                    if (col < stoppedColsRef.current) return cell
-                    return randomVisualSymbol(config)
-                }))
-            }, fast ? 55 : 85)
+            const tickerIntervalMs = getSlotTickerIntervalMs({ mode: turbo ? 'turbo' : 'normal', reduceMotion })
+            if (tickerIntervalMs > 0) {
+                ticker.current = window.setInterval(() => {
+                    setGrid(prev => prev.map((cell, index) => {
+                        const { col } = cellPositions[index]
+                        if (col < stoppedColsRef.current) return cell
+                        return randomVisualSymbol(config)
+                    }))
+                }, tickerIntervalMs)
+            }
 
-            let cumulative = 0
-            for (let col = 1; col <= cols; col += 1) {
-                const delta = colDelays[col - 1] - (col >= 2 ? colDelays[col - 2] : 0)
-                const slow = willAnticipate && col >= anticipationFromCol + 1
-                const adjusted = slow ? Math.round(delta * 1.65) : delta
-                cumulative += adjusted
-                const captureCol = col
+            for (const stop of stopSchedule.stops) {
                 timers.current.push(window.setTimeout(() => {
                     playSound('flip')
                     feedback(FEEDBACK_EVENTS.REEL_STOP, { volume: 0.62 })
-                    if (willAnticipate && captureCol === anticipationFromCol + 1) {
+                    if (willAnticipate && stop.anticipating && stop.col === (stopSchedule.anticipation?.fromCol || 0) + 1) {
                         feedback(FEEDBACK_EVENTS.ANTICIPATION, { volume: 0.72 })
                         setAnticipating(true)
                         setAnticipationScatters({ have: scatterEarlyCount, need: scatterTrigger })
                     }
-                    setStoppedColumnState(captureCol)
+                    setStoppedColumnState(stop.col)
                     setGrid(prev => prev.map((cell, index) => {
                         const { col: itemCol } = cellPositions[index]
-                        return itemCol < captureCol ? result.cells[index] : cell
+                        return itemCol < stop.col ? result.cells[index] : cell
                     }))
-                }, cumulative))
+                }, stop.atMs))
             }
 
-            const totalDelay = cumulative + totalSettleDelay
+            const totalDelay = stopSchedule.totalDelayMs
             // Capture the resolution so a second tap (slam-stop) can finish now.
             pendingFinishRef.current = () => {
                 finishRound({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
@@ -1442,6 +1434,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     '--slot-cover': `url(${cover})`,
                     '--slot-rows': config.layout.rows,
                     '--slot-cols': config.layout.cols,
+                    '--slot-reel-spin-duration': `${getSlotReelSpinDurationMs({ mode: spinMode, reduceMotion })}ms`,
                 }}
             >
                 {!slotAssetsReady && (
