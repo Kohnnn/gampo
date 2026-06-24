@@ -76,4 +76,22 @@ describe('haptics util', () => {
     it('ignores unknown pattern keys', () => {
         expect(haptic('does-not-exist', { enabled: true, force: true })).toBe(false)
     })
+
+    it('no-ops when user has not activated the page (mobile Chromium policy)', () => {
+        vi.stubGlobal('navigator', {
+            vibrate: (spec) => { vibrateCalls.push(spec); return true },
+            userActivation: { hasBeenActive: false },
+        })
+        expect(haptic('tick', { enabled: true })).toBe(false)
+        expect(vibrateCalls).toHaveLength(0)
+    })
+
+    it('returns false when navigator.vibrate is denied (mobile policy) and does not advance throttle', () => {
+        vi.stubGlobal('navigator', { vibrate: (spec) => { vibrateCalls.push(spec); return false } })
+        expect(haptic('tick', { enabled: true })).toBe(false)
+        expect(vibrateCalls).toEqual([HAPTIC_PATTERNS.tick])
+        // Throttle was NOT advanced — immediate second call reaches vibrate again.
+        expect(haptic('tick', { enabled: true })).toBe(false)
+        expect(vibrateCalls).toHaveLength(2)
+    })
 })
