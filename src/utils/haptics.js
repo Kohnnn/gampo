@@ -80,5 +80,7 @@ export function haptic(pattern = 'tick', { enabled, force = false } = {}) {
 // Cancel any ongoing vibration (e.g. on skip / unmount).
 export function cancelHaptics() {
     if (!supported()) return
+    // Chromium blocks vibrate without user activation, including cancellation.
+    if (typeof navigator.userActivation !== 'undefined' && !navigator.userActivation.hasBeenActive) return
     try { navigator.vibrate(0) } catch { /* ignore */ }
 }
