@@ -109,4 +109,51 @@ describe('cases animation helpers', () => {
         expect(claimCaseSettlement(pending)).toBe(false)
         expect(claimCaseSettlement(null)).toBe(false)
     })
+
+    it('settles a pending open once after the pending animation path resolves', () => {
+        const pending = {
+            picks: [{ name: 'Drop', valueGc: 3.25 }],
+            rows: 1,
+            settled: false,
+            stake: 2,
+        }
+        const payouts = []
+        const settle = (reason) => {
+            if (!claimCaseSettlement(pending)) return { reason, settled: false }
+            const summary = summarizeCaseSettlement(pending)
+            payouts.push(summary.totalReturn)
+            return {
+                pendingCleared: true,
+                phase: 'settled',
+                running: false,
+                settled: true,
+                summary,
+            }
+        }
+
+        const animationCompletion = settle('animation')
+        const lateSkipCompletion = settle('skip')
+
+        expect(animationCompletion).toMatchObject({
+            pendingCleared: true,
+            phase: 'settled',
+            running: false,
+            settled: true,
+            summary: { profit: 1.25, resultCount: 1, totalReturn: 3.25 },
+        })
+        expect(lateSkipCompletion).toEqual({ reason: 'skip', settled: false })
+        expect(payouts).toEqual([3.25])
+    })
+
+    it('keeps reduced-motion or rapid completion from double-settling or hanging pending', () => {
+        const pending = { settled: false }
+        const completionClaims = [
+            claimCaseSettlement(pending),
+            claimCaseSettlement(pending),
+            claimCaseSettlement(pending),
+        ]
+
+        expect(completionClaims).toEqual([true, false, false])
+        expect(pending.settled).toBe(true)
+    })
 })
