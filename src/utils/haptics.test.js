@@ -73,6 +73,15 @@ describe('haptics util', () => {
         expect(vibrateCalls).toContain(0)
     })
 
+    it('does not cancel vibration before user activation (mobile Chromium policy)', () => {
+        vi.stubGlobal('navigator', {
+            vibrate: (spec) => { vibrateCalls.push(spec); return true },
+            userActivation: { hasBeenActive: false },
+        })
+        cancelHaptics()
+        expect(vibrateCalls).toHaveLength(0)
+    })
+
     it('ignores unknown pattern keys', () => {
         expect(haptic('does-not-exist', { enabled: true, force: true })).toBe(false)
     })
