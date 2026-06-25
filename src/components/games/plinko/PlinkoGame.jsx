@@ -50,9 +50,9 @@ function loadEngine() {
     return enginePromise
 }
 
-const HOUSE_EDGE = 0.01
 const ROW_OPTIONS = [8, 10, 12, 14, 16]
 const RISK_OPTIONS = ['low', 'medium', 'high']
+
 
 const BALL_TYPES = {
     normal:   { id: 'normal',   name: 'Basic',    color: '#ff4d4f', image: '/images/coins/coin_original.svg', cost: 1,  bonus: 1  },
@@ -65,13 +65,13 @@ const BALL_TYPES = {
 
 function expectedReturn(payouts) {
     const n = payouts.length - 1
-    const sum = payouts.reduce((acc, m, k) => {
+    return payouts.reduce((acc, m, k) => {
         let coeff = 1
         for (let j = 1; j <= k; j++) coeff *= (n - j + 1) / j
         return acc + (coeff / Math.pow(2, n)) * m
     }, 0)
-    return sum * (1 - HOUSE_EDGE)
 }
+
 
 export default function PlinkoGame() {
     useGameBgm('plinko', 'idle')
@@ -239,7 +239,8 @@ export default function PlinkoGame() {
                 if (mode !== 'auto') resolve({ profit: 0 })
                 return
             }
-            const mult = Number((rawMult * ball.bonus * (1 - HOUSE_EDGE)).toFixed(4))
+            const mult = Number((rawMult * ball.bonus).toFixed(4))
+
             const returnAmount = betAmount * mult
             const profit = returnAmount - cost
             if (returnAmount > 0) addWinnings(returnAmount, 'Plinko return')
