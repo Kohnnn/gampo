@@ -249,6 +249,30 @@ describe('resolveSlotSpin engine', () => {
         expect(scatters).toBeGreaterThanOrEqual(tier.guaranteedScatters)
     })
 
+    it('only emits one free-spins event when a coin-meter fill lands with scatter-trigger counts', () => {
+        const config = getSlotTemplate('vault-rush')
+        const coinId = config.features.coinMeter.symbolId
+        const scatterId = config.features.scatter.symbolId
+        const coinRoll = 0.75
+        const result = resolveSlotSpin(config, {
+            bonusBuy: true,
+            buyTier: { id: 'test', guaranteedScatters: config.features.scatter.trigger },
+            rng: () => coinRoll,
+            rtpScalar: 1,
+        })
+        const coinHits = result.cells.filter(item => item.id === coinId).length
+        const scatterHits = result.cells.filter(item => item.id === scatterId).length
+        const freeSpinEvents = result.featureEvents.filter(event => event.type === 'free-spins')
+
+        expect(coinHits).toBeGreaterThanOrEqual(config.features.coinMeter.fillTrigger)
+        expect(scatterHits).toBeGreaterThanOrEqual(config.features.scatter.trigger)
+        expect(result.triggeredFreeSpins).toBe(true)
+        expect(freeSpinEvents).toHaveLength(1)
+        expect(freeSpinEvents[0].freeSpins).toBe(config.features.scatter.awardFreeSpins)
+        expect(freeSpinEvents[0].source).toBeUndefined()
+        expect(result.multiplier).toBeLessThan(100)
+    })
+
     it('applies multiplier zones for ghostblade-strike when wins cross zone columns', () => {
         const config = getSlotTemplate('ghostblade-strike')
         // Run multiple spins; some will cross zones, some will not.
