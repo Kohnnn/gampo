@@ -22,6 +22,49 @@ export function impliedProbability(decimalOdds) {
     return 1 / odds
 }
 
+export const ODDS_FORMATS = {
+    DECIMAL: 'decimal',
+    AMERICAN: 'american',
+    FRACTIONAL: 'fractional',
+}
+
+function greatestCommonDivisor(a, b) {
+    let x = Math.abs(a)
+    let y = Math.abs(b)
+    while (y) {
+        ;[x, y] = [y, x % y]
+    }
+    return x || 1
+}
+
+function decimalToAmerican(odds) {
+    if (odds >= 2) return `+${Math.round((odds - 1) * 100)}`
+    return `-${Math.round(100 / (odds - 1))}`
+}
+
+function decimalToFractional(odds) {
+    const fractionalValue = odds - 1
+    // Approximate to a denominator of 100 then reduce; covers standard book fractions.
+    const denominator = 100
+    const numerator = Math.round(fractionalValue * denominator)
+    const divisor = greatestCommonDivisor(numerator, denominator)
+    return `${numerator / divisor}/${denominator / divisor}`
+}
+
+export function formatOdds(decimalOdds, format = ODDS_FORMATS.DECIMAL) {
+    const odds = Number(decimalOdds)
+    if (!Number.isFinite(odds) || odds <= 1) return '—'
+    switch (format) {
+        case ODDS_FORMATS.AMERICAN:
+            return decimalToAmerican(odds)
+        case ODDS_FORMATS.FRACTIONAL:
+            return decimalToFractional(odds)
+        case ODDS_FORMATS.DECIMAL:
+        default:
+            return odds.toFixed(2)
+    }
+}
+
 export function overround(decimalOdds) {
     return decimalOdds.reduce((sum, odds) => sum + impliedProbability(odds), 0)
 }
@@ -167,6 +210,251 @@ export function evaluateOddsPolicy(selections = [], policy = ODDS_POLICIES.ACCEP
     return { allowed: true, needsManualAccept: false, reason: null }
 }
 
+function normalizeText(value) {
+    return String(value || '').trim().toLowerCase()
+}
+
+function parseNumber(value) {
+    if (value === null || value === undefined || value === '') return null
+    const direct = Number(value)
+    if (Number.isFinite(direct)) return direct
+    const match = String(value).match(/[+-]?\d+(?:\.\d+)?/)
+    if (!match) return null
+    const parsed = Number(match[0])
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function firstNumber(values) {
+    for (const value of values) {
+        const parsed = parseNumber(value)
+        if (parsed !== null) return parsed
+    }
+    return null
+}
+
+function normalizeMarketType({ marketType, marketLabel, marketId } = {}) {
+    const value = normalizeText([marketType, marketLabel, marketId].filter(Boolean).join(' '))
+    if (value.includes('total') || value.includes('over/under') || value.includes('over under')) return 'total'
+    if (value.includes('spread') || value.includes('handicap') || value.includes('run line') || value.includes('puck line')) return 'spread'
+    if (value.includes('winner') || value.includes('moneyline') || value.includes('match result') || value === '1x2' || value === 'h2h') return 'winner'
+    return null
+}
+
+function selectionLabel(input) {
+    return input.selectionLabel || input.label || input.selection?.label || ''
+}
+
+function scoreValue(input, side) {
+    const score = input.score || input.eventScore || input.eventResult?.score || input.event?.score || {}
+    return parseNumber(input[`${side}Score`] ?? score[side])
+}
+
+function selectionSide(input) {
+    const explicit = normalizeText(input.selectionSide || input.side || input.outcome || input.selection?.side)
+    if (['home', 'team1', 'team-1'].includes(explicit)) return 'home'
+    if (['away', 'visitor', 'team2', 'team-2'].includes(explicit)) return 'away'
+    if (['draw', 'tie', 'x'].includes(explicit)) return 'draw'
+
+    const label = normalizeText(selectionLabel(input))
+    const home = normalizeText(input.home || input.homeTeam || input.event?.home)
+    const away = normalizeText(input.away || input.awayTeam || input.event?.away)
+    if (home && (label === home || label.startsWith(`${home} `))) return 'home'
+    if (away && (label === away || label.startsWith(`${away} `))) return 'away'
+    if (/\bhome\b/.test(label) || label === '1' || label.startsWith('team 1')) return 'home'
+    if (/\baway\b/.test(label) || /\bvisitor\b/.test(label) || label === '2' || label.startsWith('team 2')) return 'away'
+    if (/\bdraw\b/.test(label) || /\btie\b/.test(label) || label === 'x') return 'draw'
+    return null
+}
+
+function totalSide(input) {
+    const label = normalizeText(selectionLabel(input))
+    if (label.includes('over')) return 'over'
+    if (label.includes('under')) return 'under'
+    return null
+}
+
+function settledResult(status, reason) {
+    return { status, reason }
+}
+
+function resolveWinner(input, homeScore, awayScore) {
+    const side = selectionSide(input)
+    if (!side) return settledResult('void', 'unsupported-selection')
+    const winner = homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : 'draw'
+    return settledResult(side === winner ? 'won' : 'lost', 'winner')
+}
+
+function resolveTotal(input, homeScore, awayScore) {
+    const side = totalSide(input)
+    const label = selectionLabel(input)
+    const line = firstNumber([input.marketLine, input.line, input.selection?.line, label, input.marketLabel])
+    if (!side) return settledResult('void', 'unsupported-selection')
+    if (line === null) return settledResult('pending', 'line-missing')
+    const total = homeScore + awayScore
+    if (total === line) return settledResult('void', 'push')
+    return settledResult(side === 'over' ? total > line ? 'won' : 'lost' : total < line ? 'won' : 'lost', 'total')
+}
+
+function resolveSpread(input, homeScore, awayScore) {
+    const side = selectionSide(input)
+    if (!side || side === 'draw') return settledResult('void', 'unsupported-selection')
+
+    const labelLine = firstNumber([selectionLabel(input)])
+    const sideLine = firstNumber([input.selectionLine, input.handicap, input.spread, input.line, input.selection?.line])
+    if (sideLine !== null || labelLine !== null) {
+        const line = sideLine ?? labelLine
+        const selectedScore = side === 'home' ? homeScore : awayScore
+        const otherScore = side === 'home' ? awayScore : homeScore
+        const adjusted = selectedScore + line
+        if (adjusted === otherScore) return settledResult('void', 'push')
+        return settledResult(adjusted > otherScore ? 'won' : 'lost', 'spread')
+    }
+
+    const marketLine = firstNumber([input.marketLine, input.market?.line])
+    if (marketLine === null) return settledResult('pending', 'line-missing')
+    const homeMargin = homeScore - awayScore
+    if (homeMargin === marketLine) return settledResult('void', 'push')
+    if (side === 'home') return settledResult(homeMargin > marketLine ? 'won' : 'lost', 'spread')
+    return settledResult(homeMargin < marketLine ? 'won' : 'lost', 'spread')
+}
+
+export function resolveSelectionFromScore(input = {}) {
+    const eventStatus = normalizeText(input.eventStatus || input.eventResult?.status || input.event?.status || input.status)
+    if (eventStatus === 'cancelled' || eventStatus === 'canceled') return settledResult('void', 'event-cancelled')
+    if (eventStatus !== 'settled') return settledResult('pending', 'event-not-settled')
+
+    const homeScore = scoreValue(input, 'home')
+    const awayScore = scoreValue(input, 'away')
+    if (homeScore === null || awayScore === null) return settledResult('pending', 'score-missing')
+
+    const marketType = normalizeMarketType(input)
+    if (marketType === 'winner') return resolveWinner(input, homeScore, awayScore)
+    if (marketType === 'total') return resolveTotal(input, homeScore, awayScore)
+    if (marketType === 'spread') return resolveSpread(input, homeScore, awayScore)
+    return settledResult('void', 'unsupported-market')
+}
+
+function normalizeLegStatus(status) {
+    const value = normalizeText(status)
+    if (value === 'won' || value === 'win') return 'won'
+    if (value === 'lost' || value === 'loss') return 'lost'
+    if (value === 'void' || value === 'push' || value === 'cancelled' || value === 'canceled') return 'void'
+    if (value === 'pending' || value === 'live') return 'pending'
+    return null
+}
+
+function eventResultFor(eventResults, eventId) {
+    if (!eventResults) return null
+    if (Array.isArray(eventResults)) {
+        return eventResults.find(result => result.id === eventId || result.eventId === eventId) || null
+    }
+    if (eventId && eventResults[eventId]) return eventResults[eventId]
+    return eventResults
+}
+
+function settlementLeg(selection, eventResults) {
+    const directStatus = normalizeLegStatus(selection.status)
+    const eventResult = eventResultFor(eventResults, selection.eventId)
+    const resolved = directStatus ? { status: directStatus } : resolveSelectionFromScore({
+        ...selection,
+        selectionLabel: selection.selectionLabel || selection.label,
+        marketType: selection.marketType || selection.marketId,
+        eventStatus: selection.eventStatus || eventResult?.status,
+        homeScore: selection.homeScore ?? eventResult?.homeScore ?? eventResult?.score?.home,
+        awayScore: selection.awayScore ?? eventResult?.awayScore ?? eventResult?.score?.away,
+        eventResult,
+    })
+    return {
+        selectionId: selection.selectionId,
+        eventId: selection.eventId,
+        marketId: selection.marketId,
+        label: selection.label,
+        eventLabel: selection.eventLabel,
+        marketLabel: selection.marketLabel,
+        odds: Number(selection.odds || selection.acceptedOdds || selection.currentOdds || selection.decimalOdds || 0),
+        status: resolved.status,
+        reason: resolved.reason,
+    }
+}
+
+function ticketResult(payout, stake, legs) {
+    if (payout > stake) return 'win'
+    if (payout === 0) return 'loss'
+    if (payout < stake) return 'partial'
+    if (legs.length > 0 && legs.every(leg => leg.status === 'void')) return 'void'
+    if (legs.some(leg => leg.status === 'lost')) return 'partial'
+    return 'push'
+}
+
+function pendingSettlement(legs) {
+    return { legs, payout: 0, profit: 0, result: 'pending', status: 'pending' }
+}
+
+function finalSettlement(legs, payout, amount) {
+    const roundedPayout = roundCurrency(payout)
+    const roundedStake = roundCurrency(amount)
+    return {
+        legs,
+        payout: roundedPayout,
+        profit: roundCurrency(roundedPayout - roundedStake),
+        result: ticketResult(roundedPayout, roundedStake, legs),
+        status: 'settled',
+    }
+}
+
+function legOdds(leg) {
+    return leg.status === 'void' ? 1 : Number(leg.odds) || 0
+}
+
+function hasPendingSystemCombo(legs) {
+    for (let i = 0; i < legs.length; i++) {
+        for (let j = i + 1; j < legs.length; j++) {
+            const combo = [legs[i], legs[j]]
+            if (combo.some(leg => leg.status === 'pending') && !combo.some(leg => leg.status === 'lost')) return true
+        }
+    }
+    return false
+}
+
+export function settleTicketByEventResults({ selections = [], stake = 0, mode = BET_MODES.SINGLES, eventResults = null }) {
+    const legs = selections.map(selection => settlementLeg(selection, eventResults))
+    const amount = Math.max(0, Number(stake) || 0)
+
+    if (mode === BET_MODES.SINGLES) {
+        if (legs.some(leg => leg.status === 'pending')) return pendingSettlement(legs)
+        const stakePerLeg = legs.length > 0 ? amount / legs.length : 0
+        const payout = legs.reduce((sum, leg) => {
+            if (leg.status === 'won') return sum + stakePerLeg * legOdds(leg)
+            if (leg.status === 'void') return sum + stakePerLeg
+            return sum
+        }, 0)
+        return finalSettlement(legs, payout, amount)
+    }
+
+    if (mode === BET_MODES.SYSTEM_2) {
+        if (legs.length < 2) return finalSettlement(legs, 0, amount)
+        if (hasPendingSystemCombo(legs)) return pendingSettlement(legs)
+        const combinations = combinatorial(legs.length, 2)
+        const stakePerCombo = amount / combinations
+        let payout = 0
+        for (let i = 0; i < legs.length; i++) {
+            for (let j = i + 1; j < legs.length; j++) {
+                if (legs[i].status !== 'lost' && legs[j].status !== 'lost') {
+                    const settledLegs = [legs[i], legs[j]].filter(leg => leg.status === 'won').length
+                    payout += stakePerCombo * legOdds(legs[i]) * legOdds(legs[j]) / Math.max(1, settledLegs)
+                }
+            }
+        }
+        return finalSettlement(legs, payout, amount)
+    }
+
+    if (legs.length === 0) return finalSettlement(legs, 0, amount)
+    if (legs.some(leg => leg.status === 'pending')) return pendingSettlement(legs)
+    if (legs.some(leg => leg.status === 'lost')) return finalSettlement(legs, 0, amount)
+    const payout = amount * legs.reduce((product, leg) => product * legOdds(leg), 1)
+    return finalSettlement(legs, payout, amount)
+}
+
 export function settleTicketDeterministic({ ticketId, selections = [], stake = 0, mode = BET_MODES.SINGLES, seed = '' }) {
     const rng = createRoundRng(`${seed || 'sportsbook'}:${ticketId}:${mode}:${selections.map(item => item.selectionId).join('|')}`)
     const legs = selections.map(selection => {
@@ -213,7 +501,9 @@ export function settleTicketDeterministic({ ticketId, selections = [], stake = 0
 }
 
 export function cashoutOffer(ticket, now = Date.now()) {
-    if (!ticket || ticket.status !== 'accepted') return 0
+    if (!ticket || (ticket.status !== 'accepted' && ticket.status !== 'active')) return 0
+    const legs = ticket.legs?.length ? ticket.legs : ticket.selections || []
+    if (legs.some(leg => leg.status === 'lost')) return 0
     const quote = ticket.quote || quoteTicket(ticket)
     const ageFactor = Math.min(0.92, Math.max(0.45, (now - Number(ticket.acceptedAt || now)) / 90000 + 0.45))
     return roundCurrency(Math.max(0, quote.estimatedPayout * ageFactor * 0.78))
