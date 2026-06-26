@@ -440,6 +440,86 @@ describe('sportsbookMath', () => {
                         eventStatus: 'settled',
                     }).status).toBe('won')
                 })
+
+                it('resolves Home Clean Sheet as won when the away team fails to score', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'clean-sheet',
+                        selectionLabel: 'Home',
+                        homeScore: 2,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Home Clean Sheet as lost when the away team scores', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'clean-sheet',
+                        selectionLabel: 'Home',
+                        homeScore: 2,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves Away Clean Sheet as won when the home team is blanked', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'clean-sheet',
+                        selectionLabel: 'Away',
+                        homeScore: 0,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Clean Sheet No as won when the team concedes', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'clean-sheet',
+                        selectionLabel: 'Home No',
+                        homeScore: 1,
+                        awayScore: 2,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Home Win to Nil as won when home wins without conceding', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'win-to-nil',
+                        selectionLabel: 'Home',
+                        homeScore: 2,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Home Win to Nil as lost when home wins but concedes', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'win-to-nil',
+                        selectionLabel: 'Home',
+                        homeScore: 2,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves Home Win to Nil as lost when home does not win', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'win-to-nil',
+                        selectionLabel: 'Home',
+                        homeScore: 0,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves Away Win to Nil as won when away wins without conceding', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'win-to-nil',
+                        selectionLabel: 'Away',
+                        homeScore: 0,
+                        awayScore: 3,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
             })
         })
 
@@ -611,6 +691,8 @@ describe('sportsbookMath', () => {
                 'both-teams-to-score',
                 'double-chance',
                 'draw-no-bet',
+                'clean-sheet',
+                'win-to-nil',
                 'correct-score',
                 'odd-even',
             ]))

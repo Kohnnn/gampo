@@ -238,6 +238,8 @@ function normalizeMarketType({ marketType, marketLabel, marketId } = {}) {
     if (value.includes('correct') && value.includes('score')) return 'correct-score'
     if (value.includes('double') && value.includes('chance')) return 'double-chance'
     if (value.includes('dnb') || (value.includes('draw') && (value.includes('no bet') || value.includes('no-bet')))) return 'draw-no-bet'
+    if (value.includes('clean') && value.includes('sheet')) return 'clean-sheet'
+    if ((value.includes('win') && value.includes('nil')) || value.includes('win to zero')) return 'win-to-nil'
     // odd/even must be detected before total because labels are often prefixed "Total Goals Odd/Even"
     if (value.includes('odd') && value.includes('even')) return 'odd-even'
     if (value.includes('total') || value.includes('over/under') || value.includes('over under')) return 'total'
@@ -395,6 +397,26 @@ function resolveOddEven(input, homeScore, awayScore) {
     return settledResult(won ? 'won' : 'lost', 'odd-even')
 }
 
+function resolveCleanSheet(input, homeScore, awayScore) {
+    const side = selectionSide(input)
+    if (!side || side === 'draw') return settledResult('void', 'unsupported-selection')
+    const label = normalizeText(selectionLabel(input))
+    const wantsNo = /\bno\b/.test(label)
+    const concededAgainst = side === 'home' ? awayScore : homeScore
+    const keptCleanSheet = concededAgainst === 0
+    const won = wantsNo ? !keptCleanSheet : keptCleanSheet
+    return settledResult(won ? 'won' : 'lost', 'clean-sheet')
+}
+
+function resolveWinToNil(input, homeScore, awayScore) {
+    const side = selectionSide(input)
+    if (!side || side === 'draw') return settledResult('void', 'unsupported-selection')
+    const wonMatch = side === 'home' ? homeScore > awayScore : awayScore > homeScore
+    const concededAgainst = side === 'home' ? awayScore : homeScore
+    const won = wonMatch && concededAgainst === 0
+    return settledResult(won ? 'won' : 'lost', 'win-to-nil')
+}
+
 export function resolveSelectionFromScore(input = {}) {
     const eventStatus = normalizeText(input.eventStatus || input.eventResult?.status || input.event?.status || input.status)
     if (eventStatus === 'cancelled' || eventStatus === 'canceled') return settledResult('void', 'event-cancelled')
@@ -412,6 +434,8 @@ export function resolveSelectionFromScore(input = {}) {
     if (marketType === 'correct-score') return resolveCorrectScore(input, homeScore, awayScore)
     if (marketType === 'double-chance') return resolveDoubleChance(input, homeScore, awayScore)
     if (marketType === 'draw-no-bet') return resolveDrawNoBet(input, homeScore, awayScore)
+    if (marketType === 'clean-sheet') return resolveCleanSheet(input, homeScore, awayScore)
+    if (marketType === 'win-to-nil') return resolveWinToNil(input, homeScore, awayScore)
     if (marketType === 'odd-even') return resolveOddEven(input, homeScore, awayScore)
     return settledResult('void', 'unsupported-market')
 }

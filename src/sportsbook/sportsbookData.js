@@ -109,7 +109,7 @@ const EVENT_BLUEPRINTS = [
 ]
 
 const MARKET_TEMPLATES = {
-    soccer: ['Winner', 'Total Goals', 'Handicap', 'Both Teams To Score', 'Double Chance', 'Draw No Bet', 'Correct Score', 'Odd/Even'],
+    soccer: ['Winner', 'Total Goals', 'Handicap', 'Both Teams To Score', 'Double Chance', 'Draw No Bet', 'Clean Sheet', 'Win to Nil', 'Correct Score', 'Odd/Even'],
     tennis: ['Winner', 'Total Games', 'Set Handicap', 'Correct Score'],
     cricket: ['Winner', 'Total Runs', 'Top Batter'],
     basketball: ['Winner', 'Spread', 'Total Points', 'Player Props'],
@@ -207,6 +207,8 @@ function buildSecondaryGroup(eventId, sportId, groupLabel, random, index) {
         'Both Teams To Score': ['Yes', 'No'],
         'Double Chance': ['Home or Draw', 'Home or Away', 'Draw or Away'],
         'Draw No Bet': ['Home', 'Away'],
+        'Clean Sheet': ['Home', 'Away'],
+        'Win to Nil': ['Home', 'Away'],
         'Odd/Even': ['Odd', 'Even'],
         'Correct Score': ['1-0', '1-1', '2-1', '0-1'],
         Handicap: ['Home -0.5', 'Away +0.5'],
