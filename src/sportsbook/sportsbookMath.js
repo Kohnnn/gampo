@@ -347,16 +347,31 @@ function resolveCorrectScore(input, homeScore, awayScore) {
     return settledResult(won ? 'won' : 'lost', 'correct-score')
 }
 
-function resolveDoubleChance(input, homeScore, awayScore) {
-    const label = normalizeText(selectionLabel(input)).replace(/[^0-9x]/g, '')
-    const covered = {
+function doubleChanceCover(input) {
+    const raw = normalizeText(selectionLabel(input))
+    const hasHome = /\bhome\b/.test(raw) || /\b1\b/.test(raw)
+    const hasAway = /\baway\b/.test(raw) || /\b2\b/.test(raw)
+    const hasDraw = /\bdraw\b/.test(raw) || /\btie\b/.test(raw) || /x/.test(raw)
+    if (raw.includes('or') || (hasHome && hasAway) || (hasHome && hasDraw) || (hasAway && hasDraw)) {
+        const cover = []
+        if (hasHome) cover.push('home')
+        if (hasAway) cover.push('away')
+        if (hasDraw) cover.push('draw')
+        if (cover.length >= 2) return cover
+    }
+    const compact = raw.replace(/[^0-9x]/g, '')
+    return {
         '1x': ['home', 'draw'],
         'x1': ['home', 'draw'],
         '12': ['home', 'away'],
         '21': ['home', 'away'],
         'x2': ['away', 'draw'],
         '2x': ['away', 'draw'],
-    }[label]
+    }[compact] || null
+}
+
+function resolveDoubleChance(input, homeScore, awayScore) {
+    const covered = doubleChanceCover(input)
     if (!covered) return settledResult('void', 'unsupported-selection')
     const winner = homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : 'draw'
     return settledResult(covered.includes(winner) ? 'won' : 'lost', 'double-chance')

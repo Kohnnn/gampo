@@ -11,6 +11,7 @@ import {
     formatOdds,
     cashoutOffer,
 } from './sportsbookMath'
+import { buildSyntheticSportsbookData } from './sportsbookData'
 
 const selections = [
     { selectionId: 'a', currentOdds: 2, acceptedOdds: 2, trueProbability: 0.52, oddsChanged: false, label: 'Home' },
@@ -340,6 +341,36 @@ describe('sportsbookMath', () => {
                     }).status).toBe('lost')
                 })
 
+                it('resolves Double Chance textual "Home or Draw" as won when the match is drawn', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'double-chance',
+                        selectionLabel: 'Home or Draw',
+                        homeScore: 0,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Double Chance textual "Draw or Away" as won when away wins', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'double-chance',
+                        selectionLabel: 'Draw or Away',
+                        homeScore: 1,
+                        awayScore: 3,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Double Chance textual "Home or Away" as lost when the match is drawn', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'double-chance',
+                        selectionLabel: 'Home or Away',
+                        homeScore: 2,
+                        awayScore: 2,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
                 it('voids Draw No Bet when the match is drawn', () => {
                     expect(resolveSelectionFromScore({
                         marketType: 'draw-no-bet',
@@ -566,6 +597,45 @@ describe('sportsbookMath', () => {
             const fresh = cashoutOffer(baseTicket, 1_000)
             const older = cashoutOffer(baseTicket, 1_000 + 60_000)
             expect(older).toBeGreaterThan(fresh)
+        })
+    })
+
+    describe('synthetic soccer fixtures settle every offered market deterministically', () => {
+        const { events } = buildSyntheticSportsbookData('settlement-coverage')
+        const soccer = events.find(event => event.sportId === 'soccer')
+
+        it('offers the extended Stake-style soccer markets', () => {
+            const marketIds = soccer.marketGroups.map(group => group.id)
+            expect(marketIds).toEqual(expect.arrayContaining([
+                'winner',
+                'both-teams-to-score',
+                'double-chance',
+                'draw-no-bet',
+                'correct-score',
+                'odd-even',
+            ]))
+        })
+
+        it('resolves a concrete won/lost/void status for every offered selection given a final score', () => {
+            const eventResult = { id: soccer.id, status: 'settled', homeScore: 2, awayScore: 1 }
+            const unresolved = []
+            for (const group of soccer.marketGroups) {
+                for (const selection of group.selections) {
+                    const result = resolveSelectionFromScore({
+                        marketType: group.id,
+                        marketLabel: group.label,
+                        selectionLabel: selection.label,
+                        side: selection.side,
+                        homeScore: eventResult.homeScore,
+                        awayScore: eventResult.awayScore,
+                        eventStatus: 'settled',
+                    })
+                    if (!['won', 'lost', 'void'].includes(result.status)) {
+                        unresolved.push(`${group.id}:${selection.label}=${result.status}/${result.reason}`)
+                    }
+                }
+            }
+            expect(unresolved).toEqual([])
         })
     })
 })
