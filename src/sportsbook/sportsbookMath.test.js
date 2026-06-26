@@ -218,6 +218,198 @@ describe('sportsbookMath', () => {
                 })
                 expect(result.status).toBe('pending')
             })
+
+            describe('extended score-derivable markets', () => {
+                it('resolves BTTS Yes as won when both teams score', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'both-teams-to-score',
+                        selectionLabel: 'Yes',
+                        homeScore: 2,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves BTTS Yes as lost when one team is blanked', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'btts',
+                        selectionLabel: 'Yes',
+                        homeScore: 3,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves BTTS No as won when a team is blanked', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'both-teams-to-score',
+                        selectionLabel: 'No',
+                        homeScore: 0,
+                        awayScore: 2,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves BTTS No as lost when both teams score', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'both-teams-to-score',
+                        selectionLabel: 'No',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves Correct Score as won when the exact line matches', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'correct-score',
+                        selectionLabel: '2-1',
+                        homeScore: 2,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Correct Score as lost when the line does not match', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'correct-score',
+                        selectionLabel: '2-1',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('returns pending for Correct Score when the label has no parsable line', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'correct-score',
+                        selectionLabel: 'Any Other',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('pending')
+                })
+
+                it('resolves Double Chance 1X as won when home wins', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'double-chance',
+                        selectionLabel: '1X',
+                        homeScore: 2,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Double Chance 1X as won when the match is drawn', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'double-chance',
+                        selectionLabel: '1X',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Double Chance 1X as lost when away wins', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'double-chance',
+                        selectionLabel: '1X',
+                        homeScore: 0,
+                        awayScore: 2,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves Double Chance X2 as won when away wins', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'double-chance',
+                        selectionLabel: 'X2',
+                        homeScore: 0,
+                        awayScore: 2,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Double Chance 12 as lost when the match is drawn', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'double-chance',
+                        selectionLabel: '12',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('voids Draw No Bet when the match is drawn', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'draw-no-bet',
+                        selectionLabel: 'Home',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('void')
+                })
+
+                it('resolves Draw No Bet home as won when home wins', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'draw-no-bet',
+                        selectionLabel: 'Home',
+                        homeScore: 3,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Draw No Bet home as lost when away wins', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'draw-no-bet',
+                        selectionLabel: 'Home',
+                        homeScore: 1,
+                        awayScore: 2,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves Odd/Even Odd as won when the combined total is odd', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'odd-even',
+                        selectionLabel: 'Odd',
+                        homeScore: 2,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Odd/Even Even as won when the combined total is even', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'odd-even',
+                        selectionLabel: 'Even',
+                        homeScore: 2,
+                        awayScore: 2,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Odd/Even Odd as lost when the combined total is even', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'odd-even',
+                        selectionLabel: 'Odd',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('treats an Odd/Even label prefixed with Total Goals without misrouting to totals', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'total goals odd/even',
+                        selectionLabel: 'Even',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+            })
         })
 
         describe('settleTicketByEventResults', () => {
