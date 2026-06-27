@@ -570,6 +570,83 @@ describe('sportsbookMath', () => {
                         eventStatus: 'settled',
                     }).status).toBe('lost')
                 })
+
+                it('resolves Result & BTTS "Home & Yes" as won when home wins and both teams score', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'result-both-teams-to-score',
+                        marketLabel: 'Result & Both Teams To Score',
+                        selectionLabel: 'Home & Yes',
+                        homeScore: 2,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Result & BTTS "Home & Yes" as lost when home wins but the away team is blanked', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'result-both-teams-to-score',
+                        marketLabel: 'Result & Both Teams To Score',
+                        selectionLabel: 'Home & Yes',
+                        homeScore: 2,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves Result & BTTS "Home & No" as won when home wins to nil', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'result-both-teams-to-score',
+                        marketLabel: 'Result & Both Teams To Score',
+                        selectionLabel: 'Home & No',
+                        homeScore: 2,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Result & BTTS "Draw & Yes" as won when the match is a scoring draw', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'result-both-teams-to-score',
+                        marketLabel: 'Result & Both Teams To Score',
+                        selectionLabel: 'Draw & Yes',
+                        homeScore: 1,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Result & BTTS "Draw & No" as won on a goalless draw', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'result-both-teams-to-score',
+                        marketLabel: 'Result & Both Teams To Score',
+                        selectionLabel: 'Draw & No',
+                        homeScore: 0,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Result & BTTS "Away & Yes" as won when away wins and both teams score', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'result-both-teams-to-score',
+                        marketLabel: 'Result & Both Teams To Score',
+                        selectionLabel: 'Away & Yes',
+                        homeScore: 1,
+                        awayScore: 3,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Result & BTTS "Away & Yes" as lost when the result side is wrong', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'result-both-teams-to-score',
+                        marketLabel: 'Result & Both Teams To Score',
+                        selectionLabel: 'Away & Yes',
+                        homeScore: 2,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
             })
         })
 
@@ -745,6 +822,7 @@ describe('sportsbookMath', () => {
                 'win-to-nil',
                 'home-total-goals',
                 'away-total-goals',
+                'result-both-teams-to-score',
                 'correct-score',
                 'odd-even',
             ]))

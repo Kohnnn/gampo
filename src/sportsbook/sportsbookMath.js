@@ -234,6 +234,8 @@ function firstNumber(values) {
 
 function normalizeMarketType({ marketType, marketLabel, marketId } = {}) {
     const value = normalizeText([marketType, marketLabel, marketId].filter(Boolean).join(' '))
+    // result + btts combo must be detected before plain btts/winner because its label contains both cues
+    if (value.includes('result') && (value.includes('btts') || (value.includes('both') && value.includes('teams') && value.includes('score')))) return 'result-btts'
     if (value.includes('btts') || (value.includes('both') && value.includes('teams') && value.includes('score'))) return 'btts'
     if (value.includes('correct') && value.includes('score')) return 'correct-score'
     if (value.includes('double') && value.includes('chance')) return 'double-chance'
@@ -430,6 +432,20 @@ function resolveTeamTotal(input, homeScore, awayScore) {
     return settledResult(overUnder === 'over' ? teamScore > line ? 'won' : 'lost' : teamScore < line ? 'won' : 'lost', 'team-total')
 }
 
+function resolveResultBtts(input, homeScore, awayScore) {
+    const label = normalizeText(selectionLabel(input))
+    const resultPart = /\bhome\b/.test(label) || label.startsWith('1') ? 'home'
+        : /\baway\b/.test(label) || label.startsWith('2') ? 'away'
+            : /\bdraw\b/.test(label) || /\btie\b/.test(label) ? 'draw' : null
+    const bttsPart = label.includes('yes') ? 'yes' : label.includes('no') ? 'no' : null
+    if (!resultPart || !bttsPart) return settledResult('void', 'unsupported-selection')
+    const winner = homeScore > awayScore ? 'home' : awayScore > homeScore ? 'away' : 'draw'
+    const bothScored = homeScore > 0 && awayScore > 0
+    const resultHit = resultPart === winner
+    const bttsHit = bttsPart === 'yes' ? bothScored : !bothScored
+    return settledResult(resultHit && bttsHit ? 'won' : 'lost', 'result-btts')
+}
+
 export function resolveSelectionFromScore(input = {}) {
     const eventStatus = normalizeText(input.eventStatus || input.eventResult?.status || input.event?.status || input.status)
     if (eventStatus === 'cancelled' || eventStatus === 'canceled') return settledResult('void', 'event-cancelled')
@@ -441,6 +457,7 @@ export function resolveSelectionFromScore(input = {}) {
 
     const marketType = normalizeMarketType(input)
     if (marketType === 'winner') return resolveWinner(input, homeScore, awayScore)
+    if (marketType === 'result-btts') return resolveResultBtts(input, homeScore, awayScore)
     if (marketType === 'team-total') return resolveTeamTotal(input, homeScore, awayScore)
     if (marketType === 'total') return resolveTotal(input, homeScore, awayScore)
     if (marketType === 'spread') return resolveSpread(input, homeScore, awayScore)
