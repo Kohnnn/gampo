@@ -520,6 +520,56 @@ describe('sportsbookMath', () => {
                         eventStatus: 'settled',
                     }).status).toBe('won')
                 })
+
+                it('resolves Home Team Total Over as won when the home team beats the line', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'home-total-goals',
+                        selectionLabel: 'Home Over 1.5',
+                        homeScore: 2,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('resolves Home Team Total Over as lost when the home team misses the line', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'home-total-goals',
+                        selectionLabel: 'Home Over 1.5',
+                        homeScore: 1,
+                        awayScore: 3,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
+
+                it('resolves Away Team Total Under as won when the away team stays below the line', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'away-total-goals',
+                        selectionLabel: 'Away Under 1.5',
+                        homeScore: 3,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('won')
+                })
+
+                it('voids a Team Total as a push when the team total equals an integer line', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'home-total-goals',
+                        selectionLabel: 'Home Over 2',
+                        homeScore: 2,
+                        awayScore: 0,
+                        eventStatus: 'settled',
+                    }).status).toBe('void')
+                })
+
+                it('uses only the named team score, not the combined total, for a Team Total', () => {
+                    expect(resolveSelectionFromScore({
+                        marketType: 'away-total-goals',
+                        selectionLabel: 'Away Over 2.5',
+                        homeScore: 5,
+                        awayScore: 1,
+                        eventStatus: 'settled',
+                    }).status).toBe('lost')
+                })
             })
         })
 
@@ -693,6 +743,8 @@ describe('sportsbookMath', () => {
                 'draw-no-bet',
                 'clean-sheet',
                 'win-to-nil',
+                'home-total-goals',
+                'away-total-goals',
                 'correct-score',
                 'odd-even',
             ]))
