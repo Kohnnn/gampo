@@ -4,11 +4,13 @@
 
 /* ===== CSS Variables - Exact GamPo Colors ===== */
 :root {
-    --bg-primary: #1a2c38;
-    --bg-secondary: #0f212e;
-    --bg-tertiary: #2f4553;
+    /* GamPo base palette */
+    --bg-primary: #0a0f1a;
+    --bg-secondary: #111827;
+    --bg-tertiary: #1e293b;
     --bg-input: #0f212e;
 
+    /* Win / Loss / Bonus signal tokens — keep intact */
     --accent-green: #00e701;
     --accent-green-hover: #00c700;
     --accent-blue: #1475e1;
@@ -17,6 +19,18 @@
     --accent-red: #ed4245;
     --accent-purple: #9c27b0;
 
+    /* Premium / VIP / bonus / live palette */
+    --gold: #ffd700;
+    --gold-soft: rgba(255, 215, 0, 0.15);
+    --bonus-purple: #9b59b6;
+    --bonus-soft: rgba(155, 89, 182, 0.15);
+    --live-red: #e74c3c;
+    --casino-dark: #0a0f1a;
+    --casino-panel: #111827;
+    --casino-border: rgba(255, 255, 255, 0.08);
+    --casino-surface: #0f172a;
+    --casino-elevated: #1e293b;
+
     /* Global fallback for the per-game accent. GameShell sets `--accent` on
        `.game-shell`, but the mobile action dock is portaled to <body> and so
        does not inherit it. Defining a sane default here guarantees the mobile
@@ -24,12 +38,10 @@
     --accent: #00e701;
 
     --text-primary: #ffffff;
-    --text-secondary: #b1bad3;
-    /* WCAG AA: 5.2:1 on --bg-primary (#1a2c38), 6.6:1 on darker panels.
-       Was #5f6368 (~2.4:1) which failed AA for small/secondary text. */
-    --text-muted: #909cb0;
+    --text-secondary: #94a3b8;
+    --text-muted: #74839a;
 
-    --border-color: #2f4553;
+    --border-color: rgba(255, 255, 255, 0.06);
 
     /* Color-role tokens. Use these instead of raw colors so games stay
        consistent across the casino:
@@ -169,15 +181,31 @@ body {
 }
 
 .header-mode {
-    color: var(--accent-green);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--live-red);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     padding: 5px 9px;
     border-radius: 999px;
-    background: rgba(0, 231, 1, 0.1);
-    border: 1px solid rgba(0, 231, 1, 0.18);
+    background: rgba(231, 76, 60, 0.12);
+    border: 1px solid rgba(231, 76, 60, 0.2);
+}
+.header-mode::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--live-red);
+    box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.6);
+    animation: livePulse 1.6s ease-in-out infinite;
+}
+@keyframes livePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.6); }
+    50% { box-shadow: 0 0 0 4px rgba(231, 76, 60, 0); }
 }
 
 .header-center {
@@ -1087,6 +1115,54 @@ body {
     fill: currentColor;
 }
 
+.live-wins-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--gold);
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(255, 215, 0, 0.08);
+    border: 1px solid rgba(255, 215, 0, 0.15);
+}
+.live-wins-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--live-red);
+    animation: livePulse 1.6s ease-in-out infinite;
+}
+
+.sidebar-rakeback-widget {
+    margin: 8px 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(255,215,0,0.08), rgba(155,89,182,0.06));
+    border: 1px solid rgba(255,215,0,0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.sidebar-rakeback-widget span {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.sidebar-rakeback-widget strong {
+    font-size: 18px;
+    color: var(--gold);
+    font-weight: 950;
+}
+.sidebar-rakeback-widget small {
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
 /* Wave 23: pin button on game rows. Lives in `.nav-row` flex; revealed
    on row hover and stays visible when pinned. */
 .nav-row {
@@ -1141,6 +1217,10 @@ body {
 @media (min-width: 1100px) {
     html.chat-open .main-content {
         padding-right: 0;
+    }
+
+    .main-content {
+        padding-bottom: 36px;
     }
 }
 
@@ -1812,6 +1892,8 @@ body {
         --mobile-nav-height: 64px;
         --mobile-action-height: 74px;
         --mobile-safe-bottom: calc(var(--mobile-nav-height) + var(--mobile-action-height) + max(8px, env(safe-area-inset-bottom)));
+        /* P4: bottom-sheet safe area — used by mobile bet sheet and other overlays */
+        --sheet-safe-bottom: calc(var(--mobile-nav-height) + max(8px, env(safe-area-inset-bottom)));
     }
 
     .header {

@@ -16,6 +16,7 @@ import {
 } from '../data/casinoCatalog'
 import { formatCredits, rolloverProgress } from '../utils/simulationMath'
 import { deriveSessionRecap } from '../utils/sessionRecap'
+import { LiveWinsTicker } from '../components/LiveWinsTicker'
 import '../styles/casino.css'
 
 const filters = ['All', 'Originals', 'Slots', 'Table', 'Arcade', 'Sports']
@@ -119,9 +120,12 @@ function HomePage() {
         <div className="casino-page" data-ux-surface="stage">
             <section className="casino-hero" data-ux-surface="stage">
                 <div className="casino-hero-copy" data-ux-surface="stage">
-                    <span className="casino-kicker">Practice casino lab</span>
+                    <span className="casino-kicker">
+                        <span className="ticker-dot" />
+                        Live Casino
+                    </span>
                     <h1>GamPo</h1>
-                    <p>Fake-credit originals, arcade classics, slots catalogue, live-table simulations, sportsbook odds and risk education in one app.</p>
+                    <p>Originals, slots, live tables, and sportsbook — all in one premium casino experience. No real money, no accounts, just pure play.</p>
                     <div className="casino-actions">
                         <button className="casino-action primary" onClick={() => grantPracticeCredits(500)} data-ux-primary-action>
                             <Plus size={16} />
@@ -129,15 +133,15 @@ function HomePage() {
                         </button>
                         <button className="casino-action" onClick={resetBalance}>
                             <RotateCcw size={16} />
-                            Reset lab
+                            Reset Balance
                         </button>
                         <Link className="casino-action" to="/learn">
                             <BookOpen size={16} />
-                            Risk academy
+                            Rakeback
                         </Link>
                         <Link className="casino-action" to="/verify">
                             <ShieldCheck size={16} />
-                            Verify
+                            Provably Fair
                         </Link>
                     </div>
                 </div>
@@ -145,20 +149,29 @@ function HomePage() {
                     <div>
                         <span>Practice Credits</span>
                         <strong>{formatCredits(balance)}</strong>
+                        <button className="balance-claim-btn" onClick={() => grantPracticeCredits(1000)}>
+                            Claim Credits
+                        </button>
                     </div>
                     <div className="casino-progress">
                         <span style={{ width: `${rollover * 100}%` }} />
                     </div>
                     <div className="casino-stat-grid">
-                        {lobbyStats.map(stat => (
-                            <div key={stat.label}>
-                                <span>{stat.label}</span>
-                                <strong>{stat.label === 'Practice balance' ? formatCredits(balance) : stat.value}</strong>
-                            </div>
-                        ))}
+                        {lobbyStats.map(stat => {
+                            const displayLabel = { 'Playable labs': 'Games', 'Practice balance': 'Balance', 'Cash value': 'Real money', 'Math panels': 'Fairness' }[stat.label] || stat.label
+                            const displayValue = stat.label === 'Practice balance' ? formatCredits(balance) : stat.label === 'Cash value' ? 'None' : stat.value
+                            return (
+                                <div key={stat.label}>
+                                    <span>{displayLabel}</span>
+                                    <strong>{displayValue}</strong>
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             </section>
+
+            <LiveWinsTicker />
 
             <section className="casino-strip" data-ux-surface="card">
                 {featuredCollections.map(collection => (
@@ -181,7 +194,7 @@ function HomePage() {
             {pinnedRow.length > 0 && (
                 <CategoryRow icon={<Pin size={16} />} title="Pinned games" link="/" games={pinnedRow} />
             )}
-            <CategoryRow icon={<GraduationCap size={16} />} title="New here? Start with these" link="/learn" games={recommendedRow} />
+            <CategoryRow icon={<GraduationCap size={16} />} title="Featured Games" link="/originals" games={recommendedRow} />
 
             <section className="casino-workspace" data-ux-surface="stage">
                 <main>

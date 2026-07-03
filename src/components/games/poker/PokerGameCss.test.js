@@ -54,14 +54,11 @@ describe('poker layout CSS', () => {
         expect(css).toMatch(/\.poker-page \.pk-card-back::after\s*\{\s*content:\s*''/s)
         expect(css).toMatch(/\.pk-actions\.is-waiting:not\(\.is-showdown\)\s*\{[\s\S]*max-height:\s*none/s)
         expect(css).toMatch(/\.pk-winners\s*\{[\s\S]*grid-column:\s*1 \/ -1/s)
-        // GTO hand search is pinned (sticky) so it stays reachable while the grid scrolls.
         expect(css).toMatch(/\.gto-search-row\s*\{[^}]*position:\s*sticky/s)
         expect(css).toContain('.poker-mobile-gto-now')
     })
 
     it('instruments poker surfaces for the UX benchmark like the shared shell', () => {
-        // Poker is a custom shell; without these markers it was exempt from the
-        // benchmark's surface-coverage and playfield-priority scoring.
         expect(source).toContain('className="poker-page" data-ux-surface="shell"')
         expect(source).toContain('className="poker-titlebar" data-ux-surface="shell"')
         expect(source).toContain('className="poker-table" data-ux-surface="stage"')

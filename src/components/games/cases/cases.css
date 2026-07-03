@@ -1,3 +1,14 @@
+/* B1: Screen shake on Contraband reveal */
+@keyframes caseScreenShake {
+    0%  { transform: translateX(0) rotate(0); }
+    12% { transform: translateX(-4px) rotate(-0.4deg); }
+    28% { transform: translateX(4px) rotate(0.4deg); }
+    45% { transform: translateX(-2px) rotate(-0.2deg); }
+    62% { transform: translateX(2px) rotate(0.2deg); }
+    78% { transform: translateX(-1px); }
+    100%{ transform: translateX(0); }
+}
+
 /* Stake-style Cases. Tier picker, multi-open stack, CS:GO carousel reveal.
    Wave 18 polish: 3.5s cubic-out reveal, view tabs, drop history, collection. */
 
@@ -910,6 +921,22 @@
     box-shadow: 0 0 22px -2px var(--rarity, rgba(255, 209, 102, 0.6));
     animation: caseResultPop 380ms cubic-bezier(0.2, 0.8, 0.2, 1), caseRareGlow 1.6s ease-in-out infinite alternate 0.4s;
 }
+
+/* B2: Contraband ★ tier — dramatically stronger glow with pulsing brightness */
+.cases-result-card.tier-contraband,
+.cases-result-card[data-rarity-weight="5"] {
+    box-shadow:
+        0 0 32px 6px color-mix(in srgb, var(--rarity, #ffd166) 80%, transparent),
+        0 0 64px 12px color-mix(in srgb, var(--rarity, #ffd166) 40%, transparent),
+        inset 0 0 24px color-mix(in srgb, var(--rarity, #ffd166) 20%, transparent);
+    border-color: color-mix(in srgb, var(--rarity, #ffd166) 90%, white);
+    animation: caseResultPop 380ms cubic-bezier(0.2, 0.8, 0.2, 1), caseContrabandGlow 2s ease-in-out infinite;
+}
+@keyframes caseContrabandGlow {
+    0%, 100% { filter: brightness(1); }
+    50%       { filter: brightness(1.15); }
+}
+
 .cases-result-card.single {
     width: min(420px, 100%);
     min-height: 250px;
@@ -960,6 +987,28 @@
     margin-top: 2px;
     font-size: 11px;
     color: var(--rarity, var(--text-primary, #fff));
+}
+
+/* B4: Staggered multi-drop result card reveals (×3/×5/×10) */
+.cases-result-grid .cases-result-card:nth-child(1) { animation-delay: 0ms; }
+.cases-result-grid .cases-result-card:nth-child(2) { animation-delay: 130ms; }
+.cases-result-grid .cases-result-card:nth-child(3) { animation-delay: 260ms; }
+.cases-result-grid .cases-result-card:nth-child(4) { animation-delay: 390ms; }
+.cases-result-grid .cases-result-card:nth-child(5) { animation-delay: 520ms; }
+.cases-result-grid .cases-result-card:nth-child(6) { animation-delay: 650ms; }
+.cases-result-grid .cases-result-card:nth-child(7) { animation-delay: 780ms; }
+.cases-result-grid .cases-result-card:nth-child(8) { animation-delay: 910ms; }
+.cases-result-grid .cases-result-card:nth-child(9) { animation-delay: 1040ms; }
+.cases-result-grid .cases-result-card:nth-child(10){ animation-delay: 1170ms; }
+
+/* B6: Best-drop highlight in multi-open result list */
+.cases-result-grid .cases-result-card.is-finale {
+    transform: scale(1.06);
+    border: 2px solid color-mix(in srgb, var(--rarity, #ffd166) 100%, white) !important;
+    box-shadow:
+        0 0 24px 4px color-mix(in srgb, var(--rarity, #ffd166) 70%, transparent),
+        0 12px 32px rgba(0,0,0,0.5) !important;
+    z-index: 2;
 }
 
 .cases-stack-row {
@@ -2285,6 +2334,21 @@
     filter: blur(1px);
     animation: casePrizeHalo 1800ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+/* B5: Background pulse behind prize popover — rarity-tinted radial wash */
+.cases-prize-popover::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 40%, var(--rarity, #ffd166) 0%, transparent 65%);
+    opacity: 0.12;
+    animation: caseBgPulse 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: -1;
+}
+@keyframes caseBgPulse {
+    0%, 100% { opacity: 0.08; transform: scale(1); }
+    50%       { opacity: 0.22; transform: scale(1.08); }
+}
 .cases-prize-card {
     position: relative;
     width: min(260px, 72%);
@@ -2297,7 +2361,13 @@
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.48), 0 0 36px -4px var(--rarity, #ffd166);
     text-align: center;
     transform-origin: 50% 55%;
-    animation: casePrizeCardPop 650ms cubic-bezier(0.18, 0.95, 0.28, 1.1) both;
+    animation: casePrizeCardPop 650ms cubic-bezier(0.18, 0.95, 0.28, 1.1) both,
+               casePrizeFloat 3.2s ease-in-out 0.65s infinite;
+}
+/* B3: Prize card gentle float after pop-in settles */
+@keyframes casePrizeFloat {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50%       { transform: translateY(-10px) rotate(0.3deg); }
 }
 .cases-prize-card img {
     width: 100%;
@@ -2898,6 +2968,8 @@
     min-height: 46px;
     margin-top: 9px;
     border-radius: 12px;
+    position: relative;
+    overflow: hidden;
     border: 1px solid rgba(255, 237, 160, 0.88);
     background: linear-gradient(180deg, #ffe680, #d59d31);
     color: #071018;
@@ -2917,6 +2989,22 @@
 .cases-inventory-pager button:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+}
+
+/* P4: Long-press auto-roll progress fill */
+@keyframes autoRollProgress {
+    from { width: 0%; }
+    to   { width: 100%; }
+}
+.cases-right-cta.is-auto-arming::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: #00b428;
+    animation: autoRollProgress 0.5s linear forwards;
+    pointer-events: none;
 }
 
 .cases-auto-panel {
@@ -3631,6 +3719,18 @@
         background: linear-gradient(135deg, #ffd166, #ffb347);
         color: #1a1205;
         font-size: 14px;
+        position: relative;
+        overflow: hidden;
+    }
+    .cases-mobile-open.is-auto-arming::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 3px;
+        background: #00b428;
+        animation: autoRollProgress 0.5s linear forwards;
+        pointer-events: none;
     }
 
     .cases-mobile-open:disabled {

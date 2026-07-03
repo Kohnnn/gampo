@@ -1,0 +1,23 @@
+.footer-disclaimer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    padding: 8px 24px;
+    text-align: center;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    background: var(--bg-secondary, #0e1420);
+}
+.footer-disclaimer p {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin: 0;
+}
+
+/* On mobile the bottom nav handles the disclaimer role; hide the bar. */
+@media (max-width: 768px) {
+    .footer-disclaimer {
+        display: none;
+    }
+}

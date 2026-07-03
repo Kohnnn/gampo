@@ -1,19 +1,58 @@
-// gameBgmManifest.js — Wave 35: per-route BGM keyed by game id.
+// gameBgmManifest.js — Wave 36: Casino-lounge 5-track BGM pack.
 //
-// Each casino game route now ships its own themed BGM loop. The
-// archetype-to-route mapping mirrors `scripts/bgmEngine.mjs`
-// (`GAME_ARCHETYPE`). Both `idle` and `bonus` (high-stakes) modes
-// resolve.
+// Slots | Crash | Cases | Poker | Lobby — each with idle, bonus, and loss stingers.
+// Bonus stingers trigger on celebration moments (big win, bonus entry, high multiplier).
+// Loss stingers trigger on bust / zero-out events.
 //
 // Schema:
 //   { [gameId]: { idle: '/audio/bgm/games/<id>/idle.wav',
-//                 bonus: '/audio/bgm/games/<id>/bonus.wav' } }
+//                 bonus: '/audio/bgm/games/<id>/bonus.wav',
+//                 loss:  '/audio/bgm/games/<id>/loss.wav' } }
 //
-// `bonus` is intentionally generated for every route; only games that
-// opt in via `useBgm(gameId, 'bonus')` will actually play it (e.g.
-// crash mid-flight ≥ 5×, mines cashout climb ≥ 3×, etc.).
+// Bonus and loss tracks play once as a stinger overlay, then the idle loop resumes.
 
-const GAME_IDS = [
+export const CASINO_BGM_PACK = {
+    lobby: {
+        idle:  '/audio/bgm/casino-lounge/lobby-idle.wav',
+        bonus: '/audio/bgm/casino-lounge/lobby-bonus.wav',
+        loss:  '/audio/bgm/casino-lounge/lobby-loss.wav',
+    },
+    slots: {
+        idle:  '/audio/bgm/casino-lounge/slots-idle.wav',
+        bonus: '/audio/bgm/casino-lounge/slots-bonus.wav',
+        loss:  '/audio/bgm/casino-lounge/slots-loss.wav',
+    },
+    crash: {
+        idle:  '/audio/bgm/casino-lounge/crash-idle.wav',
+        bonus: '/audio/bgm/casino-lounge/crash-bonus.wav',
+        loss:  '/audio/bgm/casino-lounge/crash-loss.wav',
+    },
+    cases: {
+        idle:  '/audio/bgm/casino-lounge/cases-idle.wav',
+        bonus: '/audio/bgm/casino-lounge/cases-bonus.wav',
+        loss:  '/audio/bgm/casino-lounge/cases-loss.wav',
+    },
+    poker: {
+        idle:  '/audio/bgm/casino-lounge/poker-idle.wav',
+        bonus: '/audio/bgm/casino-lounge/poker-bonus.wav',
+        loss:  '/audio/bgm/casino-lounge/poker-loss.wav',
+    },
+}
+
+// Map each game id to its pack entry.
+// Games not in the pack fall back to the lobby idle track.
+const GAME_TO_TRACK = {
+    lobby: 'lobby',
+    slots: 'slots',
+    crash: 'crash',
+    cases: 'cases',
+    poker: 'poker',
+    // All other game IDs use the lobby ambient loop
+}
+
+const FALLBACK_TRACK = CASINO_BGM_PACK.lobby
+
+const ALL_GAME_IDS = [
     'poker', 'crash', 'plinko', 'dice', 'limbo', 'keno', 'wheel', 'mines',
     'roulette', 'blackjack', 'baccarat', 'sicbo', 'war', 'videopoker',
     'hilo', 'lottery', 'cases', 'drill', 'packs', 'tomeoflife', 'tarot',
@@ -23,15 +62,16 @@ const GAME_IDS = [
 ]
 
 export const gameBgmManifest = Object.fromEntries(
-    GAME_IDS.map(id => [id, {
-        idle: `/audio/bgm/games/${id}/idle.wav`,
-        bonus: `/audio/bgm/games/${id}/bonus.wav`,
-    }]),
+    ALL_GAME_IDS.map(id => {
+        const track = GAME_TO_TRACK[id] || 'lobby'
+        return [id, { ...CASINO_BGM_PACK[track] }]
+    }),
 )
 
 export function resolveGameBgm(gameId, mode = 'idle') {
     const entry = gameBgmManifest[gameId]
     if (!entry) return null
-    if (mode in entry) return entry[mode] || null
+    if (mode === 'loss' && entry.loss) return entry.loss
+    if (mode === 'bonus' && entry.bonus) return entry.bonus
     return entry.idle || null
 }

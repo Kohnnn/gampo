@@ -66,6 +66,7 @@ import {
     hasReachedCasePhase,
     pickCelebrationDrop,
     summarizeCaseSettlement,
+    getRaritySfxRole,
 } from './casesAnimation'
 import { createCaseOpeningRound } from './caseOpening'
 import {
@@ -379,10 +380,15 @@ function CaseRightPanel({
                 </div>
                 <button
                     type="button"
-                    className="cases-right-cta"
+                    className={`cases-right-cta ${isHolding ? 'is-auto-arming' : ''}`}
                     data-game-action={results.length > 0 ? 'case-open-again' : 'case-open'}
                     data-ux-primary-action
                     onClick={() => performPlay({ betAmount: casePrice })}
+                    onMouseDown={handleOpenMouseDown}
+                    onMouseUp={handleOpenMouseUp}
+                    onMouseLeave={handleOpenMouseUp}
+                    onTouchStart={handleOpenMouseDown}
+                    onTouchEnd={handleOpenMouseUp}
                     disabled={running || !activeCase || balance < totalStake}
                 >
                     {results.length > 0 ? `Open again (${formatCredits(totalStake)})` : `Open ×${rows} (${formatCredits(totalStake)})`}
@@ -617,8 +623,11 @@ export default function CasesGame() {
     const [autoStopLoss, setAutoStopLoss] = useState('')
     const [autoStopRare, setAutoStopRare] = useState(true)
     const [autoRoundsLeft, setAutoRoundsLeft] = useState(0)
+    const [autoRollArmed, setAutoRollArmed] = useState(false) // P4: long-press auto-roll armed
+    const [isHolding, setIsHolding] = useState(false) // P4: hold-progress animation active
     const [autoSessionProfit, setAutoSessionProfit] = useState(0)
     const [celebrationDrop, setCelebrationDrop] = useState(null)
+    const [shakeKey, setShakeKey] = useState(0) // B1: increment to re-trigger screen shake on Contraband
     const [settlementSummary, setSettlementSummary] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
@@ -647,6 +656,7 @@ export default function CasesGame() {
     const tickRef = useRef({ ids: [], landId: null })
     const revealTimersRef = useRef([])
     const autoTimerRef = useRef(null)
+    const autoRollTimerRef = useRef(null) // P4: long-press auto-roll
     const pendingRoundRef = useRef(null)
     const celebrationTimerRef = useRef(null)
     const resultsPanelRef = useRef(null)
@@ -801,6 +811,10 @@ export default function CasesGame() {
         }
         const celebrate = pickCelebrationDrop(picks)
         setCelebrationDrop(celebrate)
+        // B1: re-trigger screen-shake CSS animation on every Contraband reveal
+        if (celebrate && (celebrate.rarity === 'Contraband' || celebrate.rarity === '★')) {
+            setShakeKey(k => k + 1)
+        }
         // C5: in a bulk open, flag the single highest-value row so the grid can
         // give it a finale pulse once everything has settled.
         if (roundRows > 1 && picks.length > 1) {
@@ -824,12 +838,19 @@ export default function CasesGame() {
         })
         if (skipped) sfx.play('land', { volume: 0.72 })
         sfx.play('reveal', { volume: 0.9 })
+        // Wave 36 P4: per-rarity drop stinger on the top prize
+        const topDrop = picks.reduce((best, p) => (Number(p.valueGc) > Number(best?.valueGc) ? p : best), null)
+        const rarityRole = getRaritySfxRole(topDrop)
+        if (rarityRole) sfx.play(rarityRole, { volume: 1 })
         if (rare) sfx.play('rare', { volume: 1 })
         // C7: tactile reward on the result. Rare/celebration drop gets the longer
         // 'rare' buzz (forced past the throttle since it's a single moment); a
         // plain win gets a short pulse. Reduce-motion / setting-off no-ops.
         if (celebrate || rare) haptic('rare', { enabled: hapticsEnabled, force: true })
         else if (won) haptic('win', { enabled: hapticsEnabled, force: true })
+        // P4: stronger vibration on Contraband / ★ tier drops
+        const isTopTier = picks.some(p => p.rarity === 'Contraband' || p.rarity === '★')
+        if (isTopTier && hapticsEnabled) navigator.vibrate(80)
         // Wave 31: extra fanfare variants for special results.
         const knifeOrGloves = picks.some(p => /knife|gloves|bayonet|karambit|huntsman|talon/i.test(p.name || ''))
         if (knifeOrGloves) sfx.play('knife', { volume: 1 })
@@ -1300,6 +1321,36 @@ export default function CasesGame() {
         }, { replace: true })
     }, [caseId, running, setSearchParams, sfx])
 
+    // P4: long-press the Open button to auto-roll until cancel
+    const handleOpenMouseDown = useCallback(() => {
+        if (running || !activeCase || balance < totalStake) return
+        setIsHolding(true)
+        const id = window.setTimeout(() => {
+            if (!activeCase || balance < totalStake) { setIsHolding(false); return }
+            const nextLeft = autoPreset === 'infinite' ? Infinity : Math.max(1, Number(autoPreset) || 10)
+            setAutoRoundsLeft(nextLeft)
+            setAutoSessionProfit(0)
+            setAutoOpen(true)
+            setAutoRollArmed(true)
+            setIsHolding(false)
+            sfx.play('click', { volume: 0.4 })
+        }, 500)
+        autoRollTimerRef.current = id
+    }, [activeCase, autoPreset, balance, running, sfx, totalStake])
+
+    const handleOpenMouseUp = useCallback(() => {
+        if (autoRollTimerRef.current) {
+            window.clearTimeout(autoRollTimerRef.current)
+            autoRollTimerRef.current = null
+        }
+        setIsHolding(false)
+        if (autoRollArmed) {
+            // Short press: do a single open
+            setAutoRollArmed(false)
+            performPlay({ betAmount: casePrice })
+        }
+    }, [autoRollArmed, casePrice, performPlay])
+
     const startCaseAuto = useCallback(() => {
         if (running || autoOpen) return
         const nextLeft = autoPreset === 'infinite' ? Infinity : Math.max(1, Number(autoPreset) || 10)
@@ -1317,6 +1368,8 @@ export default function CasesGame() {
         }
         setAutoOpen(false)
         setAutoRoundsLeft(0)
+        setAutoRollArmed(false)
+        setIsHolding(false)
         sfx.play('click', { volume: 0.28 })
     }, [sfx])
 
@@ -1718,7 +1771,7 @@ export default function CasesGame() {
                                         {results.map((r, i) => (
                                             <div
                                                 key={i}
-                                                className={`cases-result-card ${results.length === 1 ? 'single' : ''} ${RARE_TIERS.has(r.rarity) ? 'rare' : ''} ${r.statTrak ? 'stattrak' : ''} ${r.souvenir ? 'souvenir' : ''}`}
+                                                className={`cases-result-card ${results.length === 1 ? 'single' : ''} ${RARE_TIERS.has(r.rarity) ? 'rare' : ''} ${r.rarity === 'Contraband' || r.rarity === '★' ? 'tier-contraband' : ''} ${i === finaleRow && finaleRow >= 0 ? 'is-finale' : ''} ${r.statTrak ? 'stattrak' : ''} ${r.souvenir ? 'souvenir' : ''}`}
                                                 style={{ '--rarity': r.color }}
                                                 data-case-row-index={i}
                                                 data-case-outcome-id={r.skinId || r.id}
@@ -1772,7 +1825,13 @@ export default function CasesGame() {
                             </div>
                             <CaseFairnessPanel refreshKey={fairnessKey} />
                             {celebrationDrop && (
-                                <div className="cases-prize-popover" style={{ '--rarity': celebrationDrop.color }} role="status" aria-label="Rare drop">
+                                <div
+                                    className={`cases-prize-popover${(celebrationDrop.rarity === 'Contraband' || celebrationDrop.rarity === '★') ? ' case-tier-contraband-reveal' : ''}`}
+                                    key={shakeKey || undefined}
+                                    style={{ '--rarity': celebrationDrop.color }}
+                                    role="status"
+                                    aria-label="Rare drop"
+                                >
                                     <div className="cases-prize-card">
                                         <img src={celebrationDrop.image} alt={celebrationDrop.name} />
                                         <span>
@@ -2013,11 +2072,16 @@ export default function CasesGame() {
                     ) : (
                         <button
                             type="button"
-                            className="cases-mobile-open"
+                            className={`cases-mobile-open ${isHolding ? 'is-auto-arming' : ''}`}
                             data-cases-mobile-open
                             data-cases-mobile-action={results.length > 0 ? 'case-open-again' : 'case-open'}
                             data-mobile-hit-target="primary"
                             onClick={() => performPlay({ betAmount: casePrice })}
+                            onMouseDown={handleOpenMouseDown}
+                            onMouseUp={handleOpenMouseUp}
+                            onMouseLeave={handleOpenMouseUp}
+                            onTouchStart={handleOpenMouseDown}
+                            onTouchEnd={handleOpenMouseUp}
                             disabled={!activeCase || balance < totalStake}
                         >
                             {results.length > 0 ? `Open again ×${rows}` : `Open ×${rows}`}

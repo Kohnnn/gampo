@@ -136,7 +136,7 @@ function Header() {
                 <Link to="/" className="logo-link" aria-label="GamPo home">
                     <span className="logo">GamPo</span>
                 </Link>
-                <span className="header-mode">Education mode</span>
+                <span className="header-mode">Live</span>
             </div>
 
             <div className="header-center">
@@ -151,7 +151,7 @@ function Header() {
                     </svg>
                     <input
                         type="text"
-                        placeholder="Search simulators"
+                        placeholder="Search games"
                         className="search-input"
                         value={searchQuery}
                         onChange={(event) => {
@@ -160,7 +160,7 @@ function Header() {
                         }}
                         onFocus={() => setSearchOpen(true)}
                         onKeyDown={handleSearchKeyDown}
-                        aria-label="Search simulators"
+                        aria-label="Search games"
                         aria-expanded={searchOpen && searchQuery.trim().length > 0}
                     />
                     {searchOpen && searchQuery.trim().length > 0 && (
@@ -190,6 +190,9 @@ function Header() {
             </div>
 
             <div className="header-right" ref={dropdownRef}>
+            <div className="live-wins-badge" title="Recent big wins">
+                <span>Live Wins</span>
+            </div>
             <div className="header-toggles">
                 <Link
                     to="/settings"
@@ -218,17 +221,17 @@ function Header() {
                     {showCredits && (
                         <div className="credit-dropdown">
                             <div className="credit-dropdown-header">
-                                <h4>Practice Credits</h4>
+                                <h4>Balance</h4>
                                 <button className="credit-close-btn" onClick={() => setShowCredits(false)}>x</button>
                             </div>
 
                             <div className="credit-balance-section">
-                                <div className="credit-balance-label">Simulation balance</div>
+                                <div className="credit-balance-label">Balance</div>
                                 <div className="credit-balance-big">
                                     <CreditIcon size={28} fontSize={13} />
                                     {formattedBalance}
                                 </div>
-                                <p>Fake credits only. No cash value, accounts, payouts, or transfers. Practice sessions are tab-isolated.</p>
+                                <p>Virtual balance only. No real money, accounts, or payouts. Play responsibly.</p>
                             </div>
 
                             <div className="credit-actions">
@@ -237,7 +240,7 @@ function Header() {
                                         type="number"
                                         value={grantAmount}
                                         onChange={(event) => setGrantAmount(event.target.value)}
-                                        placeholder="Add practice credits"
+                                        placeholder="Add balance"
                                         className="credit-grant-input"
                                         min="0"
                                         step="1"
@@ -249,12 +252,12 @@ function Header() {
                                 <div className="credit-quick-amounts">
                                     {[100, 500, 1000, 5000].map(amount => (
                                         <button key={amount} className="credit-quick-btn" onClick={() => grantPracticeCredits(amount)}>
-                                            +GC {amount}
+                                            +{amount}
                                         </button>
                                     ))}
                                 </div>
                                 <button className="credit-reset-btn" onClick={resetBalance}>
-                                    Reset to GC 1,000.00
+                                    Reset Balance
                                 </button>
                             </div>
 

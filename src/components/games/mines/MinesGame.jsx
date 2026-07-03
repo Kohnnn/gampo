@@ -71,7 +71,7 @@ export default function MinesGame() {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const sfx = useSfx('mines')
-    const session = useGameSession('mines-shell')
+    const session = useGameSession('mines')
     const preloader = useOriginalsPreloader('mines')
 
     const [bombs, setBombs] = useState(3)

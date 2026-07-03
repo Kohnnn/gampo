@@ -8,6 +8,7 @@ import MissionToast from './MissionToast'
 import MobileBottomNav from './MobileBottomNav'
 import SessionGuardBanner from './SessionGuardBanner'
 import WelcomeModal from './WelcomeModal'
+import FooterDisclaimer from './FooterDisclaimer'
 import { useMenuBgm } from '../audio/useBgm'
 import { playSample } from '../audio/audioContext'
 import { useSettings } from '../hooks/useSettings'
@@ -79,6 +80,7 @@ function Layout() {
             <MissionToast />
             <SessionGuardBanner />
             <WelcomeModal />
+            <FooterDisclaimer />
         </div>
     )
 }

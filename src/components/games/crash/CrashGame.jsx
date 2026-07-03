@@ -14,6 +14,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, clamp } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useTremor, triggerTremor } from '../../../utils/tremor'
+import { useSettings } from '../../../hooks/useSettings'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { getBigWinThreshold,
     BetPanel,
@@ -111,7 +112,7 @@ export default function CrashGame() {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const sfx = useSfx('crash')
-    const session = useGameSession('crash-shell')
+    const session = useGameSession('crash')
     const preloader = useOriginalsPreloader('crash')
 
     const [phase, setPhase] = useState('idle')
@@ -123,6 +124,7 @@ export default function CrashGame() {
     const [missedAt, setMissedAt] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [burstKey, setBurstKey] = useState(0)
+    const { reduceMotion } = useSettings()
     const [lastBet, setLastBet] = useState(null)
     const [players, setPlayers] = useState(() => simulatePlayers(2.2))
     const [bettingMs, setBettingMs] = useState(0)
@@ -283,13 +285,13 @@ export default function CrashGame() {
                     if (eff >= 5) {
                         playSound('bigwin')
                         setBigWin({ trigger: Date.now(), profit, multiplier: eff })
-                        triggerTremor(screenRef, 'lg')
+                        if (!reduceMotion) triggerTremor(screenRef, 'lg')
                     } else {
                         playSound('win')
                     }
                 } else {
                     playSound('explode')
-                    triggerTremor(screenRef, 'lg')
+                    if (!reduceMotion) triggerTremor(screenRef, 'lg')
                     setPhase('crashed')
                 }
                 showToast(profit >= 0 ? 'win' : 'loss', outcome.cashed ? 'Cashed out' : 'Crashed', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
@@ -324,7 +326,7 @@ export default function CrashGame() {
                 if (effective >= 5) {
                     playSound('bigwin')
                     setBigWin({ trigger: Date.now(), profit, multiplier: effective })
-                    triggerTremor(screenRef, 'lg')
+                    if (!reduceMotion) triggerTremor(screenRef, 'lg')
                 } else {
                     playSound('win')
                 }
@@ -393,7 +395,7 @@ export default function CrashGame() {
         if (effective >= 5) {
             playSound('bigwin')
             setBigWin({ trigger: Date.now(), profit, multiplier: effective })
-            triggerTremor(screenRef, 'lg')
+            if (!reduceMotion) triggerTremor(screenRef, 'lg')
         } else {
             playSound('win')
         }
@@ -495,7 +497,7 @@ export default function CrashGame() {
                                     </>
                                 )}
                             </div>
-                            {burstKey > 0 && phase === 'cashed' && <Particles key={burstKey} count={20} color="#ff7ab6" />}
+                            {burstKey > 0 && phase === 'cashed' && !reduceMotion && <Particles key={burstKey} count={20} color="#ff7ab6" />}
                         </div>
                         <aside className="crash-side-rail" aria-label="Live crash players">
                             <div className="crash-rail-head">

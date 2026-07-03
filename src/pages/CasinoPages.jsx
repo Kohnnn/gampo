@@ -37,7 +37,7 @@ export function OriginalsPage() {
         <CasinoSection
             kicker="Casino originals"
             title="Originals and arcade classics"
-            text="Originals-style games, Xaxino-style arcade mechanics, table trainers and card decisions using practice credits only."
+            text="Originals-style games, Xaxino-style arcade mechanics, table games and card decisions — all powered by virtual credits."
             icon={<Radio size={18} />}
         >
             <GameGrid games={gameDefinitions} />
@@ -49,8 +49,8 @@ export function SlotsLobbyPage() {
     return (
         <CasinoSection
             kicker="Slots catalogue"
-            title="Slots simulator lobby"
-            text="A catalogue-style slot floor inspired by the example Laravel casino lists. Each tile opens the local slots simulator."
+            title="Slots lobby"
+            text="A catalogue-style slot floor with premium titles and progressive jackpots."
             icon={<Activity size={18} />}
         >
             <GameGrid games={slotCatalog} />
@@ -107,7 +107,7 @@ export function MissionsPage() {
         <CasinoSection
             kicker="Practice goals"
             title="Missions"
-            text="Daily / weekly / lifetime missions reward exploration with practice credits. No real money."
+            text="Complete challenges, earn bonuses and climb the weekly leaderboard for extra rewards."
             icon={<Target size={18} />}
             action={confirmReset ? (
                 <span className="casino-action-row">
@@ -221,11 +221,11 @@ export function VipPage() {
 export function LearnPage() {
     return (
         <CasinoSection
-            kicker="Risk academy"
-            title="Probability lessons"
-            text="A compact reference desk for RTP, edge, volatility, hit frequency, bankroll risk and sportsbook margin."
+            kicker="Rakeback"
+            title="Rakeback & bonuses"
+            text="Earn rakeback on every wager. Track your weekly earnings and climb the VIP tiers for exclusive rewards."
             icon={<BookOpen size={18} />}
-            action={<Link to="/originals" className="casino-action primary" data-ux-primary-action>Practice games</Link>}
+            action={<Link to="/originals" className="casino-action primary" data-ux-primary-action>Play games</Link>}
         >
             <div className="lesson-grid">
                 {sourceNotes.map(note => (
@@ -254,16 +254,16 @@ export function ActivityPage() {
         <CasinoSection
             kicker="Local ledger"
             title="Activity"
-            text="Every practice bet, return, top-up and reset is stored locally in the browser."
+            text="Every bet, return, top-up and reset is stored locally in the browser."
             icon={<Activity size={18} />}
-            action={<button className="casino-action" onClick={resetBalance}>Reset lab</button>}
+            action={<button className="casino-action" onClick={resetBalance}>Reset Balance</button>}
         >
             <div className="activity-table">
                 {transactions.length === 0 ? (
                     <div className="activity-empty">
                         <img src="/assets/games/lobby/hero-arcade.png" alt="" aria-hidden="true" />
                         <h3>No activity yet</h3>
-                        <p>Every practice bet, return, top-up and reset will land here. Try a quick game to seed the log.</p>
+                        <p>Every bet, return, top-up and reset will land here. Try a quick game to seed the log.</p>
                         <div className="activity-empty-actions">
                             <Link to="/dice" className="casino-action primary">Try Dice</Link>
                             <Link to="/originals" className="casino-action">Browse Originals</Link>
@@ -290,7 +290,7 @@ export function PromotionsPage() {
             title: 'Solo Casino School',
             kicker: 'Campaign',
             badge: 'New path',
-            description: 'A single-player casino campaign: clear quests, learn why outcomes happen, and unlock study badges with practice credits only.',
+            description: 'A single-player casino experience: clear quests, earn bonuses, and climb the VIP tiers.',
             cta: 'Start Missions',
             link: '/missions',
             accent: '#00e701',
@@ -300,11 +300,11 @@ export function PromotionsPage() {
         },
         {
             id: 'edge-101',
-            title: 'EV 101 Workshop',
-            kicker: 'Education',
+            title: 'VIP Rewards Week',
+            kicker: 'VIP',
             badge: 'Open now',
-            description: 'Walk through dice, limbo, and wheel side-by-side. Compare expected value at the same RTP across different volatility shapes.',
-            cta: 'Open Risk Academy',
+            description: 'Earn rakeback on every wager. Climb the VIP tiers for exclusive bonuses and priority support.',
+            cta: 'Open Rakeback',
             link: '/learn',
             accent: '#00e701',
             emoji: '\uD83D\uDCCA',
@@ -313,23 +313,23 @@ export function PromotionsPage() {
         },
         {
             id: 'race-week',
-            title: 'Practice Race Week',
+            title: 'Weekly Race',
             kicker: 'Race',
-            badge: 'Simulated',
-            description: 'Climb the simulated leaderboard. Opponents are not real players. Prizes are practice badges only.',
+            badge: 'Live',
+            description: 'Climb the leaderboard. Earn bonus credits based on your weekly wager volume.',
             cta: 'View Race',
             link: '/race',
             accent: '#ffcf5a',
-            emoji: '\uD83C\uDFC1',
+            emoji: '\uD83C\uDFC6',
             gradient: 'linear-gradient(135deg, rgba(255, 207, 90, 0.32), rgba(120, 70, 0, 0.95))',
             art: '/assets/games/promo/promo-race.png',
         },
         {
             id: 'verify-day',
-            title: 'Provably Fair Drop-in',
+            title: 'Provably Fair',
             kicker: 'Verify',
             badge: 'New',
-            description: 'Inspect your seed/nonce, rotate seeds, and replay every recent roll. Educational only.',
+            description: 'Inspect your seed/nonce, rotate seeds, and replay every recent roll.',
             cta: 'Open Verify',
             link: '/verify',
             accent: '#58a6ff',
@@ -394,7 +394,7 @@ export function PromotionsPage() {
                 ))}
             </div>
             <p className="muted" style={{ marginTop: 14 }}>
-                Reminder: GamPo runs on practice credits. There are no payouts, deposits, or transfers.
+                GamPo is a probability simulator. No real money, accounts, or payouts. Play responsibly.
             </p>
         </CasinoSection>
     )
