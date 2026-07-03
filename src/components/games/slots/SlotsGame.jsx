@@ -296,6 +296,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [spinPhase, setSpinPhase] = useState('idle')
     const [stoppedCols, setStoppedCols] = useState(startTemplate.layout.cols)
     const [winningCells, setWinningCells] = useState([])
+    // Wave 36 P4: hold-and-respin — columns the player has locked for the next spin.
+    const [lockedCols, setLockedCols] = useState(new Set())
     // Cells currently mid-pop during a cascade tumble replay (visual only).
     const [cascadePopCells, setCascadePopCells] = useState([])
     const [lastResult, setLastResult] = useState(null)
@@ -388,6 +390,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const timers = useRef([])
     const ticker = useRef(null)
     const stoppedColsRef = useRef(startTemplate.layout.cols)
+    const lockedColsRef = useRef(new Set())
     // Slam-stop: holds the in-flight round so a second tap can resolve it now.
     const pendingFinishRef = useRef(null)
     const autoplayBaselineRef = useRef(null)
@@ -409,6 +412,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     useEffect(() => { buyTierIdRef.current = bonusBuyTierId }, [bonusBuyTierId])
     useEffect(() => { persistentMultiplierRef.current = persistentMultiplier }, [persistentMultiplier])
     useEffect(() => { turboRef.current = turbo }, [turbo])
+    useEffect(() => { lockedColsRef.current = lockedCols }, [lockedCols])
 
     // Wave 10: when the free-spin counter drops to 0 mid-session, emit the end banner
     // and reset the session. This fires after finishRound has decremented freeSpins.
@@ -448,6 +452,18 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         }
     }, [])
 
+    const toggleColLock = useCallback((col) => {
+        if (running) return
+        setLockedCols(prev => {
+            const next = new Set(prev)
+            if (next.has(col)) next.delete(col)
+            else next.add(col)
+            return next
+        })
+    }, [running])
+
+    const clearLocks = useCallback(() => setLockedCols(new Set()), [])
+
     const setStoppedColumnState = useCallback((value) => {
         stoppedColsRef.current = value
         setStoppedCols(value)
@@ -465,6 +481,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setShowBuyModal(false)
         setFreeSpins(0)
         setCoinMeter(0)
+        clearLocks()
         setShowIntro(Boolean(nextConfig.features?.introOverlay))
         setAutoplayActive(false)
         setAutoplayRemaining(0)
@@ -481,7 +498,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setFreeSpinSession(null)
         setBonusEndBanner(null)
         if (clearStats) session.clear()
-    }, [clearTimers, session.clear, setStoppedColumnState])
+    }, [clearLocks, clearTimers, session.clear, setStoppedColumnState])
 
     useEffect(() => {
         const clearStats = templateResetRef.current !== config.id
@@ -952,6 +969,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             feedback(FEEDBACK_EVENTS.BIG_WIN, { volume: 0.9 })
             playSound('bigwin')
             setBigWin({ trigger: Date.now(), profit, multiplier: result.multiplier })
+            // P4: haptic pulse on tier 4+ big win
+            if (haptics) navigator.vibrate(80)
         } else {
             feedback(profit > 0 ? FEEDBACK_EVENTS.WIN : FEEDBACK_EVENTS.LOSE, { volume: profit > 0 ? 0.78 : 0.66 })
             playSound(profit > 0 ? 'win' : 'loss')
@@ -1018,6 +1037,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 setNearMiss(null)
                 setBonusEndBanner(null)
                 setAnticipating(false)
+                clearLocks()
                 // Snap every reel straight to its resolved cell — no scrolling.
                 setStoppedColumnState(cols)
                 setGrid(result.cells)
@@ -1062,7 +1082,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setSpinPhase(source === 'stage' ? 'stage-spin' : 'spinning')
             setWinningCells([])
             setCascadePopCells([])
-            setStoppedColumnState(0)
+            const locked = lockedColsRef.current
+            // Start from the highest locked column so only unlocked reels spin.
+            const startCol = locked.size > 0 ? Math.max(...locked) + 1 : 0
+            setStoppedColumnState(startCol)
             setMysteryReveal(null)
             setRetriggerFlyers([])
             setRetriggerPop(null)
@@ -1079,15 +1102,18 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             const tickerIntervalMs = getSlotTickerIntervalMs({ mode: turbo ? 'turbo' : 'normal', reduceMotion })
             if (tickerIntervalMs > 0) {
                 ticker.current = window.setInterval(() => {
+                    const locked = lockedColsRef.current
                     setGrid(prev => prev.map((cell, index) => {
                         const { col } = cellPositions[index]
                         if (col < stoppedColsRef.current) return cell
+                        if (locked.has(col)) return cell
                         return randomVisualSymbol(config)
                     }))
                 }, tickerIntervalMs)
             }
 
             for (const stop of stopSchedule.stops) {
+                if (lockedColsRef.current.has(stop.col)) continue
                 timers.current.push(window.setTimeout(() => {
                     playSound('flip')
                     feedback(FEEDBACK_EVENTS.REEL_STOP, { volume: 0.62 })
@@ -1116,7 +1142,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 finish()
             }, totalDelay))
         })
-    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearTimers, config, feedback, finishRound, freeSpins, instant, placeBet, playSound, reduceMotion, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
+    ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearLocks, clearTimers, config, feedback, finishRound, freeSpins, instant, placeBet, playSound, reduceMotion, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
 
     const slamStop = useCallback(() => {
         // Resolve an in-flight spin immediately: snap all reels to their final
@@ -1503,71 +1529,112 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         aria-busy={running ? 'true' : undefined}
                     >
                         {config.layout.evaluation === 'megaways' ? (
-                            <div className="slot-megaways-grid" style={{ gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))` }}>
-                                {Array.from({ length: config.layout.cols }).map((_, col) => {
-                                    const colRows = getColumnRows(config, col)
-                                    const cellsInCol = []
-                                    let cursor = 0
-                                    for (let c = 0; c < col; c += 1) cursor += getColumnRows(config, c)
-                                    for (let r = 0; r < colRows; r += 1) cellsInCol.push({ index: cursor + r })
-                                    return (
-                                        <div key={`col-${col}`} className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''} ${!running && wildColumns.has(col) ? 'wild-column' : ''}`}>
-                                            {cellsInCol.map(({ index }) => {
-                                                const item = displayGrid[index] || config.symbols?.[0]
-                                                const spinning = running && col >= stoppedCols
-                                                const winning = winningCells.includes(index)
-                                                const popping = cascadePopCells.includes(index)
-                                                const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
-                                                const orbValue = lastResult?.orbValues?.find(o => o.index === index)?.value
-                                                return (
-                                                    <div
-                                                        key={`mw-${index}`}
-                                                        className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''}`}
-                                                    >
-                                                        <Asset src={item?.asset} alt={item?.label} fallback={<strong>{item?.label}</strong>} />
-                                                        <em>{item?.label}</em>
-                                                        {moneyValue ? <i className="money-chip">{formatCredits(moneyValue)}</i> : null}
-                                                        {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        ) : (
-                            <div
-                                className="slot-reel-grid"
-                                style={{
-                                    gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))`,
-                                    gridTemplateRows: `repeat(${config.layout.rows}, minmax(0, 1fr))`,
-                                }}
-                            >
-                                {cellPositions.map(({ col }, index) => {
-                                    const item = displayGrid[index] || config.symbols?.[0]
-                                    if (!item) return null
-                                    const spinning = running && col >= stoppedCols
-                                    const winning = winningCells.includes(index)
-                                    const popping = cascadePopCells.includes(index)
-                                    const inAnticipationCol = anticipating && col >= config.layout.cols - 2 && spinning
-                                    const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
-                                    const orbValue = lastResult?.orbValues?.find(o => o.index === index)?.value
-                                    const isSticky = stickyWilds.includes(index)
-                                    return (
-                                        <div
-                                            key={index}
-                                            className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''} ${!spinning && wildColumns.has(col) ? 'wild-column' : ''}`}
-                                            style={{ animationDelay: `${col * 45}ms` }}
+                            <>
+                                <div className="slot-col-locks" aria-label="Hold columns">
+                                    {Array.from({ length: config.layout.cols }).map((_, col) => (
+                                        <button
+                                            key={col}
+                                            type="button"
+                                            className={`slot-col-lock ${lockedCols.has(col) ? 'is-locked' : ''}`}
+                                            onClick={() => toggleColLock(col)}
+                                            disabled={running}
+                                            aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                            aria-pressed={lockedCols.has(col)}
                                         >
-                                            <Asset src={item.asset} alt={item.label} fallback={<strong>{item.label}</strong>} />
-                                            <em>{item.label}</em>
-                                            {moneyValue ? <i className="money-chip">{formatCredits(moneyValue)}</i> : null}
-                                            {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
-                                            {isSticky && <span className="slot-cell-sticky-badge" aria-hidden>★</span>}
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                                            {lockedCols.has(col) ? '🔒' : col + 1}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="slot-megaways-grid" style={{ gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))` }}>
+                                    {Array.from({ length: config.layout.cols }).map((_, col) => {
+                                        const colRows = getColumnRows(config, col)
+                                        const cellsInCol = []
+                                        let cursor = 0
+                                        for (let c = 0; c < col; c += 1) cursor += getColumnRows(config, c)
+                                        for (let r = 0; r < colRows; r += 1) cellsInCol.push({ index: cursor + r })
+                                        return (
+                                            <div
+                                                key={`col-${col}`}
+                                                className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''} ${!running && wildColumns.has(col) ? 'wild-column' : ''} ${lockedCols.has(col) ? 'is-locked' : ''}`}
+                                                onClick={() => !running && toggleColLock(col)}
+                                                role="button"
+                                                aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                                tabIndex={running ? -1 : 0}
+                                            >
+                                                {cellsInCol.map(({ index }) => {
+                                                    const item = displayGrid[index] || config.symbols?.[0]
+                                                    const spinning = running && col >= stoppedCols
+                                                    const winning = winningCells.includes(index)
+                                                    const popping = cascadePopCells.includes(index)
+                                                    const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
+                                                    const orbValue = lastResult?.orbValues?.find(o => o.index === index)?.value
+                                                    return (
+                                                        <div
+                                                            key={`mw-${index}`}
+                                                            className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''}`}
+                                                        >
+                                                            <Asset src={item?.asset} alt={item?.label} fallback={<strong>{item?.label}</strong>} />
+                                                            <em>{item?.label}</em>
+                                                            {moneyValue ? <i className="money-chip">{formatCredits(moneyValue)}</i> : null}
+                                                            {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="slot-col-locks" aria-label="Hold columns">
+                                    {Array.from({ length: config.layout.cols }).map((_, col) => (
+                                        <button
+                                            key={col}
+                                            type="button"
+                                            className={`slot-col-lock ${lockedCols.has(col) ? 'is-locked' : ''}`}
+                                            onClick={() => toggleColLock(col)}
+                                            disabled={running}
+                                            aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                            aria-pressed={lockedCols.has(col)}
+                                        >
+                                            {lockedCols.has(col) ? '🔒' : col + 1}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div
+                                    className="slot-reel-grid"
+                                    style={{
+                                        gridTemplateColumns: `repeat(${config.layout.cols}, minmax(0, 1fr))`,
+                                        gridTemplateRows: `repeat(${config.layout.rows}, minmax(0, 1fr))`,
+                                    }}
+                                >
+                                    {cellPositions.map(({ col }, index) => {
+                                        const item = displayGrid[index] || config.symbols?.[0]
+                                        if (!item) return null
+                                        const spinning = running && col >= stoppedCols
+                                        const winning = winningCells.includes(index)
+                                        const popping = cascadePopCells.includes(index)
+                                        const inAnticipationCol = anticipating && col >= config.layout.cols - 2 && spinning
+                                        const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
+                                        const orbValue = lastResult?.orbValues?.find(o => o.index === index)?.value
+                                        const isSticky = stickyWilds.includes(index)
+                                        return (
+                                            <div
+                                                key={index}
+                                                className={`slot-cell type-${item.type || 'pay'} symbol-${item.id} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''} ${inAnticipationCol ? 'anticipating' : ''} ${isSticky ? 'sticky' : ''} ${!spinning && wildColumns.has(col) ? 'wild-column' : ''} ${lockedCols.has(col) ? 'is-locked-cell' : ''}`}
+                                                style={{ animationDelay: `${col * 45}ms` }}
+                                            >
+                                                <Asset src={item.asset} alt={item.label} fallback={<strong>{item.label}</strong>} />
+                                                <em>{item.label}</em>
+                                                {moneyValue ? <i className="money-chip">{formatCredits(moneyValue)}</i> : null}
+                                                {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
+                                                {isSticky && <span className="slot-cell-sticky-badge" aria-hidden>★</span>}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </>
                         )}
                         {cascadeTraceCells.length > 0 && (
                             <div className="slot-cascade-trace-layer" aria-hidden>
@@ -2219,10 +2286,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         </header>
                         <div className="slot-mobile-bet-value">{formatCredits(betAmount)}</div>
                         <div className="slot-mobile-bet-steppers">
+                            <button type="button" className="stepper-minus" onClick={() => setBet(betAmount / 2)} disabled={running || autoplayActive} aria-label="Decrease bet">−</button>
                             <button type="button" onClick={() => setBet(0.1)} disabled={running || autoplayActive}>Min</button>
-                            <button type="button" onClick={() => setBet(betAmount / 2)} disabled={running || autoplayActive}>½</button>
                             <button type="button" onClick={() => setBet(betAmount * 2)} disabled={running || autoplayActive}>2×</button>
-                            <button type="button" onClick={() => setBet(Math.min(10000, balance || 10000))} disabled={running || autoplayActive}>Max</button>
+                            <button type="button" className="stepper-plus" onClick={() => setBet(Math.min(10000, balance || 10000))} disabled={running || autoplayActive} aria-label="Max bet">+</button>
                         </div>
                         <input
                             type="number"

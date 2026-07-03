@@ -342,6 +342,33 @@
     overflow: hidden;
 }
 
+/* A4: Atmospheric dust particles on stage backdrop */
+.slot-stage-v2 .slot-atmosphere {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+.slot-atmosphere::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        radial-gradient(1px 1px at 18% 28%, rgba(255,255,255,0.18) 0%, transparent 100%),
+        radial-gradient(1px 1px at 42% 65%, rgba(255,255,255,0.12) 0%, transparent 100%),
+        radial-gradient(1px 1px at 63% 15%, rgba(255,255,255,0.15) 0%, transparent 100%),
+        radial-gradient(1px 1px at 82% 58%, rgba(255,255,255,0.10) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 35% 80%, rgba(255,255,255,0.08) 0%, transparent 100%),
+        radial-gradient(1px 1px at 75% 35%, rgba(255,255,255,0.13) 0%, transparent 100%);
+    background-size: 320px 320px;
+    animation: slotDustFloat 28s linear infinite;
+}
+@keyframes slotDustFloat {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-320px); }
+}
+
 .slot-stage-loader {
     position: absolute;
     inset: 0;
@@ -613,8 +640,11 @@
         linear-gradient(180deg, #122035 0%, #0a1424 100%);
     border: 1px solid var(--slot-rail-strong);
     box-shadow:
-        inset 0 0 28px rgba(0, 0, 0, 0.55),
-        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        inset 0 1px 0 rgba(255,255,255,0.14),
+        inset 0 -2px 0 rgba(0,0,0,0.45),
+        inset 2px 0 0 rgba(255,255,255,0.07),
+        inset -2px 0 0 rgba(0,0,0,0.18),
+        inset 0 0 28px rgba(0,0,0,0.55);
     position: relative;
 }
 
@@ -699,7 +729,9 @@
     background: transparent;
     border: 0;
     mix-blend-mode: normal;
-    filter: drop-shadow(0 7px 10px rgba(0, 0, 0, 0.58));
+    filter:
+        drop-shadow(0 7px 10px rgba(0, 0, 0, 0.58))
+        drop-shadow(0 0 7px color-mix(in srgb, var(--slot-accent, #4cc9f0) 25%, transparent));
 }
 
 .slot-template-miko-spirit .slot-cell img,
@@ -882,6 +914,22 @@
     0% { opacity: 0; transform: scale(0.85); }
     35% { opacity: 1; transform: scale(1.15); }
     100% { opacity: 0; transform: scale(1.4); }
+}
+
+/* A1: Win burst ring — radial ring behind each winning cell */
+.slot-cell.winning::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 14px;
+    background: radial-gradient(circle, rgba(255,230,128,0.35), transparent 70%);
+    animation: slotWinBurstRing 0.82s ease-out forwards;
+    pointer-events: none;
+    z-index: 1;
+}
+@keyframes slotWinBurstRing {
+    0%   { transform: scale(0.7); opacity: 1; }
+    100% { transform: scale(2.4); opacity: 0; }
 }
 
 /* Cascade tumble: winning cells "pop" (shrink + fade) before the next frame
@@ -1105,6 +1153,15 @@
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
+}
+
+.slot-control-spin:active {
+    transform: translateY(2px) scale(0.97) !important;
+    box-shadow:
+        0 0 0 3px rgba(0,0,0,0.35),
+        0 4px 10px rgba(0,0,0,0.42),
+        inset 0 4px 10px rgba(0,0,0,0.28) !important;
+    transition: transform 0.08s ease, box-shadow 0.08s ease !important;
 }
 
 .slot-control-spin-inner {
@@ -3252,6 +3309,64 @@
         linear-gradient(180deg, #2a120c 0%, #110604 100%);
 }
 
+/* Wave 36 P4: hold-and-respin column lock UI */
+.slot-col-locks {
+    display: flex;
+    gap: 4px;
+    padding: 0 4px 4px;
+    justify-content: center;
+}
+
+.slot-col-lock {
+    width: 28px;
+    height: 24px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+.slot-col-lock:hover:not(:disabled) {
+    border-color: rgba(240, 192, 64, 0.5);
+    background: rgba(240, 192, 64, 0.08);
+    color: rgba(240, 192, 64, 0.8);
+}
+.slot-col-lock.is-locked {
+    border-color: var(--accent-gold, #f0c040);
+    background: rgba(240, 192, 64, 0.15);
+    color: var(--accent-gold, #f0c040);
+}
+.slot-col-lock:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Locked column visual overlay on reel cells */
+.slot-megaways-col.is-locked,
+.slot-cell.is-locked-cell {
+    box-shadow: inset 0 0 0 2px rgba(240, 192, 64, 0.5);
+    opacity: 0.85;
+}
+
+@media (max-width: 768px) {
+    .slot-col-lock {
+        width: 24px;
+        height: 20px;
+        font-size: 0.6rem;
+    }
+    .slot-col-locks {
+        padding: 0 2px 3px;
+        gap: 2px;
+    }
+}
+
 .slot-reel-frame-v2 {
     min-height: clamp(220px, calc(var(--slot-rows, 4) * 78px), 390px);
     padding: 16px;
@@ -4244,19 +4359,34 @@
 }
 .slot-mobile-bet-steppers {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 8px;
 }
-.slot-mobile-bet-steppers button {
+/* P4: Large ± stepper buttons — thumb-friendly on phones */
+.slot-mobile-bet-steppers .stepper-plus,
+.slot-mobile-bet-steppers .stepper-minus {
     appearance: none;
-    min-height: 48px;
-    border-radius: 11px;
+    min-height: 56px;
+    border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.14);
     background: rgba(0, 0, 0, 0.3);
     color: var(--text-primary, #fff);
-    font-size: 14px;
+    font-size: 22px;
     font-weight: 950;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.12s;
+}
+.slot-mobile-bet-steppers .stepper-plus:hover:not(:disabled),
+.slot-mobile-bet-steppers .stepper-minus:hover:not(:disabled) {
+    background: rgba(240, 192, 64, 0.12);
+    border-color: rgba(240, 192, 64, 0.4);
+}
+.slot-mobile-bet-steppers .stepper-plus:active:not(:disabled),
+.slot-mobile-bet-steppers .stepper-minus:active:not(:disabled) {
+    background: rgba(240, 192, 64, 0.2);
 }
 .slot-mobile-bet-steppers button:disabled { opacity: 0.45; cursor: not-allowed; }
 .slot-mobile-bet-input {

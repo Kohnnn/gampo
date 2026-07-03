@@ -79,7 +79,7 @@ export default function PlinkoGame() {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const sfx = useSfx('plinko')
-    const session = useGameSession('plinko-shell')
+    const session = useGameSession('plinko')
     const preloader = useOriginalsPreloader('plinko')
 
     const canvasRef = useRef(null)

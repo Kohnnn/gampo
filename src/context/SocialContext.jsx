@@ -33,15 +33,15 @@ export const personaTemplates = {
         'auto plinko 100 balls running rn',
         'thinking of buying the mansion super bonus',
         'turbo spinning slot factory at max bet',
+        '50x on limbo lets goooo',
     ],
     analyst: [
-        'reminder this is fake credits with EV-shaped variance',
-        '99% RTP dice still has 1% house edge over time',
-        'plinko 16 rows = same EV as 8 rows, just lower hit rate',
-        'fair odds for 50% are 2.00, anything less = vig',
-        'limbo target 2x has ~49.5% hit at 99% RTP',
-        'cluster pays > line pays for low volatility chases',
+        'Crash still has that 1% house edge over time',
+        'Limbo target 2x has ~49.5% hit at 99% RTP',
+        'Plinko 16 rows = same EV as 8 rows, just different hit rate',
+        'Fair odds for 50% are 2.00, anything less = vig',
         'sample size matters: 100 rounds is barely a signal',
+        'Low volatility slots pay little and often',
     ],
     gambler: [
         'all in on red',
@@ -51,6 +51,7 @@ export const personaTemplates = {
         'crash went 33x last round, i missed it',
         'gonna chase it back',
         'riding the streak',
+        'come on come on come on',
     ],
     cautious: [
         'half my bet now, building bankroll slowly',
@@ -59,19 +60,21 @@ export const personaTemplates = {
         'keno 4 spots is the sweet spot for me',
         'tower easy mode only',
         'cashing at 1.5x every time',
+        'slow and steady',
     ],
     streaker: [
         '4 in a row on flip!',
-        'this baccarat shoe is breaking my brain',
+        'this baccarat shoe is on fire',
         'tower run was clean lvl 7',
         'just landed back to back wilds',
         'free spin retrigger, lets go',
+        'cant stop wont stop',
     ],
     mod: [
-        'reminder: GamPo Lab is fake credits, no real money',
-        'use the Stats tab to track your session',
-        'tilted? hit reset balance and walk away',
-        'check out the Risk Academy for EV explainers',
+        'Reminder: virtual credits only, no cash value',
+        'Use the Stats tab to track your session',
+        'Balance resets anytime — just top up',
+        'Play for fun, not profit',
     ],
 }
 
@@ -85,7 +88,7 @@ const personaBaseTempo = {
 }
 
 const seedChat = [
-    { user: 'edge_eva', text: 'Reminder: this is fake credits only, no cash value', flair: 'mod' },
+    { user: 'edge_eva', text: 'Reminder: virtual credits only, no cash value', flair: 'mod' },
     { user: 'oddsmonkey', text: 'Plinko 16 rows feels safer but the EV is the same' },
     { user: 'dice_doc', text: 'Try lower win chance for higher payout' },
     { user: 'crash_capt', text: 'gg I cashed at 3.2x' },

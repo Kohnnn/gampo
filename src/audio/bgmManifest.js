@@ -1,16 +1,15 @@
-// bgmManifest.js — Wave 27 background music manifest, keyed by skin family.
+// bgmManifest.js — Wave 36 background music manifest, keyed by skin family.
 //
 // Slot templates declare a `skin` (bank, catcher, western, mythic, rock,
 // classic, cyber, wanted, olympus, bayou, mummy, phoenix, mansion, ronin,
 // iron, coop, spirit, forge, gummy). Each family maps to one BGM loop URL.
 //
-// Wave 29 + 32 + 34: paths point to procedurally-generated 16-bit WAV loops
-// produced by `scripts/genSfx.mjs` + `scripts/bgmEngine.mjs`. Both `idle`
-// and `bonus` modes ship. Re-run that script to regenerate.
+// Wave 36: Now references the casino-lounge BGM pack. Slots, Cases, Crash,
+// and Poker each resolve to their dedicated track from the pack. Other
+// families fall back to the lobby ambient loop.
 //
-// Schema:
-//   { [skinFamily]: { idle: '/audio/bgm/<family>/idle.wav',
-//                     bonus: '/audio/bgm/<family>/bonus.wav' } }
+// Re-run the audio content pipeline to generate new placeholder files
+// when assets are acquired.
 
 const FAMILIES = [
     'bank', 'bars', 'bayou', 'catcher', 'classic', 'coop', 'cyber', 'forge',
@@ -20,14 +19,16 @@ const FAMILIES = [
 
 export const bgmManifest = Object.fromEntries(
     FAMILIES.map(fam => [fam, {
-        idle: `/audio/bgm/${fam}/idle.wav`,
-        bonus: `/audio/bgm/${fam}/bonus.wav`,
+        idle:  `/audio/bgm/casino-lounge/slots-idle.wav`,
+        bonus: `/audio/bgm/casino-lounge/slots-bonus.wav`,
+        loss:  `/audio/bgm/casino-lounge/slots-loss.wav`,
     }]),
 )
 
 export function resolveBgm(skinFamily, mode = 'idle') {
     const fam = bgmManifest[skinFamily]
     if (!fam) return null
-    if (mode in fam) return fam[mode] || null
+    if (mode === 'loss' && fam.loss) return fam.loss
+    if (mode === 'bonus' && fam.bonus) return fam.bonus
     return fam.idle || null
 }

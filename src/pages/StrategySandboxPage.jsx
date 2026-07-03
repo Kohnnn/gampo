@@ -70,7 +70,7 @@ export default function StrategySandboxPage() {
         <div className="sandbox-page" data-ux-surface="stage">
             <section className="sandbox-hero" data-ux-surface="stage">
                 <div>
-                    <span className="sandbox-kicker"><FlaskConical size={18} /> Strategy sandbox</span>
+                    <span className="sandbox-kicker"><FlaskConical size={18} /> Challenges</span>
                     <h1>Test any betting system, risk-free</h1>
                     <p>
                         Simulate thousands of sessions of a staking strategy against a chosen game's

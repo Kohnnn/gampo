@@ -131,7 +131,7 @@ export default function BlackjackGame() {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const sfx = useSfx('blackjack')
-    const session = useGameSession('blackjack-shell')
+    const session = useGameSession('blackjack')
     const preloader = useOriginalsPreloader('blackjack')
 
     const [decks, setDecks] = useState(4)

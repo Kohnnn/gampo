@@ -1,9 +1,9 @@
 // Lightweight hand history tab for the poker sidebar. Tracks the latest
 // concluded hands in this session via useGameSession.
 
-import useGameSession from '../games/primitives/useGameSession'
+import useGameSession from '../primitives/useGameSession'
 import { useEffect } from 'react'
-import { formatCredits } from '../../utils/simulationMath'
+import { formatCredits } from '../../../utils/simulationMath'
 
 // External API for PokerGame to record a settled hand:
 //   import { recordHand } from './HandHistoryTab'

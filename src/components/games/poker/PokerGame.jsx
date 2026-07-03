@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useCredits } from '../../context/CreditContext'
-import { useAudio } from '../../audio/AudioProvider'
-import { useGameBgm } from '../../audio/useBgm'
-import { formatCredits } from '../../utils/simulationMath'
-import { applyAction, createInitialState, dealNext, legalActions, startHand } from '../../poker/engine/Game'
-import HeuristicBot from '../../poker/bots/HeuristicBot'
-import { preloadGto } from '../../poker/gto/loader'
+import { useCredits } from '../../../context/CreditContext'
+import { useAudio } from '../../../audio/AudioProvider'
+import { useGameBgm } from '../../../audio/useBgm'
+import { formatCredits } from '../../../utils/simulationMath'
+import { applyAction, createInitialState, dealNext, legalActions, startHand } from '../../../poker/engine/Game'
+import HeuristicBot from '../../../poker/bots/HeuristicBot'
+import { preloadGto } from '../../../poker/gto/loader'
 import GtoPanel from './GtoPanel'
 import HandHistoryTab, { recordHand } from './HandHistoryTab'
-import { useScrollActionIntoView } from '../../hooks/useScrollActionIntoView'
+import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import './PokerGame.css'
 
 const BUY_INS = [1000, 5000, 25000, 100000, 500000]
@@ -41,7 +41,6 @@ function blindLevelForHand(handNumber) {
     return { level: level + 1, sb: Math.floor(bb / 2), bb, ante: level >= 2 ? Math.max(1, Math.floor(bb / 8)) : 0 }
 }
 
-// Wave 12: cash-game format keeps blinds and ante locked at the buy-in level.
 function cashGameLevel() {
     return { level: 1, sb: 5, bb: 10, ante: 0 }
 }
@@ -138,18 +137,16 @@ export default function PokerGame() {
     const [raiseOpen, setRaiseOpen] = useState(false)
     const [tab, setTab] = useState('gto')
     const [buyIn, setBuyIn] = useState(1000)
-    // Wave 12: format selector
-    const [format, setFormat] = useState('sng') // 'sng' | 'cash'
+    const [format, setFormat] = useState('sng')
     const [handNumber, setHandNumber] = useState(1)
     const [sngComplete, setSngComplete] = useState(false)
     const [bubbles, setBubbles] = useState({})
     const [confirmCashout, setConfirmCashout] = useState(false)
     const [pendingExit, setPendingExit] = useState(null)
     const [rotationLog, setRotationLog] = useState([])
-    // Wave 12: rebuy prompt for the human + chip motion + time bank
     const [rebuyPrompt, setRebuyPrompt] = useState(false)
-    const [chipMotions, setChipMotions] = useState([]) // [{ id, seat, amount, ts }]
-    const [thinkProgress, setThinkProgress] = useState(0) // 0..1 for current bot
+    const [chipMotions, setChipMotions] = useState([])
+    const [thinkProgress, setThinkProgress] = useState(0)
     const [postflopChart, setPostflopChart] = useState(null)
     const stepTimer = useRef(null)
     const lastRecordedShowdown = useRef(null)
@@ -183,7 +180,6 @@ export default function PokerGame() {
         }
     }, [state])
 
-    // Wave 12: detect putIn deltas and emit chip-motion animations on each seat.
     useEffect(() => {
         if (!state) {
             lastPutInRef.current = {}
@@ -246,7 +242,6 @@ export default function PokerGame() {
         })
     }
 
-    // Wave 12: bot decision driver with time-bank progress bar.
     useEffect(() => {
         if (!state) return
         if (state.street === 'showdown') return
@@ -264,7 +259,6 @@ export default function PokerGame() {
             setThinkProgress(0)
             return
         }
-        // Animate think progress.
         thinkStartRef.current = performance.now()
         setThinkProgress(0)
         const tick = () => {
@@ -305,7 +299,6 @@ export default function PokerGame() {
                 if (!prev || prev.street === 'showdown') return prev
                 const cur = prev.players[prev.toAct]
                 if (!cur || cur.isHuman || cur.id !== p.id) return prev
-                // eslint-disable-next-line no-console
                 console.warn('[PokerGame] bot escape-hatch fold:', p.name, 'seat', state.toAct)
                 return applyAction(prev, { type: 'fold' })
             })
@@ -324,12 +317,8 @@ export default function PokerGame() {
     const isHumanTurn = state && state.toAct >= 0 && state.players[state.toAct]?.isHuman
     const hasLiveTableStack = Boolean(seated && state && human && (human.stack || 0) > 0)
 
-    // When it becomes the player's turn, bring the action bar into view so the
-    // fold/call/raise controls aren't stranded below the fold on mobile.
     useScrollActionIntoView(actionsRef, Boolean(isHumanTurn), [isHumanTurn], { block: 'nearest' })
 
-    // Collapse the raise sizing panel whenever it stops being the player's turn
-    // so the action bar returns to its compact 1-2 row height between decisions.
     useEffect(() => {
         if (!isHumanTurn && raiseOpen) setRaiseOpen(false)
     }, [isHumanTurn, raiseOpen])
@@ -404,7 +393,6 @@ export default function PokerGame() {
             betAmount: wagered,
             meta: { winners: state.winners.map(w => w.id), street: state.street, startStack, finalStack },
         })
-        // Wave 12: rebuy prompt when the human busts.
         if ((human.stack || 0) <= 0) {
             setRebuyPrompt(true)
         }
@@ -452,7 +440,6 @@ export default function PokerGame() {
     const nextHand = () => {
         if (!state) return
         if ((human?.stack || 0) <= 0) {
-            // Trigger rebuy prompt instead of leaving immediately.
             setRebuyPrompt(true)
             return
         }
@@ -499,7 +486,6 @@ export default function PokerGame() {
         window.setTimeout(() => completePendingExit(target), 0)
     }
 
-    // Wave 12: cash-game top-up between hands.
     const topUp = () => {
         if (!state || !human) return
         const buyAmount = initialBuyInRef.current || buyIn
@@ -526,7 +512,6 @@ export default function PokerGame() {
         showToast('bet', 'Topped up', `+${formatCredits(need)}`)
     }
 
-    // Wave 12: rebuy. Adds the buy-in back to the human stack and dismisses the prompt.
     const rebuy = () => {
         if (!state || !human) return
         const buyAmount = initialBuyInRef.current || buyIn
@@ -550,7 +535,6 @@ export default function PokerGame() {
     }
 
     const declineRebuy = () => {
-        // Treat as cash-out leave with current (zero) stack.
         showToast('loss', 'Busted', 'Buy-in lost')
         setState(null); setSeated(false); setRebuyPrompt(false); setConfirmCashout(false)
     }
@@ -620,7 +604,6 @@ export default function PokerGame() {
                 <div className="poker-lobby">
                     <h2>Sit down</h2>
                     <p>Fresh 6-handed table. Bots rotate when busted; rebuy any time. Practice credits only.</p>
-                    {/* Wave 12: format toggle */}
                     <div className="poker-format-toggle" role="tablist" aria-label="Format">
                         <button
                             type="button"
@@ -831,7 +814,6 @@ export default function PokerGame() {
                                                 )}
                                             </div>
                                             {bubbles[p.id] && <div className="pk-speech">{bubbles[p.id]}</div>}
-                                            {/* Wave 12: time-bank ring on the seat that's currently to act */}
                                             {i === state.toAct && !p.isHuman && thinkProgress > 0 && (
                                                 <span className="pk-think-ring" style={{ '--p': thinkProgress }} aria-hidden="true" />
                                             )}
@@ -839,7 +821,6 @@ export default function PokerGame() {
                                         </div>
                                     ))}
                                 </div>
-                                {/* Wave 12: chip-into-pot motion overlay */}
                                 {chipMotions.map(motion => (
                                     <span
                                         key={motion.id}

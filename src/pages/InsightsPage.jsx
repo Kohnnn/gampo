@@ -96,7 +96,7 @@ export default function InsightsPage() {
                             <strong className={allTime.realStakes.net >= 0 ? 'pos' : 'neg'}>
                                 {allTime.realStakes.net >= 0 ? '+' : ''}${Math.abs(allTime.realStakes.net).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </strong>
-                            . This is practice — no real money is ever at risk.
+                            . Virtual balance only — no real money is ever at risk.
                         </p>
                     </section>
 
@@ -140,7 +140,7 @@ export default function InsightsPage() {
             )}
 
             <footer className="insights-foot">
-                <Link to="/sandbox" data-ux-primary-action>Try the strategy sandbox →</Link>
+                <Link to="/sandbox" data-ux-primary-action>Try the challenges →</Link>
             </footer>
         </div>
     )

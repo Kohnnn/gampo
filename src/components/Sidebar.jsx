@@ -19,20 +19,20 @@ const navSections = [
         ],
     },
     {
-        title: 'Progress',
+        title: 'Rewards',
         items: [
             { icon: 'gift', label: 'Promotions', path: '/promotions' },
-            { icon: 'mission', label: 'Missions', path: '/missions' },
-            { icon: 'vip', label: 'VIP Lab', path: '/vip' },
-            { icon: 'academy', label: 'Risk Academy', path: '/learn' },
-            { icon: 'barChart', label: 'Strategy Sandbox', path: '/sandbox' },
-            { icon: 'pnl', label: 'Session Insights', path: '/insights' },
+            { icon: 'mission', label: 'Challenges', path: '/missions' },
+            { icon: 'vip', label: 'VIP Club', path: '/vip' },
+            { icon: 'academy', label: 'Rakeback', path: '/learn' },
+            { icon: 'barChart', label: 'Challenges', path: '/sandbox' },
+            { icon: 'pnl', label: 'Stats', path: '/insights' },
         ],
     },
     {
-        title: 'Account',
+        title: 'Profile',
         items: [
-            { icon: 'verify', label: 'Verify', path: '/verify' },
+            { icon: 'verify', label: 'Provably Fair', path: '/verify' },
             { icon: 'race', label: 'Race', path: '/race' },
             { icon: 'activity', label: 'Activity', path: '/activity' },
             { icon: 'progress', label: 'Settings', path: '/settings' },
@@ -288,6 +288,12 @@ function CasinoSidebar({ search, setSearch }) {
                     ))}
                 </div>
             ))}
+
+            <div className="sidebar-rakeback-widget">
+                <span>Rakeback</span>
+                <strong>10%</strong>
+                <small>Weekly — updates every Monday</small>
+            </div>
 
             <div className="nav-section compact">
                 <h3 className="nav-title">Utility</h3>

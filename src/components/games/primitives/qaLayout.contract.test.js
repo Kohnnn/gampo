@@ -167,7 +167,7 @@ describe('QA layout and loader contracts', () => {
         expect(betPanelSource).toContain('data-disabled-reason')
         expect(betPanelSource).toContain('Place your first bet to enable Rebet')
         expect(educationSource).toContain('data-scroll-hint')
-        expect(educationSource).toContain('Probability Lab below')
+        expect(educationSource).toContain('Game Info below')
     })
 
     it('lets npm-provided smoke args reach browserSmoke on Windows', () => {

@@ -186,6 +186,16 @@ export const sfxManifest = {
         reveal: '/audio/cases/reveal.wav',
         win: '/audio/cases/win.wav',
         lose: '/audio/cases/lose.wav',
+        // Wave 36 P4: per-rarity drop stingers — mapped by tier loudness
+        // Quiet tier (milspec industrial): subtle drop thud
+        rarityQuiet: '/audio/cases/rarity-quiet.wav',
+        // Medium tier (consumer restricted): mild reveal tone
+        rarityMedium: '/audio/cases/rarity-medium.wav',
+        // Loud tier (covert extraordinary classified contraband ★ knives): full fanfare
+        rarityCovert: '/audio/cases/rarity-covert.wav',
+        rarityRestricted: '/audio/cases/rarity-restricted.wav',
+        rarityContraband: '/audio/cases/rarity-contraband.wav',
+        rarityStar: '/audio/cases/rarity-star.wav',
     },
     slots: {
         click: '/audio/common/click.wav',

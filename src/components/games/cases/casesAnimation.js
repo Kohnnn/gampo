@@ -18,6 +18,29 @@ export const CASE_CELEBRATION_RARITIES = new Set([
     '★',
 ])
 
+// Wave 36 P4: map rarity name to per-rarity drop stinger SFX role
+export const RARITY_SFX_MAP = {
+    // Quiet tier: subtle thud
+    'Consumer': 'rarityQuiet',
+    'Industrial': 'rarityQuiet',
+    'Mil-Spec': 'rarityQuiet',
+    // Medium tier: mild reveal tone
+    'Restricted': 'rarityMedium',
+    'Remarkable': 'rarityMedium',
+    'High': 'rarityMedium',
+    // Loud tier: full fanfare
+    'Covert': 'rarityCovert',
+    'Extraordinary': 'rarityCovert',
+    'Classified': 'rarityCovert',
+    'Contraband': 'rarityContraband',
+    '★': 'rarityStar',
+}
+
+export function getRaritySfxRole(drop) {
+    if (!drop) return null
+    return RARITY_SFX_MAP[drop.rarity] || null
+}
+
 export function finalPrizeOffset(jitter = 0, prizeIndex = CASE_PRIZE_INDEX, tilePx = CASE_TILE_PX, gapPx = CASE_TILE_GAP_PX) {
     const stride = tilePx + gapPx
     return -((prizeIndex * stride) + (tilePx / 2)) + jitter

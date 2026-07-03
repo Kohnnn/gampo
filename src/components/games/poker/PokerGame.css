@@ -1,0 +1,1241 @@
+/* ==========================================================================
+   PokerGame.css — Full stylesheet for Live Poker
+   Poker visual repair: final source of truth for cards and phone table flow
+   ========================================================================== */
+
+/* --- Base layout shell -------------------------------------------------------- */
+.poker-page {
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: 24px;
+    padding: 16px;
+    background: radial-gradient(circle at 20% 0%, rgba(255, 207, 90, 0.06), transparent 50%), var(--bg-primary);
+    touch-action: pan-x pan-y;
+}
+
+.poker-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: 12px;
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* --- Titlebar ----------------------------------------------------------------- */
+.poker-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.poker-back {
+    font-size: 1rem;
+    color: var(--accent-gold, #f0c040);
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+.poker-back:hover { background: rgba(240,192,64,0.12); }
+
+.poker-balance {
+    margin-left: auto;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-muted, #888);
+}
+.poker-balance strong { display: block; font-size: 1rem; color: var(--text-primary, #fff); }
+
+/* --- Lobby ------------------------------------------------------------------- */
+.poker-lobby {
+    width: 100%;
+    padding: 16px;
+    background: var(--surface-2, rgba(255,255,255,0.04));
+    border-radius: 12px;
+}
+
+.poker-format-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.poker-format-toggle button {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary, #aaa);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.poker-format-toggle button.active {
+    background: rgba(240,192,64,0.15);
+    border-color: var(--accent-gold, #f0c040);
+    color: var(--accent-gold, #f0c040);
+}
+
+.poker-buyin-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.poker-buyin-options button {
+    padding: 8px 14px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    color: var(--text-primary, #fff);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+}
+.poker-buyin-options button:disabled { opacity: 0.4; cursor: not-allowed; }
+.poker-buyin-options button.active {
+    background: rgba(240,192,64,0.15);
+    border-color: var(--accent-gold, #f0c040);
+    color: var(--accent-gold, #f0c040);
+}
+
+.poker-buyin { margin-top: 12px; }
+.poker-buyin button {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent-gold, #f0c040);
+    color: #111;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: filter 0.15s;
+}
+.poker-buyin button:hover:not(:disabled) { filter: brightness(1.15); }
+.poker-buyin button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.pk-lobby-note {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted, #888);
+    text-align: center;
+}
+
+/* --- Info strip -------------------------------------------------------------- */
+.pk-info-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.pk-info-cell {
+    flex: 1 1 80px;
+    min-width: 70px;
+    padding: 4px 6px;
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--text-muted, #888);
+}
+.pk-info-cell strong { display: block; font-size: 0.9rem; color: var(--text-primary, #fff); }
+.pk-info-pot { color: var(--accent-gold, #f0c040) !important; }
+.pk-info-pl.pos strong { color: #00b428; }
+.pk-info-pl.neg strong { color: #ed4245; }
+
+.pk-info-topup,
+.pk-info-cashout {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: transparent;
+    color: var(--text-secondary, #aaa);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.pk-info-topup:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+.pk-info-cashout:hover { border-color: #ed4245; color: #ed4245; }
+
+.pk-rotation-log { font-size: 0.72rem; color: var(--text-muted); min-height: 1em; }
+
+/* --- Cashout confirm --------------------------------------------------------- */
+.pk-cashout-confirm {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+.pk-cashout-actions {
+    display: flex;
+    gap: 12px;
+    padding: 24px;
+    background: var(--surface-2, #1a1a2e);
+    border-radius: 16px;
+    max-width: 360px;
+    width: 90%;
+}
+.pk-cashout-actions .pk-act {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: filter 0.15s;
+}
+.pk-cashout-actions .pk-act:hover { filter: brightness(1.2); }
+.pk-cashout-actions .pk-act.primary { background: var(--accent-gold, #f0c040); color: #111; }
+.pk-cashout-actions .pk-act.fold { background: rgba(237,66,69,0.2); color: #ed4245; }
+
+/* --- Rebuy prompt ------------------------------------------------------------ */
+.pk-rebuy-prompt {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+
+/* --- Exit guard -------------------------------------------------------------- */
+.pk-exit-guard {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+}
+.pk-exit-guard-card {
+    padding: 28px;
+    background: var(--surface-2, #1a1a2e);
+    border-radius: 16px;
+    max-width: 400px;
+    width: 90%;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.pk-exit-guard-card h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    color: var(--text-primary, #fff);
+}
+.pk-exit-guard-card p { font-size: 0.85rem; color: var(--text-muted, #888); margin-bottom: 20px; }
+.pk-exit-guard-actions { display: flex; gap: 10px; }
+.pk-exit-guard-actions .pk-act {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: filter 0.15s;
+}
+.pk-exit-guard-actions .pk-act:hover { filter: brightness(1.2); }
+.pk-exit-guard-actions .pk-act.primary { background: var(--accent-gold, #f0c040); color: #111; font-weight: 600; }
+.pk-exit-guard-actions .pk-act.fold { background: rgba(237,66,69,0.2); color: #ed4245; }
+
+/* --- Mobile GTO scroll repair: overrides for small screens --------------------- */
+@media (max-width: 768px) {
+    .poker-sidebar-body,
+    .gto-grid-wrap {
+        overflow-y: visible;
+    }
+    .pk-actions {
+        position: static;
+    }
+}
+
+/* --- Mobile GTO panel --------------------------------------------------------- */
+.poker-mobile-gto-now {
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.poker-mobile-gto-bars {
+    display: flex;
+    gap: 4px;
+    height: 6px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.06);
+    margin-bottom: 6px;
+}
+.poker-mobile-gto-bars i { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.poker-mobile-gto-bars i.raise { background: #00b428; }
+.poker-mobile-gto-bars i.call  { background: #f0c040; }
+.poker-mobile-gto-bars i.fold  { background: #ed4245; }
+
+.poker-mobile-gto-mix {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    font-family: monospace;
+}
+.poker-mobile-gto-mix .raise { color: #00b428; }
+.poker-mobile-gto-mix .call  { color: #f0c040; }
+.poker-mobile-gto-mix .fold  { color: #ed4245; }
+
+/* --- Table ------------------------------------------------------------------- */
+.poker-table {
+    width: 100%;
+}
+
+.pk-table-status {
+    font-size: 0.75rem;
+    color: var(--text-muted, #888);
+    padding: 4px 0;
+    text-align: center;
+}
+
+/* --- Felt / grid ------------------------------------------------------------- */
+.poker-table-felt {
+    background: radial-gradient(ellipse at 50% 40%, #1b5e20 0%, #0d3d0d 60%, #0a2a0a 100%);
+    border-radius: 16px;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    border: 2px solid rgba(255,255,255,0.05);
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.5), 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.pk-pot {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #f0c040;
+    padding: 6px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 8px;
+}
+
+/* --- Board ------------------------------------------------------------------- */
+.pk-board {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* --- Seats ------------------------------------------------------------------- */
+.pk-seats { grid-column: 1 / -1; }
+
+.pk-seat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+    transition: border-color 0.2s;
+}
+.pk-seat.on-turn { border-color: rgba(240,192,64,0.6); }
+.pk-seat.has-button { border-color: rgba(240,192,64,0.4); }
+
+.pk-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.pk-you {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(240,192,64,0.2);
+    color: var(--accent-gold, #f0c040);
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pk-seat-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.pk-name { font-size: 0.75rem; font-weight: 600; color: var(--text-primary, #fff); }
+.pk-stack { font-size: 0.7rem; color: var(--text-muted, #888); }
+.pk-diff { font-size: 0.65rem; padding: 1px 5px; border-radius: 4px; }
+.pk-diff.beginner { background: rgba(0,180,40,0.2); color: #00b428; }
+.pk-diff.intermediate { background: rgba(240,192,64,0.2); color: #f0c040; }
+.pk-diff.advanced { background: rgba(237,66,69,0.2); color: #ed4245; }
+.pk-last { font-size: 0.65rem; color: var(--text-muted); font-style: italic; }
+.pk-bet { font-size: 0.75rem; color: var(--accent-gold); font-weight: 600; }
+
+.pk-seat-cards {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+}
+
+/* --- Card component ---------------------------------------------------------- */
+.pk-card {
+    width: 40px;
+    height: 56px;
+    border-radius: 6px;
+    background: #fff;
+    color: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    position: relative;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    user-select: none;
+}
+.pk-card.red { color: #c0392b; }
+.pk-card.black { color: #111; }
+.pk-card.empty { background: rgba(255,255,255,0.08); color: var(--text-muted); font-size: 0.6rem; }
+.pk-card.hidden { background: #1a3a6c; border: 2px solid #2a5aaa; }
+
+.pk-corner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1;
+}
+.pk-corner-tl { position: absolute; top: 3px; left: 4px; }
+.pk-corner-br { position: absolute; bottom: 3px; right: 4px; transform: rotate(180deg); }
+.pk-rank { font-size: 0.7rem; }
+.pk-suit { font-size: 0.6rem; }
+.pk-pip {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+/* Card back */
+.pk-card-back {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #1a3a6c 0%, #0d2240 100%);
+    position: relative;
+}
+.pk-card-back::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(255,255,255,0.04) 4px, rgba(255,255,255,0.04) 8px);
+}
+
+/* --- Chip motion ------------------------------------------------------------- */
+.pk-chip-motion {
+    position: absolute;
+    pointer-events: none;
+    font-size: 0.8rem;
+    color: var(--accent-gold, #f0c040);
+    animation: chipFly 0.6s ease-out forwards;
+}
+@keyframes chipFly {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-30px) scale(0.7); }
+}
+
+/* --- Action bar -------------------------------------------------------------- */
+.pk-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.pk-actions.is-waiting:not(.is-showdown) { max-height: none; }
+.pk-actions.is-raise-open { border-color: rgba(240,192,64,0.4); }
+
+.pk-action-status {
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-muted, #888);
+    padding: 4px 0;
+}
+.pk-action-status.is-live { color: var(--accent-gold, #f0c040); }
+
+.pk-act {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06);
+    color: var(--text-primary, #fff);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+}
+.pk-act:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+.pk-act:disabled { opacity: 0.4; cursor: not-allowed; }
+.pk-act.primary { background: var(--accent-gold, #f0c040); color: #111; border-color: transparent; }
+.pk-act.primary:hover:not(:disabled) { filter: brightness(1.1); }
+.pk-act.fold { border-color: rgba(237,66,69,0.4); color: #ed4245; }
+.pk-act.call  { border-color: rgba(0,180,40,0.4); color: #00b428; }
+.pk-act.check { border-color: rgba(255,255,255,0.2); }
+.pk-act.raise { border-color: rgba(240,192,64,0.4); color: var(--accent-gold, #f0c040); }
+
+/* Raise panel */
+.pk-raise-open-panel {
+    padding: 10px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+}
+.pk-raise-presets {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+.pk-raise-preset {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: var(--text-secondary, #aaa);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+.pk-raise-preset:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+.pk-raise-slider { width: 100%; accent-color: var(--accent-gold); }
+
+/* Winners */
+.pk-winners {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    grid-column: 1 / -1;
+    padding: 8px;
+    background: rgba(0,180,40,0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(0,180,40,0.3);
+}
+.pk-winner-chip {
+    padding: 4px 10px;
+    background: rgba(0,180,40,0.2);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: #00b428;
+}
+
+/* --- Sidebar ----------------------------------------------------------------- */
+.poker-sidebar {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.poker-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding-bottom: 4px;
+}
+.poker-tab {
+    flex: 1;
+    padding: 6px;
+    border: none;
+    border-radius: 6px 6px 0 0;
+    background: transparent;
+    color: var(--text-muted, #888);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.poker-tab.active {
+    background: rgba(240,192,64,0.1);
+    color: var(--accent-gold, #f0c040);
+}
+
+.poker-sidebar-body {
+    overflow-y: auto;
+    max-height: 400px;
+}
+
+/* --- Chat -------------------------------------------------------------------- */
+.poker-chat { padding: 8px 0; }
+.pk-chat-banner {
+    font-size: 0.7rem;
+    color: var(--text-muted, #888);
+    text-align: center;
+    padding: 4px;
+    margin-bottom: 8px;
+}
+.pk-chat-list { display: flex; flex-direction: column; gap: 6px; }
+.pk-chat-msg { font-size: 0.78rem; color: var(--text-secondary, #aaa); }
+.pk-chat-msg .name { font-weight: 600; color: var(--text-primary, #fff); }
+.pk-chat-msg.bot .name { color: var(--accent-gold, #f0c040); }
+.pk-chat-input-row { display: flex; gap: 6px; margin-top: 8px; }
+.pk-chat-input {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-primary, #fff);
+    font-size: 0.8rem;
+}
+.pk-chat-input::placeholder { color: var(--text-muted); }
+.pk-chat-send {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    background: var(--accent-gold, #f0c040);
+    color: #111;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+/* --- Speech bubbles ----------------------------------------------------------- */
+.pk-speech {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    color: #111;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    z-index: 10;
+}
+.pk-speech::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #fff;
+}
+
+/* --- Think ring -------------------------------------------------------------- */
+.pk-think-ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--accent-gold, #f0c040);
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- Button chip ------------------------------------------------------------- */
+.pk-button-chip {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-gold, #f0c040);
+    color: #111;
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ==========================================================================
+   GTO Panel — full styles
+   ========================================================================== */
+
+.gto-panel {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.gto-empty {
+    text-align: center;
+    color: var(--text-muted, #888);
+    font-size: 0.85rem;
+    padding: 20px;
+}
+
+/* --- Context header ----------------------------------------------------------- */
+.gto-context {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg-primary, #0d0d1a);
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.gto-ctx-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 4px;
+}
+.gto-ctx-line.muted { font-size: 0.72rem; color: var(--text-muted, #888); }
+
+.gto-pill {
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary, #aaa);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.gto-pill.alt { background: rgba(240,192,64,0.1); color: var(--accent-gold, #f0c040); border-color: rgba(240,192,64,0.2); }
+.gto-pill.ctx { background: rgba(0,180,40,0.1); color: #00b428; border-color: rgba(0,180,40,0.2); }
+.gto-pill.mono { font-family: monospace; font-size: 0.68rem; }
+
+.gto-suggestion {
+    padding: 8px;
+    border-radius: 8px;
+    margin: 6px 0;
+}
+.gto-suggestion.tone-raise { background: rgba(0,180,40,0.1); border: 1px solid rgba(0,180,40,0.2); }
+.gto-suggestion.tone-call  { background: rgba(240,192,64,0.1); border: 1px solid rgba(240,192,64,0.2); }
+.gto-suggestion.tone-fold  { background: rgba(237,66,69,0.1); border: 1px solid rgba(237,66,69,0.2); }
+.gto-suggestion.tone-mix  { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+
+.gto-decision-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.gto-suggestion-label { font-size: 0.7rem; color: var(--text-muted); }
+.gto-decision-head strong { font-size: 1rem; color: var(--text-primary, #fff); }
+.gto-suggestion small { font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 6px; }
+
+.gto-mini-bars {
+    display: flex;
+    height: 5px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.06);
+    margin-bottom: 6px;
+}
+.gto-mini-bars .bar { height: 100%; border-radius: 4px; }
+.gto-mini-bars .raise { background: #00b428; }
+.gto-mini-bars .call  { background: #f0c040; }
+.gto-mini-bars .fold  { background: #ed4245; }
+
+.gto-mix-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.gto-mix-list span { font-size: 0.7rem; }
+.gto-mix-list .raise { color: #00b428; }
+.gto-mix-list .call  { color: #f0c040; }
+.gto-mix-list .fold  { color: #ed4245; }
+
+.gto-insight-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-top: 6px;
+}
+.gto-insight-grid > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+}
+.gto-insight-grid span { font-size: 0.65rem; color: var(--text-muted); }
+.gto-insight-grid strong { font-size: 0.78rem; color: var(--text-primary, #fff); }
+
+.gto-ctx-row {
+    display: flex;
+    justify-content: space-around;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: var(--text-muted, #888);
+    padding: 4px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+}
+.gto-ctx-row span { padding: 2px 6px; }
+
+.gto-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+.gto-metric-grid > div {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+}
+.gto-metric-grid span { font-size: 0.65rem; color: var(--text-muted); }
+.gto-metric-grid strong { font-size: 0.82rem; color: var(--text-primary, #fff); }
+
+.gto-ev-deltas {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.72rem;
+}
+.gto-ev-deltas span { padding: 2px 8px; border-radius: 4px; }
+.gto-ev-deltas .raise { background: rgba(0,180,40,0.1); color: #00b428; }
+.gto-ev-deltas .call  { background: rgba(240,192,64,0.1); color: #f0c040; }
+.gto-ev-deltas .fold  { background: rgba(237,66,69,0.1); color: #ed4245; }
+
+/* --- Search row -------------------------------------------------------------- */
+.gto-search-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    padding: 6px 0;
+    background: var(--bg-primary, #0d0d1a);
+    z-index: 5;
+}
+.gto-search-input {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-primary, #fff);
+    font-size: 0.8rem;
+}
+.gto-search-input::placeholder { color: var(--text-muted); }
+
+.gto-legend {
+    display: flex;
+    gap: 6px;
+    font-size: 0.68rem;
+    color: var(--text-muted, #888);
+    white-space: nowrap;
+}
+.gto-legend .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 2px;
+    vertical-align: middle;
+}
+.gto-legend .raise { background: #00b428; }
+.gto-legend .call  { background: #f0c040; }
+.gto-legend .fold  { background: #ed4245; }
+
+/* --- Hand detail -------------------------------------------------------------- */
+.gto-hand-detail {
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+.gto-hand-detail-live {
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+.gto-hand-detail.tone-raise { background: rgba(0,180,40,0.1); border: 1px solid rgba(0,180,40,0.2); }
+.gto-hand-detail.tone-call  { background: rgba(240,192,64,0.1); border: 1px solid rgba(240,192,64,0.2); }
+.gto-hand-detail.tone-fold  { background: rgba(237,66,69,0.1); border: 1px solid rgba(237,66,69,0.2); }
+.gto-hand-detail header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.gto-hand-detail header strong { font-size: 0.9rem; color: var(--text-primary); }
+.gto-hand-detail header em { color: var(--text-muted); font-style: normal; }
+.gto-hand-detail p { font-size: 0.75rem; color: var(--text-muted); margin: 4px 0; }
+
+.gto-detail-bars {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+.gto-detail-bars > span {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+}
+.gto-detail-bars b { font-weight: 600; }
+.gto-detail-bars i { height: 6px; border-radius: 3px; display: block; }
+.gto-detail-bars strong { font-size: 0.72rem; }
+.gto-detail-bars .raise i { background: #00b428; }
+.gto-detail-bars .call  i { background: #f0c040; }
+.gto-detail-bars .fold  i { background: #ed4245; }
+
+/* --- Grid -------------------------------------------------------------------- */
+.gto-grid-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+}
+
+.gto-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.65rem;
+}
+.gto-grid th,
+.gto-grid td {
+    padding: 0;
+    text-align: center;
+}
+.gto-grid th {
+    padding: 4px 2px;
+    color: var(--text-muted, #888);
+    font-weight: 600;
+}
+.gto-grid th:first-child { text-align: left; }
+
+.gto-cell {
+    width: 28px;
+    height: 28px;
+    padding: 1px;
+}
+.gto-cell.hero .gto-cell-button { box-shadow: 0 0 0 2px var(--accent-gold, #f0c040); }
+.gto-cell.selected .gto-cell-button { box-shadow: 0 0 0 2px rgba(255,255,255,0.5); }
+.gto-cell.dim { opacity: 0.25; }
+
+.gto-cell-button {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s;
+}
+.gto-cell-button:hover { transform: scale(1.1); z-index: 2; }
+.gto-cell-button:focus-visible {
+    outline: 2px solid var(--accent-gold, #f0c040);
+    outline-offset: 1px;
+}
+.gto-cell-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: 3px;
+}
+.gto-cell-label {
+    position: relative;
+    z-index: 1;
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    line-height: 1;
+}
+
+/* --- Sizings ----------------------------------------------------------------- */
+.gto-sizings {
+    padding: 8px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+}
+.gto-sizings h4 { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px; }
+.gto-sizings ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.gto-sizings li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+}
+.gto-sizings li span:first-child { color: var(--text-primary); min-width: 50px; }
+.gto-sizings li strong { color: var(--accent-gold, #f0c040); min-width: 36px; }
+.gto-sizing-bar { height: 4px; background: rgba(240,192,64,0.2); border-radius: 2px; flex: 1; }
+
+/* --- Breakdown --------------------------------------------------------------- */
+.gto-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.gto-bk {
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+}
+.gto-bk-value { border-left: 2px solid #00b428; }
+.gto-bk-bluff  { border-left: 2px solid #ed4245; }
+.gto-bk-marginal { border-left: 2px solid #f0c040; }
+
+.gto-bk h5 { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 4px; }
+.gto-bk-items { display: flex; flex-wrap: wrap; gap: 4px; }
+.gto-bk-chip {
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    background: rgba(255,255,255,0.05);
+    color: var(--text-secondary, #aaa);
+}
+
+/* --- Exploit ----------------------------------------------------------------- */
+.gto-exploit {
+    padding: 8px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+}
+.gto-exploit h4 { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px; }
+.gto-exploit-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.gto-exploit-row button {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: var(--text-muted, #888);
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.gto-exploit-row button:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+.gto-exploit-row button.active { background: rgba(240,192,64,0.1); border-color: var(--accent-gold); color: var(--accent-gold); }
+
+.gto-exploit-result {
+    padding: 8px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+}
+.gto-exploit-note { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px; }
+.gto-ev-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.gto-ev-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    font-size: 0.65rem;
+}
+.gto-ev-cell span { color: var(--text-muted); }
+.gto-ev-cell strong { font-size: 0.78rem; color: var(--text-primary); }
+.gto-ev-cell.exploit strong { color: #00b428; }
+.gto-ev-cell.delta strong { color: var(--accent-gold, #f0c040); }
+
+/* ==========================================================================
+   Hand history tab
+   ========================================================================== */
+
+.poker-history-tab {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ph-stats {
+    display: flex;
+    gap: 8px;
+}
+.ph-stat {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+}
+.ph-stat span { font-size: 0.65rem; color: var(--text-muted); }
+.ph-stat strong { font-size: 0.9rem; color: var(--text-primary, #fff); }
+.ph-stat .pos { color: #00b428; }
+.ph-stat .neg { color: #ed4245; }
+
+.poker-history-tab h4 { font-size: 0.78rem; color: var(--text-muted); margin: 0; }
+.ph-empty { font-size: 0.78rem; color: var(--text-muted); text-align: center; padding: 12px; }
+.ph-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.ph-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 8px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+.ph-label { color: var(--text-secondary); }
+.ph-list strong { font-size: 0.8rem; }
+.ph-list strong.pos { color: #00b428; }
+.ph-list strong.neg { color: #ed4245; }
+
+.ph-show {
+    padding: 8px;
+    text-align: center;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+}
+
+.ph-clear {
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: transparent;
+    color: var(--text-muted, #888);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.ph-clear:hover:not(:disabled) { border-color: #ed4245; color: #ed4245; }
+.ph-clear:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ==========================================================================
+   Poker visual repair: final source of truth for cards and phone table flow
+   Responsive overrides for small screens (phone)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .poker-page {
+        padding: 12px;
+    }
+
+    .poker-page .pk-card-back::after {
+        content: '';
+    }
+
+    .poker-page .pk-seat.is-human .pk-seat-cards .pk-card {
+        width: clamp(58px, 17vw, 72px);
+        height: auto;
+        aspect-ratio: 5 / 7;
+        font-size: 0.85rem;
+    }
+
+    .poker-page .pk-seat:not(.is-human) .pk-seat-cards .pk-card {
+        width: 26px;
+        font-size: 0.6rem;
+    }
+
+    .pk-seat {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+    }
+
+    .pk-seat-info { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+    .poker-table-felt {
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .pk-pot { font-size: 0.82rem; }
+
+    .pk-actions {
+        padding: 10px;
+    }
+
+    .pk-board {
+        gap: 4px;
+    }
+
+    .pk-board .pk-card {
+        width: clamp(44px, 14vw, 56px);
+        height: auto;
+        aspect-ratio: 5 / 7;
+    }
+
+    /* Safe-area inset on mobile */
+    .pk-actions {
+        bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)));
+    }
+}
+
+/* ==========================================================================
+   Poker desktop repair: final source of truth for non-phone table layout
+   Responsive overrides for desktop (≥ 769px)
+   ========================================================================== */
+
+@media (min-width: 769px) {
+    .poker-layout {
+        flex-direction: row;
+        align-items: start;
+        max-width: 1200px;
+        gap: 16px;
+    }
+
+    .poker-table {
+        flex: 2;
+    }
+
+    .poker-sidebar {
+        flex: 1;
+        min-width: 280px;
+        max-width: 360px;
+        position: sticky;
+        top: 16px;
+        max-height: calc(100vh - 32px);
+        overflow-y: auto;
+    }
+
+    .poker-table-felt {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 20px;
+    }
+
+    .poker-page .pk-seat.is-human .pk-seat-cards .pk-card {
+        width: 62px;
+        height: auto;
+        aspect-ratio: 5 / 7;
+        font-size: 1rem;
+    }
+
+    .poker-page .pk-seat:not(.is-human) .pk-seat-cards .pk-card {
+        width: 38px;
+        font-size: 0.7rem;
+    }
+
+    .pk-actions {
+        position: static;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .pk-actions .pk-act {
+        width: auto;
+        flex: 1;
+        min-width: 80px;
+        max-width: 140px;
+    }
+
+    .gto-panel {
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
+    }
+
+    .gto-search-row {
+        top: 0;
+    }
+}

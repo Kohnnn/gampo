@@ -247,7 +247,7 @@ function ChatDock() {
 
             {tab === 'chat' && (
                 <>
-                    <div className="chat-dock-banner">Simulated chat. Fake credits, fake users, no money.</div>
+                    <div className="chat-dock-banner">Virtual players only. Chat is simulated.</div>
                     <div className="chat-dock-list" ref={scrollRef}>
                         {messages.map(msg => (
                             <div key={msg.id} className={`chat-msg chat-msg-${msg.type}`}>
@@ -273,7 +273,7 @@ function ChatDock() {
 
             {tab === 'race' && (
                 <>
-                    <div className="chat-dock-banner">Practice race. Opponents are simulated.</div>
+                    <div className="chat-dock-banner">Weekly race leaderboard. Virtual opponents.</div>
                     <div className="chat-dock-list">
                         {race.map((player, index) => (
                             <div key={player.id} className={`race-mini ${player.isYou ? 'you' : ''}`}>
@@ -288,14 +288,14 @@ function ChatDock() {
 
             {tab === 'stats' && (
                 <>
-                    <div className="chat-dock-banner">PnL across session, this game, and all-time.</div>
+                    <div className="chat-dock-banner">Session stats & wagering history.</div>
                     <StatsPanel />
                 </>
             )}
 
             {tab === 'progress' && (
                 <>
-                    <div className="chat-dock-banner">Achievements + missions. Local progress only.</div>
+                    <div className="chat-dock-banner">Challenges, achievements & leaderboard.</div>
                     <ProgressPanel />
                 </>
             )}

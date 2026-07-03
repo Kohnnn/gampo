@@ -41,7 +41,7 @@ export default function DinoGame() {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const sfx = useSfx('dino')
-    const session = useGameSession('dino-shell')
+    const session = useGameSession('dino')
 
     const canvasRef = useRef(null)
     const engineRef = useRef(null)

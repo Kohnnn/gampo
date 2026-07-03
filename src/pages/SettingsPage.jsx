@@ -199,7 +199,7 @@ export default function SettingsPage() {
                 <section className="settings-card" data-ux-surface="controls">
                     <h2><ShieldCheck size={16} /> Responsible play (optional)</h2>
                     <p className="settings-help">
-                        Set limits for a play session. These are educational nudges — practice credits
+                        Set limits for a play session. These are responsible-play nudges — virtual balance
                         only, nothing is ever blocked. A gentle banner appears when you approach a limit
                         or start chasing losses.
                     </p>

@@ -7,8 +7,8 @@
 // cell, frequency progress bars in the breakdown, and a live legend.
 
 import { useEffect, useState } from 'react'
-import { codeAt } from '../../poker/util/handCanonicalize'
-import { fetchPayload } from '../../poker/gto/lookup'
+import { codeAt } from '../../../poker/util/handCanonicalize'
+import { fetchPayload } from '../../../poker/gto/lookup'
 
 const RANK_HEADERS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
 const EXPLOITS = [

@@ -10,9 +10,9 @@ import { useOnboarding } from '../hooks/useOnboarding'
 import './WelcomeModal.css'
 
 const POINTS = [
-    { icon: <Dice5 size={18} />, title: 'Real casino odds', text: 'Every game uses the same math a real casino runs — true RTP, true house edge.' },
-    { icon: <TrendingDown size={18} />, title: 'The house edge is the lesson', text: 'You will lose over time on purpose. Watch how variance and the edge actually behave.' },
-    { icon: <ShieldCheck size={18} />, title: 'Practice credits only', text: 'No real money, no deposits, no cashout. Reset or top up anytime — it is a sandbox.' },
+    { icon: <Dice5 size={18} />, title: 'Real casino odds', text: 'Every game runs the same math a real casino uses — true RTP, fair house edge.' },
+    { icon: <TrendingDown size={18} />, title: 'Built for play', text: 'Watch variance and edge play out in real time. Pure entertainment, no investment.' },
+    { icon: <ShieldCheck size={18} />, title: 'Virtual balance only', text: 'No real money, no deposits, no cashout. Top up or reset anytime — it is a sandbox.' },
 ]
 
 export default function WelcomeModal() {
@@ -73,10 +73,10 @@ export default function WelcomeModal() {
                     <X size={16} />
                 </button>
                 <span className="welcome-kicker"><GraduationCap size={16} /> Welcome to GamPo</span>
-                <h2 id="welcome-title">A casino that teaches you the math</h2>
+                <h2 id="welcome-title">Premium casino experience</h2>
                 <p className="welcome-lead">
-                    GamPo is an educational simulator. It looks like a casino, plays like a casino,
-                    and runs the same odds — so you can learn how they really work, risk-free.
+                    GamPo is a probability simulator. It looks like a casino, plays like a casino,
+                    and runs the same odds — all in pure entertainment mode.
                 </p>
                 <ul className="welcome-points">
                     {POINTS.map(p => (
