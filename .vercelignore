@@ -1,0 +1,22 @@
+# Heavy reference/template dirs (also gitignored) — not part of the app build
+example
+rainbetclone
+stake-clone
+GameTemplate
+.agents
+
+# Tooling / index / editor dirs — not part of the app build
+.codegraph
+.codex
+.claude
+.vibecode-backup
+docs
+
+# Build + tooling artifacts (Vercel builds fresh from source)
+node_modules
+dist
+output
+
+# Local dev/preview logs
+*.log
+.vercel-deploy.log
