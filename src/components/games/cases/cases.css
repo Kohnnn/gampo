@@ -4110,3 +4110,91 @@
     color: var(--text-primary, #fff);
     font-variant-numeric: tabular-nums;
 }
+
+/* Streak gauge — last 10 drops, rarities as colored slots
+   ============================================================== */
+.cases-streak {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+}
+.cases-streak-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--text-muted, #888);
+}
+.cases-streak-head strong {
+    color: var(--text-primary, #fff);
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+}
+.cases-streak-bar {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--cases-streak-count, 10), minmax(0, 1fr));
+    gap: 4px;
+}
+.cases-streak-bar[data-streak-count="8"] {
+    --cases-streak-count: 8;
+}
+.cases-streak-bar[data-streak-count="10"] {
+    --cases-streak-count: 10;
+}
+.cases-streak-slot {
+    position: relative;
+    height: 14px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+}
+.cases-streak-slot.is-filled {
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--rarity, #ffd166), transparent 50%);
+    background: color-mix(in srgb, var(--rarity, #ffd166), transparent 78%);
+    box-shadow: 0 0 8px -2px var(--rarity, rgba(255, 209, 102, 0.5));
+}
+.cases-streak-slot-fill {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--rarity, #ffd166), transparent 30%),
+        color-mix(in srgb, var(--rarity, #ffd166), transparent 65%));
+}
+.cases-streak-slot-empty {
+    position: absolute;
+    inset: 3px;
+    border-radius: 3px;
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+}
+.cases-streak-slot.is-fresh {
+    animation: cases-streak-drop 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes cases-streak-drop {
+    0%   { transform: translateY(-6px) scaleY(0.4); opacity: 0; }
+    60%  { transform: translateY(0) scaleY(1.08); opacity: 1; }
+    100% { transform: translateY(0) scaleY(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .cases-streak-slot,
+    .cases-streak-slot.is-fresh {
+        animation: none;
+        transition: opacity 0.15s linear;
+    }
+    .cases-streak-slot.is-fresh { opacity: 0.4; }
+}
+@media (max-width: 768px) {
+    .cases-streak-bar {
+        --cases-streak-count: 8;
+    }
+}

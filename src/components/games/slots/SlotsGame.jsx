@@ -52,6 +52,7 @@ import { winTier, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, rollupDurationMs, r
 import { buildPaytable } from './slotPaytable'
 import { describePaylines } from './slotPaylines'
 import { buildSparkline } from './slotSparkline'
+import FreeSpinCounter from './FreeSpinCounter'
 import './slots.css'
 
 const FEATURE_LABELS = {
@@ -1469,6 +1470,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <span>Loading lab...</span>
                     </div>
                 )}
+                <FreeSpinCounter
+                    totalAwarded={freeSpinSession?.totalAwarded || 0}
+                    remaining={freeSpins}
+                    onComplete={() => slotSfx?.play?.('slots-bonus')}
+                />
                 <header className="slot-stage-header">
                     <div className="slot-stage-title">
                         <span className="slot-benchmark-badge">Benchmark · {config.benchmark}</span>

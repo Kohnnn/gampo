@@ -130,6 +130,33 @@ const checkExpr = `
 })()
 `
 
+// Wave 2: extended touch-floor assertion for the bet chips.
+// Counts `.bp-bet-btn` chips inside `[data-mobile-stepper-chips]` and asserts
+// none are below the 44px touch target. Reports min-height + count so a
+// regression is obvious in the log.
+const TOUCH_FLOOR_EXPR = `
+(() => {
+  const groups = document.querySelectorAll('[data-mobile-stepper-chips]');
+  if (!groups.length) return { ok: false, reason: 'no stepper chips found' };
+  let minHeight = Infinity;
+  let total = 0;
+  for (const group of groups) {
+    const chips = group.querySelectorAll('.bp-bet-btn');
+    for (const chip of chips) {
+      total += 1;
+      const r = chip.getBoundingClientRect();
+      if (r.height < minHeight) minHeight = r.height;
+    }
+  }
+  return {
+    ok: total > 0 && minHeight >= 44,
+    total,
+    minHeight: Number.isFinite(minHeight) ? Math.round(minHeight) : null,
+    floor: 44,
+  };
+})()
+`
+
 async function main() {
     const version = await waitForDebugger()
     ws = new WebSocket(version.webSocketDebuggerUrl)
@@ -171,6 +198,15 @@ async function main() {
             const status = r.ok ? 'PASS' : (r.reason?.includes('no setup') ? 'SKIP' : 'FAIL')
             if (status === 'FAIL') failures++
             console.log(`${status} ${vp.w}x${vp.h} ${route} :: ${JSON.stringify(r)}`)
+            // Wave 2: 44px touch floor on the bet chips. Sheet SKIPs don't
+            // count as failures — many games don't expose the bet sheet
+            // (e.g. fixed-stake games).
+            let tf
+            try { tf = await evalExpr(TOUCH_FLOOR_EXPR, sessionId) }
+            catch (e) { tf = { ok: false, reason: String(e).slice(0, 80) } }
+            const tfStatus = tf.ok ? 'PASS' : (tf.reason?.includes('no stepper') ? 'SKIP' : 'FAIL')
+            if (tfStatus === 'FAIL') failures++
+            console.log(`${tfStatus} ${vp.w}x${vp.h} ${route} touch-floor :: ${JSON.stringify(tf)}`)
         }
     }
 

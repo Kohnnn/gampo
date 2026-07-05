@@ -321,6 +321,7 @@
 /* ---------- Stage ---------- */
 
 .slot-stage-v2 {
+    position: relative;
     width: 100%;
     min-width: 0;
     min-height: min(560px, calc(100dvh - 176px));
@@ -4731,5 +4732,113 @@
     .slot-bonus-cine {
         max-height: calc(100dvh - 40px);
         transform: scale(0.86);
+    }
+}
+
+/* Free-spin HUD counter (Wave 2 brainstorm S2)
+   Top-center persistent chip during a free-spin session.
+   Ring drains from 100% to 0% across the awarded count.
+   ============================================================== */
+.slot-free-spin-counter {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 8;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(20, 26, 38, 0.92), rgba(15, 22, 33, 0.85));
+    border: 1px solid rgba(255, 230, 128, 0.35);
+    box-shadow:
+        0 4px 18px rgba(0, 0, 0, 0.45),
+        0 0 22px -4px rgba(255, 230, 128, 0.45);
+    backdrop-filter: blur(8px);
+    color: var(--text-primary, #fff);
+    font-family: var(--font-display, inherit);
+    pointer-events: none;
+}
+.slot-free-spin-counter-ring {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+}
+.slot-free-spin-counter-ring-track {
+    stroke: rgba(255, 230, 128, 0.15);
+}
+.slot-free-spin-counter-ring-fill {
+    stroke: var(--feature-gold, #ffe680);
+    filter: drop-shadow(0 0 4px rgba(255, 230, 128, 0.6));
+    transition: stroke-dashoffset 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.slot-free-spin-counter-value {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1;
+    gap: 2px;
+}
+.slot-free-spin-counter-value strong {
+    font-size: 1.4rem;
+    font-weight: 900;
+    color: var(--feature-gold, #ffe680);
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 12px rgba(255, 230, 128, 0.4);
+}
+.slot-free-spin-counter-value small {
+    font-size: 0.62rem;
+    color: var(--text-muted, #888);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.slot-free-spin-counter-percent {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-secondary, #b1bad3);
+    font-variant-numeric: tabular-nums;
+    padding-left: 4px;
+    border-left: 1px solid rgba(255, 230, 128, 0.2);
+    margin-left: 4px;
+}
+.slot-free-spin-counter-final-tag {
+    font-size: 0.7rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    color: #1a1a1a;
+    background: linear-gradient(135deg, #ffe680, #f4b400);
+    padding: 3px 8px;
+    border-radius: 4px;
+    box-shadow: 0 0 12px rgba(255, 230, 128, 0.65);
+}
+.slot-free-spin-counter.is-final {
+    animation: slot-free-spin-final-flash 0.6s ease-out 2;
+    border-color: var(--feature-gold, #ffe680);
+}
+@keyframes slot-free-spin-final-flash {
+    0%, 100% { box-shadow: 0 4px 18px rgba(0,0,0,0.45), 0 0 22px -4px rgba(255, 230, 128, 0.45); }
+    50% { box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 38px 0px rgba(255, 230, 128, 0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .slot-free-spin-counter-ring-fill {
+        transition: none;
+    }
+    .slot-free-spin-counter.is-final {
+        animation: none;
+    }
+}
+@media (max-width: 768px) {
+    .slot-free-spin-counter {
+        top: 8px;
+        padding: 6px 12px;
+        gap: 8px;
+    }
+    .slot-free-spin-counter-ring {
+        width: 36px;
+        height: 36px;
+    }
+    .slot-free-spin-counter-value strong {
+        font-size: 1.1rem;
     }
 }

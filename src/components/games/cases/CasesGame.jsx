@@ -67,6 +67,8 @@ import {
     pickCelebrationDrop,
     summarizeCaseSettlement,
     getRaritySfxRole,
+    pickHighestRarityRole,
+    shouldPlayRarityStinger,
 } from './casesAnimation'
 import { createCaseOpeningRound } from './caseOpening'
 import {
@@ -83,6 +85,7 @@ import {
 } from './caseEconomy'
 import './cases.css'
 import { useGameBgm } from '../../../audio/useBgm'
+import StreakGauge from './StreakGauge'
 const ROW_OPTIONS = [1, 3, 5, 10]
 const REEL_PREVIEW_ROWS = 5
 const REEL_PREVIEW_TILES = 18
@@ -594,7 +597,7 @@ export default function CasesGame() {
     const { balance, placeBet, addWinnings, showToast } = useCredits()
     const { play: playSound } = useAudio()
     const sfx = useSfx('cases')
-    const { haptics: hapticsEnabled } = useSettings()
+    const { haptics: hapticsEnabled, sfx: sfxEnabled = true } = useSettings()
     const session = useGameSession('cases')
     const preloader = useOriginalsPreloader('cases')
     const csCatalog = useCsCollection()
@@ -838,10 +841,14 @@ export default function CasesGame() {
         })
         if (skipped) sfx.play('land', { volume: 0.72 })
         sfx.play('reveal', { volume: 0.9 })
-        // Wave 36 P4: per-rarity drop stinger on the top prize
-        const topDrop = picks.reduce((best, p) => (Number(p.valueGc) > Number(best?.valueGc) ? p : best), null)
-        const rarityRole = getRaritySfxRole(topDrop)
-        if (rarityRole) sfx.play(rarityRole, { volume: 1 })
+        // Wave 2: rarity stinger dispatch — collapse the batch to the highest-rarity
+// stinger (so a ×10 bulk open with one Covert + nine Mil-Spec plays the
+// Covert stinger once, not all 10 sounds layered). Cooldown-gated at 200 ms
+// to avoid overlaps when the user re-triggers within the same frame.
+        const rarityRole = pickHighestRarityRole(picks)
+        if (rarityRole && shouldPlayRarityStinger(sfxEnabled)) {
+            sfx.play(rarityRole, { volume: 1 })
+        }
         if (rare) sfx.play('rare', { volume: 1 })
         // C7: tactile reward on the result. Rare/celebration drop gets the longer
         // 'rare' buzz (forced past the throttle since it's a single moment); a
@@ -1500,6 +1507,8 @@ export default function CasesGame() {
                     }}
                 >
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+
+                    <StreakGauge drops={(collection.drops || []).slice(0, 10)} />
 
                     {view === 'open' && (
                         <>

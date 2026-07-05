@@ -87,6 +87,9 @@ export default function BetPanel({
 
     const half = useCallback(() => setBetAmount(v => Math.max(minBet, Number((v / 2).toFixed(2)))), [minBet])
     const double = useCallback(() => setBetAmount(v => Math.min(maxBet, Number((v * 2).toFixed(2)))), [maxBet])
+    // Wave 2: 1/4 chip for fast halving chains (1x → 1/4x in two taps).
+    const quarter = useCallback(() => setBetAmount(v => Math.max(minBet, Number((v / 4).toFixed(2)))), [minBet])
+    const reset = useCallback(() => setBetAmount(initialBet), [initialBet])
     const max = useCallback(() => setBetAmount(Math.max(minBet, Number(Math.min(maxBet, balance || 0).toFixed(2)))), [balance, maxBet, minBet])
     const min = useCallback(() => setBetAmount(minBet), [minBet])
     const rebet = useCallback(() => {
@@ -385,19 +388,20 @@ export default function BetPanel({
 
                 <div className="bp-section">
                 <label className="bp-label" htmlFor={`${panelId}-bet-amount`}>{betLabel}</label>
-                <div className="bp-bet-row">
+                <div className="bp-bet-row" data-mobile-stepper-chips="primary" data-stepper-touch-floor="44">
                     <input id={`${panelId}-bet-amount`} type="number" className="bp-bet-input" min={minBet} max={maxBet} step={0.5}
                         value={effectiveBetAmount}
                         disabled={hasFixedBet}
                         onChange={e => setBetAmount(Math.max(minBet, Number(e.target.value) || 0))}
                     />
-                    <button className="bp-bet-btn" onClick={half} disabled={hasFixedBet}>½</button>
-                    <button className="bp-bet-btn" onClick={double} disabled={hasFixedBet}>2×</button>
-                    <button className="bp-bet-btn" onClick={max} disabled={hasFixedBet}>Max</button>
+                    <button className="bp-bet-btn" onClick={quarter} disabled={hasFixedBet} data-bet-chip="quarter" aria-label="Quarter current bet">1/4</button>
+                    <button className="bp-bet-btn" onClick={half} disabled={hasFixedBet} data-bet-chip="half" aria-label="Half current bet">½</button>
+                    <button className="bp-bet-btn" onClick={double} disabled={hasFixedBet} data-bet-chip="double" aria-label="Double current bet">2×</button>
+                    <button className="bp-bet-btn" onClick={max} disabled={hasFixedBet} data-bet-chip="max" aria-label="Bet the maximum">Max</button>
                 </div>
-                <div className="bp-quick-actions">
-                    <button onClick={min} disabled={hasFixedBet}>Min</button>
-                    <button onClick={() => setBetAmount(initialBet)} disabled={hasFixedBet}>Reset</button>
+                <div className="bp-quick-actions" data-mobile-stepper-chips="secondary">
+                    <button onClick={min} disabled={hasFixedBet} data-bet-chip="min">Min</button>
+                    <button onClick={reset} disabled={hasFixedBet} data-bet-chip="reset" aria-label={`Reset to default bet ${formatCredits(initialBet)}`}>1×</button>
                     <button
                         onClick={rebet}
                         disabled={hasFixedBet || !lastBet}

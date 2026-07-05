@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => {
             // Plinko row outcome tables are generated, route-lazy, and intentionally
             // ~2 MB per active row-count chunk. Keep warnings focused on unexpected chunks.
             chunkSizeWarningLimit: 2100,
+            cssCodeSplit: false,
             rollupOptions: {
                 output: {
                     manualChunks: {
