@@ -11,8 +11,11 @@ import {
     getCaseReelStartOffset,
     hasReachedCasePhase,
     pickCelebrationDrop,
+    pickHighestRarityRole,
     shouldCelebrateDrop,
+    shouldPlayRarityStinger,
     summarizeCaseSettlement,
+    _resetRarityStingerCooldown,
 } from './casesAnimation'
 
 describe('cases animation helpers', () => {
@@ -155,5 +158,41 @@ describe('cases animation helpers', () => {
 
         expect(completionClaims).toEqual([true, false, false])
         expect(pending.settled).toBe(true)
+    })
+})
+
+describe('Wave 2 rarity stinger dispatch', () => {
+    const drop = (rarity) => ({ rarity, valueGc: 1 })
+
+    it('returns null for empty drops arrays', () => {
+        expect(pickHighestRarityRole([])).toBe(null)
+        expect(pickHighestRarityRole(null)).toBe(null)
+    })
+
+    it('picks the loudest rarity across a batch', () => {
+        expect(pickHighestRarityRole([drop('Mil-Spec'), drop('Covert'), drop('Restricted')]))
+            .toBe('rarityCovert')
+        expect(pickHighestRarityRole([drop('Covert'), drop('Contraband')]))
+            .toBe('rarityContraband')
+        expect(pickHighestRarityRole([drop('Covert'), drop('★')]))
+            .toBe('rarityStar')
+    })
+
+    it('falls back to quiet for low-tier batches', () => {
+        expect(pickHighestRarityRole([drop('Mil-Spec'), drop('Industrial'), drop('Consumer')]))
+            .toBe('rarityQuiet')
+    })
+
+    it('cooldown-gates the rarity stinger so bulk opens do not spam', () => {
+        _resetRarityStingerCooldown()
+        expect(shouldPlayRarityStinger(true, 1000)).toBe(true)
+        expect(shouldPlayRarityStinger(true, 1100)).toBe(false) // 100ms later — within cooldown
+        expect(shouldPlayRarityStinger(true, 1201)).toBe(true) // 201ms — outside cooldown
+    })
+
+    it('returns false when sfx is disabled in settings', () => {
+        _resetRarityStingerCooldown()
+        expect(shouldPlayRarityStinger(false, 5000)).toBe(false)
+        expect(shouldPlayRarityStinger(undefined, 5000)).toBe(false)
     })
 })

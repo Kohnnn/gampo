@@ -41,6 +41,53 @@ export function getRaritySfxRole(drop) {
     return RARITY_SFX_MAP[drop.rarity] || null
 }
 
+// Wave 2: rarity priority order for "highest wins" arbitration on bulk opens.
+// Higher number = louder. Used to collapse a batch of drops into a single
+// stinger (e.g. a ×10 bulk open plays the rarest stinger, not all 10).
+const RARITY_PRIORITY = {
+    rarityQuiet: 1,
+    rarityMedium: 2,
+    rarityRestricted: 3,
+    rarityCovert: 4,
+    rarityContraband: 5,
+    rarityStar: 6,
+}
+
+export function pickHighestRarityRole(drops) {
+    if (!Array.isArray(drops) || drops.length === 0) return null
+    let winner = null
+    let winnerPriority = 0
+    for (const drop of drops) {
+        const role = getRaritySfxRole(drop)
+        if (!role) continue
+        const priority = RARITY_PRIORITY[role] || 0
+        if (priority > winnerPriority) {
+            winnerPriority = priority
+            winner = role
+        }
+    }
+    return winner
+}
+
+// Wave 2: cooldown gate for the rarity stinger. Without this, a ×10 bulk
+// open that completes within a few seconds would spam 10 overlapping stingers
+// (and a fast bulk re-trigger would re-stinger instantly). 200 ms is the
+// sweet spot: long enough to avoid overlaps, short enough that the user
+// perceives a clean hit.
+const RARITY_STINGER_COOLDOWN_MS = 200
+let lastRarityStingerAt = 0
+
+export function shouldPlayRarityStinger(enabled, now = Date.now()) {
+    if (!enabled) return false
+    if (now - lastRarityStingerAt < RARITY_STINGER_COOLDOWN_MS) return false
+    lastRarityStingerAt = now
+    return true
+}
+
+export function _resetRarityStingerCooldown() {
+    lastRarityStingerAt = 0
+}
+
 export function finalPrizeOffset(jitter = 0, prizeIndex = CASE_PRIZE_INDEX, tilePx = CASE_TILE_PX, gapPx = CASE_TILE_GAP_PX) {
     const stride = tilePx + gapPx
     return -((prizeIndex * stride) + (tilePx / 2)) + jitter
