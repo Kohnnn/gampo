@@ -39,15 +39,26 @@ describe('fetchFreeProviderFeed', () => {
         expect(result.errors).toEqual(['free feed proxy 500'])
     })
 
-    it('skips the optional proxy request under Vite static preview', async () => {
-        globalThis.location = { hostname: '127.0.0.1', port: '4173' }
-        globalThis.fetch = vi.fn()
+    it('skips the optional proxy request under Vite static preview but fetches on remote hosts', async () => {
+        globalThis.location = { hostname: 'localhost', port: '5199' }
+        globalThis.fetch = vi.fn(async () => ({ ok: false, status: 404 }))
 
-        const result = await fetchFreeProviderFeed()
+        const localResult = await fetchFreeProviderFeed()
 
-        expect(result.events).toEqual([])
-        expect(result.errors).toEqual([])
+        expect(localResult.events).toEqual([])
+        expect(localResult.errors).toEqual([])
         expect(globalThis.fetch).not.toHaveBeenCalled()
+
+        globalThis.location = { hostname: 'gampo.example', port: '' }
+
+        const remoteResult = await fetchFreeProviderFeed()
+
+        expect(remoteResult.events).toEqual([])
+        expect(remoteResult.errors).toEqual([])
+        expect(globalThis.fetch).toHaveBeenCalledWith('/api/sportsbook/free-feed', {
+            method: 'GET',
+            headers: { accept: 'application/json' },
+        })
     })
 
     it('labels synthetic fallback and exposes the Netlify free-feed endpoint', async () => {

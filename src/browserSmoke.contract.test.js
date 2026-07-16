@@ -3,8 +3,15 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(resolve(process.cwd(), 'scripts/browserSmoke.mjs'), 'utf8')
+const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'))
 
 describe('browserSmoke CDP route isolation', () => {
+    it('uses experimental WebSocket support for Node 20 package scripts', () => {
+        for (const name of ['smoke:browser', 'ux:benchmark']) {
+            expect(packageJson.scripts[name]).toContain('node --experimental-websocket scripts/browserSmoke.mjs')
+        }
+    })
+
     it('creates and closes a fresh target for every route check', () => {
         const routeLoop = source.indexOf('for (const route of routes)')
         const createAfterRouteLoop = source.indexOf("Target.createTarget", routeLoop)

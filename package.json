@@ -3,13 +3,16 @@
     "version": "1.0.0",
     "description": "GamPo fake-credit casino and sportsbook probability simulator",
     "type": "module",
+    "engines": {
+        "node": ">=20.19.0 <21"
+    },
     "scripts": {
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
         "test": "vitest run",
-        "smoke:browser": "node scripts/browserSmoke.mjs",
-        "ux:benchmark": "node scripts/browserSmoke.mjs --mode=ux --out=output/ux-benchmark",
+        "smoke:browser": "node --experimental-websocket scripts/browserSmoke.mjs",
+        "ux:benchmark": "node --experimental-websocket scripts/browserSmoke.mjs --mode=ux --out=output/ux-benchmark",
         "verify:betsheet": "node scripts/verifyBetSheet.mjs",
         "audit:a11y": "node scripts/auditA11y.mjs",
         "audit:contrast": "node scripts/auditContrast.mjs",

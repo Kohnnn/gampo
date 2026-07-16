@@ -4,6 +4,14 @@ import { describe, expect, it } from 'vitest'
 const proxySource = readFileSync(new URL('../../server/sportsbookProviderProxy.js', import.meta.url), 'utf8')
 
 describe('sportsbook provider proxy source contract', () => {
+    it('reads The Odds API keys only from the server-only environment variable', () => {
+        const match = proxySource.match(/function oddsApiKeys\(env\)\s*\{([\s\S]*?)\n\}/)
+
+        expect(match?.[1]).toContain("['ODDS_API_KEYS']")
+        expect(match?.[1]).not.toContain('VITE_ODDS_API_KEYS')
+        expect(match?.[1]).not.toContain('odds_api_keys')
+    })
+
     it('applies marquee filtering server-side before odds fanout and exposes metrics', () => {
         expect(proxySource).toContain("import { curateTopSportsbookItems, mergeMarqueeMetrics }")
         expect(proxySource).toContain('const MAX_EVENTS_PER_SPORT = 12')

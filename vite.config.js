@@ -2,12 +2,14 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from "path"
 import { sportsbookProviderProxy } from './server/sportsbookProviderProxy.js'
+import { plinkoOutcomesStaticPlugin } from './scripts/plinkoOutcomesStaticPlugin.js'
+import { resolveZrokDevAllowedHosts } from './src/config/devAllowedHosts.js'
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
 
     return {
-        plugins: [react(), sportsbookProviderProxy(env)],
+        plugins: [react(), plinkoOutcomesStaticPlugin(), sportsbookProviderProxy(env)],
         resolve: {
             alias: {
                 "@": path.resolve(__dirname, "./src"),
@@ -15,7 +17,7 @@ export default defineConfig(({ mode }) => {
         },
         server: {
             host: '0.0.0.0',
-            allowedHosts: ['vdklbvkzbd1g.share.zrok.io'],
+            allowedHosts: resolveZrokDevAllowedHosts(mode, env.GAMPO_ZROK_DEV_HOST),
             port: 5173,
             open: false,
             watch: {
@@ -24,8 +26,8 @@ export default defineConfig(({ mode }) => {
         },
         build: {
             outDir: 'dist',
-            // Plinko row outcome tables are generated, route-lazy, and intentionally
-            // ~2 MB per active row-count chunk. Keep warnings focused on unexpected chunks.
+            // Plinko outcome tables are emitted as static JSON assets rather than
+            // transformed JavaScript chunks; keep warnings focused on app chunks.
             chunkSizeWarningLimit: 2100,
             cssCodeSplit: false,
             rollupOptions: {
