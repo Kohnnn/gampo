@@ -65,7 +65,7 @@ function isLocalVitePreview() {
     const location = globalThis.location
     if (!location) return false
     const host = location.hostname || ''
-    return (host === '127.0.0.1' || host === 'localhost') && location.port === '4173'
+    return host === '127.0.0.1' || host === 'localhost'
 }
 
 export async function fetchFreeProviderFeed() {

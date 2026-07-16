@@ -245,7 +245,7 @@ async function loadOddsApiIo(token) {
 const ODDS_API_COOLDOWN = new Map()
 
 function oddsApiKeys(env) {
-    const raw = envValue(env, ['ODDS_API_KEYS', 'VITE_ODDS_API_KEYS', 'odds_api_keys'])
+    const raw = envValue(env, ['ODDS_API_KEYS'])
     return String(raw || '').split(',').map(part => part.trim()).filter(Boolean)
 }
 
