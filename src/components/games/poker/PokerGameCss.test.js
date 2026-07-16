@@ -47,7 +47,7 @@ describe('poker layout CSS', () => {
         expect(css).toMatch(/@media \(min-width: 769px\)[\s\S]*\.poker-page \.pk-seat\.is-human \.pk-seat-cards \.pk-card\s*\{[\s\S]*width:\s*62px/s)
         expect(css).toMatch(/@media \(min-width: 769px\)[\s\S]*\.poker-page \.pk-seat:not\(\.is-human\) \.pk-seat-cards \.pk-card\s*\{[\s\S]*width:\s*38px/s)
         expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.pk-actions\s*\{[\s\S]*position:\s*static/s)
-        expect(css).toContain('bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)))')
+        expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.poker-buyin\s*\{[\s\S]*position:\s*sticky[\s\S]*bottom:\s*calc\(var\(--mobile-nav-height, 64px\) \+ max\(8px, env\(safe-area-inset-bottom\)\)\)/s)
         expect(css).toMatch(/\.poker-table-felt\s*\{[\s\S]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s)
         expect(css).toMatch(/\.poker-page \.pk-seat\.is-human \.pk-seat-cards \.pk-card\s*\{[\s\S]*width:\s*clamp\(58px, 17vw, 72px\)/s)
         expect(css).toMatch(/\.poker-page \.pk-seat:not\(\.is-human\) \.pk-seat-cards \.pk-card\s*\{[\s\S]*width:\s*26px/s)

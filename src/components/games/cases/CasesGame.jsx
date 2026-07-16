@@ -287,6 +287,9 @@ function CaseRightPanel({
     caseUxStats,
     collection,
     inventoryShowArchived,
+    isHolding,
+    handleOpenMouseDown,
+    handleOpenMouseUp,
     quickOpen,
     results,
     rows,
@@ -1471,6 +1474,9 @@ export default function CasesGame() {
                     caseUxStats={caseUxStats}
                     collection={collection}
                     inventoryShowArchived={inventoryShowArchived}
+                    isHolding={isHolding}
+                    handleOpenMouseDown={handleOpenMouseDown}
+                    handleOpenMouseUp={handleOpenMouseUp}
                     quickOpen={quickOpen}
                     results={results}
                     rows={rows}
