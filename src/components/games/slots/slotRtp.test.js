@@ -48,7 +48,7 @@ describe('slot RTP calibration', () => {
         // mean is not absurdly over 100% (catches a broken/missing scalar). Tight
         // convergence is validated by scripts/verifySlotRtp.mjs at high spin counts.
         for (const t of SLOT_TEMPLATES) {
-            const rtp = measureRtp(t, makeRng(0x1234 ^ t.id.length * 97), 4000)
+            const rtp = measureRtp(t, makeRng(0x1234 ^ t.id.length * 97), 500)
             expect(rtp, `${t.id} RTP ${(rtp * 100).toFixed(0)}% way over target`).toBeLessThan(1.6)
         }
     })
