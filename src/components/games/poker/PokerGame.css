@@ -1170,6 +1170,11 @@
     .pk-actions {
         bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)));
     }
+
+    .poker-buyin {
+        position: sticky;
+        bottom: calc(var(--mobile-nav-height, 64px) + max(8px, env(safe-area-inset-bottom)));
+    }
 }
 
 /* ==========================================================================

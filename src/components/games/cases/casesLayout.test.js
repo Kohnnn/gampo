@@ -30,6 +30,24 @@ describe('cases x10 layout contract', () => {
         expect(source).not.toContain('className="cases-result-actions"')
     })
 
+    it('threads the P4 hold-progress state into CaseRightPanel so the right-side Open button does not reference an undefined identifier', () => {
+        // Regression for EVL cycle 9: CasesGame previously rendered CaseRightPanel
+        // without passing isHolding/handleOpenMouseDown/handleOpenMouseUp. The
+        // sub-component destructured them as if they were in-scope hook values,
+        // throwing ReferenceError at /cases render time. The owning component
+        // must hand these props down explicitly so the JSX evaluator can find them.
+        expect(source).toMatch(/isHolding\s*=\s*\{isHolding\}/)
+        expect(source).toMatch(/handleOpenMouseDown\s*=\s*\{handleOpenMouseDown\}/)
+        expect(source).toMatch(/handleOpenMouseUp\s*=\s*\{handleOpenMouseUp\}/)
+        // CaseRightPanel parameter destructure must list all three.
+        const destructure = source.match(/function CaseRightPanel\(\{([\s\S]*?)\}\)/)
+        expect(destructure, 'CaseRightPanel parameter block must exist').toBeTruthy()
+        const params = destructure[1]
+        expect(params).toMatch(/\bisHolding\b/)
+        expect(params).toMatch(/\bhandleOpenMouseDown\b/)
+        expect(params).toMatch(/\bhandleOpenMouseUp\b/)
+    })
+
     it('keeps inventory actions addressable for browser smoke tests', () => {
         expect(source).toContain('data-inventory-action="favorite"')
         expect(source).toContain("data-inventory-action={drop.archived ? 'restore' : 'archive'}")
