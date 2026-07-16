@@ -1,8 +1,6 @@
-// Game-route error boundary. Wraps each lazy-loaded game so a runtime
-// exception inside the game component doesn't blank the whole layout.
-
 import { Component } from 'react'
 import { Link } from 'react-router-dom'
+import { recoverLazyChunk } from './lazyChunkRecovery'
 
 export default class ErrorBoundary extends Component {
     constructor(props) {
@@ -15,12 +13,12 @@ export default class ErrorBoundary extends Component {
     }
 
     componentDidCatch(error, info) {
-        // Surface to console so a developer can grab the trace.
-        // eslint-disable-next-line no-console
-        console.error('GamePo route error:', error, info)
+        if (!recoverLazyChunk(error)) console.error('GamePo route error:', error, info)
     }
 
-    reset = () => this.setState({ error: null })
+    reset = () => {
+        if (!recoverLazyChunk(this.state.error)) this.setState({ error: null })
+    }
 
     render() {
         if (this.state.error) {
