@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { assertBaseReachable, classifyPage } from './pagePreflight.mjs'
 
 const BASE = (process.argv.find(a => a.startsWith('--baseUrl='))?.split('=')[1] || 'http://127.0.0.1:4173').replace(/\/$/, '')
 const ROUTES = (process.argv.find(a => a.startsWith('--routes='))?.split('=')[1] || '/,/settings,/insights,/sandbox,/dice,/poker').split(',')
@@ -24,8 +25,7 @@ if (!browser) throw new Error('No Edge/Chrome found')
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 const port = 9850 + Math.floor(Math.random() * 120)
-const proc = spawn(browser, ['--headless=new', '--disable-gpu', '--no-first-run', '--mute-audio', `--remote-debugging-port=${port}`, `--user-data-dir=${join(tmpdir(), `gampo-contrast-${process.pid}`)}`, 'about:blank'], { stdio: 'ignore' })
-proc.unref()
+let proc
 
 async function waitDbg() {
     const start = Date.now()
@@ -51,8 +51,31 @@ async function evalExpr(expression, sessionId) {
     return r.result?.value
 }
 
-const auditExpr = `
+async function waitForRenderedPage(sessionId) {
+    const start = Date.now()
+    while (Date.now() - start < 8000) {
+        if (await evalExpr("Boolean(document.querySelector('#root')?.children.length) && ((document.body.innerText || '').trim().length > 20 || document.querySelector('.route-error'))", sessionId)) return
+        await sleep(120)
+    }
+}
+
+const auditExpr = route => `
 (() => {
+  const route = ${JSON.stringify(route)};
+  const requiredSelectors = {
+    '/': '.casino-page',
+    '/settings': '.settings-page',
+    '/insights': '.insights-page',
+    '/sandbox': '.sandbox-page',
+    '/dice': '.game-shell',
+    '/poker': '.poker-page',
+    '/collections': '.collections-page',
+    '/sicbo': '.game-shell',
+    '/war': '.game-shell',
+    '/lottery': '.game-shell',
+    '/darts': '.game-shell',
+    '/tarot': '.game-shell',
+  };
   const LIMIT = ${LIMIT};
   const parseColor = (str) => {
     const m = str.match(/rgba?\\(([^)]+)\\)/);
@@ -149,11 +172,21 @@ const auditExpr = `
     }
   }
   offenders.sort((a, b) => a.ratio - b.ratio);
-  return { count: offenders.length, worst: offenders.slice(0, LIMIT) };
+   const ready = document.readyState === 'complete';
+   const rootChildren = document.querySelector('#root')?.children.length || 0;
+   const routeErrors = Array.from(document.querySelectorAll('.route-error')).filter(isVisible).map(el => el.innerText.trim()).filter(Boolean);
+  const required = document.querySelector(requiredSelectors[route]);
+  const hasBodyText = (document.body.innerText || '').trim().length > 0;
+  const hasSurface = Array.from(document.querySelectorAll('[data-ux-surface]')).some(isVisible);
+  const requiredContent = requiredSelectors[route] ? Boolean(required && isVisible(required) && hasBodyText) : hasBodyText && hasSurface;
+   return { count: offenders.length, worst: offenders.slice(0, LIMIT), ready, rootChildren, routeErrors, requiredContent };
 })()
 `
 
 async function main() {
+    await assertBaseReachable(BASE)
+    proc = spawn(browser, ['--headless=new', '--disable-gpu', '--no-first-run', '--mute-audio', `--remote-debugging-port=${port}`, `--user-data-dir=${join(tmpdir(), `gampo-contrast-${process.pid}`)}`, 'about:blank'], { stdio: 'ignore' })
+    proc.unref()
     const v = await waitDbg()
     ws = new WebSocket(v.webSocketDebuggerUrl)
     await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej })
@@ -170,12 +203,14 @@ async function main() {
     let totalFail = 0
     for (const route of ROUTES) {
         await send('Page.navigate', { url: `${BASE}${route}` }, sessionId)
+        await waitForRenderedPage(sessionId)
         await sleep(1600)
         let r
-        try { r = await evalExpr(auditExpr, sessionId) } catch (e) { r = { count: -1, worst: [{ text: String(e).slice(0, 60) }] } }
-        if (r.count > 0) totalFail += r.count
-        const status = r.count === 0 ? 'PASS' : 'FAIL'
-        console.log(`${status} ${route} :: ${r.count} AA contrast issue(s)`)
+        try { r = await evalExpr(auditExpr(route), sessionId) } catch (e) { r = { count: -1, worst: [{ text: String(e).slice(0, 60) }], ready: false, rootChildren: 0, routeErrors: [], requiredContent: false } }
+        const preflight = classifyPage(r)
+        if (!preflight.ok || r.count > 0) totalFail += Math.max(1, r.count)
+        const status = preflight.ok && r.count === 0 ? 'PASS' : 'FAIL'
+        console.log(`${status} ${route} :: ${r.count} AA contrast issue(s) preflight=${JSON.stringify(preflight.reasons)}`)
         for (const o of r.worst || []) {
             console.log(`   ${o.ratio}:1 (need ${o.threshold}) "${o.text}" [${o.cls}] ${o.color} ${o.size}px${o.bold ? ' bold' : ''}`)
         }
@@ -186,4 +221,4 @@ async function main() {
     console.log(totalFail === 0 ? '\\nWCAG AA CONTRAST PASSED' : `\\n${totalFail} contrast issue(s) found`)
     process.exit(totalFail === 0 ? 0 : 1)
 }
-main().catch(e => { console.error(e); proc.kill(); process.exit(1) })
+main().catch(e => { console.error(e); proc?.kill(); process.exit(1) })

@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { assertBaseReachable, classifyPage } from './pagePreflight.mjs'
 
 const BASE = (process.argv.find(a => a.startsWith('--baseUrl='))?.split('=')[1] || 'http://127.0.0.1:4173').replace(/\/$/, '')
 const ROUTES = (process.argv.find(a => a.startsWith('--routes='))?.split('=')[1] || '/settings,/insights,/sandbox').split(',')
@@ -24,8 +25,7 @@ if (!browser) throw new Error('No Edge/Chrome found')
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 const port = 9800 + Math.floor(Math.random() * 150)
-const proc = spawn(browser, ['--headless=new', '--disable-gpu', '--no-first-run', '--mute-audio', `--remote-debugging-port=${port}`, `--user-data-dir=${join(tmpdir(), `gampo-a11y-${process.pid}`)}`, 'about:blank'], { stdio: 'ignore' })
-proc.unref()
+let proc
 
 async function waitDbg() {
     const start = Date.now()
@@ -51,8 +51,19 @@ async function evalExpr(expression, sessionId) {
     return r.result?.value
 }
 
-const auditExpr = `
+const auditExpr = route => `
 (async () => {
+  const route = ${JSON.stringify(route)};
+  const requiredSelectors = {
+    '/settings': '.settings-page',
+    '/insights': '.insights-page',
+    '/sandbox': '.sandbox-page',
+  };
+  const isVisible = el => {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+  };
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const issues = [];
   const accName = el => (el.getAttribute('aria-label') || el.getAttribute('title') || el.innerText || el.value || (el.getAttribute('aria-labelledby') ? 'labelledby' : '')).trim();
@@ -81,11 +92,20 @@ const auditExpr = `
     await sleep(400);
     sandboxRan = !!document.querySelector('.sandbox-verdict');
   }
-  return { issues, focusable, sandboxRan, surfaces: Array.from(document.querySelectorAll('[data-ux-surface]')).length };
+   const ready = document.readyState === 'complete';
+   const rootChildren = document.querySelector('#root')?.children.length || 0;
+   const routeErrors = Array.from(document.querySelectorAll('.route-error')).filter(isVisible).map(el => el.innerText.trim()).filter(Boolean);
+  const required = document.querySelector(requiredSelectors[route]);
+  const hasSurface = Array.from(document.querySelectorAll('[data-ux-surface]')).some(isVisible);
+  const requiredContent = Boolean(focusable && hasSurface && (requiredSelectors[route] ? required && isVisible(required) : true));
+   return { issues, focusable, sandboxRan, surfaces: Array.from(document.querySelectorAll('[data-ux-surface]')).filter(isVisible).length, ready, rootChildren, routeErrors, requiredContent };
 })()
 `
 
 async function main() {
+    await assertBaseReachable(BASE)
+    proc = spawn(browser, ['--headless=new', '--disable-gpu', '--no-first-run', '--mute-audio', `--remote-debugging-port=${port}`, `--user-data-dir=${join(tmpdir(), `gampo-a11y-${process.pid}`)}`, 'about:blank'], { stdio: 'ignore' })
+    proc.unref()
     const v = await waitDbg()
     ws = new WebSocket(v.webSocketDebuggerUrl)
     await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej })
@@ -108,11 +128,12 @@ async function main() {
         await send('Page.navigate', { url: `${BASE}${route}` }, sessionId)
         await sleep(1500)
         let r
-        try { r = await evalExpr(auditExpr, sessionId) } catch (e) { r = { issues: ['eval error: ' + String(e).slice(0, 80)] } }
+        try { r = await evalExpr(auditExpr(route), sessionId) } catch (e) { r = { issues: ['eval error: ' + String(e).slice(0, 80)], ready: false, rootChildren: 0, routeErrors: [], requiredContent: false } }
         const errs = consoleErrors.filter(Boolean)
-        const ok = r.issues.length === 0 && errs.length === 0 && (r.sandboxRan === null || r.sandboxRan === true)
+        const preflight = classifyPage(r)
+        const ok = preflight.ok && r.issues.length === 0 && errs.length === 0 && (r.sandboxRan === null || r.sandboxRan === true)
         if (!ok) failures++
-        console.log(`${ok ? 'PASS' : 'FAIL'} ${route} :: surfaces=${r.surfaces} a11yIssues=${JSON.stringify(r.issues)} sandboxRan=${r.sandboxRan} consoleErrors=${errs.length}`)
+        console.log(`${ok ? 'PASS' : 'FAIL'} ${route} :: surfaces=${r.surfaces} a11yIssues=${JSON.stringify(r.issues)} sandboxRan=${r.sandboxRan} consoleErrors=${errs.length} preflight=${JSON.stringify(preflight.reasons)}`)
     }
 
     await send('Target.closeTarget', { targetId })
@@ -120,4 +141,4 @@ async function main() {
     console.log(failures === 0 ? '\\nA11Y AUDIT PASSED' : `\\n${failures} ROUTE(S) FAILED`)
     process.exit(failures === 0 ? 0 : 1)
 }
-main().catch(e => { console.error(e); proc.kill(); process.exit(1) })
+main().catch(e => { console.error(e); proc?.kill(); process.exit(1) })

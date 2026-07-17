@@ -9,6 +9,7 @@ import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { assertBaseReachable, classifyPage } from './pagePreflight.mjs'
 
 const BASE = (process.argv.find(a => a.startsWith('--baseUrl='))?.split('=')[1] || 'http://127.0.0.1:4173').replace(/\/$/, '')
 const ROUTES = (process.argv.find(a => a.startsWith('--routes='))?.split('=')[1] || '/dice,/blackjack,/roulette,/keno').split(',')
@@ -35,11 +36,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 const port = 9700 + Math.floor(Math.random() * 200)
 const userDataDir = join(tmpdir(), `gampo-betsheet-${process.pid}`)
 
-const proc = spawn(browser, [
-    '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-    '--mute-audio', `--remote-debugging-port=${port}`, `--user-data-dir=${userDataDir}`, 'about:blank',
-], { stdio: 'ignore' })
-proc.unref()
+let proc
 
 async function waitForDebugger() {
     const start = Date.now()
@@ -74,6 +71,28 @@ async function evalExpr(expression, sessionId) {
     if (res.exceptionDetails) throw new Error(JSON.stringify(res.exceptionDetails))
     return res.result?.value
 }
+
+const pagePreflightExpr = route => `
+(() => {
+  const route = ${JSON.stringify(route)};
+  const requiredSelectors = {
+    '/dice': '.game-shell',
+    '/blackjack': '.game-shell',
+    '/roulette': '.game-shell',
+    '/keno': '.game-shell',
+  };
+  const isVisible = el => {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+  };
+   const ready = document.readyState === 'complete';
+   const rootChildren = document.querySelector('#root')?.children.length || 0;
+   const routeErrors = Array.from(document.querySelectorAll('.route-error')).filter(isVisible).map(el => el.innerText.trim()).filter(Boolean);
+  const required = document.querySelector(requiredSelectors[route]);
+   return { ready, rootChildren, routeErrors, requiredContent: Boolean(required && isVisible(required)) };
+})()
+`
 
 const checkExpr = `
 (async () => {
@@ -158,6 +177,12 @@ const TOUCH_FLOOR_EXPR = `
 `
 
 async function main() {
+    await assertBaseReachable(BASE)
+    proc = spawn(browser, [
+        '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+        '--mute-audio', `--remote-debugging-port=${port}`, `--user-data-dir=${userDataDir}`, 'about:blank',
+    ], { stdio: 'ignore' })
+    proc.unref()
     const version = await waitForDebugger()
     ws = new WebSocket(version.webSocketDebuggerUrl)
     await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject })
@@ -192,12 +217,16 @@ async function main() {
         for (const route of ROUTES) {
             await send('Page.navigate', { url: `${BASE}${route}` }, sessionId)
             await sleep(1700)
+            let preflightSnapshot
+            try { preflightSnapshot = await evalExpr(pagePreflightExpr(route), sessionId) }
+            catch (e) { preflightSnapshot = { ready: false, rootChildren: 0, routeErrors: [], requiredContent: false, preflightError: String(e).slice(0, 80) } }
+            const preflight = classifyPage(preflightSnapshot)
             let r
             try { r = await evalExpr(checkExpr, sessionId) }
             catch (e) { r = { ok: false, reason: String(e).slice(0, 80) } }
-            const status = r.ok ? 'PASS' : (r.reason?.includes('no setup') ? 'SKIP' : 'FAIL')
+            const status = !preflight.ok ? 'FAIL' : (r.ok ? 'PASS' : (r.reason?.includes('no setup') ? 'SKIP' : 'FAIL'))
             if (status === 'FAIL') failures++
-            console.log(`${status} ${vp.w}x${vp.h} ${route} :: ${JSON.stringify(r)}`)
+            console.log(`${status} ${vp.w}x${vp.h} ${route} :: ${JSON.stringify(r)} preflight=${JSON.stringify(preflight.reasons)}`)
             // Wave 2: 44px touch floor on the bet chips. Sheet SKIPs don't
             // count as failures — many games don't expose the bet sheet
             // (e.g. fixed-stake games).
@@ -217,4 +246,4 @@ async function main() {
     process.exit(failures === 0 ? 0 : 1)
 }
 
-main().catch(err => { console.error(err); proc.kill(); process.exit(1) })
+main().catch(err => { console.error(err); proc?.kill(); process.exit(1) })
