@@ -148,27 +148,106 @@ export function snapshotGampoState() {
     return data
 }
 
-/**
- * Restore a snapshot produced by `snapshotGampoState`. By default this clears
- * existing `gampo_*` keys first so the restore is exact. Only keys under the
- * `gampo_` prefix are written, so a malformed/foreign file can't inject
- * arbitrary keys.
- */
-export function restoreGampoState(data, { clearExisting = true } = {}) {
-    const store = getStore()
-    if (!store || !data || typeof data !== 'object') return { restored: 0, skipped: 0 }
-    if (clearExisting) {
-        for (const key of listGampoKeys()) removeKey(key)
+function strictStore() {
+    try {
+        if (typeof localStorage === 'undefined') throw new Error('localStorage is unavailable.')
+        const store = localStorage
+        if (!store) throw new Error('localStorage is unavailable.')
+        return store
+    } catch (cause) {
+        throw Object.assign(new Error('GamPo save restore failed.'), {
+            applyFailed: true,
+            rolledBack: false,
+            rollbackFailed: false,
+            cause,
+        })
     }
-    let restored = 0
-    let skipped = 0
-    for (const [key, value] of Object.entries(data)) {
-        if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX) && typeof value === 'string') {
-            if (writeRaw(key, value)) restored += 1
-            else skipped += 1
-        } else {
-            skipped += 1
+}
+
+function invalidRestoreData() {
+    return Object.assign(new Error('Invalid GamPo save data.'), { validationFailed: true })
+}
+
+function validateRestoreData(data) {
+    try {
+        const prototype = data != null && typeof data === 'object' ? Object.getPrototypeOf(data) : null
+        if (data == null || Array.isArray(data) || (prototype !== Object.prototype && prototype !== null)) throw invalidRestoreData()
+        const entries = Object.entries(data)
+        for (const [key, value] of entries) {
+            if (!key.startsWith(STORAGE_PREFIX) || typeof value !== 'string') throw invalidRestoreData()
+        }
+        return entries
+    } catch {
+        throw invalidRestoreData()
+    }
+}
+
+function strictCall(store, method, ...args) {
+    const result = store[method](...args)
+    if (result === false) throw new Error(`${method} failed.`)
+    return result
+}
+
+function strictSnapshot(store) {
+    const snapshot = {}
+    for (let index = 0; index < store.length; index += 1) {
+        const key = strictCall(store, 'key', index)
+        if (key && key.startsWith(STORAGE_PREFIX)) {
+            const value = strictCall(store, 'getItem', key)
+            if (value == null) throw new Error(`getItem ${key} failed.`)
+            snapshot[key] = value
         }
     }
-    return { restored, skipped }
+    return snapshot
+}
+
+function restoreSnapshot(store, snapshot) {
+    const current = strictSnapshot(store)
+    for (const key of Object.keys(current)) strictCall(store, 'removeItem', key)
+    for (const [key, value] of Object.entries(snapshot)) strictCall(store, 'setItem', key, value)
+}
+
+export function restoreGampoState(data, { clearExisting = true } = {}) {
+    const entries = validateRestoreData(data)
+    let store
+    let snapshot
+    try {
+        store = strictStore()
+        snapshot = strictSnapshot(store)
+    } catch (cause) {
+        if (cause?.applyFailed) throw cause
+        throw Object.assign(new Error('GamPo save restore failed.'), {
+            applyFailed: true,
+            rolledBack: false,
+            rollbackFailed: false,
+            cause,
+        })
+    }
+
+    try {
+        if (clearExisting) {
+            for (const key of Object.keys(snapshot)) strictCall(store, 'removeItem', key)
+        }
+        for (const [key, value] of entries) strictCall(store, 'setItem', key, value)
+    } catch (cause) {
+        try {
+            restoreSnapshot(store, snapshot)
+        } catch (rollbackCause) {
+            throw Object.assign(new Error('GamPo save restore failed and rollback failed.'), {
+                applyFailed: true,
+                rolledBack: false,
+                rollbackFailed: true,
+                cause,
+                rollbackCause,
+            })
+        }
+        throw Object.assign(new Error('GamPo save restore failed; previous save was restored.'), {
+            applyFailed: true,
+            rolledBack: true,
+            rollbackFailed: false,
+            cause,
+        })
+    }
+
+    return { restored: entries.length, skipped: 0 }
 }

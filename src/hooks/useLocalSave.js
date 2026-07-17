@@ -77,6 +77,20 @@ export function applySavePayload(payload, options) {
     return restoreGampoState(data, options)
 }
 
+export async function importSaveText(text, options) {
+    let parsed
+    try {
+        parsed = JSON.parse(text)
+    } catch {
+        throw new Error('Could not read save file (invalid JSON).')
+    }
+    const result = applySavePayload(parsed, options)
+    if (typeof window !== 'undefined' && window.location && options?.reload !== false) {
+        window.location.reload()
+    }
+    return result
+}
+
 export function useLocalSave() {
     const exportSave = useCallback((filename) => {
         const payload = buildSavePayload()
@@ -99,19 +113,7 @@ export function useLocalSave() {
 
     const importSave = useCallback(async (file, options) => {
         const text = typeof file === 'string' ? file : await file.text()
-        let parsed
-        try {
-            parsed = JSON.parse(text)
-        } catch {
-            throw new Error('Could not read save file (invalid JSON).')
-        }
-        const result = applySavePayload(parsed, options)
-        // A reload is the simplest way to re-hydrate every module-scope hook
-        // singleton from the freshly restored localStorage.
-        if (typeof window !== 'undefined' && window.location && options?.reload !== false) {
-            window.location.reload()
-        }
-        return result
+        return importSaveText(text, options)
     }, [])
 
     return {

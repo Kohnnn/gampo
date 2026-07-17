@@ -1,24 +1,40 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
     SAVE_VERSION,
     buildSavePayload,
     validateSavePayload,
     applySavePayload,
     migrateSaveData,
+    importSaveText,
     useLocalSave,
 } from './useLocalSave'
 import { writeJson, writeRaw, readJson, readRaw } from '../utils/storage'
 
-beforeEach(() => {
-    const store = new Map()
+function installStorage(initial = {}, controls = {}) {
+    const store = new Map(Object.entries(initial))
     globalThis.localStorage = {
         get length() { return store.size },
         key: (i) => Array.from(store.keys())[i] ?? null,
-        getItem: (k) => (store.has(k) ? store.get(k) : null),
-        setItem: (k, v) => { store.set(k, String(v)) },
-        removeItem: (k) => { store.delete(k) },
+        getItem: (key) => (store.has(key) ? store.get(key) : null),
+        setItem(key, value) {
+            if (controls.setItem?.(key, String(value))) throw new Error(`set ${key} failed`)
+            store.set(key, String(value))
+        },
+        removeItem(key) {
+            if (controls.removeItem?.(key)) throw new Error(`remove ${key} failed`)
+            store.delete(key)
+        },
         clear: () => store.clear(),
     }
+}
+
+function saveText(data) {
+    return JSON.stringify({ app: 'gampo', kind: 'save', version: SAVE_VERSION, data })
+}
+
+beforeEach(() => {
+    installStorage()
+    globalThis.window = { location: { reload: vi.fn() } }
 })
 
 describe('useLocalSave', () => {
@@ -57,6 +73,63 @@ describe('useLocalSave', () => {
 
     it('throws a friendly error on a foreign file', () => {
         expect(() => applySavePayload({ app: 'evil' })).toThrow(/not a GamPo save/i)
+    })
+
+    it('reloads once after a successful import', async () => {
+        await expect(importSaveText(saveText({ gampo_credits: '2000' }))).resolves.toEqual({ restored: 1, skipped: 0 })
+        expect(window.location.reload).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not reload when reload is disabled', async () => {
+        await expect(importSaveText(saveText({ gampo_credits: '2000' }), { reload: false })).resolves.toEqual({ restored: 1, skipped: 0 })
+        expect(window.location.reload).not.toHaveBeenCalled()
+    })
+
+    it('keeps JSON and envelope errors friendly without reloading', async () => {
+        await expect(importSaveText('{bad json')).rejects.toThrow('Could not read save file (invalid JSON).')
+        await expect(importSaveText(JSON.stringify({ app: 'other' }))).rejects.toThrow('This file is not a GamPo save.')
+        expect(window.location.reload).not.toHaveBeenCalled()
+    })
+
+    it('does not reload after validation failure', async () => {
+        await expect(importSaveText(saveText({ gampo_credits: 2000 }))).rejects.toMatchObject({
+            message: 'Invalid GamPo save data.',
+            validationFailed: true,
+        })
+        expect(window.location.reload).not.toHaveBeenCalled()
+    })
+
+    it('does not reload after an apply failure with successful rollback', async () => {
+        let failed = false
+        installStorage(
+            { gampo_old: 'old' },
+            { setItem: (key) => key === 'gampo_new' && !failed && (failed = true) },
+        )
+        await expect(importSaveText(saveText({ gampo_new: 'new' }))).rejects.toMatchObject({
+            rolledBack: true,
+            rollbackFailed: false,
+        })
+        expect(window.location.reload).not.toHaveBeenCalled()
+    })
+
+    it('does not reload after rollback failure', async () => {
+        let applyFailed = false
+        installStorage(
+            { gampo_old: 'old' },
+            {
+                setItem: (key) => {
+                    if (key === 'gampo_new' && !applyFailed) {
+                        applyFailed = true
+                        return true
+                    }
+                    return key === 'gampo_old'
+                },
+            },
+        )
+        await expect(importSaveText(saveText({ gampo_new: 'new' }))).rejects.toMatchObject({
+            rollbackFailed: true,
+        })
+        expect(window.location.reload).not.toHaveBeenCalled()
     })
 
     it('exposes a hook function', () => {
