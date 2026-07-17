@@ -36,19 +36,13 @@ import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreload
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import CrashChart from './CrashChart'
+import { rollCrashMultiplier } from './crashMath'
 import './crash.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
 const HOUSE_EDGE = 0.01
 const TARGET_PRESETS = [1.25, 1.5, 2, 3, 5, 10, 25, 50, 100]
 const BETTING_OPEN_MS = 3500
-
-function rollCrashMultiplier(uniform) {
-    const u = Math.max(1e-9, Math.min(1 - 1e-9, uniform))
-    if (u < HOUSE_EDGE) return 1.0
-    const m = (1 - HOUSE_EDGE) / (1 - u)
-    return Math.max(1.0, Math.floor(m * 100) / 100)
-}
 
 // Time → multiplier curve, Rainbet-style. Slow ease-in for first 5s
 // (~1.07× per second) then accelerates (~1.10× per second) so big rounds
