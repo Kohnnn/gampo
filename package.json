@@ -13,11 +13,11 @@
         "test": "vitest run",
         "smoke:browser": "node --experimental-websocket scripts/browserSmoke.mjs",
         "ux:benchmark": "node --experimental-websocket scripts/browserSmoke.mjs --mode=ux --out=output/ux-benchmark",
-        "verify:betsheet": "node scripts/verifyBetSheet.mjs",
-        "audit:a11y": "node scripts/auditA11y.mjs",
-        "audit:contrast": "node scripts/auditContrast.mjs",
+        "verify:betsheet": "node --experimental-websocket scripts/verifyBetSheet.mjs",
+        "audit:a11y": "node --experimental-websocket scripts/auditA11y.mjs",
+        "audit:contrast": "node --experimental-websocket scripts/auditContrast.mjs",
         "audit:scroll": "node scripts/auditPlayfieldOverflow.mjs",
-        "audit:all": "node scripts/auditA11y.mjs && node scripts/auditContrast.mjs && node scripts/auditPlayfieldOverflow.mjs && node scripts/verifyBetSheet.mjs",
+        "audit:all": "npm run audit:a11y && npm run audit:contrast && npm run audit:scroll && npm run verify:betsheet",
         "gen:assets": "node scripts/genAssets.js"
     },
     "dependencies": {

@@ -6,10 +6,12 @@ const source = readFileSync(resolve(process.cwd(), 'scripts/browserSmoke.mjs'), 
 const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'))
 
 describe('browserSmoke CDP route isolation', () => {
-    it('uses experimental WebSocket support for Node 20 package scripts', () => {
-        for (const name of ['smoke:browser', 'ux:benchmark']) {
-            expect(packageJson.scripts[name]).toContain('node --experimental-websocket scripts/browserSmoke.mjs')
+    it('uses experimental WebSocket support for Node 20 raw-CDP package scripts', () => {
+        for (const name of ['smoke:browser', 'ux:benchmark', 'audit:a11y', 'audit:contrast', 'verify:betsheet']) {
+            expect(packageJson.scripts[name]).toContain('--experimental-websocket')
         }
+        expect(packageJson.scripts['audit:scroll']).not.toContain('--experimental-websocket')
+        expect(packageJson.scripts['audit:all']).toBe('npm run audit:a11y && npm run audit:contrast && npm run audit:scroll && npm run verify:betsheet')
     })
 
     it('creates and closes a fresh target for every route check', () => {
@@ -22,5 +24,36 @@ describe('browserSmoke CDP route isolation', () => {
         expect(createAfterRouteLoop, 'create target inside route loop').toBeGreaterThan(routeLoop)
         expect(createAfterRouteLoop, 'target is created before route navigation').toBeLessThan(navigateAfterRouteLoop)
         expect(closeAfterRouteLoop, 'target is closed after route check').toBeGreaterThan(navigateAfterRouteLoop)
+    })
+
+    it('uses shared preflight diagnostics and covers the reliability route matrix', () => {
+        expect(source).toContain("from './pagePreflight.mjs'")
+        expect(source).toContain('await assertBaseReachable(baseUrl)')
+        expect(source).toMatch(/classifyPage\(\{ ready, rootChildren: metrics\.rootChildren, routeErrors: metrics\.routeErrors, requiredContent: metrics\.requiredContent \}\)/)
+        expect(source).toContain('preflightReasons')
+        expect(source).toContain('routeErrors')
+        expect(source).toContain('rootChildren')
+        expect(source).toContain('requiredContent')
+        expect(source).toContain('!item.ready')
+        expect(source).toContain('isFailure(item)')
+        for (const route of ['/collections', '/settings', '/insights', '/sicbo', '/war', '/lottery', '/darts', '/tarot']) {
+            expect(source).toContain(`'${route}'`)
+        }
+    })
+
+    it('requires clipped-aware visibility in both smoke selection paths', () => {
+        const visibleRectCount = (source.match(/const visibleRect = el =>/g) || []).length
+        expect(visibleRectCount).toBe(2)
+        expect(source).toMatch(/parentElement[\s\S]*overflowX[\s\S]*overflowY/)
+        expect(source).toContain("['hidden', 'clip', 'auto', 'scroll']")
+        expect(source).toMatch(/Math\.max\([\s\S]*Math\.min\(/)
+        expect(source).toMatch(/return right <= left \|\| bottom <= top \? null/)
+    })
+
+    it('uses the clipped rectangle center while retaining visible blocked-target failures', () => {
+        expect(source).toContain('const visible = el => Boolean(visibleRect(el));')
+        expect(source).toContain('const visible = el => Boolean(visibleRect(el));')
+        expect(source).toContain('document.elementFromPoint')
+        expect(source).toContain('item.mobileActionHit?.blocked')
     })
 })

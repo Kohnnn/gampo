@@ -3,6 +3,7 @@ import { closeSync, existsSync, openSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
+import { assertBaseReachable, classifyPage, isFailure } from './pagePreflight.mjs'
 
 const DEFAULT_ROUTES = [
     '/',
@@ -27,6 +28,14 @@ const DEFAULT_ROUTES = [
     '/chickencross',
     '/videopoker',
     '/crash',
+    '/collections',
+    '/settings',
+    '/insights',
+    '/sicbo',
+    '/war',
+    '/lottery',
+    '/darts',
+    '/tarot',
 ]
 
 const DEFAULT_VIEWPORTS = [
@@ -79,6 +88,14 @@ const KEY_ACTIONS = {
     '/videopoker': /deal|draw|hold|bet/i,
     '/crash': /bet|cashout|start/i,
     '/coinflip': /flip|heads|tails|bet|play/i,
+    '/collections': /open|cases|collection|search/i,
+    '/settings': /export|import|settings|audio/i,
+    '/insights': /browse games|try the challenges|insights/i,
+    '/sicbo': /roll dice|roll|clear|repeat/i,
+    '/war': /draw cards|go to war|surrender/i,
+    '/lottery': /draw lottery|quick pick|draw/i,
+    '/darts': /throw dart|bullseye|sector/i,
+    '/tarot': /pull|wands|cups|swords|pentacles/i,
 }
 
 function argValue(name, fallback) {
@@ -232,8 +249,9 @@ async function waitForReady(client, sessionId, timeoutMs = 8000) {
               && document.querySelector('#root').children.length > 0
               && (!!document.querySelector('[data-ux-surface], .app-layout, .game-shell, .casino-page, .sb-page')
                 || (document.body.innerText || '').trim().length > 20)
-              && !document.querySelector('.route-fallback')
-              && !document.querySelector('.core-stage.is-loading')
+               && !document.querySelector('.route-fallback')
+               && !document.querySelector('.route-error')
+               && !document.querySelector('.core-stage.is-loading')
               && !/LOADING\\s+(LAB|STAGE)/i.test(document.body.innerText || '')`,
             returnByValue: true,
         }, sessionId)
@@ -241,19 +259,6 @@ async function waitForReady(client, sessionId, timeoutMs = 8000) {
         await sleep(120)
     }
     return false
-}
-
-async function assertBaseReachable(baseUrl) {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 3500)
-    try {
-        const res = await fetch(baseUrl, { signal: controller.signal })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    } catch (error) {
-        throw new Error(`Browser smoke base URL is not reachable: ${baseUrl}. Start the dev/preview server first or pass --baseUrl=<url>. (${error?.message || error})`)
-    } finally {
-        clearTimeout(timeout)
-    }
 }
 
 function collectErrors(events) {
@@ -272,12 +277,29 @@ function collectErrors(events) {
     return [...new Set(errors)].slice(0, 8)
 }
 
+const REQUIRED_CONTENT_SELECTORS = {
+    '/': '.casino-page',
+    '/settings': '.settings-page',
+    '/insights': '.insights-page',
+    '/sandbox': '.sandbox-page',
+    '/dice': '.game-shell',
+    '/poker': '.poker-page',
+    '/collections': '.collections-page',
+    '/sicbo': '.game-shell',
+    '/war': '.game-shell',
+    '/lottery': '.game-shell',
+    '/darts': '.game-shell',
+    '/tarot': '.game-shell',
+}
+
 async function evaluatePage(client, sessionId, route) {
     const actionPattern = (KEY_ACTIONS[route] || /bet|spin|deal|roll|play|drop|cashout|open|hit|stand|draw|start|search/i).source
+    const requiredSelector = REQUIRED_CONTENT_SELECTORS[route] || ''
     const expression = `
 (() => {
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
+   const requiredSelector = ${JSON.stringify(requiredSelector)};
+   const viewportWidth = window.innerWidth;
+   const viewportHeight = window.innerHeight;
   const body = document.body;
   const html = document.documentElement;
   const docWidth = Math.max(body.scrollWidth, html.scrollWidth);
@@ -288,11 +310,33 @@ async function evaluatePage(client, sessionId, route) {
     const text = (el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || '').trim().replace(/\\s+/g, ' ').slice(0, 70);
     return { tag: el.tagName.toLowerCase() + cls, text, left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width) };
   };
-  const isVisible = (el) => {
-    const rect = el.getBoundingClientRect();
-    const style = getComputedStyle(el);
-    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none' && rect.bottom >= 0 && rect.top <= viewportHeight;
-  };
+   const visibleRect = el => {
+     if (!el) return null;
+     const rect = el.getBoundingClientRect();
+     const style = getComputedStyle(el);
+     if (rect.width <= 0 || rect.height <= 0 || style.visibility === 'hidden' || style.display === 'none') return null;
+     let left = Math.max(rect.left, 0);
+     let right = Math.min(rect.right, viewportWidth);
+     let top = Math.max(rect.top, 0);
+     let bottom = Math.min(rect.bottom, viewportHeight);
+     for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+       const parentStyle = getComputedStyle(parent);
+       const parentRect = parent.getBoundingClientRect();
+       const clipsX = ['hidden', 'clip', 'auto', 'scroll'].includes(parentStyle.overflowX);
+       const clipsY = ['hidden', 'clip', 'auto', 'scroll'].includes(parentStyle.overflowY);
+       if (clipsX) {
+         left = Math.max(left, parentRect.left);
+         right = Math.min(right, parentRect.right);
+       }
+       if (clipsY) {
+         top = Math.max(top, parentRect.top);
+         bottom = Math.min(bottom, parentRect.bottom);
+       }
+       if (right <= left || bottom <= top) return null;
+     }
+     return right <= left || bottom <= top ? null : { left, right, top, bottom };
+   };
+   const isVisible = el => Boolean(visibleRect(el));
   const overflowing = Array.from(document.querySelectorAll('body *'))
     .filter(el => {
       if (!isVisible(el)) return false;
@@ -351,11 +395,11 @@ async function evaluatePage(client, sessionId, route) {
         .map(selector => Array.from(document.querySelectorAll(selector)).find(el => isVisible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true'))
         .find(Boolean)
     : null;
-  const mobileActionHit = (() => {
-    if (!primaryTarget) return { checked: false, blocked: false };
-    const rect = primaryTarget.getBoundingClientRect();
-    const x = Math.max(0, Math.min(viewportWidth - 1, rect.left + rect.width / 2));
-    const y = Math.max(0, Math.min(viewportHeight - 1, rect.top + rect.height / 2));
+   const mobileActionHit = (() => {
+     const rect = visibleRect(primaryTarget);
+     if (!rect) return { checked: false, blocked: false };
+     const x = Math.max(0, Math.min(viewportWidth - 1, (rect.left + rect.right) / 2));
+     const y = Math.max(0, Math.min(viewportHeight - 1, (rect.top + rect.bottom) / 2));
     const top = document.elementFromPoint(x, y);
     const clean = !!top && (top === primaryTarget || primaryTarget.contains(top) || top.closest?.(mobilePrimarySelector) === primaryTarget);
     return {
@@ -407,11 +451,19 @@ async function evaluatePage(client, sessionId, route) {
     const panelRect = controlsPanel.getBoundingClientRect();
     return playRect.top <= panelRect.top + 2;
   })();
-  const uxSurfaces = Array.from(document.querySelectorAll('[data-ux-surface]'))
-    .filter(isVisible)
-    .map(el => el.getAttribute('data-ux-surface'))
-    .filter(Boolean);
-  const uniqueUxSurfaces = [...new Set(uxSurfaces)];
+   const uxSurfaces = Array.from(document.querySelectorAll('[data-ux-surface]'))
+     .filter(isVisible)
+     .map(el => el.getAttribute('data-ux-surface'));
+   const uniqueUxSurfaces = [...new Set(uxSurfaces)];
+   const rootChildren = document.querySelector('#root')?.children.length || 0;
+   const routeErrors = Array.from(document.querySelectorAll('.route-error'))
+     .filter(isVisible)
+     .map(el => (el.innerText || el.textContent || '').trim())
+     .filter(Boolean);
+   const requiredElement = requiredSelector ? document.querySelector(requiredSelector) : null;
+   const requiredContent = requiredSelector
+     ? Boolean(requiredElement && isVisible(requiredElement))
+     : uniqueUxSurfaces.length > 0;
   const uxPrimaryVisible = Boolean(uxPrimary);
   const uxScore = Math.max(0, 100
     - (docWidth > viewportWidth + 1 ? 20 : 0)
@@ -435,8 +487,11 @@ async function evaluatePage(client, sessionId, route) {
     keyActionVisible: Boolean(action || uxPrimary),
     keyAction: action || null,
     uxPrimaryAction: uxPrimary ? describe(uxPrimary) : null,
-    loadingBlocking,
-    mobileActionHit,
+     loadingBlocking,
+     rootChildren,
+     routeErrors,
+     requiredContent,
+     mobileActionHit,
     ux: {
       score: uxScore,
       surfaces: uniqueUxSurfaces,
@@ -461,12 +516,33 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
 (async () => {
   const route = ${JSON.stringify(route)};
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const visible = el => {
-    if (!el) return false;
-    const rect = el.getBoundingClientRect();
-    const style = getComputedStyle(el);
-    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && rect.bottom >= 0 && rect.top <= innerHeight;
-  };
+   const visibleRect = el => {
+     if (!el) return null;
+     const rect = el.getBoundingClientRect();
+     const style = getComputedStyle(el);
+     if (rect.width <= 0 || rect.height <= 0 || style.display === 'none' || style.visibility === 'hidden') return null;
+     let left = Math.max(rect.left, 0);
+     let right = Math.min(rect.right, innerWidth);
+     let top = Math.max(rect.top, 0);
+     let bottom = Math.min(rect.bottom, innerHeight);
+     for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+       const parentStyle = getComputedStyle(parent);
+       const parentRect = parent.getBoundingClientRect();
+       const clipsX = ['hidden', 'clip', 'auto', 'scroll'].includes(parentStyle.overflowX);
+       const clipsY = ['hidden', 'clip', 'auto', 'scroll'].includes(parentStyle.overflowY);
+       if (clipsX) {
+         left = Math.max(left, parentRect.left);
+         right = Math.min(right, parentRect.right);
+       }
+       if (clipsY) {
+         top = Math.max(top, parentRect.top);
+         bottom = Math.min(bottom, parentRect.bottom);
+       }
+       if (right <= left || bottom <= top) return null;
+     }
+     return right <= left || bottom <= top ? null : { left, right, top, bottom };
+   };
+   const visible = el => Boolean(visibleRect(el));
   const describe = el => {
     if (!el) return null;
     const rect = el.getBoundingClientRect();
@@ -485,9 +561,10 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
   const clickTarget = selector => {
     const el = findTarget(selector);
     if (!el) return { clicked: false, missing: true, selector };
-    const rect = el.getBoundingClientRect();
-    const x = Math.max(0, Math.min(innerWidth - 1, rect.left + rect.width / 2));
-    const y = Math.max(0, Math.min(innerHeight - 1, rect.top + rect.height / 2));
+     const rect = visibleRect(el);
+     if (!rect) return { clicked: false, missing: true, selector };
+     const x = Math.max(0, Math.min(innerWidth - 1, (rect.left + rect.right) / 2));
+     const y = Math.max(0, Math.min(innerHeight - 1, (rect.top + rect.bottom) / 2));
     const top = document.elementFromPoint(x, y);
     const clean = !!top && (top === el || el.contains(top) || top.closest?.(selector) === el);
     if (!clean) return { clicked: false, blocked: true, selector, target: describe(el), top: describe(top), point: { x: Math.round(x), y: Math.round(y) } };
@@ -756,6 +833,7 @@ async function run() {
                     const metrics = await evaluatePage(client, sessionId, route)
                     const interaction = await runMobileInteraction(client, sessionId, route, viewport)
                     const interactionEvents = client.drainEvents(sessionId)
+                    const preflight = classifyPage({ ready, rootChildren: metrics.rootChildren, routeErrors: metrics.routeErrors, requiredContent: metrics.requiredContent })
                     const screenshotName = `${viewport.width}x${viewport.height}-${routeSlug(route)}.png`
                     const screenshotPath = join(screenshotDir, screenshotName)
                     const shot = await client.send('Page.captureScreenshot', {
@@ -770,11 +848,16 @@ async function run() {
                         screenshot: screenshotPath,
                         errors: collectErrors([...events, ...interactionEvents]),
                         interaction,
+                        ready,
+                        rootChildren: metrics.rootChildren,
+                        routeErrors: metrics.routeErrors,
+                        requiredContent: metrics.requiredContent,
+                        preflightReasons: preflight.reasons,
                         ...metrics,
                     })
                     const blocked = metrics.mobileActionHit?.blocked ? ' blocked' : ''
                     const score = isUxMode && metrics.ux ? ` ux=${metrics.ux.score}` : ''
-                    console.log(`${viewport.width}x${viewport.height} ${route} overflow=${metrics.overflowDelta}px action=${metrics.keyActionVisible ? 'yes' : 'no'}${blocked}${score} interaction=${interaction.status} errors=${collectErrors([...events, ...interactionEvents]).length}`)
+                    console.log(`${viewport.width}x${viewport.height} ${route} ready=${ready ? 'yes' : 'no'} root=${metrics.rootChildren} routeErrors=${metrics.routeErrors.length} required=${metrics.requiredContent ? 'yes' : 'no'} preflight=${preflight.reasons.length} overflow=${metrics.overflowDelta}px action=${metrics.keyActionVisible ? 'yes' : 'no'}${blocked}${score} interaction=${interaction.status} errors=${collectErrors([...events, ...interactionEvents]).length}`)
                 } finally {
                     try {
                         await client.send('Target.closeTarget', { targetId })
@@ -790,6 +873,8 @@ async function run() {
             || item.loadingBlocking
             || item.brokenImages.length
             || item.errors.length
+            || !item.ready
+            || isFailure(item)
             || !item.keyActionVisible
             || item.mobileActionHit?.blocked
             || item.interaction?.status === 'failed'
@@ -808,7 +893,7 @@ async function run() {
         }
         await writeFile(join(runDir, 'report.json'), JSON.stringify(report, null, 2))
         const summaryRows = results.map(item => {
-            const common = `| ${item.viewport.width}x${item.viewport.height} | ${item.route} | ${item.overflowDelta}px | ${item.loadingBlocking ? 'yes' : 'no'} | ${item.keyActionVisible ? 'yes' : 'no'} | ${item.mobileActionHit?.checked ? (item.mobileActionHit.blocked ? 'blocked' : 'clean') : 'n/a'} | ${item.interaction?.status || 'n/a'} | ${item.brokenImages.length} | ${item.errors.length}`
+            const common = `| ${item.viewport.width}x${item.viewport.height} | ${item.route} | ${item.ready ? 'yes' : 'no'} | ${item.rootChildren} | ${item.routeErrors.length} | ${item.requiredContent ? 'yes' : 'no'} | ${item.preflightReasons.map(reason => reason.code).join(', ') || 'none'} | ${item.overflowDelta}px | ${item.loadingBlocking ? 'yes' : 'no'} | ${item.keyActionVisible ? 'yes' : 'no'} | ${item.mobileActionHit?.checked ? (item.mobileActionHit.blocked ? 'blocked' : 'clean') : 'n/a'} | ${item.interaction?.status || 'n/a'} | ${item.brokenImages.length} | ${item.errors.length}`
             if (!isUxMode) return `${common} | ${item.screenshot.replaceAll('\\', '/')} |`
             return `${common} | ${item.ux?.score ?? 'n/a'} | ${uxStatus(item.ux?.scrollReachable)} | ${uxStatus(item.ux?.playfieldPriority)} | ${item.ux?.surfaces?.join(', ') || 'none'} | ${item.screenshot.replaceAll('\\', '/')} |`
         })
@@ -821,11 +906,11 @@ async function run() {
             `Failures: ${failures.length}`,
             '',
             isUxMode
-                ? '| Viewport | Route | Overflow | Loading | Key Action | Hit Test | Interaction | Broken Images | Errors | UX Score | Scroll | Playfield First | UX Surfaces | Screenshot |'
-                : '| Viewport | Route | Overflow | Loading | Key Action | Hit Test | Interaction | Broken Images | Errors | Screenshot |',
+                ? '| Viewport | Route | Ready | Root | Route Errors | Required Content | Preflight | Overflow | Loading | Key Action | Hit Test | Interaction | Broken Images | Errors | UX Score | Scroll | Playfield First | UX Surfaces | Screenshot |'
+                : '| Viewport | Route | Ready | Root | Route Errors | Required Content | Preflight | Overflow | Loading | Key Action | Hit Test | Interaction | Broken Images | Errors | Screenshot |',
             isUxMode
-                ? '| --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |'
-                : '| --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | --- |',
+                ? '| --- | --- | --- | ---: | ---: | --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |'
+                : '| --- | --- | --- | ---: | ---: | --- | --- | ---: | --- | --- | --- | --- | ---: | ---: | --- |',
             ...summaryRows,
             '',
         ].join('\n'))
