@@ -20,7 +20,7 @@ function TopMatchCard({ event, selectedIds, onToggleSelection, onOpenEvent }) {
                     <strong>{event.home}<br />{event.away}</strong>
                     <TeamLogo src={event.awayLogo} label={event.away} className="sb-team-mark is-away" />
                 </div>
-                <small>{event.tags?.includes('estimated-odds') ? 'Estimated odds' : event.tags?.includes('live') ? 'Live market activity' : 'Popular 1x2 market'}</small>
+                <small>{event.tags?.includes('model-priced') ? 'Generated model practice odds' : event.tags?.includes('estimated-odds') ? 'Estimated odds' : event.tags?.includes('live') ? 'Live market activity' : 'Popular 1x2 market'}</small>
             </button>
             <div className="sb-top-match-odds">
                 {(market?.selections || []).slice(0, 3).map(selection => (
@@ -75,7 +75,7 @@ function SpendGuard({ marquee, feedSource }) {
         <section className="sb-spend-guard" aria-label="Sportsbook API spend guard">
             <div>
                 <ShieldCheck size={18} />
-                <span>{live ? 'Real-event feed guard active' : 'Synthetic fallback guard ready'}</span>
+                <span>{live ? 'Real-event feed guard active' : 'Generated model practice board · fake credits'}</span>
             </div>
             <dl>
                 <div><dt>Candidates</dt><dd>{candidates || '-'}</dd></div>

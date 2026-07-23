@@ -86,7 +86,7 @@ function availableSelections(group) {
 }
 
 function sourceLabel(source) {
-    if (!source || source === 'synthetic') return 'Gampo synthetic'
+    if (!source || source === 'synthetic') return 'Generated model price'
     if (source === 'synthetic-estimate') return 'Estimated odds'
     if (source === 'sportsgameodds') return 'SportsGameOdds'
     if (source === 'api-football') return 'API-Football'

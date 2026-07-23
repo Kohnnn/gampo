@@ -4,7 +4,7 @@ import { AlertTriangle, Radio, RefreshCcw } from 'lucide-react'
 import { useGameBgm } from '../audio/useBgm'
 import { useCredits } from '../context/CreditContext'
 import { formatCredits } from '../utils/simulationMath'
-import { buildSyntheticSportsbookData, driftSyntheticEvents } from './sportsbookData'
+import { buildSyntheticSportsbookData, driftSyntheticEvents, modelBoardWindow } from './sportsbookData'
 import { loadSportsbookFeed } from './sportsbookFeed'
 import { BET_MODES } from './sportsbookMath'
 import {
@@ -102,6 +102,7 @@ function SportsbookShell() {
     const [marquee, setMarquee] = useState(null)
     const [feedMode, setFeedMode] = useState('fallback')
     const driftTick = useRef(0)
+    const boardWindowRef = useRef(modelBoardWindow())
     const creditedTicketIds = useRef(new Set())
     const settledToastIds = useRef(new Set())
 
@@ -124,7 +125,15 @@ function SportsbookShell() {
     useEffect(() => {
         const timer = window.setInterval(() => {
             driftTick.current += 1
-            setEvents(current => driftSyntheticEvents(current, driftTick.current))
+            const nextWindow = modelBoardWindow()
+            setEvents(current => {
+                const localOnly = current.every(event => event.source === 'synthetic')
+                if (localOnly && nextWindow !== boardWindowRef.current) {
+                    boardWindowRef.current = nextWindow
+                    return buildSyntheticSportsbookData(nextWindow).events
+                }
+                return driftSyntheticEvents(current, driftTick.current)
+            })
         }, 26000)
         return () => window.clearInterval(timer)
     }, [])
@@ -261,7 +270,7 @@ function SportsbookShell() {
                         <h1 id="sportsbook-heading">{titleForView(viewState, sports)}</h1>
                     </div>
                     <div className="sb-topbar-actions">
-                        {feedLoaded ? <small><Radio size={12} /> real-event feed connected</small> : <small>synthetic practice fallback</small>}
+                        {feedLoaded ? <small><Radio size={12} /> real-event feed connected</small> : <small>synthetic practice fallback · generated model prices · fake credits</small>}
                         {feedErrors.length ? <small className="is-warning"><AlertTriangle size={12} /> {feedErrors[0]}</small> : null}
                         {totalQuotaRemaining ? <small>API quota {totalQuotaRemaining}</small> : null}
                         <button type="button" onClick={refreshFeed}><RefreshCcw size={15} /> Refresh</button>
