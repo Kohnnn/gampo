@@ -24,7 +24,7 @@ export function deriveSportsbookEnergy({ events = [], marquee = null, feedSource
     const note = score >= 75 ? 'Live, famous, or fast-moving boards are clustered first so the sportsbook feels event-led.'
         : score >= 45 ? 'Odds movement and marquee filters are active. Watch price changes before placing practice tickets.'
             : feedLive ? 'Real-event feed is connected, but the current slate is quiet.'
-                : 'Synthetic fallback keeps the practice sportsbook playable while providers are unavailable.'
+                : 'Generated model prices keep this fake-credit practice sportsbook playable while providers are unavailable.'
 
     return {
         score,

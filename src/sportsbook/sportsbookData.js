@@ -33,24 +33,24 @@ export const SPORTS = [
 ]
 
 export const LEAGUES = [
-    { id: 'soccer-england', sportId: 'soccer', region: 'Europe', country: 'England', label: 'Premier Practice League' },
-    { id: 'soccer-europe', sportId: 'soccer', region: 'Europe', country: 'International', label: 'Continental Cup' },
-    { id: 'tennis-paris', sportId: 'tennis', region: 'Europe', country: 'France', label: 'Paris Clay Practice' },
-    { id: 'cricket-world', sportId: 'cricket', region: 'World', country: 'International', label: 'Twenty20 Practice Cup' },
-    { id: 'basketball-usa', sportId: 'basketball', region: 'North America', country: 'USA', label: 'Hoops Association' },
-    { id: 'ice-hockey-usa', sportId: 'ice-hockey', region: 'North America', country: 'USA', label: 'Northern Ice League' },
-    { id: 'baseball-usa', sportId: 'baseball', region: 'North America', country: 'USA', label: 'Diamond Series' },
-    { id: 'football-usa', sportId: 'football', region: 'North America', country: 'USA', label: 'Gridiron Practice' },
+    { id: 'soccer-england', sportId: 'soccer', region: 'Europe', country: 'England', label: 'English Premier League' },
+    { id: 'soccer-europe', sportId: 'soccer', region: 'Europe', country: 'International', label: 'UEFA Champions League' },
+    { id: 'tennis-paris', sportId: 'tennis', region: 'Europe', country: 'France', label: 'Roland Garros' },
+    { id: 'cricket-world', sportId: 'cricket', region: 'World', country: 'International', label: 'ICC T20 World Cup' },
+    { id: 'basketball-usa', sportId: 'basketball', region: 'North America', country: 'USA', label: 'NBA' },
+    { id: 'ice-hockey-usa', sportId: 'ice-hockey', region: 'North America', country: 'USA', label: 'NHL' },
+    { id: 'baseball-usa', sportId: 'baseball', region: 'North America', country: 'USA', label: 'MLB' },
+    { id: 'football-usa', sportId: 'football', region: 'North America', country: 'USA', label: 'NFL' },
     { id: 'handball-feed', sportId: 'handball', region: 'API-SPORTS', country: 'Global', label: 'Handball Feed' },
     { id: 'rugby-feed', sportId: 'rugby', region: 'API-SPORTS', country: 'Global', label: 'Rugby Feed' },
     { id: 'volleyball-feed', sportId: 'volleyball', region: 'API-SPORTS', country: 'Global', label: 'Volleyball Feed' },
     { id: 'formula-1-feed', sportId: 'formula-1', region: 'API-SPORTS', country: 'Global', label: 'Formula 1 Feed' },
     { id: 'mma-feed', sportId: 'mma', region: 'API-SPORTS', country: 'Global', label: 'MMA Feed' },
-    { id: 'dota-major', sportId: 'dota-2', region: 'Esports', country: 'Global', label: 'Ancient Arena Major' },
-    { id: 'racing-europe', sportId: 'horse-racing', region: 'Europe', country: 'Ireland', label: 'Greenfield Races' },
-    { id: 'cs2-league', sportId: 'cs2', region: 'Esports', country: 'Global', label: 'Tactical Masters' },
-    { id: 'valorant-league', sportId: 'valorant', region: 'Esports', country: 'Global', label: 'Valorant Feed' },
-    { id: 'lol-league', sportId: 'league-of-legends', region: 'Esports', country: 'Global', label: 'Rift Invitational' },
+    { id: 'dota-major', sportId: 'dota-2', region: 'Esports', country: 'Global', label: 'Dota 2 Major' },
+    { id: 'racing-europe', sportId: 'horse-racing', region: 'Europe', country: 'United Kingdom', label: 'Royal Ascot' },
+    { id: 'cs2-league', sportId: 'cs2', region: 'Esports', country: 'Global', label: 'CS2 Major' },
+    { id: 'valorant-league', sportId: 'valorant', region: 'Esports', country: 'Global', label: 'Valorant Champions Tour' },
+    { id: 'lol-league', sportId: 'league-of-legends', region: 'Esports', country: 'Global', label: 'LoL World Championship' },
 ]
 
 export const PROMO_CARDS = [
@@ -81,31 +81,31 @@ export const PROMO_CARDS = [
 ]
 
 export const OUTRIGHTS = [
-    ['Spain Practice XI', 5.75],
-    ['France Practice XI', 6.1],
-    ['England Practice XI', 7],
-    ['Brazil Practice XI', 9],
-    ['Argentina Practice XI', 9.4],
-    ['Portugal Practice XI', 11],
-    ['Germany Practice XI', 14],
-    ['Netherlands Practice XI', 21],
+    ['Spain', 5.75],
+    ['France', 6.1],
+    ['England', 7],
+    ['Brazil', 9],
+    ['Argentina', 9.4],
+    ['Portugal', 11],
+    ['Germany', 14],
+    ['Netherlands', 21],
 ]
 
 const EVENT_BLUEPRINTS = [
-    ['soccer', 'soccer-england', 'Harbor United', 'River City FC', 'prematch', ['top', 'popular']],
-    ['soccer', 'soccer-england', 'Northbridge FC', 'Lakeside Town', 'live', ['live', 'top']],
-    ['soccer', 'soccer-europe', 'Capital Albion', 'Westport SC', 'prematch', ['popular']],
-    ['tennis', 'tennis-paris', 'Ari Chen', 'Mika Soto', 'live', ['live', 'top']],
-    ['tennis', 'tennis-paris', 'Nora Vance', 'Elena Park', 'prematch', ['popular']],
-    ['cricket', 'cricket-world', 'Metro Strikers', 'Harbor Kings', 'prematch', ['starting-soon']],
-    ['basketball', 'basketball-usa', 'San Aurelio Spurs', 'Oklahoma City Waves', 'prematch', ['top']],
-    ['basketball', 'basketball-usa', 'Cleveland Guards', 'New York Towers', 'live', ['live', 'popular']],
-    ['ice-hockey', 'ice-hockey-usa', 'Northern Frost', 'Capital Rangers', 'prematch', ['starting-soon']],
-    ['baseball', 'baseball-usa', 'Yokohama Densetsu', 'Tokyo Swallows', 'prematch', ['popular']],
-    ['dota-2', 'dota-major', 'Ancient Falcons', 'Legacy Core', 'live', ['live', 'popular']],
-    ['horse-racing', 'racing-europe', 'Minnie Harbor', 'Star Anise', 'prematch', ['top', 'racing']],
-    ['cs2', 'cs2-league', 'Tactical North', 'Inferno Five', 'prematch', ['popular']],
-    ['league-of-legends', 'lol-league', 'Rift Academy', 'Dragon Coast', 'live', ['live']],
+    ['soccer', 'soccer-england', 'Manchester City', 'Liverpool', 'prematch', ['top', 'popular']],
+    ['soccer', 'soccer-england', 'Arsenal', 'Chelsea', 'live', ['live', 'top']],
+    ['soccer', 'soccer-europe', 'Real Madrid', 'Bayern Munich', 'prematch', ['popular']],
+    ['tennis', 'tennis-paris', 'Carlos Alcaraz', 'Jannik Sinner', 'live', ['live', 'top']],
+    ['tennis', 'tennis-paris', 'Iga Swiatek', 'Aryna Sabalenka', 'prematch', ['popular']],
+    ['cricket', 'cricket-world', 'India', 'Australia', 'prematch', ['starting-soon']],
+    ['basketball', 'basketball-usa', 'Boston Celtics', 'Denver Nuggets', 'prematch', ['top']],
+    ['basketball', 'basketball-usa', 'Los Angeles Lakers', 'Golden State Warriors', 'live', ['live', 'popular']],
+    ['ice-hockey', 'ice-hockey-usa', 'Boston Bruins', 'Toronto Maple Leafs', 'prematch', ['starting-soon']],
+    ['baseball', 'baseball-usa', 'New York Yankees', 'Los Angeles Dodgers', 'prematch', ['popular']],
+    ['dota-2', 'dota-major', 'Team Spirit', 'Gaimin Gladiators', 'live', ['live', 'popular']],
+    ['horse-racing', 'racing-europe', 'Galileo Star', 'Frankel Legacy', 'prematch', ['top', 'racing']],
+    ['cs2', 'cs2-league', 'FaZe Clan', 'Natus Vincere', 'prematch', ['popular']],
+    ['league-of-legends', 'lol-league', 'T1', 'Gen.G', 'live', ['live']],
 ]
 
 const MARKET_TEMPLATES = {
@@ -127,8 +127,13 @@ function slugify(value) {
     return String(value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
 
-function startsAtFor(index, status) {
-    const date = new Date()
+export function modelBoardWindow(now = Date.now()) {
+    return new Date(now).toISOString().slice(0, 13)
+}
+
+function startsAtFor(index, status, window) {
+    const date = new Date(`${window}:00:00.000Z`)
+    if (!Number.isFinite(date.getTime())) date.setTime(Date.UTC(2026, 0, 1))
     date.setMinutes(0, 0, 0)
     if (status === 'live') {
         date.setMinutes(date.getMinutes() - 25 - index)
@@ -252,11 +257,12 @@ function buildSecondaryGroup(eventId, sportId, groupLabel, random, index) {
     return { id: marketId, label: groupLabel, displayMode: labels.length > 2 ? 'grid' : 'rows', collapsed: index % 4 === 0, selections }
 }
 
-export function buildSyntheticSportsbookData(seed = new Date().toISOString().slice(0, 10)) {
+export function buildSyntheticSportsbookData(seed = modelBoardWindow()) {
     const random = createSeededRandom(`gampo-sportsbook-${seed}`)
+    const window = String(seed).slice(0, 13)
     const events = EVENT_BLUEPRINTS.map(([sportId, leagueId, home, away, status, tags], index) => {
         const eventId = `${sportId}-${slugify(home)}-${slugify(away)}`
-        const startsAt = startsAtFor(index, status)
+        const startsAt = startsAtFor(index, status, window)
         const score = status === 'live'
             ? { home: Math.floor(random() * 4), away: Math.floor(random() * 4) }
             : null
@@ -284,8 +290,9 @@ export function buildSyntheticSportsbookData(seed = new Date().toISOString().sli
                 tickets: Math.floor(4200 + random() * 16000),
             },
             popularity: Math.floor(6200 + random() * 19000),
-            tags,
+            tags: [...tags, 'model-priced'],
             marketGroups: groups,
+            oddsMode: 'model',
             source: 'synthetic',
         }
     })

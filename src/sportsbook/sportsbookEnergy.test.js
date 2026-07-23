@@ -7,7 +7,7 @@ describe('deriveSportsbookEnergy', () => {
 
         expect(energy.label).toBe('Practice board')
         expect(energy.feedLive).toBe(false)
-        expect(energy.note).toContain('Synthetic fallback')
+        expect(energy.note).toContain('Generated model prices')
     })
 
     it('scores live marquee moving markets as big-match night', () => {

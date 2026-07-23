@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BET_MODES, ODDS_POLICIES, cashoutOffer } from './sportsbookMath'
-import { buildSyntheticSportsbookData } from './sportsbookData'
+import { buildSyntheticSportsbookData, modelBoardWindow } from './sportsbookData'
 import {
     DEFAULT_BETSLIP_SETTINGS,
     acceptSelectionOdds,
@@ -47,6 +47,22 @@ const event = {
         ],
     }],
 }
+
+describe('model board generation', () => {
+    it('builds reproducible real-world practice fixtures with valid selections', () => {
+        const window = modelBoardWindow(Date.UTC(2026, 6, 23, 14, 45))
+        const first = buildSyntheticSportsbookData(window)
+        const second = buildSyntheticSportsbookData(window)
+
+        expect(window).toBe('2026-07-23T14')
+        expect(first.events).toEqual(second.events)
+        expect(first.events).not.toHaveLength(0)
+        expect(first.events.every(event => event.home !== event.away)).toBe(true)
+        expect(first.events.some(event => event.home === 'Manchester City' && event.away === 'Liverpool')).toBe(true)
+        expect(first.events.every(event => event.oddsMode === 'model' && event.tags.includes('model-priced'))).toBe(true)
+        expect(first.events.flatMap(event => event.marketGroups).flatMap(group => group.selections).every(selection => Number.isFinite(selection.decimalOdds) && selection.decimalOdds > 1)).toBe(true)
+    })
+})
 
 describe('sportsbookState', () => {
     it('selects and removes available prices while ignoring suspended prices', () => {
