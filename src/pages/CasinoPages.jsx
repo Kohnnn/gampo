@@ -18,14 +18,21 @@ const MISSION_ROUTES = {
     'daily-wins-3': '/dice',
     'daily-multi-5': '/limbo',
     'daily-3-games': '/',
+    'daily-profit-50': '/blackjack',
+    'daily-wagered-250': '/slots',
     'weekly-spins-100': '/originals',
     'weekly-wagered-1000': '/slots',
     'weekly-streak-5': '/mines',
     'weekly-multi-25': '/wheel',
+    'weekly-5-games': '/',
+    'weekly-bigwin-500': '/crash',
     'lifetime-spins-1000': '/originals',
     'lifetime-wagered-10000': '/slots-lobby',
     'lifetime-multi-100': '/crash',
     'lifetime-games-15': '/',
+    'lifetime-games-40': '/',
+    'lifetime-wagered-100000': '/slots-lobby',
+    'lifetime-multi-500': '/limbo',
 }
 
 function missionRouteFor(mission) {
@@ -221,11 +228,11 @@ export function VipPage() {
 export function LearnPage() {
     return (
         <CasinoSection
-            kicker="Rakeback"
-            title="Rakeback & bonuses"
-            text="Earn rakeback on every wager. Track your weekly earnings and climb the VIP tiers for exclusive rewards."
+            kicker="Educational probability"
+            title="Probability Lab"
+            text="Educational probability material for exploring game rules, probability, and house-edge concepts with local practice credits."
             icon={<BookOpen size={18} />}
-            action={<Link to="/originals" className="casino-action primary" data-ux-primary-action>Play games</Link>}
+            action={<Link to="/originals" className="casino-action primary" data-ux-primary-action>Explore practice games</Link>}
         >
             <div className="lesson-grid">
                 {sourceNotes.map(note => (

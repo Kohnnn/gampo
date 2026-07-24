@@ -33,7 +33,7 @@ export function createInitialState({ players, sb = 1, bb = 2, ante = 0, buttonIn
         players: players.map(p => ({
             id: p.id, name: p.name, stack: p.stack, hole: [],
             status: p.stack > 0 ? 'active' : 'sittingOut',
-            putIn: 0, lastAction: null, isHuman: !!p.isHuman, avatar: p.avatar || null,
+            putIn: 0, committed: 0, lastAction: null, isHuman: !!p.isHuman, avatar: p.avatar || null,
             persona: p.persona || p.pokerStyle || null,
             pokerStyle: p.pokerStyle || p.persona?.pokerStyle || p.persona?.style || null,
         })),
@@ -86,8 +86,9 @@ export function startHand(state) {
     for (const p of next.players) {
         p.hole = []
         p.putIn = 0
+        p.committed = 0
         p.lastAction = null
-        if (p.stack > 0) p.status = 'active'
+        p.status = p.stack > 0 ? 'active' : 'sittingOut'
     }
     // Move button to next eligible seat
     next.buttonIndex = nextActiveIndex(next, next.buttonIndex)
@@ -131,6 +132,7 @@ function postBlind(state, idx, amount, type = 'blind') {
     const pay = Math.min(p.stack, amount)
     p.stack -= pay
     p.putIn += pay
+    p.committed += pay
     state.pot += pay
     if (p.stack === 0) p.status = 'allin'
     state.history.push({ type, player: p.id, amount: pay })
@@ -172,6 +174,7 @@ export function applyAction(state, action) {
         const pay = Math.min(toCall, p.stack)
         p.stack -= pay
         p.putIn += pay
+        p.committed += pay
         next.pot += pay
         if (p.stack === 0) p.status = 'allin'
         p.lastAction = 'call'
@@ -181,6 +184,7 @@ export function applyAction(state, action) {
         const pay = target - p.putIn
         p.stack -= pay
         p.putIn += pay
+        p.committed += pay
         next.pot += pay
         const oldBet = next.currentBet
         if (target > next.currentBet) {
@@ -262,22 +266,51 @@ function concludeHand(state) {
         next.toAct = -1
         return next
     }
-    // Showdown: solve hands
+    // Showdown: solve hands for every player still in the hand.
     const ranked = live.map(p => {
         const cards = [...p.hole, ...next.community].map(c => c.toUpperCase().replace('T', 'T'))
         const hand = SolverHand.solve(cards)
         return { player: p, hand }
     })
-    const winners = SolverHand.winners(ranked.map(r => r.hand))
-    const winningEntries = ranked.filter(r => winners.includes(r.hand))
-    const share = Math.floor(next.pot / winningEntries.length)
-    let remainder = next.pot - share * winningEntries.length
-    for (const w of winningEntries) {
-        const give = share + (remainder > 0 ? 1 : 0)
-        if (remainder > 0) remainder--
-        w.player.stack += give
-        next.winners.push({ id: w.player.id, share: give, hand: w.hand.descr })
+    const handById = new Map(ranked.map(r => [r.player.id, r.hand]))
+
+    // Build layered main/side pots from every seat's total committed chips.
+    // Folded players' committed chips are dead money that still fills lower
+    // layers; only non-folded seats can win a layer they are eligible for.
+    const contributors = next.players.filter(p => p.committed > 0)
+    const levels = [...new Set(contributors.map(p => p.committed))].sort((a, b) => a - b)
+    const wonById = new Map()
+    const pots = []
+    let prevLevel = 0
+    for (const level of levels) {
+        const layerContributors = contributors.filter(p => p.committed >= level)
+        const amount = (level - prevLevel) * layerContributors.length
+        prevLevel = level
+        if (amount <= 0) continue
+        // Eligible = non-folded seats who reached this layer.
+        const eligible = ranked.filter(r => r.player.committed >= level)
+        if (eligible.length === 0) continue
+        const bestHands = SolverHand.winners(eligible.map(r => r.hand))
+        const potWinners = eligible.filter(r => bestHands.includes(r.hand))
+        // Split with odd chips assigned by seat order (left of button first).
+        const ordered = potWinners
+            .map(r => ({ r, seat: next.players.indexOf(r.player) }))
+            .sort((a, b) => a.seat - b.seat)
+        const base = Math.floor(amount / ordered.length)
+        let remainder = amount - base * ordered.length
+        for (const { r } of ordered) {
+            const give = base + (remainder > 0 ? 1 : 0)
+            if (remainder > 0) remainder--
+            r.player.stack += give
+            wonById.set(r.player.id, (wonById.get(r.player.id) || 0) + give)
+        }
+        pots.push({ amount, eligible: eligible.map(r => r.player.id) })
     }
+
+    next.sidePots = pots
+    next.winners = [...wonById.entries()].map(([id, share]) => ({
+        id, share, hand: handById.get(id)?.descr ?? null,
+    }))
     next.pot = 0
     next.showdownInfo = ranked.map(r => ({ id: r.player.id, descr: r.hand.descr, hand: r.hand.cards.map(c => c.toString()) }))
     next.toAct = -1

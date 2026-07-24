@@ -1,6 +1,5 @@
 // Lightweight hotkey help modal. Toggles when the user presses '?'.
-// Wave 17: also accepts external control via `controlledOpen` + `onClose`
-// so the GameToolbar popover can open it.
+// Wave 17: also accepts external control via `controlledOpen` + `onOpenChange`.
 
 import { useEffect, useState } from 'react'
 import { Keyboard, X } from 'lucide-react'
@@ -16,36 +15,37 @@ const SHORTCUTS = [
     { key: '?', desc: 'Toggle this help overlay' },
 ]
 
-export default function HotkeyHelp({ controlledOpen, onClose }) {
+export function isEditableHotkeyTarget(target) {
+    for (let element = target; element; element = element.parentElement) {
+        const tag = (element.tagName || '').toLowerCase()
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || element.isContentEditable || element.getAttribute?.('role') === 'textbox') return true
+    }
+    return false
+}
+
+export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
     const [open, setOpen] = useState(false)
     const isOpen = controlledOpen !== undefined ? controlledOpen : open
+    const requestOpen = (next) => {
+        if (controlledOpen !== undefined) onOpenChange?.(next)
+        else setOpen(next)
+    }
 
     useEffect(() => {
         const onKey = (e) => {
-            const tag = (e.target?.tagName || '').toLowerCase()
-            if (tag === 'input' || tag === 'textarea' || tag === 'select') return
-            if (e.target?.isContentEditable) return
-            if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+            if (isEditableHotkeyTarget(e.target) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+            if (e.key === '?') {
                 e.preventDefault()
-                if (controlledOpen !== undefined) {
-                    if (controlledOpen) onClose?.()
-                    else onClose?.() // controlled host should toggle externally
-                } else {
-                    setOpen(o => !o)
-                }
+                requestOpen(!isOpen)
             } else if (e.key === 'Escape' && isOpen) {
-                if (controlledOpen !== undefined) onClose?.()
-                else setOpen(false)
+                requestOpen(false)
             }
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [isOpen, controlledOpen, onClose])
+    }, [isOpen, controlledOpen, onOpenChange])
 
-    const dismiss = () => {
-        if (controlledOpen !== undefined) onClose?.()
-        else setOpen(false)
-    }
+    const dismiss = () => requestOpen(false)
 
     return (
         <>
@@ -54,7 +54,7 @@ export default function HotkeyHelp({ controlledOpen, onClose }) {
                     <div className="hotkey-card" role="dialog" aria-label="Keyboard shortcuts" onClick={e => e.stopPropagation()}>
                         <header className="hotkey-head">
                             <h2><Keyboard size={16} /> Keyboard shortcuts</h2>
-                            <button className="hotkey-close" onClick={dismiss} aria-label="Close shortcuts"><X size={14} /></button>
+                            <button type="button" className="hotkey-close" onClick={dismiss} aria-label="Close shortcuts"><X size={14} /></button>
                         </header>
                         <ul className="hotkey-list">
                             {SHORTCUTS.map(s => (

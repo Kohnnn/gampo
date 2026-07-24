@@ -82,9 +82,9 @@ export default function InsightsPage() {
                         {theoretical.band && (
                             <p className="insights-band">
                                 Expected return for these games is <strong>{pct(theoretical.rtp)}</strong>.
-                                With {allTime.count} rounds, results between{' '}
+                                This Illustrative 95% estimate uses a simplified variance model: with {allTime.count} rounds, results between{' '}
                                 <strong>{pct(theoretical.band.lower)}</strong> and <strong>{pct(theoretical.band.upper)}</strong>{' '}
-                                are just normal variance (95% band). Your <strong>{pct(allTime.realizedRtp)}</strong> is{' '}
+                                are just normal variance. Your <strong>{pct(allTime.realizedRtp)}</strong> is{' '}
                                 {allTime.realizedRtp != null && (allTime.realizedRtp < theoretical.band.lower || allTime.realizedRtp > theoretical.band.upper)
                                     ? 'outside that band — an unusual run, but it converges with more play.'
                                     : 'right where the math expects it.'}

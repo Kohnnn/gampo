@@ -127,6 +127,34 @@
     text-align: center;
 }
 
+.pk-sng-result {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+}
+.pk-sng-result-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.pk-sng-result-head strong { font-size: 1rem; }
+.pk-sng-result-head .pk-sng-prize.pos { color: var(--pos, #4ade80); }
+.pk-sng-result-head .pk-sng-prize.neg { color: var(--text-muted, #888); }
+.pk-sng-places { display: flex; flex-direction: column; gap: 2px; }
+.pk-sng-place {
+    display: flex;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--text-muted, #999);
+}
+.pk-sng-place.is-hero { color: var(--text, #fff); font-weight: 600; }
+.pk-sng-place .pk-sng-rank { width: 2.5em; }
+.pk-info-icm strong { color: var(--accent, #7dd3fc); }
+
 /* --- Info strip -------------------------------------------------------------- */
 .pk-info-strip {
     display: flex;

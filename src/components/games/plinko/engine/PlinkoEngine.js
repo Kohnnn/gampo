@@ -113,7 +113,7 @@ class PlinkoEngine {
 
     /**
      * Get a valid drop X for a specific bin from pre-generated outcomes
-     * Data loaded from plinkoOutcomes.js (generated offline by scripts/generatePlinkoOutcomes.cjs)
+     * Data fetched as static JSON through plinkoOutcomesLoader.js
      */
     _getDropXForBin(binIndex) {
         const rowOutcomes = this.outcomesByRow[this.rowCount] || getCachedOutcomes(this.rowCount);
@@ -123,6 +123,8 @@ class PlinkoEngine {
         if (!positions || positions.length === 0) return pad(WIDTH / 2);
 
         // Random pick from valid X positions for this bin
+        // gampo:allow-math-random-visual — initial drop X is visual jitter only; the
+        // payout bin is selected downstream via nextRoll('plinko') in PlinkoGame.jsx.
         return positions[Math.floor(Math.random() * positions.length)];
     }
 
@@ -284,7 +286,7 @@ class PlinkoEngine {
             (pinId) => this.triggerPinAnimation(pinId)
         );
 
-        ball.id = Math.random().toString(36).substr(2, 9);
+        ball.id = Math.random().toString(36).substr(2, 9); // gampo:allow-math-random-visual — ball DOM id (cosmetic), payout via per-ball settle map.
         ball.type = ballType;
         this.balls.push(ball);
         this.betAmountOfExistingBalls[ball.id] = this.betAmount;
@@ -300,6 +302,7 @@ class PlinkoEngine {
      */
     dropBallRandom() {
         const spawnRange = this.pinDistanceX * 0.8;
+        // gampo:allow-math-random-visual — initial drop X jitter only; payout via precomputed outcomes table.
         const startX = pad(WIDTH / 2 + (Math.random() - 0.5) * spawnRange);
 
         const physics = PHYSICS_BY_ROWS[this.rowCount] || PHYSICS_BY_ROWS[16];
@@ -322,7 +325,7 @@ class PlinkoEngine {
             this.ballImage
         );
 
-        ball.id = Math.random().toString(36).substr(2, 9);
+        ball.id = Math.random().toString(36).substr(2, 9); // gampo:allow-math-random-visual — ball DOM id (cosmetic), payout via per-ball settle map.
         this.balls.push(ball);
         this.betAmountOfExistingBalls[ball.id] = this.betAmount;
         this.onBalanceChange(-this.betAmount);

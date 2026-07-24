@@ -18,6 +18,10 @@
         "audit:contrast": "node --experimental-websocket scripts/auditContrast.mjs",
         "audit:scroll": "node scripts/auditPlayfieldOverflow.mjs",
         "audit:all": "npm run audit:a11y && npm run audit:contrast && npm run audit:scroll && npm run verify:betsheet",
+        "lint": "eslint .",
+        "lint:rng-test": "node scripts/lintRngGuard.test.mjs",
+        "wording:scan": "node scripts/wordingScan.mjs",
+        "wording:scan:test": "node scripts/wordingScan.test.mjs",
         "gen:assets": "node scripts/genAssets.js"
     },
     "dependencies": {
@@ -34,12 +38,15 @@
         "tailwind-merge": "^3.5.0"
     },
     "devDependencies": {
+        "@eslint/js": "^9.36.0",
         "@tailwindcss/vite": "^4.2.1",
         "@types/node": "^25.3.0",
         "@types/react": "^18.2.0",
         "@types/react-dom": "^18.2.0",
         "@vitejs/plugin-react": "^5.2.0",
         "autoprefixer": "^10.4.24",
+        "eslint": "^9.36.0",
+        "globals": "^15.11.0",
         "postcss": "^8.5.6",
         "shadcn": "^3.8.5",
         "tailwindcss": "^4.2.1",

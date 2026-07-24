@@ -151,7 +151,7 @@ export const vipLevels = [
     { tier: 'Bronze', threshold: 0, perk: '5% Weekly Rakeback, daily bonuses unlocked' },
     { tier: 'Silver', threshold: 500, perk: '7.5% Rakeback, priority support, monthly bonus' },
     { tier: 'Gold', threshold: 2000, perk: '10% Rakeback, personal manager, weekly bonus' },
-    { tier: 'Platinum', threshold: 10000, perk: '12% Rakeback, instant withdrawals, exclusive drops' },
+    { tier: 'Platinum', threshold: 10000, perk: '12% Rakeback, fast virtual top-up, exclusive drops' },
     { tier: 'Diamond', threshold: 50000, perk: '15% Rakeback, luxury rewards, private tournaments' },
 ]
 

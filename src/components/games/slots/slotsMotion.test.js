@@ -9,6 +9,7 @@ import {
     buildSlotAnticipationTiming,
     buildSlotFeatureDemoState,
     buildSlotStopSchedule,
+    buildCascadeLadderSteps,
     buildCascadeTraceCells,
     buildCascadeTimeline,
     cascadeTimelineDurationMs,
@@ -17,6 +18,7 @@ import {
     buildHoldTileStates,
     buildRetriggerFlyers,
     getCellCenterPercent,
+    sumCascadeStepPayouts,
 } from './slotsMotion'
 
 describe('slot motion helpers', () => {
@@ -262,5 +264,87 @@ describe('cascade tumble timeline', () => {
         expect(timeline[0].cells).toEqual(frames[frames.length - 1].cells)
         expect(timeline[0].popCells).toEqual([])
         expect(timeline[0].isFinal).toBe(true)
+    })
+
+    it('SC-SLOT-CASCADE-001 sumCascadeStepPayouts sums every step payout deterministically', () => {
+        // Given: a 4-step cascadeFrames array.
+        const frames = [
+            { cells: [], winCells: [0, 1], stepPayout: 2, stepMultiplier: 1 },
+            { cells: [], winCells: [0], stepPayout: 3.5, stepMultiplier: 2 },
+            { cells: [], winCells: [4, 5], stepPayout: 1.25, stepMultiplier: 3 },
+            { cells: [], winCells: [], stepPayout: 0, stepMultiplier: 0 },
+        ]
+        // When: the total is summed.
+        // Then: every finite step contributes; missing values are skipped.
+        expect(sumCascadeStepPayouts(frames)).toBe(6.75)
+        expect(sumCascadeStepPayouts([])).toBe(0)
+        expect(sumCascadeStepPayouts(null)).toBe(0)
+        // Non-finite values are ignored, not NaN-poisoning the sum.
+        expect(sumCascadeStepPayouts([
+            { stepPayout: 2 },
+            { stepPayout: 'oops' },
+            { stepPayout: 1 },
+        ])).toBe(3)
+    })
+
+    it('SC-SLOT-CASCADE-002 buildCascadeLadderSteps preserves the engine multiplier ladder', () => {
+        // Given: a 3-step cascadeFrames with stepMultiplier values [1, 2, 3].
+        const frames = [
+            { cells: [], winCells: [0], stepPayout: 2, stepMultiplier: 1 },
+            { cells: [], winCells: [1], stepPayout: 4, stepMultiplier: 2 },
+            { cells: [], winCells: [], stepPayout: 0, stepMultiplier: 3 },
+        ]
+        // When: the ladder is built without reduced-motion.
+        // Then: every positive multiplier becomes a step and the final one is flagged.
+        const ladder = buildCascadeLadderSteps(frames)
+        expect(ladder).toHaveLength(3)
+        expect(ladder.map(s => s.multiplier)).toEqual([1, 2, 3])
+        expect(ladder[ladder.length - 1].isFinal).toBe(true)
+        expect(ladder.slice(0, -1).every(s => s.isFinal === false)).toBe(true)
+    })
+
+    it('SC-SLOT-CASCADE-003 reduced-motion collapses the ladder to the final step', () => {
+        // Given: a multi-step chain.
+        const frames = [
+            { cells: [], winCells: [0], stepPayout: 2, stepMultiplier: 1 },
+            { cells: [], winCells: [1], stepPayout: 4, stepMultiplier: 2 },
+            { cells: [], winCells: [], stepPayout: 0, stepMultiplier: 3 },
+        ]
+        // When: the ladder is built with reduceMotion.
+        // Then: only the final entry survives, marked as final.
+        const ladder = buildCascadeLadderSteps(frames, { reduceMotion: true })
+        expect(ladder).toHaveLength(1)
+        expect(ladder[0]).toEqual({ index: 2, multiplier: 3, isFinal: true })
+    })
+
+    it('SC-SLOT-CASCADE-004 buildCascadeLadderSteps drops zero-missing-multiplier frames', () => {
+        // Given: a settle frame with stepMultiplier 0 (no further payout).
+        const frames = [
+            { cells: [], winCells: [0], stepPayout: 2, stepMultiplier: 1 },
+            { cells: [], winCells: [], stepPayout: 0, stepMultiplier: 0 },
+        ]
+        // When: the ladder is built.
+        // Then: only positive-multiplier steps are kept so the UI never shows
+        // a 0× pill.
+        const ladder = buildCascadeLadderSteps(frames)
+        expect(ladder).toHaveLength(1)
+        expect(ladder[0].multiplier).toBe(1)
+    })
+
+    it('SC-SLOT-CASCADE-005 timeline + ladder agree on per-step cell order', () => {
+        // Conservation: the index-th entry of the ladder lines up with the
+        // index-th entry of the timeline; both stay in lockstep so the UI
+        // can render the active step's multiplier without re-sorting.
+        const frames = [
+            { cells: ['a', 'b'], winCells: [0], stepPayout: 2, stepMultiplier: 1 },
+            { cells: ['c', 'b'], winCells: [1], stepPayout: 4, stepMultiplier: 2 },
+            { cells: ['c', 'd'], winCells: [], stepPayout: 0, stepMultiplier: 3 },
+        ]
+        const timeline = buildCascadeTimeline(frames)
+        const ladder = buildCascadeLadderSteps(frames)
+        ladder.forEach((step, index) => {
+            expect(step.index).toBe(timeline[index].index)
+            expect(step.multiplier).toBe(timeline[index].stepMultiplier)
+        })
     })
 })

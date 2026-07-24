@@ -78,8 +78,15 @@
 
     --transition-fast: 0.15s ease;
     --transition-normal: 0.3s ease;
-    --motion-page-enter-duration: 0.32s;
-    --motion-page-enter-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    /* Frozen motion scale — single source for durations/easings so games
+       animate on one system instead of ad-hoc hardcoded values. */
+    --motion-duration-fast: 0.15s;
+    --motion-duration-base: 0.32s;
+    --motion-duration-slow: 0.9s;
+    --motion-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --motion-page-enter-duration: var(--motion-duration-base);
+    --motion-page-enter-ease: var(--motion-ease-out);
     --motion-page-enter-distance: 8px;
 
     --mobile-nav-height: 0px;

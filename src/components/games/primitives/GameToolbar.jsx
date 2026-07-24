@@ -133,7 +133,7 @@ export default function GameToolbar({ helpHref, definition }) {
                 <span>Keyboard shortcuts</span>
             </button>
             {helpHref && (
-                <a className="gt-popover-item" role="menuitem" href={helpHref} target="_blank" rel="noreferrer noopener">
+                <a className="gt-popover-item" role="menuitem" href={helpHref}>
                     <HelpCircle size={14} />
                     <span>Game help</span>
                 </a>
@@ -177,7 +177,7 @@ export default function GameToolbar({ helpHref, definition }) {
             </div>
             {popover}
             <FairnessDrawer open={fairOpen} onClose={() => setFairOpen(false)} />
-            <HotkeyHelp controlledOpen={hotkeyOpen} onClose={() => setHotkeyOpen(false)} />
+            <HotkeyHelp controlledOpen={hotkeyOpen} onOpenChange={setHotkeyOpen} />
             <OddsPopup open={oddsOpen} onClose={() => setOddsOpen(false)} definition={definition} />
         </>
     )

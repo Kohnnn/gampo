@@ -35,6 +35,7 @@ export class Ball {
         this.onFinish = onFinish;
         this.onCollidePin = onCollidePin;
         this.finished = false;
+        // gampo:allow-math-random-visual — DOM id for the ball; payout routed by settle map keyed off this id.
         this.id = Math.random().toString(36).substr(2, 9);
 
         // Physics constants (configurable per rowCount)

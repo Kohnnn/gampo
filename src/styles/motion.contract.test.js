@@ -18,9 +18,17 @@ function ruleBody(selector) {
 }
 
 describe('global motion token contract', () => {
-    it('declares reusable page-entry motion tokens from DESIGN.md', () => {
-        expect(readToken('--motion-page-enter-duration')).toBe('0.32s')
-        expect(readToken('--motion-page-enter-ease')).toBe('cubic-bezier(0.2, 0.8, 0.2, 1)')
+    it('declares the frozen motion scale as a single source of truth', () => {
+        expect(readToken('--motion-duration-fast')).toBe('0.15s')
+        expect(readToken('--motion-duration-base')).toBe('0.32s')
+        expect(readToken('--motion-duration-slow')).toBe('0.9s')
+        expect(readToken('--motion-ease-out')).toBe('cubic-bezier(0.2, 0.8, 0.2, 1)')
+        expect(readToken('--motion-ease-in-out')).toBe('cubic-bezier(0.4, 0, 0.2, 1)')
+    })
+
+    it('derives page-entry tokens from the frozen scale, not hardcoded values', () => {
+        expect(readToken('--motion-page-enter-duration')).toBe('var(--motion-duration-base)')
+        expect(readToken('--motion-page-enter-ease')).toBe('var(--motion-ease-out)')
     })
 
     it('uses page-entry tokens for the existing main content animation', () => {

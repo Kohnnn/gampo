@@ -20,7 +20,7 @@ export default function GameShell({
     children,
     aside,
     titleBarExtras,
-    helpHref,
+    helpHref = '#game-info',
     variant = 'stake',
 }) {
     const extras = titleBarExtras !== undefined

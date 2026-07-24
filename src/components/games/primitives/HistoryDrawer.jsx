@@ -12,8 +12,8 @@ export default function HistoryDrawer({ history, onClear }) {
             <summary className="hd-header">
                 <span>History</span>
                 <strong>{history.length}</strong>
-                {history.length > 0 && <button className="hd-clear" onClick={onClear}>Clear</button>}
             </summary>
+            {history.length > 0 && <button type="button" className="hd-clear" onClick={onClear}>Clear</button>}
             <div className="hd-list">
                 {history.length === 0 ? (
                     <p className="hd-empty">No plays yet.</p>

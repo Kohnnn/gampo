@@ -16,6 +16,8 @@ import './SicBoDie.css'
 import './sicbo.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
+export const canAddSicBoBet = (running, totalStake, chip, balance) => !running && Number.isInteger(balance) && totalStake + chip <= balance
+
 export default function SicBoGame() {
     useGameBgm('sicbo', 'idle')
     const definition = findGameDefinition('sicbo')
@@ -46,7 +48,10 @@ export default function SicBoGame() {
     useScrollActionIntoView(stageRef, running, [running], { block: 'nearest' })
 
     const totalStake = Object.values(bets).reduce((s, v) => s + v, 0)
-    const addBet = (key) => setBets(prev => ({ ...prev, [key]: (prev[key] || 0) + chip }))
+    const addBet = (key) => {
+        if (!canAddSicBoBet(running, totalStake, chip, balance)) return
+        setBets(prev => ({ ...prev, [key]: (prev[key] || 0) + chip }))
+    }
     const clear = () => setBets({})
     const restoreLast = () => {
         if (!Object.keys(lastChips).length) {
@@ -211,51 +216,65 @@ export default function SicBoGame() {
                             { key: 'big', label: 'Big (11–17) 2×' },
                             { key: 'odd', label: 'Odd 2×' },
                             { key: 'even', label: 'Even 2×' },
-                        ].map(b => (
-                            <div key={b.key} className={`sb-cell ${cellOn(b.key) ? 'has-bet' : ''}`} onClick={() => addBet(b.key)}>{b.label}{cellOn(b.key) ? ` · ${formatCredits(bets[b.key])}` : ''}</div>
-                        ))}
+                        ].map(b => {
+                            const selected = cellOn(b.key)
+                            const canAddBet = canAddSicBoBet(running, totalStake, chip, balance)
+                            return <button key={b.key} type="button" className={`sb-cell ${selected ? 'has-bet' : ''}`} aria-pressed={selected} disabled={!canAddBet} onClick={() => addBet(b.key)}>{b.label}{selected ? ` · ${formatCredits(bets[b.key])}` : ''}</button>
+                        })}
                     </div>
 
                     <div className="sb-row-label">Three-Dice Total</div>
                     <div className="sb-row totals">
-                        {[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map(t => (
-                            <div key={t} className={`sb-cell ${cellOn(`total-${t}`) ? 'has-bet' : ''}`} onClick={() => addBet(`total-${t}`)}>
+                        {[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].map(t => {
+                            const key = `total-${t}`
+                            const selected = cellOn(key)
+                            const canAddBet = canAddSicBoBet(running, totalStake, chip, balance)
+                            return <button key={t} type="button" className={`sb-cell ${selected ? 'has-bet' : ''}`} aria-label={selected ? undefined : `Total ${t} wager`} aria-pressed={selected} disabled={!canAddBet} onClick={() => addBet(key)}>
                                 {t}
-                                {cellOn(`total-${t}`) && <span className="sb-payout">{formatCredits(bets[`total-${t}`])}</span>}
-                            </div>
-                        ))}
+                                {selected && <span className="sb-payout">{formatCredits(bets[key])}</span>}
+                            </button>
+                        })}
                     </div>
 
                     <div className="sb-row-label">Single Dice <small>· pays 2× for 1, 3× for 2, 4× for 3 of a kind</small></div>
                     <div className="sb-row singles">
-                        {[1, 2, 3, 4, 5, 6].map(n => (
-                            <div key={n} className={`sb-cell ${cellOn(`single-${n}`) ? 'has-bet' : ''}`} onClick={() => addBet(`single-${n}`)} title="Pays 2×/3×/4× for 1, 2, or 3 of this number">
+                        {[1, 2, 3, 4, 5, 6].map(n => {
+                            const key = `single-${n}`
+                            const selected = cellOn(key)
+                            const canAddBet = canAddSicBoBet(running, totalStake, chip, balance)
+                            return <button key={n} type="button" className={`sb-cell ${selected ? 'has-bet' : ''}`} aria-label={selected ? undefined : `Single dice ${n} wager`} aria-pressed={selected} disabled={!canAddBet} onClick={() => addBet(key)} title="Pays 2×/3×/4× for 1, 2, or 3 of this number">
                                 {n}
-                                {cellOn(`single-${n}`) && <span className="sb-payout">{formatCredits(bets[`single-${n}`])}</span>}
-                            </div>
-                        ))}
+                                {selected && <span className="sb-payout">{formatCredits(bets[key])}</span>}
+                            </button>
+                        })}
                     </div>
 
                     <div className="sb-row-label">Specific Pair (11×)</div>
                     <div className="sb-row pairs">
-                        {[1, 2, 3, 4, 5, 6].map(n => (
-                            <div key={n} className={`sb-cell ${cellOn(`pair-${n}`) ? 'has-bet' : ''}`} onClick={() => addBet(`pair-${n}`)}>
+                        {[1, 2, 3, 4, 5, 6].map(n => {
+                            const key = `pair-${n}`
+                            const selected = cellOn(key)
+                            const canAddBet = canAddSicBoBet(running, totalStake, chip, balance)
+                            return <button key={n} type="button" className={`sb-cell ${selected ? 'has-bet' : ''}`} aria-label={selected ? undefined : `Pair ${n}-${n} wager`} aria-pressed={selected} disabled={!canAddBet} onClick={() => addBet(key)}>
                                 {n}-{n}
-                                {cellOn(`pair-${n}`) && <span className="sb-payout">{formatCredits(bets[`pair-${n}`])}</span>}
-                            </div>
-                        ))}
+                                {selected && <span className="sb-payout">{formatCredits(bets[key])}</span>}
+                            </button>
+                        })}
                     </div>
 
                     <div className="sb-row-label">Triple</div>
                     <div className="sb-row triples">
-                        <div className={`sb-cell ${cellOn('triple-any') ? 'has-bet' : ''}`} onClick={() => addBet('triple-any')}>Any 31×{cellOn('triple-any') && ` · ${formatCredits(bets['triple-any'])}`}</div>
-                        {[1, 2, 3, 4, 5, 6].map(n => (
-                            <div key={n} className={`sb-cell ${cellOn(`triple-${n}`) ? 'has-bet' : ''}`} onClick={() => addBet(`triple-${n}`)}>
+                        <button type="button" className={`sb-cell ${cellOn('triple-any') ? 'has-bet' : ''}`} aria-pressed={cellOn('triple-any')} disabled={!canAddSicBoBet(running, totalStake, chip, balance)} onClick={() => addBet('triple-any')}>Any 31×{cellOn('triple-any') && ` · ${formatCredits(bets['triple-any'])}`}</button>
+                        {[1, 2, 3, 4, 5, 6].map(n => {
+                            const key = `triple-${n}`
+                            const selected = cellOn(key)
+                            const canAddBet = canAddSicBoBet(running, totalStake, chip, balance)
+                            return <button key={n} type="button" className={`sb-cell ${selected ? 'has-bet' : ''}`} aria-label={selected ? undefined : `Triple ${n}-${n}-${n} wager`} aria-pressed={selected} disabled={!canAddBet} onClick={() => addBet(key)}>
                                 {n}-{n}-{n}
                                 <span className="sb-payout">181×</span>
-                                {cellOn(`triple-${n}`) && <span className="sb-payout">{formatCredits(bets[`triple-${n}`])}</span>}
-                            </div>
-                        ))}
+                                {selected && <span className="sb-payout">{formatCredits(bets[key])}</span>}
+                            </button>
+                        })}
                     </div>
 
                     <div className="sb-row-label">Two-Dice Combos (6×)</div>
@@ -265,13 +284,16 @@ export default function SicBoGame() {
                             [2, 3], [2, 4], [2, 5], [2, 6],
                             [3, 4], [3, 5], [3, 6],
                             [4, 5], [4, 6], [5, 6],
-                        ].map(([a, b]) => (
-                            <div key={`${a}-${b}`} className={`sb-cell ${cellOn(`combo-${a}-${b}`) ? 'has-bet' : ''}`} onClick={() => addBet(`combo-${a}-${b}`)}>
+                        ].map(([a, b]) => {
+                            const key = `combo-${a}-${b}`
+                            const selected = cellOn(key)
+                            const canAddBet = canAddSicBoBet(running, totalStake, chip, balance)
+                            return <button key={`${a}-${b}`} type="button" className={`sb-cell ${selected ? 'has-bet' : ''}`} aria-label={selected ? undefined : `Two-dice combo ${a}-${b} wager`} aria-pressed={selected} disabled={!canAddBet} onClick={() => addBet(key)}>
                                 {a}-{b}
                                 <span className="sb-payout">6×</span>
-                                {cellOn(`combo-${a}-${b}`) && <span className="sb-payout">{formatCredits(bets[`combo-${a}-${b}`])}</span>}
-                            </div>
-                        ))}
+                                {selected && <span className="sb-payout">{formatCredits(bets[key])}</span>}
+                            </button>
+                        })}
                     </div>
                 </div>
 

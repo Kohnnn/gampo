@@ -22,7 +22,7 @@ export function deriveSessionRecap({ progressStats = {}, missionSummary = {}, ch
             ? 'Ahead on practice credits'
             : profit < 0
                 ? 'Variance check'
-                : 'Flat session'
+                : 'Even so far'
 
     const nextAction = pickNextAction({ rounds, challenge, missionsComplete, missionsTotal, profit, uniqueGames })
     const educationNote = pickEducationNote({ rounds, profit, rtp, bestMultiplier, biggestSingleWin, challenge })
@@ -55,13 +55,13 @@ export function deriveSessionRecap({ progressStats = {}, missionSummary = {}, ch
 }
 
 function pickNextAction({ rounds, challenge, missionsComplete, missionsTotal, profit, uniqueGames }) {
-    if (rounds === 0) return "Play one Original or slot to start today's recap."
-    if (challenge?.claimable) return "Claim today's challenge reward in Progress."
-    if (challenge && !challenge.complete) return `Push the daily challenge: ${challenge.name}.`
-    if (missionsTotal > 0 && missionsComplete < missionsTotal) return 'Finish one open mission before switching games.'
-    if (uniqueGames < 3) return 'Sample more game types to unlock variety progress.'
-    if (profit < 0) return 'Try a lower-volatility game and compare the math panel.'
-    return 'Bank the session or chase a new personal best with practice credits.'
+    if (rounds === 0) return 'Play one Original or slot to start your cumulative local progress snapshot.'
+    if (challenge?.claimable) return "Claim today's challenge in Progress Snapshot."
+    if (challenge && !challenge.complete) return `Continue today's challenge: ${challenge.name}.`
+    if (missionsTotal > 0 && missionsComplete < missionsTotal) return 'Choose an open mission before switching games.'
+    if (uniqueGames < 3) return 'Try more game types to build variety progress.'
+    if (profit < 0) return 'Try a lower-volatility game and compare its math panel.'
+    return 'Pause here or try a new personal best with practice credits.'
 }
 
 function pickEducationNote({ rounds, profit, rtp, bestMultiplier, biggestSingleWin, challenge }) {
@@ -69,6 +69,6 @@ function pickEducationNote({ rounds, profit, rtp, bestMultiplier, biggestSingleW
     if (challenge?.complete) return 'Challenge complete. Claiming rewards does not change the real-money status: credits stay practice-only.'
     if (bestMultiplier >= 20 || biggestSingleWin >= 500) return 'Big hits are variance spikes. Judge the decision by price and risk, not only the outcome.'
     if (profit < 0) return 'Downswings are expected in high-volatility games. Smaller bets make the lesson last longer.'
-    if (rtp !== null && rtp > 1.1) return 'Short-session RTP can run hot; long-run RTP still follows each game paytable.'
+    if (rtp !== null && rtp > 1.1) return 'Small samples can run hot; long-run RTP still follows each game paytable.'
     return 'Good session pacing: compare volatility, RTP, and hit frequency before raising stake size.'
 }
