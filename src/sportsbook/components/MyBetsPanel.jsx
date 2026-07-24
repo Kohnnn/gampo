@@ -103,10 +103,22 @@ function TicketCard({ ticket, eventMap, onCashOut }) {
     )
 }
 
+function settledSummary(tickets) {
+    return tickets.reduce((acc, ticket) => {
+        acc.staked += Number(ticket.stake || 0)
+        acc.returned += Number(ticket.payout || 0)
+        acc.net += Number(ticket.profit || 0)
+        if (Number(ticket.profit || 0) > 0) acc.won += 1
+        else if (Number(ticket.profit || 0) < 0) acc.lost += 1
+        return acc
+    }, { staked: 0, returned: 0, net: 0, won: 0, lost: 0 })
+}
+
 function MyBetsPanel({ tickets = [], events = [], onCashOut }) {
     const eventMap = useMemo(() => new Map(events.map(event => [event.id, event])), [events])
     const activeTickets = tickets.filter(isActiveTicket)
     const settledTickets = tickets.filter(ticket => ticket.status === 'settled' || ticket.status === 'cashed_out')
+    const summary = useMemo(() => settledSummary(settledTickets), [settledTickets])
 
     return (
         <section className="sb-my-bets-panel">
@@ -118,6 +130,14 @@ function MyBetsPanel({ tickets = [], events = [], onCashOut }) {
                 <div className="sb-empty-panel">Accepted and settled practice tickets will appear here.</div>
             ) : (
                 <div className="sb-ticket-sections">
+                    {settledTickets.length ? (
+                        <div className="sb-bets-summary" role="group" aria-label="Practice profit and loss summary">
+                            <div><span>Settled</span><strong>{summary.won}W · {summary.lost}L</strong></div>
+                            <div><span>Staked</span><strong>{formatGc(summary.staked)}</strong></div>
+                            <div><span>Returned</span><strong>{formatGc(summary.returned)}</strong></div>
+                            <div><span>Net P/L</span><strong className={summary.net >= 0 ? 'is-positive' : 'is-negative'}>{summary.net >= 0 ? '+' : ''}{formatGc(summary.net)}</strong></div>
+                        </div>
+                    ) : null}
                     <TicketSection
                         title="Active practice tickets"
                         copy="Pending legs follow the simulator event feed."

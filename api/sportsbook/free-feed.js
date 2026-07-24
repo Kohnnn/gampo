@@ -27,4 +27,6 @@ export function createFreeFeedHandler({ loadFeed = loadProviderFeed, env = proce
     }
 }
 
-export default { fetch: createFreeFeedHandler() }
+export const config = { runtime: 'edge' }
+
+export default createFreeFeedHandler()

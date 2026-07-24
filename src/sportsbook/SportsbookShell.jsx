@@ -20,6 +20,7 @@ import {
     validateTicket,
 } from './sportsbookState'
 import { parseSportsbookRoute, sportsbookPathForView } from './sportsbookRoutes'
+import { readJson, writeJson } from '../utils/storage'
 import BetSlip from './components/BetSlip'
 import EventDetail from './components/EventDetail'
 import EventList from './components/EventList'
@@ -31,8 +32,25 @@ import SportsRail from './components/SportsRail'
 import { OddsFormatProvider } from './components/OddsFormatContext'
 import '../styles/sportsbook.css'
 
+const TICKETS_STORAGE_KEY = 'gampo_sportsbook_tickets_v1'
+
 function initialFeed() {
     return buildSyntheticSportsbookData()
+}
+
+function loadStoredTickets() {
+    const stored = readJson(TICKETS_STORAGE_KEY, [])
+    return Array.isArray(stored) ? stored.filter(ticket => ticket && typeof ticket === 'object' && ticket.id).slice(0, 20) : []
+}
+
+function seedCreditedIds(tickets) {
+    const set = new Set()
+    for (const ticket of tickets) {
+        if (ticket?.status !== 'settled' && ticket?.status !== 'cashed_out') continue
+        set.add(ticket.id)
+        if (ticket.settlementKey) set.add(ticket.settlementKey)
+    }
+    return set
 }
 
 function filterEvents(events, viewState) {
@@ -87,7 +105,7 @@ function SportsbookShell() {
     const [events, setEvents] = useState(() => initialFeed().events)
     const [viewState, setViewState] = useState(routeViewState)
     const [selections, setSelections] = useState([])
-    const [tickets, setTickets] = useState([])
+    const [tickets, setTickets] = useState(loadStoredTickets)
     const [stake, setStake] = useState(10)
     const [mode, setMode] = useState(BET_MODES.SINGLES)
     const [settings, setSettings] = useState(DEFAULT_BETSLIP_SETTINGS)
@@ -103,8 +121,8 @@ function SportsbookShell() {
     const [feedMode, setFeedMode] = useState('fallback')
     const driftTick = useRef(0)
     const boardWindowRef = useRef(modelBoardWindow())
-    const creditedTicketIds = useRef(new Set())
-    const settledToastIds = useRef(new Set())
+    const creditedTicketIds = useRef(seedCreditedIds(tickets))
+    const settledToastIds = useRef(new Set(tickets.map(settlementToastKey).filter(Boolean)))
 
     useEffect(() => {
         let mounted = true
@@ -121,6 +139,10 @@ function SportsbookShell() {
         })
         return () => { mounted = false }
     }, [])
+
+    useEffect(() => {
+        writeJson(TICKETS_STORAGE_KEY, tickets)
+    }, [tickets])
 
     useEffect(() => {
         const timer = window.setInterval(() => {
