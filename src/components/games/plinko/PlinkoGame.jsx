@@ -37,8 +37,8 @@ import EducationPanel from '../../EducationPanel'
 import './plinko.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
-// Engine and outcomes table are imported lazily so the ~16MB outcomes module
-// is split into its own chunk (only loaded on /plinko).
+// Engine code is lazy-loaded; per-row outcome data is fetched separately as
+// static JSON only when the selected Plinko board needs it.
 let enginePromise = null
 function loadEngine() {
     if (!enginePromise) {
@@ -115,6 +115,7 @@ export default function PlinkoGame() {
     useEffect(() => {
         let timer = null
         const schedule = () => {
+            // gampo:allow-math-random-visual — visual drop cadence jitter only; settle is keyed by per-ball id.
             const delay = 2400 + Math.random() * 1600
             timer = window.setTimeout(() => {
                 simSeqRef.current += 1

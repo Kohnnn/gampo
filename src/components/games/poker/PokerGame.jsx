@@ -5,6 +5,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { useGameBgm } from '../../../audio/useBgm'
 import { formatCredits } from '../../../utils/simulationMath'
 import { applyAction, createInitialState, dealNext, legalActions, startHand } from '../../../poker/engine/Game'
+import { icmEquity } from '../../../poker/icm'
 import HeuristicBot from '../../../poker/bots/HeuristicBot'
 import { preloadGto } from '../../../poker/gto/loader'
 import GtoPanel from './GtoPanel'
@@ -13,7 +14,10 @@ import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import './PokerGame.css'
 
 const BUY_INS = [1000, 5000, 25000, 100000, 500000]
-const SNG_HAND_LIMIT = 60
+// 6-max sit-and-go: real tournament. No rebuys once seated, play to elimination,
+// top 3 paid from the 6-buy-in prize pool at 50/30/20.
+const SNG_SEATS = 6
+const SNG_PAYOUTS = [0.5, 0.3, 0.2]
 const LEVEL_HANDS = 6
 const BOT_THINK_MS = 1100
 const BOT_PERSONAS = [
@@ -43,6 +47,12 @@ function blindLevelForHand(handNumber) {
 
 function cashGameLevel() {
     return { level: 1, sb: 5, bb: 10, ante: 0 }
+}
+
+function ordinal(n) {
+    const s = ['th', 'st', 'nd', 'rd']
+    const v = n % 100
+    return n + (s[(v - 20) % 10] || s[v] || s[0])
 }
 
 function suitGlyph(s) { return s === 'h' ? '\u2665' : s === 'd' ? '\u2666' : s === 's' ? '\u2660' : '\u2663' }
@@ -140,6 +150,9 @@ export default function PokerGame() {
     const [format, setFormat] = useState('sng')
     const [handNumber, setHandNumber] = useState(1)
     const [sngComplete, setSngComplete] = useState(false)
+    const [sngPlacements, setSngPlacements] = useState([])
+    const [sngResult, setSngResult] = useState(null)
+    const prizePoolRef = useRef(0)
     const [bubbles, setBubbles] = useState({})
     const [confirmCashout, setConfirmCashout] = useState(false)
     const [pendingExit, setPendingExit] = useState(null)
@@ -153,6 +166,9 @@ export default function PokerGame() {
     const heroStartStackRef = useRef(0)
     const lastHandStartHistoryLen = useRef(-1)
     const initialBuyInRef = useRef(0)
+    const eliminatedRef = useRef({})
+    const placementOrderRef = useRef([])
+    const handStartStacksRef = useRef({})
     const lastPutInRef = useRef({})
     const actionsRef = useRef(null)
     const thinkRafRef = useRef(null)
@@ -177,6 +193,9 @@ export default function PokerGame() {
             heroStartStackRef.current = hero.stack + (hero.putIn || 0)
             lastHandStartHistoryLen.current = state.history.length
             lastRecordedShowdown.current = null
+            handStartStacksRef.current = Object.fromEntries(
+                state.players.map(p => [p.id, (p.stack || 0) + (p.putIn || 0)])
+            )
         }
     }, [state])
 
@@ -226,10 +245,15 @@ export default function PokerGame() {
         ]
         const init = createInitialState({ players: seats, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante, buttonIndex: 4 })
         initialBuyInRef.current = selectedBuyIn
+        prizePoolRef.current = selectedFormat === 'sng' ? SNG_SEATS * selectedBuyIn : 0
+        eliminatedRef.current = {}
+        placementOrderRef.current = []
         setFormat(selectedFormat)
         setState(startHand(init))
         setHandNumber(1)
         setSngComplete(false)
+        setSngPlacements([])
+        setSngResult(null)
         setSeated(true)
         setRotationLog([])
         setConfirmCashout(false)
@@ -316,6 +340,18 @@ export default function PokerGame() {
     const human = state ? state.players.find(p => p.isHuman) : null
     const isHumanTurn = state && state.toAct >= 0 && state.players[state.toAct]?.isHuman
     const hasLiveTableStack = Boolean(seated && state && human && (human.stack || 0) > 0)
+    const playersLeft = state ? state.players.filter(p => (p.stack || 0) > 0).length : 0
+    const heroIcmEquity = useMemo(() => {
+        if (!state || format !== 'sng') return null
+        const survivors = state.players.filter(p => (p.stack || 0) > 0)
+        if (survivors.length < 2 || survivors.length > SNG_PAYOUTS.length + 1) return null
+        const pool = prizePoolRef.current || 0
+        if (pool <= 0) return null
+        const payouts = SNG_PAYOUTS.slice(0, survivors.length).map(f => f * pool)
+        const eq = icmEquity(survivors.map(p => p.stack || 0), payouts)
+        const heroIdx = survivors.findIndex(p => p.isHuman)
+        return heroIdx >= 0 ? Math.round(eq[heroIdx]) : null
+    }, [state, format])
 
     useScrollActionIntoView(actionsRef, Boolean(isHumanTurn), [isHumanTurn], { block: 'nearest' })
 
@@ -393,10 +429,10 @@ export default function PokerGame() {
             betAmount: wagered,
             meta: { winners: state.winners.map(w => w.id), street: state.street, startStack, finalStack },
         })
-        if ((human.stack || 0) <= 0) {
+        if ((human.stack || 0) <= 0 && format === 'cash') {
             setRebuyPrompt(true)
         }
-    }, [state, human])
+    }, [state, human, format])
 
     const handleAction = (act) => {
         if (!isHumanTurn) return
@@ -404,6 +440,8 @@ export default function PokerGame() {
         setState(prev => applyAction(prev, act))
     }
 
+    // Cash game only: busted bots buy back in with a fresh persona so the table
+    // stays 6-handed. SNG never rotates — busts are eliminations.
     const rotateBustedBots = (prev) => {
         if (!prev) return prev
         const next = structuredClone(prev)
@@ -437,21 +475,74 @@ export default function PokerGame() {
         return next
     }
 
+    // Award the SNG prize pool by finishing place (top 3 pay 50/30/20).
+    const finishSng = (placements, heroPlace) => {
+        const pool = prizePoolRef.current || 0
+        const payoutFrac = SNG_PAYOUTS[heroPlace - 1] || 0
+        const prize = Math.round(pool * payoutFrac)
+        if (prize > 0) addWinnings(prize, `Poker SNG — ${ordinal(heroPlace)} place`)
+        setSngPlacements(placements)
+        setSngResult({ place: heroPlace, prize, seats: SNG_SEATS, pool })
+        setSngComplete(true)
+        showToast(
+            prize > 0 ? 'win' : 'loss',
+            `SNG finished — ${ordinal(heroPlace)} of ${SNG_SEATS}`,
+            prize > 0 ? `Won ${formatCredits(prize)}` : 'Out of the money',
+        )
+        setState(null); setSeated(false); setConfirmCashout(false); setRebuyPrompt(false)
+    }
+
+    // SNG progression: record eliminations from the just-finished hand, then
+    // either end the tournament (human busted or heads-up decided) or deal on.
+    const advanceSng = () => {
+        const startStacks = handStartStacksRef.current || {}
+        const survivors = state.players.filter(p => (p.stack || 0) > 0)
+        const aliveAfter = survivors.length
+        const newlyOut = state.players.filter(
+            p => (p.stack || 0) <= 0 && !eliminatedRef.current[p.id]
+        )
+        // Larger starting stack finishes in the better (lower-numbered) place.
+        newlyOut.sort((a, b) => (startStacks[b.id] || 0) - (startStacks[a.id] || 0))
+        newlyOut.forEach((p, idx) => {
+            eliminatedRef.current[p.id] = { place: aliveAfter + idx + 1, name: p.name, isHuman: !!p.isHuman }
+        })
+
+        const placeList = () => {
+            const out = Object.values(eliminatedRef.current)
+            if (aliveAfter === 1) out.push({ place: 1, name: survivors[0].name, isHuman: !!survivors[0].isHuman })
+            return out.sort((a, b) => a.place - b.place)
+        }
+
+        const heroRec = eliminatedRef.current['you']
+        if (heroRec) {
+            finishSng(placeList(), heroRec.place)
+            return
+        }
+        if (aliveAfter <= 1) {
+            // Human is the last player standing — 1st place.
+            finishSng(placeList(), 1)
+            return
+        }
+
+        const nextHandNumber = handNumber + 1
+        const blindLevel = blindLevelForHand(nextHandNumber)
+        setHandNumber(nextHandNumber)
+        setState(prev => dealNext({ ...prev, sb: blindLevel.sb, bb: blindLevel.bb, ante: blindLevel.ante }))
+        setConfirmCashout(false)
+    }
+
     const nextHand = () => {
         if (!state) return
+        if (format === 'sng') {
+            advanceSng()
+            return
+        }
         if ((human?.stack || 0) <= 0) {
             setRebuyPrompt(true)
             return
         }
-        if (format === 'sng' && handNumber >= SNG_HAND_LIMIT) {
-            const stack = human?.stack || 0
-            if (stack > 0) addWinnings(stack, 'Poker sit-and-go cashout')
-            setSngComplete(true)
-            showToast(stack >= buyIn ? 'win' : 'loss', 'Sit-and-go complete', `Final stack ${formatCredits(stack)}`)
-            setState(null); setSeated(false); return
-        }
         const nextHandNumber = handNumber + 1
-        const blindLevel = format === 'cash' ? cashGameLevel() : blindLevelForHand(nextHandNumber)
+        const blindLevel = cashGameLevel()
         setHandNumber(nextHandNumber)
         setState(prev => {
             const rotated = rotateBustedBots(prev)
@@ -603,7 +694,9 @@ export default function PokerGame() {
             {!seated && (
                 <div className="poker-lobby">
                     <h2>Sit down</h2>
-                    <p>Fresh 6-handed table. Bots rotate when busted; rebuy any time. Practice credits only.</p>
+                    <p>{format === 'sng'
+                        ? '6-max sit-and-go. No rebuys — play to elimination. Top 3 paid 50/30/20 of the prize pool. Practice credits only.'
+                        : 'Fresh 6-handed cash table. Bots rotate when busted; top up or rebuy any time. Practice credits only.'}</p>
                     <div className="poker-format-toggle" role="tablist" aria-label="Format">
                         <button
                             type="button"
@@ -611,7 +704,7 @@ export default function PokerGame() {
                             aria-selected={format === 'sng'}
                             className={format === 'sng' ? 'active' : ''}
                             onClick={() => setFormat('sng')}
-                        >Sit-and-go ({SNG_HAND_LIMIT}h)</button>
+                        >Sit-and-go ({SNG_SEATS}-max)</button>
                         <button
                             type="button"
                             role="tab"
@@ -625,7 +718,28 @@ export default function PokerGame() {
                             <button type="button" key={amount} className={buyIn === amount ? 'active' : ''} disabled={balance < amount} onClick={() => setBuyIn(amount)}>{formatCredits(amount)}</button>
                         ))}
                     </div>
-                    {sngComplete && <div className="pk-lobby-note">Last sit-and-go completed. Choose a stake to sit fresh.</div>}
+                    {sngComplete && sngResult && (
+                        <div className="pk-sng-result" role="status">
+                            <strong>
+                                {sngResult.place <= 3 ? 'In the money' : 'Out of the money'} — {ordinal(sngResult.place)} of {sngResult.seats}
+                            </strong>
+                            {sngResult.prize > 0
+                                ? <p>Won {formatCredits(sngResult.prize)} from a {formatCredits(sngResult.pool)} prize pool (top 3 pay 50/30/20).</p>
+                                : <p>Only the top 3 of {sngResult.seats} cash. Prize pool was {formatCredits(sngResult.pool)}.</p>}
+                            {sngPlacements.length > 0 && (
+                                <ol className="pk-sng-places">
+                                    {sngPlacements.map(pl => (
+                                        <li key={pl.place} className={pl.isHuman ? 'is-human' : ''}>
+                                            <span>{ordinal(pl.place)}</span>
+                                            <b>{pl.isHuman ? 'You' : pl.name}</b>
+                                            <em>{SNG_PAYOUTS[pl.place - 1] ? formatCredits(Math.round(sngResult.pool * SNG_PAYOUTS[pl.place - 1])) : '—'}</em>
+                                        </li>
+                                    ))}
+                                </ol>
+                            )}
+                            <span className="pk-sng-hint">Choose a stake to sit a fresh table.</span>
+                        </div>
+                    )}
                     <button
                         type="button"
                         className="poker-buyin"
@@ -644,12 +758,15 @@ export default function PokerGame() {
                 <>
                     <div className="pk-info-strip" role="status" aria-label="Hand info">
                         <div className="pk-info-cell">
-                            <span>{format === 'cash' ? 'Hand' : 'Hand'}</span>
-                            <strong>
-                                {handNumber}
-                                {format === 'sng' && <em> / {SNG_HAND_LIMIT}</em>}
-                            </strong>
+                            <span>Hand</span>
+                            <strong>{handNumber}</strong>
                         </div>
+                        {format === 'sng' && (
+                            <div className="pk-info-cell">
+                                <span>Players left</span>
+                                <strong>{playersLeft} / {SNG_SEATS}</strong>
+                            </div>
+                        )}
                         <div className="pk-info-cell">
                             <span>Format</span>
                             <strong>{format === 'cash' ? 'Cash' : 'SNG'}</strong>
@@ -674,6 +791,12 @@ export default function PokerGame() {
                             <span>Session P/L</span>
                             <strong>{profitInSession >= 0 ? '+' : ''}{formatCredits(profitInSession)}</strong>
                         </div>
+                        {format === 'sng' && heroIcmEquity != null && (
+                            <div className="pk-info-cell" title="Independent Chip Model equity — your expected share of the prize pool. Study aid only.">
+                                <span>ICM equity</span>
+                                <strong>{formatCredits(heroIcmEquity)}</strong>
+                            </div>
+                        )}
                         {format === 'cash' && (
                             <button className="pk-info-topup" onClick={topUp} title="Top up to full buy-in">
                                 Top Up

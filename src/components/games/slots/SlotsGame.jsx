@@ -36,6 +36,7 @@ import {
 } from './slotFactory'
 import {
     SLOT_RETRIGGER_FLY_MS,
+    buildCascadeLadderSteps,
     buildCascadeTraceCells,
     buildHoldTileStates,
     buildRetriggerFlyers,
@@ -46,6 +47,7 @@ import {
     cascadeTimelineDurationMs,
     getSlotReelSpinDurationMs,
     getSlotTickerIntervalMs,
+    sumCascadeStepPayouts,
 } from './slotsMotion'
 import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
 import { winTier, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, rollupDurationMs, rollupFrame } from './slotWinPresentation'
@@ -301,6 +303,16 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [lockedCols, setLockedCols] = useState(new Set())
     // Cells currently mid-pop during a cascade tumble replay (visual only).
     const [cascadePopCells, setCascadePopCells] = useState([])
+    // Active step in the cascade timeline replay (drives the per-step
+    // multiplier pulse + per-step payout running total). -1 = no cascade
+    // currently replaying. Reset to -1 whenever a new spin starts or the
+    // cascade timeline ends (see useEffect below).
+    const [cascadeStepIndex, setCascadeStepIndex] = useState(-1)
+    // True while a multi-frame cascade timeline is animating. Slam-stop and
+    // Space-to-skip become no-ops for the duration so the timeline can finish
+    // cleanly. The timeline sets this to true when it queues its first frame
+    // and back to false when its final frame lands.
+    const cascadeReplayRef = useRef(false)
     const [lastResult, setLastResult] = useState(null)
     const [lastStake, setLastStake] = useState(5)
     // Spin resolve mode: 'normal' (full animation), 'turbo' (sped-up reels),
@@ -509,6 +521,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     useEffect(() => () => clearTimers(), [clearTimers])
 
+    // Cascade replay cleanup: when the SlotsGame unmounts mid-replay (template
+    // switch, route change, tab nav), make sure the in-flight lock is released
+    // and the transient per-step state is reset so a remount sees a clean slate.
+    useEffect(() => () => {
+        cascadeReplayRef.current = false
+        setCascadeStepIndex(-1)
+        setCascadePopCells([])
+    }, [])
+
     // Cancel any in-flight win-rollup animation frame on unmount.
     useEffect(() => () => {
         if (rollupRafRef.current) {
@@ -670,6 +691,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             reduceMotion,
         })
         if (cascadeTimeline.length > 1) {
+            // Lock slam-stop / Space / skip-animation for the duration of the
+            // timeline so the per-step pops can land deterministically. The
+            // lock is released when the last frame's timer fires (below).
+            cascadeReplayRef.current = true
+            setCascadeStepIndex(0)
             // Start on the first (pre-tumble) board with its winning cells lit.
             const first = cascadeTimeline[0]
             setGrid(first.cells)
@@ -682,17 +708,29 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     setGrid(frame.cells)
                     setWinningCells(frame.winCells)
                     setCascadePopCells(frame.popCells)
+                    setCascadeStepIndex(frame.index)
                     if (!frame.isFinal && frame.winCells.length) {
                         slotSfx.play('cascadeStep', { volume: 0.72 })
+                    }
+                    if (frame.isFinal) {
+                        // Timeline done — release the input lock so the next
+                        // spin / slam-stop behaves normally.
+                        cascadeReplayRef.current = false
                     }
                 }, frame.atMs))
             }
             // Clear the pop highlight shortly after the last frame settles.
-            timers.current.push(window.setTimeout(() => setCascadePopCells([]), cascadeTimelineDurationMs(cascadeTimeline) + 120))
+            timers.current.push(window.setTimeout(() => {
+                setCascadePopCells([])
+                setCascadeStepIndex(-1)
+                cascadeReplayRef.current = false
+            }, cascadeTimelineDurationMs(cascadeTimeline) + 120))
         } else {
             setGrid(result.cells)
             setWinningCells(result.winningIndexes)
             setCascadePopCells([])
+            setCascadeStepIndex(-1)
+            cascadeReplayRef.current = false
         }
         setLastResult({ ...result, profit, returnAmount, stake, baseBet, usedFreeSpin, usedBonusBuy })
         setRunning(false)
@@ -1148,6 +1186,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const slamStop = useCallback(() => {
         // Resolve an in-flight spin immediately: snap all reels to their final
         // cells, cancel pending timers, and run the captured finish.
+        // Skip while a cascade tumble timeline is replaying — the per-step
+        // pops must land deterministically; bailing mid-replay would strand
+        // the UI in an inconsistent state with no settlement for the
+        // interrupted steps.
+        if (cascadeReplayRef.current) return
         const finish = pendingFinishRef.current
         if (!finish) return
         pendingFinishRef.current = null
@@ -1171,6 +1214,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         const onKey = (e) => {
             if (e.key !== ' ' && e.code !== 'Space') return
             if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
+            // Skip while a cascade tumble is replaying — slam-stop would strand
+            // the per-step animations. slamStop() itself already short-circuits
+            // on this flag, but Space must not start a fresh spin either.
+            if (cascadeReplayRef.current) return
             const el = e.target
             const tag = (el?.tagName || '').toLowerCase()
             if (tag === 'input' || tag === 'textarea' || tag === 'select') return
@@ -1285,6 +1332,36 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             layout: config.layout,
         })
     }, [cellPositions, config.layout, lastResult, running, reduceMotion])
+    // Per-step multiplier ladder derived from the engine's cascadeFrames.
+    // Consumed by the slot-cascade-mult overlay to show the active step's
+    // multiplier with a pulse on each transition. Reduced-motion collapses
+    // to the final step (handled inside the helper).
+    const cascadeLadderSteps = useMemo(() => {
+        if (!lastResult?.cascadeFrames?.length) return []
+        return buildCascadeLadderSteps(lastResult.cascadeFrames, { reduceMotion })
+    }, [lastResult, reduceMotion])
+    // Per-step payout running total. We show the live running sum as the
+    // cascade timeline progresses (cascadeStepIndex >= 0) and fall back to the
+    // full chain sum once the timeline settles (cascadeStepIndex === -1).
+    const cascadeLivePayout = useMemo(() => {
+        const frames = lastResult?.cascadeFrames
+        if (!frames?.length) return 0
+        const sumTotal = sumCascadeStepPayouts(frames)
+        if (cascadeStepIndex < 0) return sumTotal
+        return frames
+            .slice(0, cascadeStepIndex + 1)
+            .reduce((total, frame) => {
+                const payout = Number(frame?.stepPayout)
+                return Number.isFinite(payout) ? total + payout : total
+            }, 0)
+    }, [lastResult, cascadeStepIndex])
+    const cascadeActiveStep = cascadeStepIndex >= 0
+        ? cascadeLadderSteps.find(step => step.index === cascadeStepIndex) || null
+        : null
+    // Visible while a multi-frame cascade timeline is mid-replay. The final
+    // pill below the reels remains; this is purely the per-step pulse so the
+    // player sees the multiplier climb frame-by-frame.
+    const cascadeReplayActive = cascadeStepIndex >= 0 && cascadeLadderSteps.length > 1
     const visibleFeatureEvents = useMemo(() => {
         if (running || !lastResult?.featureEvents?.length) return []
         return lastResult.featureEvents.slice(0, 3)
@@ -1973,6 +2050,40 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <span>Cascade chain</span>
                         <strong>×{cascadeSteps + 1}</strong>
                         <em>tumbles paid</em>
+                    </div>
+                )}
+
+                {/* S1 cascade half: per-step multiplier pulse + per-step payout
+                    running total. Renders while the cascade timeline is mid-replay
+                    (cascadeStepIndex >= 0). Reduced-motion collapses the helper
+                    output to a single final step, so this stays meaningful and
+                    deterministic for accessibility callers. */}
+                {cascadeReplayActive && cascadeActiveStep && (
+                    <div
+                        className="slot-cascade-mult"
+                        key={`cas-mult-${cascadeActiveStep.index}`}
+                        role="status"
+                        aria-live="polite"
+                        aria-label={`Tumble step ${cascadeActiveStep.index + 1} of ${cascadeLadderSteps.length}, multiplier ${cascadeActiveStep.multiplier} times`}
+                    >
+                        <span>Tumble</span>
+                        <strong>×{cascadeActiveStep.multiplier}</strong>
+                        <em>{formatCredits(cascadeLivePayout)}</em>
+                    </div>
+                )}
+                {/* Side ladder of every step's multiplier — fires while the
+                    timeline is replaying so the player sees the chain climb.
+                    Mirrors the same data as the slot-pill-cascade but per-step. */}
+                {cascadeReplayActive && cascadeLadderSteps.length > 1 && (
+                    <div className="slot-cascade-ladder" aria-hidden>
+                        {cascadeLadderSteps.map(step => (
+                            <span
+                                key={`ladder-${step.index}`}
+                                className={`slot-cascade-ladder-step ${step.index === cascadeStepIndex ? 'is-active' : ''} ${step.index < cascadeStepIndex ? 'is-done' : ''} ${step.isFinal ? 'is-final' : ''}`}
+                            >
+                                ×{step.multiplier}
+                            </span>
+                        ))}
                     </div>
                 )}
 

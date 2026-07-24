@@ -71,6 +71,7 @@ describe('fetchFreeProviderFeed', () => {
         expect(shellSource).toContain('synthetic practice fallback')
         expect(netlifyToml).toContain('from = "/api/sportsbook/free-feed"')
         expect(netlifyFunction).toContain('loadProviderFeed(process.env)')
+        expect(netlifyFunction).toContain("console.error('sportsbook upstream failure', sanitizeUpstreamFailure(error, process.env))")
     })
 
     it('uses blended real-event feed events with estimated odds when a feed is available', async () => {

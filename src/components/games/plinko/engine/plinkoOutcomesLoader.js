@@ -1,39 +1,81 @@
-// Lazy-loads per-row Plinko outcome tables.
-// Each rows-N.js is ~1.8 MB; we only fetch the active row count.
-// PlinkoEngine awaits this loader during construction and after row-count switches.
+const DEFAULT_BASE_URL = '/data/plinko/outcomes'
+const MIN_ROWS = 8
+const MAX_ROWS = 16
 
-const cache = new Map()
-
-const loaders = {
-    8: () => import('./outcomes/rows-8.js'),
-    9: () => import('./outcomes/rows-9.js'),
-    10: () => import('./outcomes/rows-10.js'),
-    11: () => import('./outcomes/rows-11.js'),
-    12: () => import('./outcomes/rows-12.js'),
-    13: () => import('./outcomes/rows-13.js'),
-    14: () => import('./outcomes/rows-14.js'),
-    15: () => import('./outcomes/rows-15.js'),
-    16: () => import('./outcomes/rows-16.js'),
+function normalizeRowCount(rowCount) {
+    const parsed = Number(rowCount) || MAX_ROWS
+    return Number.isInteger(parsed) && parsed >= MIN_ROWS && parsed <= MAX_ROWS
+        ? parsed
+        : null
 }
 
-export async function loadOutcomes(rowCount) {
-    const key = Number(rowCount) || 16
-    if (cache.has(key)) return cache.get(key)
-    const loader = loaders[key]
-    if (!loader) {
-        cache.set(key, null)
-        return null
+function normalizeBaseUrl(baseUrl) {
+    return String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')
+}
+
+function validateOutcomes(data, rowCount) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new TypeError(`Invalid Plinko outcomes for ${rowCount} rows`)
     }
-    const mod = await loader()
-    const data = mod.default || mod
-    cache.set(key, data)
+
+    for (let binIndex = 0; binIndex <= rowCount; binIndex += 1) {
+        const positions = data[binIndex]
+        if (!Array.isArray(positions) || positions.some(position => !Number.isFinite(position))) {
+            throw new TypeError(`Invalid Plinko outcomes for ${rowCount} rows at bin ${binIndex}`)
+        }
+    }
+
     return data
 }
 
-export function getCachedOutcomes(rowCount) {
-    return cache.get(Number(rowCount) || 16) || null
+export function createOutcomesLoader({ fetchImpl = globalThis.fetch, baseUrl = DEFAULT_BASE_URL } = {}) {
+    const dataCache = new Map()
+    const pendingCache = new Map()
+    const normalizedBaseUrl = normalizeBaseUrl(baseUrl)
+
+    async function loadOutcomes(rowCount) {
+        const key = normalizeRowCount(rowCount)
+        if (key === null) return null
+        if (dataCache.has(key)) return dataCache.get(key)
+        if (pendingCache.has(key)) return pendingCache.get(key)
+        if (typeof fetchImpl !== 'function') {
+            throw new TypeError('Plinko outcomes require a fetch implementation')
+        }
+
+        const request = (async () => {
+            const response = await fetchImpl(`${normalizedBaseUrl}/rows-${key}.json`, {
+                headers: { accept: 'application/json' },
+            })
+            if (!response?.ok) {
+                throw new Error(`Unable to load Plinko outcomes for ${key} rows (${response?.status || 'network error'})`)
+            }
+            const data = validateOutcomes(await response.json(), key)
+            dataCache.set(key, data)
+            return data
+        })()
+
+        pendingCache.set(key, request)
+        try {
+            return await request
+        } finally {
+            pendingCache.delete(key)
+        }
+    }
+
+    function getCachedOutcomes(rowCount) {
+        const key = normalizeRowCount(rowCount)
+        return key === null ? null : dataCache.get(key) || null
+    }
+
+    function preloadOutcomes(rowCounts = [MAX_ROWS]) {
+        return Promise.all(rowCounts.map(loadOutcomes))
+    }
+
+    return { loadOutcomes, getCachedOutcomes, preloadOutcomes }
 }
 
-export function preloadOutcomes(rowCounts = [16]) {
-    return Promise.all(rowCounts.map(loadOutcomes))
-}
+const defaultLoader = createOutcomesLoader()
+
+export const loadOutcomes = defaultLoader.loadOutcomes
+export const getCachedOutcomes = defaultLoader.getCachedOutcomes
+export const preloadOutcomes = defaultLoader.preloadOutcomes

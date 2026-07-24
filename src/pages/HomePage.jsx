@@ -137,7 +137,7 @@ function HomePage() {
                         </button>
                         <Link className="casino-action" to="/learn">
                             <BookOpen size={16} />
-                            Rakeback
+                            Probability Lab
                         </Link>
                         <Link className="casino-action" to="/verify">
                             <ShieldCheck size={16} />
@@ -245,7 +245,7 @@ function HomePage() {
                             <div><i style={{ width: `${progress.summary.percent || 0}%` }} /></div>
                         </div>
                     </RailBlock>
-                    <RailBlock icon={<Trophy size={16} />} title="Session Recap">
+                    <RailBlock icon={<Trophy size={16} />} title="Progress Snapshot">
                         <div className="activity-mini">
                             <span>{sessionRecap.mood}</span>
                             <strong className={sessionRecap.profit >= 0 ? 'positive' : 'negative'}>

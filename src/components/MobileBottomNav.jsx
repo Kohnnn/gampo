@@ -1,9 +1,21 @@
 import { MessageCircle, GraduationCap, Home, Trophy, Gamepad2 } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { gameDefinitions } from '../data/gameDefinitions'
+import { SLOT_TEMPLATE_ROUTES } from '../data/slotRoutes'
+
+const GAME_PATHS = new Set([
+    '/originals',
+    '/slots-lobby',
+    '/collections',
+    ...gameDefinitions.map(({ path }) => path),
+    ...SLOT_TEMPLATE_ROUTES.map(({ path }) => path),
+])
+
+export const isGamePath = pathname => GAME_PATHS.has(pathname)
 
 const navItems = [
     { id: 'home', label: 'Home', path: '/', icon: Home, match: pathname => pathname === '/' },
-    { id: 'games', label: 'Games', path: '/originals', icon: Gamepad2, match: pathname => pathname === '/originals' || pathname.startsWith('/slots') || pathname.startsWith('/collections') },
+    { id: 'games', label: 'Games', path: '/originals', icon: Gamepad2, match: pathname => GAME_PATHS.has(pathname) },
     { id: 'sportsbook', label: 'Sports', path: '/sportsbook', icon: Trophy, match: pathname => pathname.startsWith('/sportsbook') || pathname.startsWith('/sports') },
     { id: 'learn', label: 'Learn', path: '/learn', icon: GraduationCap, match: pathname => pathname.startsWith('/learn') || pathname.startsWith('/missions') || pathname.startsWith('/vip') },
 ]

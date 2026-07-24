@@ -233,6 +233,44 @@ export function cascadeTimelineDurationMs(timeline = []) {
     return timeline[timeline.length - 1].atMs
 }
 
+// Sum of every step's `stepPayout`. The UI uses this to display the running
+// total that has landed so far during the tumble replay (the per-step
+// `stepPayout` from the engine). Reduced-motion callers still get the full
+// sum even though only the final frame renders — the engine's `cascadeSteps`
+// is what guarantees the math.
+export function sumCascadeStepPayouts(frames = []) {
+    if (!Array.isArray(frames) || !frames.length) return 0
+    return frames.reduce((total, frame) => {
+        const payout = Number(frame?.stepPayout)
+        return Number.isFinite(payout) ? total + payout : total
+    }, 0)
+}
+
+// Per-step multiplier ladder. The engine records the active step's
+// `stepMultiplier` on each `cascadeFrames[i]`; the UI shows the active step's
+// value and pulses on transitions. Reduced-motion / instant callers skip the
+// intermediate steps and land on the last entry's value.
+export function buildCascadeLadderSteps(frames = [], { reduceMotion = false } = {}) {
+    if (!Array.isArray(frames) || !frames.length) return []
+    if (reduceMotion) {
+        const last = frames[frames.length - 1]
+        const lastMultiplier = Number(last?.stepMultiplier)
+        if (!Number.isFinite(lastMultiplier) || lastMultiplier <= 0) return []
+        return [{ index: frames.length - 1, multiplier: lastMultiplier, isFinal: true }]
+    }
+    return frames
+        .map((frame, index) => {
+            const multiplier = Number(frame?.stepMultiplier)
+            if (!Number.isFinite(multiplier) || multiplier <= 0) return null
+            return {
+                index,
+                multiplier,
+                isFinal: index === frames.length - 1,
+            }
+        })
+        .filter(Boolean)
+}
+
 export function buildSlotFeatureDemoState({
     layout = { cols: 5, rows: 3 },
     cellPositions,

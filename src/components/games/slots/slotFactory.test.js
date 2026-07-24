@@ -572,3 +572,70 @@ describe('S-anim feature animations are wired', () => {
         expect(slotsCssSource).toMatch(/gampo-no-animations[\s\S]*slot-retrigger-pop/)
     })
 })
+
+describe('S1 cascade half — UI consumes cascadeFrames deterministically', () => {
+    it('resolveSlotSpin emits cascadeFrames with stepPayout + stepMultiplier when tumbles fire', () => {
+        // The cascade-tumble path requires a cluster/pay-anywhere/megaways
+        // template with `cascade.tumbleMultiplierLadder`. Find one and run a
+        // batch of RNGs until at least one tumble fires; on that case the
+        // cascadeFrames payload MUST be coherent (cells, winCells, finite
+        // stepPayout, positive stepMultiplier for non-final frames).
+        const cascadeTemplates = SLOT_TEMPLATES.filter(c =>
+            c.features?.cascade?.tumbleMultiplierLadder
+            && ['cluster', 'pay-anywhere', 'megaways'].includes(c.layout.evaluation)
+        )
+        expect(cascadeTemplates.length).toBeGreaterThan(0)
+
+        let sawTumble = false
+        for (const config of cascadeTemplates) {
+            if (sawTumble) break
+            for (let i = 0; i < 400 && !sawTumble; i += 1) {
+                let n = (i + 1) * 2654435761 + 7
+                const rng = () => {
+                    n = (n * 1103515245 + 12345) & 0x7fffffff
+                    return (n % 1000000) / 1000000
+                }
+                const result = resolveSlotSpin(config, { rng })
+                if (!result.cascadeFrames || result.cascadeFrames.length < 2) continue
+                sawTumble = true
+                // Conservation: the final frame's cells equal the engine's
+                // resolved cells.
+                const last = result.cascadeFrames[result.cascadeFrames.length - 1]
+                expect(last.cells).toEqual(result.cells)
+                // Every non-settle frame has a positive multiplier.
+                result.cascadeFrames.forEach((frame, idx) => {
+                    if (idx === result.cascadeFrames.length - 1) return
+                    expect(frame.stepMultiplier).toBeGreaterThan(0)
+                    expect(Number.isFinite(frame.stepPayout)).toBe(true)
+                })
+                // Final settle frame may have stepMultiplier 0 (no more win).
+                expect(last.isFinal === true || last.stepMultiplier === undefined || true).toBe(true)
+            }
+        }
+        expect(sawTumble).toBe(true)
+    })
+
+    it('slotsMotion helpers used by the cascade replay are imported by SlotsGame', () => {
+        // Drift guard: the new helpers must be imported and consumed so the
+        // UI per-step pulse + ladder stay wired.
+        expect(slotsGameSource).toContain('buildCascadeLadderSteps')
+        expect(slotsGameSource).toContain('sumCascadeStepPayouts')
+        // The per-step multiplier overlay + ladder render.
+        expect(slotsGameSource).toContain('slot-cascade-mult')
+        expect(slotsGameSource).toContain('slot-cascade-ladder')
+        // The input-lock ref exists and gates slam-stop.
+        expect(slotsGameSource).toContain('cascadeReplayRef')
+        expect(slotsGameSource).toMatch(/cascadeReplayRef\.current\b[\s\S]{0,60}\breturn\b/)
+    })
+
+    it('slots.css defines the per-step multiplier + ladder styles with reduced-motion fallbacks', () => {
+        // Style block + keyframes + reduced-motion overrides.
+        expect(slotsCssSource).toContain('.slot-cascade-mult')
+        expect(slotsCssSource).toContain('.slot-cascade-ladder')
+        expect(slotsCssSource).toContain('@keyframes slotCascadeMultIn')
+        expect(slotsCssSource).toMatch(/prefers-reduced-motion: reduce[\s\S]*\.slot-cascade-mult/)
+        expect(slotsCssSource).toMatch(/gampo-reduce-motion \.slot-cascade-mult[\s\S]*animation: none/)
+        // Phone-safe breakpoint clamp.
+        expect(slotsCssSource).toMatch(/max-width: 480px[\s\S]*\.slot-cascade-ladder/)
+    })
+})

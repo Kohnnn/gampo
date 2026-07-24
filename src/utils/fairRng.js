@@ -10,6 +10,7 @@ function randomHex(length = 32) {
     if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
         crypto.getRandomValues(bytes)
     } else {
+        // gampo:allow-math-random-visual — emergency fallback when Web Crypto is unavailable in a non-browser test environment. Real gameplay uses crypto.getRandomValues above.
         for (let i = 0; i < length; i++) bytes[i] = Math.floor(Math.random() * 256)
     }
     return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
@@ -205,6 +206,7 @@ export async function nextRollAsync(gameId) {
     }
     saveState({ ...state, nonce })
     pushRecent({
+        // gampo:allow-math-random-visual — recent-roll DOM id, not payout-deciding.
         id: `${nonce}-${Math.random().toString(16).slice(2, 6)}`,
         ts: Date.now(),
         gameId,

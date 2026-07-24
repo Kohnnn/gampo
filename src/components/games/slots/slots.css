@@ -2795,6 +2795,162 @@
     to { opacity: 1; transform: translateX(0); }
 }
 
+/* ---- S1 cascade per-step pulse + ladder (Phase 2) ----
+   The cascade overlay above is the FINAL chain summary (renders after the
+   timeline settles). The two pieces below render WHILE the timeline is
+   mid-replay so the player sees the multiplier climb frame-by-frame plus a
+   running total of the per-step payouts.
+
+   Reduced-motion collapses the helper output to the final step, so these
+   blocks either don't mount or land on the final value and stay still. */
+
+/* Per-step multiplier + running payout pulse: floats above the reels, fades
+   in on each new step (re-keyed by cascadeActiveStep.index), then settles.
+   The pulse animation fires once per step — no animation-iteration. */
+.slot-cascade-mult {
+    position: absolute;
+    left: 50%;
+    top: 18px;
+    transform: translateX(-50%);
+    z-index: 6;
+    display: grid;
+    gap: 2px;
+    padding: 8px 18px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--slot-accent), white 24%);
+    background: linear-gradient(180deg, rgba(20, 32, 50, 0.96), rgba(8, 16, 28, 0.96));
+    color: var(--slot-text);
+    text-align: center;
+    pointer-events: none;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.5);
+    animation: slotCascadeMultIn 0.34s cubic-bezier(0.18, 0.95, 0.28, 1.05) both;
+}
+.slot-cascade-mult span {
+    color: color-mix(in srgb, var(--slot-accent), white 36%);
+    font-size: 9px;
+    font-weight: 950;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+.slot-cascade-mult strong {
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    text-shadow: 0 0 16px color-mix(in srgb, var(--slot-accent), transparent 50%);
+    font-variant-numeric: tabular-nums;
+}
+.slot-cascade-mult em {
+    color: var(--slot-text-dim);
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes slotCascadeMultIn {
+    0% { opacity: 0; transform: translate(-50%, -10%) scale(0.85); }
+    60% { opacity: 1; transform: translate(-50%, 0) scale(1.06); }
+    100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* Per-step ladder chip strip: every step's multiplier in a horizontal row
+   so the player can see how many tumbles the chain has. Done steps fade,
+   the active step glows, the final step keeps an accent ring. */
+.slot-cascade-ladder {
+    position: absolute;
+    right: 14px;
+    top: 130px;
+    z-index: 6;
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--slot-accent), white 18%);
+    background: linear-gradient(180deg, rgba(20, 32, 50, 0.92), rgba(8, 16, 28, 0.92));
+    pointer-events: none;
+    animation: slotCascadeIn 0.32s cubic-bezier(0.18, 0.95, 0.28, 1.05) both;
+    max-width: calc(100% - 28px);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.slot-cascade-ladder-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--slot-accent), transparent 60%);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--slot-text-dim);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.slot-cascade-ladder-step.is-done {
+    color: color-mix(in srgb, var(--slot-accent), white 12%);
+    border-color: color-mix(in srgb, var(--slot-accent), transparent 30%);
+}
+.slot-cascade-ladder-step.is-active {
+    color: #fff;
+    background: color-mix(in srgb, var(--slot-accent), transparent 70%);
+    border-color: var(--slot-accent);
+    transform: translateY(-1px) scale(1.04);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--slot-accent), transparent 50%);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--slot-accent), transparent 30%);
+}
+.slot-cascade-ladder-step.is-final {
+    /* The final step keeps a slightly thicker ring so the player can see
+       where the chain ends once it settles. */
+    border-width: 2px;
+}
+
+/* Phone-safe: clamp the ladder to a single horizontal row at narrow widths
+   so it never breaks out of the reel frame. */
+@media (max-width: 480px) {
+    .slot-cascade-ladder {
+        right: 8px;
+        top: 110px;
+        gap: 4px;
+        padding: 6px 8px;
+        max-width: calc(100% - 16px);
+    }
+    .slot-cascade-ladder-step {
+        min-width: 26px;
+        height: 22px;
+        font-size: 10px;
+        padding: 0 6px;
+    }
+    .slot-cascade-mult {
+        top: 12px;
+        padding: 6px 14px;
+    }
+    .slot-cascade-mult strong {
+        font-size: 18px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .slot-cascade-mult,
+    .slot-cascade-ladder,
+    .slot-cascade-ladder-step {
+        animation: none !important;
+        transition: none !important;
+        transform: none !important;
+    }
+}
+.gampo-reduce-motion .slot-cascade-mult,
+.gampo-reduce-motion .slot-cascade-ladder,
+.gampo-reduce-motion .slot-cascade-ladder-step {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+}
+
 /* Reduced motion guards for Wave 20 cosmetics */
 @media (prefers-reduced-motion: reduce) {
     .slot-cell.sticky,

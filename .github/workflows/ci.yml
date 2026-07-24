@@ -12,9 +12,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
+      # Phase 3: integrity + language guardrails run BEFORE tests/build so a
+      # regression is caught at the cheapest step (no test bootstrap, no build
+      # artefact, no minutes of CI spent after the fact).
+      - name: Real-money wording scan (Phase 3)
+        run: npm run wording:scan
+      - name: ESLint with RNG guard (Phase 3)
+        run: npm run lint
+      - name: Wording + RNG-guard focused tests (Phase 3)
+        run: npm run wording:scan:test && npm run lint:rng-test
       - run: npm test
       - run: npm run build
       - run: npm audit --omit=dev --audit-level=high
