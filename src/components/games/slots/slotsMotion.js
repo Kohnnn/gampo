@@ -301,3 +301,65 @@ export function buildSlotFeatureDemoState({
         }),
     }
 }
+
+const defaultMotionScheduler = {
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: id => clearTimeout(id),
+    setInterval: (fn, ms) => setInterval(fn, ms),
+    clearInterval: id => clearInterval(id),
+    requestAnimationFrame: typeof requestAnimationFrame === 'function' ? fn => requestAnimationFrame(fn) : null,
+    cancelAnimationFrame: typeof cancelAnimationFrame === 'function' ? id => cancelAnimationFrame(id) : null,
+}
+
+export function createSlotMotionController(scheduler = defaultMotionScheduler) {
+    let generation = 0
+    const timeoutIds = new Set()
+    const intervalIds = new Set()
+    let rafId = null
+
+    return {
+        get generation() {
+            return generation
+        },
+        schedule(callback, delayMs = 0) {
+            const gen = generation
+            let id = null
+            id = scheduler.setTimeout(() => {
+                if (id != null) timeoutIds.delete(id)
+                if (gen !== generation) return
+                callback()
+            }, delayMs)
+            timeoutIds.add(id)
+            return id
+        },
+        ticker(callback, intervalMs) {
+            const gen = generation
+            const id = scheduler.setInterval(() => {
+                if (gen !== generation) return
+                callback()
+            }, intervalMs)
+            intervalIds.add(id)
+            return id
+        },
+        raf(callback) {
+            if (!scheduler.requestAnimationFrame) return null
+            if (rafId != null && scheduler.cancelAnimationFrame) scheduler.cancelAnimationFrame(rafId)
+            const gen = generation
+            rafId = scheduler.requestAnimationFrame(() => {
+                rafId = null
+                if (gen !== generation) return
+                callback()
+            })
+            return rafId
+        },
+        cancel() {
+            generation += 1
+            timeoutIds.forEach(id => scheduler.clearTimeout(id))
+            timeoutIds.clear()
+            intervalIds.forEach(id => scheduler.clearInterval(id))
+            intervalIds.clear()
+            if (rafId != null && scheduler.cancelAnimationFrame) scheduler.cancelAnimationFrame(rafId)
+            rafId = null
+        },
+    }
+}

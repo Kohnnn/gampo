@@ -129,7 +129,9 @@ describe('fetchFreeProviderFeed', () => {
         expect(feed.events.some(event => event.tags?.includes('top'))).toBe(true)
         expect(feed.events.some(event => event.tags?.includes('popular'))).toBe(true)
         expect(feed.marquee).toMatchObject({ candidateCount: 2, shownCount: 1, skippedCount: 1, marqueeCount: 1 })
-        expect(shellSource).toContain('<SportsRail')
+        // Single-rail structure: the global app sidebar is the only sportsbook nav rail.
+        // The redundant in-shell SportsRail was removed to kill the double-sidebar layout.
+        expect(shellSource).not.toContain('<SportsRail')
         expect(sportsbookFeedSource).toContain('perSport: 12, minimumVisible: 60, maximumVisible: 120')
         expect(sportsbookFeedSource).toContain('feedEvents = filtered.items.slice(0, 120)')
         expect(sportsHomeSource).toContain('Real-event feed guard active')
