@@ -5,13 +5,23 @@
 
 /* --- Base layout shell -------------------------------------------------------- */
 .poker-page {
+    /* Poker rides the shared casino aesthetic: green accent (--accent-green) on
+       the navy base, not the old bespoke gold. `--accent-gold` is a poker-only
+       token (the app's real premium token is --gold), so aliasing it here flips
+       every chrome element to the house green in one place. The raw #f0c040 used
+       by the GTO raise/call/fold bars stays amber — that's a data legend, not chrome. */
+    --accent-gold: var(--accent-green, #00e701);
+    --pk-accent-soft: rgba(0, 231, 1, 0.14);
+    --pk-accent-line: rgba(0, 231, 1, 0.4);
+    --pk-accent-glow: rgba(0, 231, 1, 0.35);
+
     min-height: 0;
     height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: 24px;
     padding: 16px;
-    background: radial-gradient(circle at 20% 0%, rgba(255, 207, 90, 0.06), transparent 50%), var(--bg-primary);
+    background: radial-gradient(circle at 20% 0%, rgba(0, 231, 1, 0.05), transparent 50%), var(--bg-primary);
     touch-action: pan-x pan-y;
 }
 
@@ -43,7 +53,7 @@
     border-radius: 6px;
     transition: background 0.15s;
 }
-.poker-back:hover { background: rgba(240,192,64,0.12); }
+.poker-back:hover { background: var(--pk-accent-soft); }
 
 .poker-balance {
     margin-left: auto;
@@ -77,7 +87,7 @@
     transition: all 0.15s;
 }
 .poker-format-toggle button.active {
-    background: rgba(240,192,64,0.15);
+    background: var(--pk-accent-soft);
     border-color: var(--accent-gold, #f0c040);
     color: var(--accent-gold, #f0c040);
 }
@@ -99,7 +109,7 @@
 }
 .poker-buyin-options button:disabled { opacity: 0.4; cursor: not-allowed; }
 .poker-buyin-options button.active {
-    background: rgba(240,192,64,0.15);
+    background: var(--pk-accent-soft);
     border-color: var(--accent-gold, #f0c040);
     color: var(--accent-gold, #f0c040);
 }
@@ -328,8 +338,12 @@
     text-align: center;
 }
 
-/* --- Felt / grid ------------------------------------------------------------- */
+/* --- Felt -------------------------------------------------------------------
+   Mobile-first: felt is a simple 2-column flow (pot + board span full, seats
+   stacked). The oval table with absolutely-positioned seats is layered on at
+   >=769px in the desktop repair block below. */
 .poker-table-felt {
+    position: relative;
     background: radial-gradient(ellipse at 50% 40%, #1b5e20 0%, #0d3d0d 60%, #0a2a0a 100%);
     border-radius: 16px;
     padding: 16px;
@@ -342,11 +356,12 @@
 
 .pk-pot {
     grid-column: 1 / -1;
+    justify-self: center;
     text-align: center;
     font-size: 0.9rem;
     font-weight: 600;
     color: #f0c040;
-    padding: 6px;
+    padding: 6px 14px;
     background: rgba(0,0,0,0.25);
     border-radius: 8px;
 }
@@ -361,9 +376,15 @@
 }
 
 /* --- Seats ------------------------------------------------------------------- */
-.pk-seats { grid-column: 1 / -1; }
+.pk-seats {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
 
 .pk-seat {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -371,10 +392,15 @@
     background: rgba(0,0,0,0.3);
     border-radius: 10px;
     border: 1px solid rgba(255,255,255,0.06);
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
-.pk-seat.on-turn { border-color: rgba(240,192,64,0.6); }
-.pk-seat.has-button { border-color: rgba(240,192,64,0.4); }
+.pk-seat.is-human { border-color: var(--pk-accent-line); background: var(--pk-accent-soft); }
+.pk-seat.on-turn {
+    border-color: var(--accent-green, #00e701);
+    box-shadow: 0 0 0 1px var(--pk-accent-line), 0 0 18px var(--pk-accent-glow);
+}
+.pk-seat.folded { opacity: 0.4; filter: grayscale(0.4); }
+.pk-seat.has-button { border-color: var(--pk-accent-line); }
 
 .pk-avatar {
     width: 36px;
@@ -386,8 +412,8 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(240,192,64,0.2);
-    color: var(--accent-gold, #f0c040);
+    background: var(--pk-accent-soft);
+    color: var(--accent-gold, #00e701);
     font-size: 0.65rem;
     font-weight: 700;
     display: flex;
@@ -400,12 +426,27 @@
     flex-direction: column;
     gap: 2px;
 }
-.pk-name { font-size: 0.75rem; font-weight: 600; color: var(--text-primary, #fff); }
+.pk-seat-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pk-name { font-size: 0.75rem; font-weight: 600; color: var(--text-primary, #fff); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pk-stack { font-size: 0.7rem; color: var(--text-muted, #888); }
-.pk-diff { font-size: 0.65rem; padding: 1px 5px; border-radius: 4px; }
-.pk-diff.beginner { background: rgba(0,180,40,0.2); color: #00b428; }
-.pk-diff.intermediate { background: rgba(240,192,64,0.2); color: #f0c040; }
-.pk-diff.advanced { background: rgba(237,66,69,0.2); color: #ed4245; }
+/* Opponent play-style read (LAG / Rock / Station / Solver). Chrome-neutral chips
+   with a tone hint so styles are legible at a glance without shouting. */
+.pk-style {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+.pk-style-lag   { background: rgba(237,66,69,0.14);  color: #ff6b6e; border-color: rgba(237,66,69,0.3); }
+.pk-style-rock  { background: rgba(88,166,255,0.14); color: #7cc0ff; border-color: rgba(88,166,255,0.3); }
+.pk-style-nit   { background: rgba(88,166,255,0.14); color: #7cc0ff; border-color: rgba(88,166,255,0.3); }
+.pk-style-fish  { background: rgba(240,192,64,0.14); color: #f0c040; border-color: rgba(240,192,64,0.3); }
+.pk-style-tag   { background: var(--pk-accent-soft);  color: var(--accent-green, #00e701); border-color: var(--pk-accent-line); }
 .pk-last { font-size: 0.65rem; color: var(--text-muted); font-style: italic; }
 .pk-bet { font-size: 0.75rem; color: var(--accent-gold); font-weight: 600; }
 
@@ -493,7 +534,7 @@
     border: 1px solid rgba(255,255,255,0.06);
 }
 .pk-actions.is-waiting:not(.is-showdown) { max-height: none; }
-.pk-actions.is-raise-open { border-color: rgba(240,192,64,0.4); }
+.pk-actions.is-raise-open { border-color: var(--pk-accent-line); }
 
 .pk-action-status {
     text-align: center;
@@ -519,10 +560,33 @@
 .pk-act:disabled { opacity: 0.4; cursor: not-allowed; }
 .pk-act.primary { background: var(--accent-gold, #f0c040); color: #111; border-color: transparent; }
 .pk-act.primary:hover:not(:disabled) { filter: brightness(1.1); }
-.pk-act.fold { border-color: rgba(237,66,69,0.4); color: #ed4245; }
-.pk-act.call  { border-color: rgba(0,180,40,0.4); color: #00b428; }
+/* Action hierarchy: raise = filled primary (dominant), call = medium green
+   outline, check = neutral, fold = quiet/recessive so the eye lands on the
+   value-bearing action first. */
+.pk-act.fold {
+    background: transparent;
+    border-color: rgba(237,66,69,0.25);
+    color: #d78488;
+    font-weight: 500;
+}
+.pk-act.fold:hover:not(:disabled) { background: rgba(237,66,69,0.12); color: #ff6b6e; border-color: rgba(237,66,69,0.5); }
 .pk-act.check { border-color: rgba(255,255,255,0.2); }
-.pk-act.raise { border-color: rgba(240,192,64,0.4); color: var(--accent-gold, #f0c040); }
+.pk-act.call {
+    border-color: rgba(0,180,40,0.45);
+    color: #4fd06a;
+    font-weight: 700;
+}
+.pk-act.call:hover:not(:disabled) { background: rgba(0,180,40,0.14); }
+.pk-act.raise {
+    background: linear-gradient(180deg, var(--accent-green, #00e701), #00b428);
+    color: #06210a;
+    border-color: transparent;
+    font-weight: 800;
+    box-shadow: 0 2px 12px var(--pk-accent-glow);
+}
+.pk-act.raise:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 3px 16px var(--pk-accent-glow); }
+.pk-act.pk-raise-open { background: transparent; color: var(--accent-green, #00e701); border-color: var(--pk-accent-line); box-shadow: none; font-weight: 700; }
+.pk-act.pk-raise-open:hover:not(:disabled) { background: var(--pk-accent-soft); }
 
 /* Raise panel */
 .pk-raise-open-panel {
@@ -536,17 +600,45 @@
     margin-bottom: 8px;
     flex-wrap: wrap;
 }
-.pk-raise-preset {
-    padding: 4px 10px;
+.pk-raise-presets button {
+    padding: 5px 10px;
     border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: transparent;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
     color: var(--text-secondary, #aaa);
     font-size: 0.75rem;
     cursor: pointer;
+    transition: all 0.15s;
 }
-.pk-raise-preset:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
-.pk-raise-slider { width: 100%; accent-color: var(--accent-gold); }
+.pk-raise-presets button:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
+.pk-raise input[type="range"] { width: 100%; accent-color: var(--accent-gold); margin-bottom: 8px; }
+
+/* Showdown result banner: instant read of the hand outcome for the player. */
+.pk-showdown-banner {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    text-align: center;
+}
+.pk-showdown-banner strong { font-size: 1.05rem; font-weight: 800; }
+.pk-showdown-banner em { font-style: normal; font-size: 0.8rem; opacity: 0.85; }
+.pk-showdown-banner.is-win {
+    background: var(--pk-accent-soft);
+    color: var(--accent-green, #00e701);
+    border: 1px solid var(--pk-accent-line);
+}
+.pk-showdown-banner.is-loss {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary, #aaa);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Next-blind-level countdown hint inside the info strip. */
+.pk-info-next { display: block; font-size: 0.62rem; color: var(--text-muted, #888); font-weight: 500; margin-top: 1px; }
 
 /* Winners */
 .pk-winners {
@@ -594,13 +686,16 @@
     transition: all 0.15s;
 }
 .poker-tab.active {
-    background: rgba(240,192,64,0.1);
+    background: var(--pk-accent-soft);
     color: var(--accent-gold, #f0c040);
 }
 
 .poker-sidebar-body {
     overflow-y: auto;
-    max-height: 400px;
+    /* No fixed clip: the GTO panel (sticky header + 13x13 chart + preflop ranges)
+       is tall. On desktop the sticky .poker-sidebar owns the scroll; on mobile the
+       page scrolls. A hard 400px max-height used to bury the chart and ranges. */
+    max-height: min(72vh, 720px);
 }
 
 /* --- Chat -------------------------------------------------------------------- */
@@ -612,12 +707,13 @@
     padding: 4px;
     margin-bottom: 8px;
 }
-.pk-chat-list { display: flex; flex-direction: column; gap: 6px; }
-.pk-chat-msg { font-size: 0.78rem; color: var(--text-secondary, #aaa); }
-.pk-chat-msg .name { font-weight: 600; color: var(--text-primary, #fff); }
-.pk-chat-msg.bot .name { color: var(--accent-gold, #f0c040); }
-.pk-chat-input-row { display: flex; gap: 6px; margin-top: 8px; }
-.pk-chat-input {
+.pk-chat-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.pk-msg { font-size: 0.78rem; color: var(--text-secondary, #aaa); display: flex; gap: 6px; }
+.pk-msg span { font-weight: 600; color: var(--accent-gold, #f0c040); flex-shrink: 0; }
+.pk-msg b { font-weight: 400; }
+.pk-msg.self span { color: #7dd3fc; }
+.pk-chat-input { display: flex; gap: 6px; margin-top: 8px; }
+.pk-chat-input input {
     flex: 1;
     padding: 6px 10px;
     border-radius: 6px;
@@ -626,8 +722,8 @@
     color: var(--text-primary, #fff);
     font-size: 0.8rem;
 }
-.pk-chat-input::placeholder { color: var(--text-muted); }
-.pk-chat-send {
+.pk-chat-input input::placeholder { color: var(--text-muted); }
+.pk-chat-input button {
     padding: 6px 12px;
     border-radius: 6px;
     border: none;
@@ -662,16 +758,31 @@
     border-top-color: #fff;
 }
 
-/* --- Think ring -------------------------------------------------------------- */
+/* --- Think progress --------------------------------------------------------
+   Determinate bar pinned to the bottom of the seat that fills with the bot's
+   actual think progress (--p, 0..1). Replaces the old spinning border ellipse
+   that rendered as an ugly yellow ring around the whole seat row. */
 .pk-think-ring {
     position: absolute;
-    inset: -4px;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    border-top-color: var(--accent-gold, #f0c040);
-    animation: spin 0.8s linear infinite;
+    left: 8px;
+    right: 8px;
+    bottom: 4px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    pointer-events: none;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.pk-think-ring::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform-origin: left center;
+    transform: scaleX(var(--p, 0));
+    background: linear-gradient(90deg, var(--accent-green, #00e701), #45f36a);
+    border-radius: 2px;
+    transition: transform 0.08s linear;
+}
 
 /* --- Button chip ------------------------------------------------------------- */
 .pk-button-chip {
@@ -735,7 +846,7 @@
     color: var(--text-secondary, #aaa);
     border: 1px solid rgba(255,255,255,0.08);
 }
-.gto-pill.alt { background: rgba(240,192,64,0.1); color: var(--accent-gold, #f0c040); border-color: rgba(240,192,64,0.2); }
+.gto-pill.alt { background: var(--pk-accent-soft); color: var(--accent-gold, #f0c040); border-color: var(--pk-accent-line); }
 .gto-pill.ctx { background: rgba(0,180,40,0.1); color: #00b428; border-color: rgba(0,180,40,0.2); }
 .gto-pill.mono { font-family: monospace; font-size: 0.68rem; }
 
@@ -999,7 +1110,7 @@
 }
 .gto-sizings li span:first-child { color: var(--text-primary); min-width: 50px; }
 .gto-sizings li strong { color: var(--accent-gold, #f0c040); min-width: 36px; }
-.gto-sizing-bar { height: 4px; background: rgba(240,192,64,0.2); border-radius: 2px; flex: 1; }
+.gto-sizing-bar { height: 4px; background: var(--pk-accent-soft); border-radius: 2px; flex: 1; }
 
 /* --- Breakdown --------------------------------------------------------------- */
 .gto-breakdown {
@@ -1045,7 +1156,7 @@
     transition: all 0.15s;
 }
 .gto-exploit-row button:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
-.gto-exploit-row button.active { background: rgba(240,192,64,0.1); border-color: var(--accent-gold); color: var(--accent-gold); }
+.gto-exploit-row button.active { background: var(--pk-accent-soft); border-color: var(--accent-gold); color: var(--accent-gold); }
 
 .gto-exploit-result {
     padding: 8px;
@@ -1232,10 +1343,66 @@
         overflow-y: auto;
     }
 
+    /* Oval table: pot + board centred, six seats orbit the felt. */
     .poker-table-felt {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        padding: 20px;
+        position: relative;
+        min-height: 460px;
+        padding: 24px;
+        justify-content: center;
+        align-items: center;
+        background:
+            radial-gradient(ellipse at 50% 45%, #1f6b26 0%, #0f4512 55%, #0a2c0c 100%);
     }
+
+    .poker-table-felt::before {
+        content: '';
+        position: absolute;
+        inset: 40px 60px;
+        border-radius: 50% / 46%;
+        border: 2px solid rgba(255, 255, 255, 0.05);
+        box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
+        pointer-events: none;
+    }
+
+    .pk-pot {
+        position: absolute;
+        top: 34%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2;
+    }
+
+    .pk-board {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2;
+    }
+
+    .pk-seats {
+        position: absolute;
+        inset: 0;
+        display: block;
+    }
+
+    .pk-seat {
+        position: absolute;
+        width: 150px;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        transform: translate(-50%, -50%);
+    }
+    .pk-seat .pk-seat-info { flex: 1; min-width: 0; }
+
+    /* Human bottom-centre, then clockwise around the oval. */
+    .pk-seat.seat-0 { top: 92%; left: 50%; }
+    .pk-seat.seat-1 { top: 66%; left: 8%; }
+    .pk-seat.seat-2 { top: 20%; left: 12%; }
+    .pk-seat.seat-3 { top: 6%;  left: 50%; }
+    .pk-seat.seat-4 { top: 20%; left: 88%; }
+    .pk-seat.seat-5 { top: 66%; left: 92%; }
 
     .poker-page .pk-seat.is-human .pk-seat-cards .pk-card {
         width: 62px;
@@ -1270,5 +1437,10 @@
 
     .gto-search-row {
         top: 0;
+    }
+
+    /* Sidebar GtoPanel already shows this — hide the duplicate strip on desktop. */
+    .poker-mobile-gto-now {
+        display: none;
     }
 }

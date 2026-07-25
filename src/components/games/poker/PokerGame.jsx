@@ -18,8 +18,11 @@ const BUY_INS = [1000, 5000, 25000, 100000, 500000]
 // top 3 paid from the 6-buy-in prize pool at 50/30/20.
 const SNG_SEATS = 6
 const SNG_PAYOUTS = [0.5, 0.3, 0.2]
-const LEVEL_HANDS = 6
-const BOT_THINK_MS = 1100
+const LEVEL_HANDS = 10
+// Curated blind ladder (bb). Escalates gently — roughly +50% a step instead of
+// the old 20*2^level doubling that crushed 50bb stacks under 6bb by hand ~18 and
+// forced everyone into push/fold jams. Caps out so deep play survives late.
+const BLIND_LADDER = [20, 30, 40, 60, 80, 120, 160, 240, 320, 480]
 const BOT_PERSONAS = [
     { name: 'lucky_lemur', avatar: 1, aggression: 0.52, pokerStyle: 'whale', chat: ['glgl', 'small pot poker', 'river saved me'] },
     { name: 'binary_bee', avatar: 2, aggression: 0.38, pokerStyle: 'analyst', chat: ['range says call', 'too many bluffs?', 'checking back'] },
@@ -40,9 +43,9 @@ const BOT_PERSONAS = [
 const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => `/assets/games/poker/poker-avatar-${i}.png`)
 
 function blindLevelForHand(handNumber) {
-    const level = Math.floor((handNumber - 1) / LEVEL_HANDS)
-    const bb = 20 * (2 ** level)
-    return { level: level + 1, sb: Math.floor(bb / 2), bb, ante: level >= 2 ? Math.max(1, Math.floor(bb / 8)) : 0 }
+    const level = Math.min(BLIND_LADDER.length - 1, Math.floor((handNumber - 1) / LEVEL_HANDS))
+    const bb = BLIND_LADDER[level]
+    return { level: level + 1, sb: Math.floor(bb / 2), bb, ante: level >= 3 ? Math.max(1, Math.floor(bb / 10)) : 0 }
 }
 
 function cashGameLevel() {
@@ -66,6 +69,19 @@ function prettyStreet(street) {
     if (!street) return 'Waiting'
     if (street === 'showdown') return 'Showdown'
     return street.charAt(0).toUpperCase() + street.slice(1)
+}
+
+// Short read-tag per play style so opponent tendencies are legible at a glance.
+const STYLE_TAGS = {
+    'tight-passive': { label: 'Rock', tone: 'rock' },
+    'loose-aggressive': { label: 'LAG', tone: 'lag' },
+    whale: { label: 'Fish', tone: 'fish' },
+    cautious: { label: 'Nit', tone: 'nit' },
+    analyst: { label: 'TAG', tone: 'tag' },
+}
+function styleTag(style) {
+    const key = typeof style === 'string' ? style : style?.pokerStyle || style?.id
+    return STYLE_TAGS[key] || null
 }
 
 const DIFFICULTY_TUNING = { beginner: -0.18, intermediate: -0.06, advanced: 0.06 }
@@ -285,9 +301,18 @@ export default function PokerGame() {
         }
         thinkStartRef.current = performance.now()
         setThinkProgress(0)
+        // Per-turn think variance so bots feel human: snap when facing no bet or
+        // when very aggressive, tank longer in bigger spots. Kept well under the
+        // 5s escape-hatch fold below.
+        const facing = Math.max(0, (state.currentBet || 0) - (p.putIn || 0))
+        const aggro = p.persona?.aggression ?? 0.5
+        const snap = facing === 0 && Math.random() < 0.4
+        const thinkMs = snap
+            ? 420 + Math.random() * 260
+            : Math.round((facing > 0 ? 900 : 650) + Math.random() * 1300 + (1 - aggro) * 500)
         const tick = () => {
             const elapsed = performance.now() - thinkStartRef.current
-            const ratio = Math.min(1, elapsed / BOT_THINK_MS)
+            const ratio = Math.min(1, elapsed / thinkMs)
             setThinkProgress(ratio)
             if (ratio < 1) thinkRafRef.current = window.requestAnimationFrame(tick)
         }
@@ -317,7 +342,7 @@ export default function PokerGame() {
                     return next
                 }), 2800)
             }
-        }, BOT_THINK_MS)
+        }, thinkMs)
         const escapeTimer = window.setTimeout(() => {
             setState(prev => {
                 if (!prev || prev.street === 'showdown') return prev
@@ -648,6 +673,9 @@ export default function PokerGame() {
     const blindLevel = state
         ? (format === 'cash' ? cashGameLevel() : blindLevelForHand(handNumber))
         : null
+    const handsToNextLevel = format === 'sng' && blindLevel && blindLevel.level < BLIND_LADDER.length
+        ? LEVEL_HANDS - ((handNumber - 1) % LEVEL_HANDS)
+        : null
     const profitInSession = state && human && initialBuyInRef.current
         ? (human.stack || 0) - initialBuyInRef.current
         : 0
@@ -772,8 +800,11 @@ export default function PokerGame() {
                             <strong>{format === 'cash' ? 'Cash' : 'SNG'}</strong>
                         </div>
                         <div className="pk-info-cell">
-                            <span>Blinds</span>
+                            <span>Blinds · Lvl {blindLevel.level}</span>
                             <strong>{formatCredits(blindLevel.sb)} / {formatCredits(blindLevel.bb)}</strong>
+                            {format === 'sng' && handsToNextLevel != null && (
+                                <em className="pk-info-sub">{handsToNextLevel > 0 ? `up in ${handsToNextLevel}` : 'max level'}</em>
+                            )}
                         </div>
                         <div className="pk-info-cell">
                             <span>Ante</span>
@@ -917,11 +948,13 @@ export default function PokerGame() {
                                             className={`pk-seat seat-${i} ${p.status} ${p.isHuman ? 'is-human' : ''} ${i === state.toAct ? 'on-turn' : ''} ${i === state.buttonIndex ? 'has-button' : ''}`}>
                                             {p.avatar ? <img className="pk-avatar" src={p.avatar} alt="" /> : <div className="pk-avatar pk-you">YOU</div>}
                                             <div className="pk-seat-info">
-                                                <span className="pk-name">{p.name}</span>
+                                                <span className="pk-seat-line">
+                                                    <span className="pk-name">{p.name}</span>
+                                                    {!p.isHuman && styleTag(p.pokerStyle || p.persona) && (
+                                                        <span className={`pk-style pk-style-${styleTag(p.pokerStyle || p.persona).tone}`} title="Play style read">{styleTag(p.pokerStyle || p.persona).label}</span>
+                                                    )}
+                                                </span>
                                                 <span className="pk-stack">{formatCredits(p.stack)}</span>
-                                                {p.persona?.difficulty && (
-                                                    <span className={`pk-diff ${p.persona.difficulty}`}>{p.persona.difficulty.slice(0, 3)}</span>
-                                                )}
                                                 {p.lastAction && <span className="pk-last">{p.lastAction}</span>}
                                                 {(p.putIn || 0) > 0 && state.street !== 'showdown' && (
                                                     <span className="pk-bet">{formatCredits(p.putIn)}</span>
@@ -961,10 +994,20 @@ export default function PokerGame() {
                             >
                                 {state.street === 'showdown' ? (
                                     <>
+                                        {(() => {
+                                            const heroWin = human && state.winners.find(w => w.id === human.id)
+                                            return (
+                                                <div className={`pk-showdown-banner ${heroWin ? 'is-win' : 'is-loss'}`}>
+                                                    <strong>{heroWin ? `You won ${formatCredits(heroWin.share)}` : 'Hand over'}</strong>
+                                                    {heroWin?.hand && <em>{heroWin.hand}</em>}
+                                                </div>
+                                            )
+                                        })()}
                                         <div className="pk-winners">
-                                            {state.winners.map((w, i) => (
-                                                <div key={i}>{w.id} won {formatCredits(w.share)}{w.hand ? ` · ${w.hand}` : ''}</div>
-                                            ))}
+                                            {state.winners.map((w, i) => {
+                                                const wname = state.players.find(p => p.id === w.id)?.name || w.id
+                                                return <div key={i}>{wname} won {formatCredits(w.share)}{w.hand ? ` · ${w.hand}` : ''}</div>
+                                            })}
                                         </div>
                                         <button className="pk-act primary" onClick={nextHand}>Next hand</button>
                                         <button className="pk-act" onClick={() => cashOut(true)}>Cash out</button>

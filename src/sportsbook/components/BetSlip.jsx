@@ -233,18 +233,34 @@ function BetSlip({ selections = [], tickets = [], events = [], stake, mode, sett
 
                     <label className="sb-slip-stake">
                         <span>Total Practice Stake</span>
-                        <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={stake}
-                            onChange={event => onStakeChange(Math.max(0, Number(event.target.value) || 0))}
-                        />
+                        <div className="sb-stake-field">
+                            <em>GC</em>
+                            <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={stake}
+                                onChange={event => onStakeChange(Math.max(0, Number(event.target.value) || 0))}
+                            />
+                        </div>
                     </label>
+
+                    <div className="sb-stake-chips">
+                        {[5, 10, 25, 50].map(amount => (
+                            <button key={amount} type="button" onClick={() => onStakeChange(Math.max(0, Number(stake) || 0) + amount)}>
+                                +{amount}
+                            </button>
+                        ))}
+                        <button type="button" onClick={() => onStakeChange(Math.max(0, Math.floor(Number(balance) || 0)))}>Max</button>
+                    </div>
+
+                    <div className="sb-slip-payout">
+                        <span>Est. Return</span>
+                        <strong>{formatGc(quote.estimatedPayout)}</strong>
+                    </div>
 
                     <div className="sb-slip-metrics">
                         <div><span>Status</span><strong>{status}</strong></div>
-                        <div><span>Est. Return</span><strong>{formatGc(quote.estimatedPayout)}</strong></div>
                         <div><span>EV Hint</span><strong className={quote.expectedValue >= 0 ? 'is-positive' : 'is-negative'}>{formatGc(quote.expectedValue)}</strong></div>
                         <div><span>Balance</span><strong>{formatGc(balance)}</strong></div>
                     </div>
@@ -254,10 +270,15 @@ function BetSlip({ selections = [], tickets = [], events = [], stake, mode, sett
                     <div className="sb-slip-actions">
                         <button type="button" className="sb-clear-btn" onClick={onClear} disabled={selections.length === 0}>
                             <Trash2 size={15} />
-                            Clear Picks
+                            Clear
                         </button>
                         <button type="button" className="sb-place-btn" onClick={onPlace} disabled={!validation.valid || placing} data-ux-primary-action>
-                            {placing ? 'Placing...' : 'Place Practice Bet'}
+                            {placing ? 'Placing...' : (
+                                <>
+                                    <span>Place Practice Bet</span>
+                                    {validation.valid && quote.estimatedPayout > 0 ? <b>{formatGc(quote.estimatedPayout)}</b> : null}
+                                </>
+                            )}
                         </button>
                     </div>
                 </>

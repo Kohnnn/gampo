@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+    createSlotMotionController,
     SLOT_HOLD_NEW_TILE_PULSE_MS,
     SLOT_RETRIGGER_FLY_MS,
     SLOT_WHEEL_WOBBLE_MS,
@@ -346,5 +347,107 @@ describe('cascade tumble timeline', () => {
             expect(step.index).toBe(timeline[index].index)
             expect(step.multiplier).toBe(timeline[index].stepMultiplier)
         })
+    })
+})
+
+describe('slot motion controller', () => {
+    beforeEach(() => {
+        vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
+    })
+
+    it('runs a scheduled callback once its delay elapses', () => {
+        const motion = createSlotMotionController()
+        const spy = vi.fn()
+        motion.schedule(spy, 100)
+        expect(spy).not.toHaveBeenCalled()
+        vi.advanceTimersByTime(100)
+        expect(spy).toHaveBeenCalledTimes(1)
+    })
+
+    it('cancel suppresses queued callbacks', () => {
+        const motion = createSlotMotionController()
+        const spy = vi.fn()
+        motion.schedule(spy, 100)
+        motion.cancel()
+        vi.advanceTimersByTime(500)
+        expect(spy).not.toHaveBeenCalled()
+    })
+
+    it('replacement invalidates stale callbacks after cancel bumps the generation', () => {
+        const motion = createSlotMotionController()
+        const stale = vi.fn()
+        const fresh = vi.fn()
+        motion.schedule(stale, 100)
+        motion.cancel()
+        motion.schedule(fresh, 100)
+        vi.advanceTimersByTime(100)
+        expect(stale).not.toHaveBeenCalled()
+        expect(fresh).toHaveBeenCalledTimes(1)
+    })
+
+    it('rejects a stale callback whose timer survives the cancel', () => {
+        let saved = null
+        const scheduler = {
+            setTimeout: (fn) => { saved = fn; return 1 },
+            clearTimeout: () => {},
+            setInterval: () => 2,
+            clearInterval: () => {},
+            requestAnimationFrame: null,
+            cancelAnimationFrame: null,
+        }
+        const motion = createSlotMotionController(scheduler)
+        const spy = vi.fn()
+        motion.schedule(spy, 100)
+        motion.cancel()
+        saved()
+        expect(spy).not.toHaveBeenCalled()
+    })
+
+    it('ticker fires on its interval and stops after cancel', () => {
+        const motion = createSlotMotionController()
+        const spy = vi.fn()
+        motion.ticker(spy, 50)
+        vi.advanceTimersByTime(150)
+        expect(spy).toHaveBeenCalledTimes(3)
+        motion.cancel()
+        vi.advanceTimersByTime(150)
+        expect(spy).toHaveBeenCalledTimes(3)
+    })
+
+    it('cancels a pending rAF and rejects a stale rAF callback', () => {
+        const frames = []
+        let cancelled = 0
+        const scheduler = {
+            setTimeout: (fn, ms) => setTimeout(fn, ms),
+            clearTimeout: id => clearTimeout(id),
+            setInterval: (fn, ms) => setInterval(fn, ms),
+            clearInterval: id => clearInterval(id),
+            requestAnimationFrame: (fn) => { frames.push(fn); return frames.length },
+            cancelAnimationFrame: () => { cancelled += 1 },
+        }
+        const motion = createSlotMotionController(scheduler)
+        const spy = vi.fn()
+        motion.raf(spy)
+        motion.cancel()
+        expect(cancelled).toBe(1)
+        frames[0]()
+        expect(spy).not.toHaveBeenCalled()
+    })
+
+    it('reports null from raf when the scheduler cannot animate frames', () => {
+        const scheduler = {
+            setTimeout: (fn, ms) => setTimeout(fn, ms),
+            clearTimeout: id => clearTimeout(id),
+            setInterval: (fn, ms) => setInterval(fn, ms),
+            clearInterval: id => clearInterval(id),
+            requestAnimationFrame: null,
+            cancelAnimationFrame: null,
+        }
+        const motion = createSlotMotionController(scheduler)
+        expect(motion.raf(() => {})).toBeNull()
     })
 })

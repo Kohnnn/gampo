@@ -162,6 +162,30 @@ describe('slotFactory layout helpers', () => {
         expect(slotsGameSource).toMatch(/if \(!bonusEndBanner\) return undefined[\s\S]*setBonusEndBanner\(null\), 6000\)[\s\S]*\}, \[bonusEndBanner\]\)/)
     })
 
+    it('locks spin dispatch synchronously and settles each spin id once', () => {
+        expect(slotsGameSource).toContain('if (spinLockRef.current || running || cascadeReplayRef.current)')
+        expect(slotsGameSource).toContain('spinLockRef.current = true')
+        expect(slotsGameSource).toContain('const spinId = (spinSeqRef.current += 1)')
+        expect(slotsGameSource).toContain('if (spinId != null && spinId <= settledSpinIdRef.current)')
+        expect(slotsGameSource.match(/finishRound\(\{ spinId,/g)).toHaveLength(2)
+    })
+
+    it('cancels the previous win rollup when slot timers are cleared', () => {
+        expect(slotsGameSource).toMatch(/const clearTimers = useCallback\(\(\) => \{[\s\S]*cancelAnimationFrame\(rollupRafRef\.current\)[\s\S]*rollupRafRef\.current = null/)
+    })
+
+    it('runs the autoplay inter-spin gap on a dedicated timer, not the animation controller', () => {
+        // Regression: autoplay's next-spin gap previously scheduled on
+        // motion.current (the per-spin animation controller). Any clearTimers()
+        // during the gap (a spin tap while running===false) bumps the
+        // controller generation and silently drops the queued spin, wedging
+        // autoplayPendingRef===true forever. The gap must own a separate timer
+        // cleared by stopAutoplay / resetSlotTemplate / unmount.
+        // The auto-spin is queued on the dedicated timer, not motion.current.
+        expect(slotsGameSource).toMatch(/autoplayTimerRef\.current = setTimeout\([\s\S]*?performSpin\(\{ source: 'auto'/)
+        expect(slotsGameSource).toMatch(/const stopAutoplay = useCallback\(\(\) => \{[\s\S]*clearTimeout\(autoplayTimerRef\.current\)/)
+    })
+
     it('hides the in-flow panel spin on mobile so the fixed dock owns the single CTA', () => {
         // On phones the slot-mobile-dock provides the primary Spin. The in-flow
         // slot-panel-spin is hidden to avoid two competing spin buttons.

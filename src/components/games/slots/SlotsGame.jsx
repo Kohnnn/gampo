@@ -45,6 +45,7 @@ import {
     buildSlotStopSchedule,
     buildCascadeTimeline,
     cascadeTimelineDurationMs,
+    createSlotMotionController,
     getSlotReelSpinDurationMs,
     getSlotTickerIntervalMs,
     sumCascadeStepPayouts,
@@ -313,6 +314,17 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     // cleanly. The timeline sets this to true when it queues its first frame
     // and back to false when its final frame lands.
     const cascadeReplayRef = useRef(false)
+    // Synchronous spin re-entrancy lock. `running` is React state and only
+    // flips true a render later, so two performSpin() calls dispatched in the
+    // same tick (Space + button, autoplay tick + manual) both read running ===
+    // false and each resolve a spin — double-resolving and double-awarding free
+    // spins. This ref is set true synchronously at the top of performSpin and
+    // released in finishRound / resetSlotTemplate, closing that window.
+    const spinLockRef = useRef(false)
+    // Monotonic spin id + last-settled id. Belt-and-suspenders idempotency so a
+    // given resolved spin can never be settled (and awarded) twice.
+    const spinSeqRef = useRef(0)
+    const settledSpinIdRef = useRef(0)
     const [lastResult, setLastResult] = useState(null)
     const [lastStake, setLastStake] = useState(5)
     // Spin resolve mode: 'normal' (full animation), 'turbo' (sped-up reels),
@@ -400,8 +412,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const bgmMode = (freeSpinSession || freeSpins > 0) ? 'bonus' : 'idle'
     useBgm(config.skin, bgmMode)
 
-    const timers = useRef([])
-    const ticker = useRef(null)
+    const motion = useRef(null)
+    if (!motion.current) motion.current = createSlotMotionController()
     const stoppedColsRef = useRef(startTemplate.layout.cols)
     const lockedColsRef = useRef(new Set())
     // Slam-stop: holds the in-flight round so a second tap can resolve it now.
@@ -410,6 +422,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const autoplayRemainingRef = useRef(0)
     const autoplayInfiniteRef = useRef(false)
     const autoplayPendingRef = useRef(false)
+    // Autoplay's inter-spin gap runs on its OWN timer, not the animation
+    // controller. clearTimers() cancels motion.current every spin/slam-stop/
+    // template-switch; if the queued next-autoplay spin lived there, a spin tap
+    // during the 220ms gap would silently drop it and wedge autoplay (pending
+    // stuck true, effect early-returns forever). This timer is only cleared on
+    // stopAutoplay / reset / unmount.
+    const autoplayTimerRef = useRef(null)
     const stopsRef = useRef(advancedStops)
     const buyTierIdRef = useRef(null)
     const persistentMultiplierRef = useRef(0)
@@ -457,11 +476,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     }, [bonusEndBanner])
 
     const clearTimers = useCallback(() => {
-        timers.current.forEach(id => window.clearTimeout(id))
-        timers.current = []
-        if (ticker.current) {
-            window.clearInterval(ticker.current)
-            ticker.current = null
+        motion.current.cancel()
+        // The win-rollup rAF is not a timeout, so it survived the old clearTimers
+        // and kept counting up over the next spin's banner. Cancel it here so a
+        // new spin owns a clean rollup.
+        if (rollupRafRef.current) {
+            cancelAnimationFrame(rollupRafRef.current)
+            rollupRafRef.current = null
         }
     }, [])
 
@@ -484,6 +505,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     const resetSlotTemplate = useCallback((nextConfig, { clearStats = false } = {}) => {
         clearTimers()
+        // Release the synchronous spin lock and drop any captured finish so a
+        // template switch mid-spin can never wedge the machine or settle the
+        // interrupted spin against the new template.
+        spinLockRef.current = false
+        pendingFinishRef.current = null
         setGrid(makeInitialGrid(nextConfig))
         setRunning(false)
         setSpinPhase('idle')
@@ -501,6 +527,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         autoplayRemainingRef.current = 0
         autoplayInfiniteRef.current = false
         autoplayPendingRef.current = false
+        if (autoplayTimerRef.current) {
+            clearTimeout(autoplayTimerRef.current)
+            autoplayTimerRef.current = null
+        }
         setAnticipating(false)
         setMysteryReveal(null)
         setPersistentMultiplier(0)
@@ -519,7 +549,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         templateResetRef.current = config.id
     }, [config, resetSlotTemplate])
 
-    useEffect(() => () => clearTimers(), [clearTimers])
+    useEffect(() => () => {
+        clearTimers()
+        if (autoplayTimerRef.current) {
+            clearTimeout(autoplayTimerRef.current)
+            autoplayTimerRef.current = null
+        }
+    }, [clearTimers])
 
     // Cascade replay cleanup: when the SlotsGame unmounts mid-replay (template
     // switch, route change, tab nav), make sure the in-flight lock is released
@@ -675,7 +711,19 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setBetAmount(round2(next))
     }, [])
 
-    const finishRound = useCallback(({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve }) => {
+    const finishRound = useCallback(({ spinId, result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve }) => {
+        // Idempotency: never settle (and therefore never award) the same spin
+        // twice. The synchronous spinLockRef closes the double-dispatch window;
+        // this is the belt-and-suspenders backstop for the finish path (a spin
+        // can be finished either by its scheduled timer or by slamStop). Once a
+        // spinId is settled, any second finish for it is a no-op — but we still
+        // release the lock so the machine never wedges.
+        if (spinId != null && spinId <= settledSpinIdRef.current) {
+            spinLockRef.current = false
+            return
+        }
+        if (spinId != null) settledSpinIdRef.current = spinId
+        spinLockRef.current = false
         clearTimers()
         const returnAmount = round2(baseBet * result.multiplier)
         const profit = round2(returnAmount - stake)
@@ -704,7 +752,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             slotSfx.play('cascadeStep', { volume: 0.7 })
             for (let i = 1; i < cascadeTimeline.length; i += 1) {
                 const frame = cascadeTimeline[i]
-                timers.current.push(window.setTimeout(() => {
+                motion.current.schedule(() => {
                     setGrid(frame.cells)
                     setWinningCells(frame.winCells)
                     setCascadePopCells(frame.popCells)
@@ -717,14 +765,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         // spin / slam-stop behaves normally.
                         cascadeReplayRef.current = false
                     }
-                }, frame.atMs))
+                }, frame.atMs)
             }
             // Clear the pop highlight shortly after the last frame settles.
-            timers.current.push(window.setTimeout(() => {
+            motion.current.schedule(() => {
                 setCascadePopCells([])
                 setCascadeStepIndex(-1)
                 cascadeReplayRef.current = false
-            }, cascadeTimelineDurationMs(cascadeTimeline) + 120))
+            }, cascadeTimelineDurationMs(cascadeTimeline) + 120)
         } else {
             setGrid(result.cells)
             setWinningCells(result.winningIndexes)
@@ -764,12 +812,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 const amount = rollupFrame(returnAmount, elapsed, duration, reduceMotion)
                 setWinRollup(prev => (prev.trigger === rollTrigger ? { ...prev, amount } : prev))
                 if (elapsed < duration) {
-                    rollupRafRef.current = requestAnimationFrame(step)
+                    rollupRafRef.current = motion.current.raf(step)
                 } else {
                     rollupRafRef.current = null
                 }
             }
-            rollupRafRef.current = requestAnimationFrame(step)
+            rollupRafRef.current = motion.current.raf(step)
         } else {
             // Reduced-motion, instant, or no win: show the final value immediately.
             setWinRollup({ trigger: rollTrigger, amount: returnAmount, target: returnAmount, tierId: tier.id })
@@ -814,13 +862,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     accent: config.accent,
                 }),
             })
-            timers.current.push(window.setTimeout(() => {
+            motion.current.schedule(() => {
                 setBonusCine(current => (current && current.trigger === revealTrigger ? null : current))
-            }, bonusCineMs))
+            }, bonusCineMs)
         }
         if (result.featureEvents.some(item => item.type === 'persistent-multiplier')) {
             setPersistRamp(true)
-            timers.current.push(window.setTimeout(() => setPersistRamp(false), 520))
+            motion.current.schedule(() => setPersistRamp(false), 520)
         }
         const wheelEvent = result.featureEvents.find(item => item.type === 'multiplier-wheel')
         if (wheelEvent) {
@@ -852,9 +900,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setFeatureAnnounce({ trigger: revealTrigger, label: announceEvent.label, kind: announceEvent.type })
             if (announceEvent.type === 'random-feature') slotSfx.play('anticipation', { volume: 0.6 })
             else slotSfx.play('cascadeStep', { volume: 0.7 })
-            timers.current.push(window.setTimeout(() => {
+            motion.current.schedule(() => {
                 setFeatureAnnounce(current => (current && current.trigger === revealTrigger ? null : current))
-            }, reduceMotion ? 900 : 1600))
+            }, reduceMotion ? 900 : 1600)
         } else {
             setFeatureAnnounce(null)
         }
@@ -863,9 +911,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         // the particles — the BigWinOverlay still announces the amount).
         if (!reduceMotion && result.multiplier >= SLOT_BIG_WIN_THRESHOLD) {
             setCoinShower({ trigger: revealTrigger })
-            timers.current.push(window.setTimeout(() => {
+            motion.current.schedule(() => {
                 setCoinShower(current => (current && current.trigger === revealTrigger ? null : current))
-            }, 1800))
+            }, 1800)
         } else {
             setCoinShower(null)
         }
@@ -921,9 +969,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         accent: config.accent,
                     }),
                 })
-                timers.current.push(window.setTimeout(() => {
+                motion.current.schedule(() => {
                     setBonusCine(current => (current && current.trigger === revealTrigger ? null : current))
-                }, bonusCineMs))
+                }, bonusCineMs)
             }
             // Progression: count a bonus trigger (only on the initial entry, not
             // retriggers) plus the free spins awarded for achievement tracking.
@@ -940,17 +988,17 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     trigger: revealTrigger,
                 })
                 setRetriggerFlyers(flyers)
-                timers.current.push(window.setTimeout(() => {
+                motion.current.schedule(() => {
                     setRetriggerFlyers([])
-                }, SLOT_RETRIGGER_FLY_MS + 260))
+                }, SLOT_RETRIGGER_FLY_MS + 260)
             }
             // Retrigger pop: a celebratory "+N FREE SPINS" banner distinct from the
             // flying scatter badges, so an in-session retrigger has its own beat.
             if (freeSpinSession) {
                 setRetriggerPop({ trigger: revealTrigger, amount: freeSpinEvent.freeSpins })
-                timers.current.push(window.setTimeout(() => {
+                motion.current.schedule(() => {
                     setRetriggerPop(current => (current && current.trigger === revealTrigger ? null : current))
-                }, 1500))
+                }, 1500)
             }
             setFreeSpins(value => value + freeSpinEvent.freeSpins)
             setFreeSpinSession(prev => {
@@ -1025,10 +1073,18 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     const performSpin = useCallback(({ source = 'manual', bet = betAmount, free = canUseFreeSpin, tierId = null } = {}) => (
         new Promise(resolve => {
-            if (running) {
+            // Synchronous re-entrancy guard. Do NOT rely on `running` state here
+            // — it lags a render, so two calls in the same tick would both pass.
+            // cascadeReplayRef blocks EVERY spin entry point (panel/stage/Space/
+            // autoplay) from starting a fresh spin mid-cascade; stage/Space guard
+            // it too, but the panel spin button called performSpin directly and
+            // could cancel an active cascade timeline.
+            if (spinLockRef.current || running || cascadeReplayRef.current) {
                 resolve({ profit: 0, skipped: true })
                 return
             }
+            spinLockRef.current = true
+            const spinId = (spinSeqRef.current += 1)
             const baseBet = round2(Number(bet) || betAmount)
             const usedFreeSpin = Boolean(freeSpins > 0 && free)
             const tier = !usedFreeSpin && tierId ? (buyTiers.find(t => t.id === tierId) || null) : null
@@ -1036,6 +1092,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             const stake = usedFreeSpin ? 0 : round2(baseBet * (usedBonusBuy ? tier.costMultiplier : 1))
 
             if (!usedFreeSpin && !placeBet(stake, `${config.title} ${usedBonusBuy ? 'bonus buy' : 'spin'}`)) {
+                spinLockRef.current = false
                 showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`)
                 resolve({ profit: 0, error: 'balance' })
                 return
@@ -1083,14 +1140,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 playSound('tick')
                 feedback(FEEDBACK_EVENTS.SPIN_START, { volume: 0.7 })
                 pendingFinishRef.current = () => {
-                    finishRound({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
+                    finishRound({ spinId, result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
                 }
-                timers.current.push(window.setTimeout(() => {
+                motion.current.schedule(() => {
                     if (!pendingFinishRef.current) return
                     const finish = pendingFinishRef.current
                     pendingFinishRef.current = null
                     finish()
-                }, 0))
+                }, 0)
                 return
             }
             const scatterId = config.features?.scatter?.symbolId
@@ -1140,7 +1197,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
             const tickerIntervalMs = getSlotTickerIntervalMs({ mode: turbo ? 'turbo' : 'normal', reduceMotion })
             if (tickerIntervalMs > 0) {
-                ticker.current = window.setInterval(() => {
+                motion.current.ticker(() => {
                     const locked = lockedColsRef.current
                     setGrid(prev => prev.map((cell, index) => {
                         const { col } = cellPositions[index]
@@ -1153,7 +1210,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
             for (const stop of stopSchedule.stops) {
                 if (lockedColsRef.current.has(stop.col)) continue
-                timers.current.push(window.setTimeout(() => {
+                motion.current.schedule(() => {
                     playSound('flip')
                     feedback(FEEDBACK_EVENTS.REEL_STOP, { volume: 0.62 })
                     if (willAnticipate && stop.anticipating && stop.col === (stopSchedule.anticipation?.fromCol || 0) + 1) {
@@ -1166,20 +1223,20 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         const { col: itemCol } = cellPositions[index]
                         return itemCol < stop.col ? result.cells[index] : cell
                     }))
-                }, stop.atMs))
+                }, stop.atMs)
             }
 
             const totalDelay = stopSchedule.totalDelayMs
             // Capture the resolution so a second tap (slam-stop) can finish now.
             pendingFinishRef.current = () => {
-                finishRound({ result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
+                finishRound({ spinId, result, baseBet, stake, usedFreeSpin, usedBonusBuy, resolve })
             }
-            timers.current.push(window.setTimeout(() => {
+            motion.current.schedule(() => {
                 if (!pendingFinishRef.current) return
                 const finish = pendingFinishRef.current
                 pendingFinishRef.current = null
                 finish()
-            }, totalDelay))
+            }, totalDelay)
         })
     ), [betAmount, buyTiers, canUseFreeSpin, cellPositions, clearLocks, clearTimers, config, feedback, finishRound, freeSpins, instant, placeBet, playSound, reduceMotion, running, setStoppedColumnState, showToast, slotSfx, stickyWilds, turbo])
 
@@ -1250,6 +1307,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         autoplayRemainingRef.current = 0
         autoplayInfiniteRef.current = false
         autoplayPendingRef.current = false
+        // Cancel the queued inter-spin timer so stopping mid-gap never fires one
+        // more spin after the user hit stop.
+        if (autoplayTimerRef.current) {
+            clearTimeout(autoplayTimerRef.current)
+            autoplayTimerRef.current = null
+        }
     }, [])
 
     // Compact list of the currently-armed stop conditions, surfaced on the dock
@@ -1277,7 +1340,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         }
         autoplayPendingRef.current = true
         const tierId = canUseFreeSpin ? null : buyTierIdRef.current
-        const id = window.setTimeout(() => {
+        if (autoplayTimerRef.current) clearTimeout(autoplayTimerRef.current)
+        autoplayTimerRef.current = setTimeout(() => {
+            autoplayTimerRef.current = null
             performSpin({ source: 'auto', bet: betAmount, free: canUseFreeSpin, tierId }).then(outcome => {
                 autoplayPendingRef.current = false
                 if (!autoplayActive) return
@@ -1299,7 +1364,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 else if (autoplayRemainingRef.current <= 0 && autoplayRemainingRef.current !== Infinity) stopAutoplay()
             })
         }, 220)
-        timers.current.push(id)
     }, [autoplayActive, betAmount, balance, canUseFreeSpin, performSpin, running, stopAutoplay])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

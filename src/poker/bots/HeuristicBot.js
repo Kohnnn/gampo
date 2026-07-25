@@ -364,10 +364,12 @@ export default function HeuristicBot({
     const effectiveAggression = clamp(aggression + anteBoost + personaProfile.aggression, 0.02, 0.98)
     const pressure = effectiveAggression * (equity - 0.5)
 
-    // Wave 12: short-stack push/fold ICM nudges. Below ~12 BB, advanced and
-    // intermediate bots collapse to a clean push/fold spectrum on preflop.
-    // Push threshold is hand-strength based: nut-strong jam, mid-strength jam
-    // from late position, weak hands fold.
+    // Wave 13: short-stack play. Only genuinely short stacks (<=8 BB) collapse
+    // to a pure all-in-or-fold jam spectrum. From 8-12 BB bots instead make a
+    // normal sized open/re-raise (not a full-stack shove) so they stop jamming
+    // every hand — a 10 BB stack shoving AKo is fine, but shoving with the
+    // whole stack on a marginal hand every orbit is the "too dumb" behaviour.
+    // Floors are tightened so trash folds instead of punting.
     const stackBb = (me.stack + (me.putIn || 0)) / Math.max(1, state.bb)
     if (street === 'preflop' && stackBb <= 12 && difficulty !== 'beginner') {
         const raiseAct = acts.find(a => a.type === 'raise')
@@ -375,16 +377,21 @@ export default function HeuristicBot({
         const positionLate = role === 'BTN' || role === 'CO' || role === 'SB'
         const facedRaise = state.history.some(h => h.type === 'raise')
         let pushFloor
-        if (stackBb <= 6) pushFloor = positionLate ? 0.42 : 0.5
-        else if (stackBb <= 9) pushFloor = positionLate ? 0.48 : 0.58
-        else pushFloor = positionLate ? 0.55 : 0.65
-        // When facing a raise, we need stronger to call/jam.
-        if (facedRaise) pushFloor += 0.07
+        if (stackBb <= 6) pushFloor = positionLate ? 0.46 : 0.54
+        else if (stackBb <= 9) pushFloor = positionLate ? 0.54 : 0.62
+        else pushFloor = positionLate ? 0.62 : 0.70
+        // When facing a raise, we need stronger to continue.
+        if (facedRaise) pushFloor += 0.08
         if (raiseAct && equity >= pushFloor) {
-            return { type: 'raise', amount: raiseAct.max }
+            // <=8 BB: true jam. Otherwise size a normal raise and keep chips back.
+            const amount = stackBb <= 8
+                ? raiseAct.max
+                : chooseRaiseSize({ raiseAct, state, equity, street, aggression: effectiveAggression, rng })
+            return { type: 'raise', amount }
         }
         const callAct = acts.find(a => a.type === 'call')
-        if (callAct && equity >= pushFloor - 0.05 && callAct.amount >= me.stack * 0.6) {
+        // Only flat all-in-priced calls when we clear the (jam) floor comfortably.
+        if (callAct && equity >= pushFloor - 0.04 && callAct.amount >= me.stack * 0.6) {
             return { type: 'call' }
         }
         if (acts.find(a => a.type === 'fold')) return { type: 'fold' }
