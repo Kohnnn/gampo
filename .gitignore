@@ -40,3 +40,8 @@ rainbetclone/_quarantine/
 rainbetclone/
 .vibecode-backup*/
 docs/
+_evl_*.log
+_dev.log
+.cursor/
+.playwright-cli/
+.playwright-mcp/
