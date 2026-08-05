@@ -25,6 +25,7 @@
 
 import js from '@eslint/js'
 import globals from 'globals'
+import react from 'eslint-plugin-react'
 
 // ---------------------------------------------------------------------------
 // RNG guard scope + narrow visual/sim allowlist.
@@ -105,6 +106,14 @@ export default [
                 ecmaFeatures: { jsx: true },
             },
             globals: { ...globals.browser },
+        },
+    },
+
+    {
+        files: ['src/**/*.jsx'],
+        plugins: { react },
+        rules: {
+            'react/jsx-uses-vars': 'error',
         },
     },
 
