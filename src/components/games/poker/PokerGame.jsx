@@ -9,6 +9,7 @@ import { icmEquity } from '../../../poker/icm'
 import HeuristicBot from '../../../poker/bots/HeuristicBot'
 import { preloadGto } from '../../../poker/gto/loader'
 import { normalizeDecisionContext, resolveDecision } from '../../../poker/strategy/decisionContract'
+import { currentDecisionSource } from '../../../poker/strategy/strategySource'
 import CoachPanel from './CoachPanel'
 import RangeBrowser from './RangeBrowser'
 import HandHistoryTab, { recordHand } from './HandHistoryTab'
@@ -393,7 +394,7 @@ export default function PokerGame() {
             sng: format === 'sng' ? { payoutSignature: SNG_PAYOUTS, icmModel: 'malmuth-harville-v1' } : undefined,
         })
         if (!normalized.ok) return { state: 'unavailable', reason: normalized.reason, provenance: null, result: null }
-        return resolveDecision({ context: normalized.context, source: null })
+        return resolveDecision({ context: normalized.context, source: currentDecisionSource(normalized.context) })
     }, [state, human, isHumanTurn, format, acts])
 
     const coachTable = useMemo(() => {
