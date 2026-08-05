@@ -19,7 +19,7 @@ export const SLOT_RTP_SCALARS = {
     "mansion-megaways": 0.038992,
     "ghostblade-strike": 0.371687,
     "iron-fist": 0.304687,
-    "coop-cluck": 0.0420588,
+    "coop-cluck": 0.0520109,
     "miko-spirit": 0.0536472,
     "forge-anvil": 2.18478,
     "gummy-drops": 0.000018251

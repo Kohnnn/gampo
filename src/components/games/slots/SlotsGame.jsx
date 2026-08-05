@@ -56,6 +56,7 @@ import { buildPaytable } from './slotPaytable'
 import { describePaylines } from './slotPaylines'
 import { buildSparkline } from './slotSparkline'
 import FreeSpinCounter from './FreeSpinCounter'
+import { applyFreeSpinAward, shouldStopAutoplay } from './slotAccounting'
 import './slots.css'
 
 const FEATURE_LABELS = {
@@ -727,6 +728,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         clearTimers()
         const returnAmount = round2(baseBet * result.multiplier)
         const profit = round2(returnAmount - stake)
+        const freeSpinEvent = result.featureEvents.find(item => item.type === 'free-spins')
+        const awardedFreeSpins = applyFreeSpinAward(freeSpinSession, freeSpinEvent?.freeSpins || 0)
+        const displayedFeatureEvents = result.featureEvents.flatMap(event => {
+            if (event.type !== 'free-spins') return [event]
+            return awardedFreeSpins > 0 ? [{ ...event, freeSpins: awardedFreeSpins }] : []
+        })
 
         // Cascade tumble replay: when the engine recorded multiple cascadeFrames
         // (pop -> collapse -> refill chain), animate them on the grid instead of
@@ -780,7 +787,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             setCascadeStepIndex(-1)
             cascadeReplayRef.current = false
         }
-        setLastResult({ ...result, profit, returnAmount, stake, baseBet, usedFreeSpin, usedBonusBuy })
+        setLastResult({ ...result, featureEvents: displayedFeatureEvents, profit, returnAmount, stake, baseBet, usedFreeSpin, usedBonusBuy })
         setRunning(false)
         setSpinPhase(result.multiplier > 0 ? 'win' : 'settled')
         setAnticipating(false)
@@ -955,8 +962,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             })
         }
 
-        const freeSpinEvent = result.featureEvents.find(item => item.type === 'free-spins')
-        if (freeSpinEvent?.freeSpins) {
+        if (awardedFreeSpins > 0) {
             feedback(FEEDBACK_EVENTS.BONUS_ENTER, { volume: 0.92 })
             // Bespoke bonus-entry cinematic on the initial bonus open (not on
             // retriggers, and not when the vault-burst path already played it).
@@ -965,7 +971,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     trigger: revealTrigger,
                     ...getBonusCinematic(config.id, {
                         kind: 'free-spins',
-                        freeSpins: freeSpinEvent.freeSpins,
+                        freeSpins: awardedFreeSpins,
                         accent: config.accent,
                     }),
                 })
@@ -977,14 +983,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             // retriggers) plus the free spins awarded for achievement tracking.
             recordFeatureEvent({
                 type: freeSpinSession ? 'retrigger' : 'free-spins',
-                freeSpins: freeSpinEvent.freeSpins,
+                freeSpins: awardedFreeSpins,
             })
             if (freeSpinSession && freeSpinEvent.indexes?.length) {
                 const flyers = buildRetriggerFlyers({
                     indexes: freeSpinEvent.indexes,
                     cellPositions,
                     layout: config.layout,
-                    amount: freeSpinEvent.freeSpins,
+                    amount: awardedFreeSpins,
                     trigger: revealTrigger,
                 })
                 setRetriggerFlyers(flyers)
@@ -995,23 +1001,23 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             // Retrigger pop: a celebratory "+N FREE SPINS" banner distinct from the
             // flying scatter badges, so an in-session retrigger has its own beat.
             if (freeSpinSession) {
-                setRetriggerPop({ trigger: revealTrigger, amount: freeSpinEvent.freeSpins })
+                setRetriggerPop({ trigger: revealTrigger, amount: awardedFreeSpins })
                 motion.current.schedule(() => {
                     setRetriggerPop(current => (current && current.trigger === revealTrigger ? null : current))
                 }, 1500)
             }
-            setFreeSpins(value => value + freeSpinEvent.freeSpins)
+            setFreeSpins(value => value + awardedFreeSpins)
             setFreeSpinSession(prev => {
                 if (prev) {
                     // Retrigger: extend session count.
                     return {
                         ...prev,
-                        totalAwarded: prev.totalAwarded + freeSpinEvent.freeSpins,
+                        totalAwarded: prev.totalAwarded + awardedFreeSpins,
                         retriggers: (prev.retriggers || 0) + 1,
                     }
                 }
                 return {
-                    totalAwarded: freeSpinEvent.freeSpins,
+                    totalAwarded: awardedFreeSpins,
                     played: 0,
                     totalWin: 0,
                     baseBet,
@@ -1352,15 +1358,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 }
                 const stops = stopsRef.current
                 const baseline = autoplayBaselineRef.current ?? balance
-                const net = balance - baseline
-                const spinProfit = Number(outcome?.profit) || 0
-                if (stops.stopOnFeature && outcome?.featureEvents?.length) stopAutoplay()
-                else if (stops.stopOnBigWin && outcome?.multiplier >= stops.bigWinThreshold) stopAutoplay()
-                else if (stops.stopOnLoss && balance <= baseline * (1 - stops.lossPercent / 100)) stopAutoplay()
-                else if (stops.stopOnGain && balance >= baseline * (1 + stops.gainPercent / 100)) stopAutoplay()
-                else if (stops.stopOnLossAbs && stops.lossAbs > 0 && net <= -stops.lossAbs) stopAutoplay()
-                else if (stops.stopOnGainAbs && stops.gainAbs > 0 && net >= stops.gainAbs) stopAutoplay()
-                else if (stops.stopOnSingleWin && stops.singleWinAbs > 0 && spinProfit >= stops.singleWinAbs) stopAutoplay()
+                const settledBalance = balance + outcome.profit
+                if (shouldStopAutoplay({ baseline, settledBalance, outcome, stops })) stopAutoplay()
                 else if (autoplayRemainingRef.current <= 0 && autoplayRemainingRef.current !== Infinity) stopAutoplay()
             })
         }, 220)

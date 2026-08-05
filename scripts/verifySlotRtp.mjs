@@ -1,5 +1,6 @@
 // Verifies that calibrated slot scalars bring each template within tolerance of
 // its rtpTarget. Run: node --loader ./scripts/extResolve.mjs scripts/verifySlotRtp.mjs
+import assert from 'node:assert/strict'
 import { SLOT_TEMPLATES, resolveSlotSpin, __setSlotCalibrationRng } from '../src/components/games/slots/slotFactory.js'
 import { MAX_FREE_SPINS_PER_SESSION } from '../src/components/games/slots/slotConstants.js'
 
@@ -39,6 +40,41 @@ function hashId(id) {
     return h >>> 0
 }
 
+function applyFreeSpinAward(state, { source, rawAward, persistentAward = false }) {
+    const actualAward = Math.max(0, Math.min(rawAward, MAX_FREE_SPINS_PER_SESSION - state.totalAwarded))
+    if (actualAward > 0) {
+        state.queued += actualAward
+        state.totalAwarded += actualAward
+        if (persistentAward) state.persistent = Math.min(state.persistentCap, state.persistent + 1)
+    }
+    return { source, rawAward, actualAward, zeroSideEffect: actualAward === 0 }
+}
+
+function runAccountingSelfCheck() {
+    const state = { queued: 0, totalAwarded: 0, played: 0, persistent: 2, persistentCap: 10 }
+    const initial = applyFreeSpinAward(state, { source: 'scatter', rawAward: 12 })
+    state.queued -= 1
+    state.played += 1
+    const retrigger = applyFreeSpinAward(state, { source: 'free-spins', rawAward: 12, persistentAward: true })
+    const exhausted = applyFreeSpinAward(state, { source: 'free-spins', rawAward: 12, persistentAward: true })
+    const coinMeterState = { queued: 0, totalAwarded: 0, played: 0, persistent: 1, persistentCap: 10 }
+    const coinMeter = applyFreeSpinAward(coinMeterState, { source: 'coin-meter-fill', rawAward: 12 })
+    assert.equal(initial.source, 'scatter')
+    assert.equal(initial.actualAward, 12)
+    assert.equal(retrigger.actualAward, 8)
+    assert.equal(state.totalAwarded, 20)
+    assert.equal(state.played, 1)
+    assert.equal(state.queued, 19)
+    assert.equal(exhausted.actualAward, 0)
+    assert.equal(exhausted.zeroSideEffect, true)
+    assert.equal(state.persistent, 3)
+    assert.equal(coinMeter.source, 'coin-meter-fill')
+    assert.equal(coinMeter.rawAward, 12)
+    assert.equal(coinMeter.actualAward, 12)
+}
+
+runAccountingSelfCheck()
+
 let allPass = true
 console.log('id'.padEnd(20), 'target', 'realRTP', 'verdict')
 for (const config of SLOT_TEMPLATES) {
@@ -68,21 +104,26 @@ for (const config of SLOT_TEMPLATES) {
             let total = 0
             const base = resolveSlotSpin(config, { persistentMultiplier: 1 })
             total += base.multiplier
-            let fs = base.triggeredFreeSpins ? award : 0
-            if (!fs) {
-                const burst = base.featureEvents?.find(e => e.type === 'coin-meter-fill')
-                if (burst) fs = burst.freeSpins || 0
+            const state = { queued: 0, totalAwarded: 0, played: 0, persistent: 1, persistentCap: cap }
+            const initialAward = base.featureEvents?.find(event => event.type === 'free-spins')
+            if (initialAward) {
+                applyFreeSpinAward(state, {
+                    source: initialAward.source === 'coin-meter' ? 'coin-meter-fill' : 'scatter',
+                    rawAward: initialAward.freeSpins || award,
+                })
             }
-            let played = 0
-            let persistent = 1
-            while (fs > 0 && played < MAX_FS) {
-                fs -= 1; played += 1
-                const spin = resolveSlotSpin(config, { persistentMultiplier: persistent })
+            while (state.queued > 0 && state.played < MAX_FS) {
+                state.queued -= 1; state.played += 1
+                const spin = resolveSlotSpin(config, { persistentMultiplier: state.persistent })
                 total += spin.multiplier
-                if (hasPersistent && spin.cascadeSteps > 0) persistent = Math.min(cap, persistent + 1)
-                if (spin.triggeredFreeSpins && played + fs < MAX_FS) {
-                    fs += award
-                    if (hasPersistent) persistent = Math.min(cap, persistent + 1)
+                if (hasPersistent && spin.cascadeSteps > 0) state.persistent = Math.min(cap, state.persistent + 1)
+                const retriggerAward = spin.featureEvents?.find(event => event.type === 'free-spins')
+                if (retriggerAward) {
+                    applyFreeSpinAward(state, {
+                        source: retriggerAward.source === 'coin-meter' ? 'coin-meter-fill' : 'free-spins',
+                        rawAward: retriggerAward.freeSpins || award,
+                        persistentAward: hasPersistent,
+                    })
                 }
             }
             sum += total
