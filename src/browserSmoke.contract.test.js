@@ -50,17 +50,30 @@ describe('browserSmoke CDP route isolation', () => {
         expect(source).toMatch(/return right <= left \|\| bottom <= top \? null/)
     })
 
-    it('requires seated table, retired-advice absence, and enabled human action in the Poker smoke branch', () => {
+    it('requires seated table, truthful coach, and enabled human action in the Poker smoke branch', () => {
         const pokerStart = source.indexOf("if (route === '/poker')")
         const pokerEnd = source.indexOf("if (route === '/cases')", pokerStart)
         const pokerBranch = source.slice(pokerStart, pokerEnd)
 
-        expect(pokerBranch).toContain("const adviceAbsent = !document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel=\"gto\"]');")
+        // The retired mobile advice panels must still be asserted gone.
+        expect(pokerBranch).toContain("const retiredAbsent = !document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel=\"gto\"]');")
+        // But retired-selector absence alone is vacuously true, so the gate must also
+        // observe the live coach and its truthfulness.
+        expect(pokerBranch).toContain("const coach = document.querySelector('[data-poker-coach-state]');")
+        expect(pokerBranch).toContain("const truthfulState = coachState !== null && coachState !== 'supported';")
+        expect(pokerBranch).toContain('const adviceAbsent = retiredAbsent && truthfulState && freqHonest')
+        // The coach sits behind the Coach tab, so the gate must open it before asserting.
+        expect(pokerBranch).toMatch(/coachTab[\s\S]*click\(\)/)
         expect(pokerBranch).toContain('return table && adviceAbsent && action')
-        expect(pokerBranch).toContain("? ok('poker seated; retired advice absent; human action reachable', { table, adviceAbsent, action })")
+        expect(pokerBranch).toContain("? ok('poker seated; coach truthful; human action reachable', details)")
         expect(pokerBranch).not.toContain('const gto =')
         expect(pokerBranch).not.toContain('table && gto && action')
         expect(source).toContain("if (viewport.width >= 768 && route !== '/poker') return { status: 'skipped', reason: 'desktop viewport' }")
+    })
+
+    it('defaults the smoke base URL to the preview port used by sibling audit scripts', () => {
+        expect(source).toContain("argValue('baseUrl', 'http://127.0.0.1:4173')")
+        expect(source).not.toContain("argValue('baseUrl', 'http://127.0.0.1:5173')")
     })
 
     it('uses the clipped rectangle center while retaining visible blocked-target failures', () => {

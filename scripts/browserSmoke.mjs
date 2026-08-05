@@ -598,7 +598,22 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
     // (enabled action button) rather than a fixed sleep that races the bots.
     await sleep(500);
     const table = Boolean(document.querySelector('.poker-layout'));
-    const adviceAbsent = !document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel="gto"]');
+    // The retired mobile advice panels must stay gone.
+    const retiredAbsent = !document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel="gto"]');
+    // The coach is behind the Coach tab (sidebar defaults to History), so open it
+    // before asserting. Checking only the retired selectors above is vacuously true
+    // and proves nothing; this exercises the real coach surface instead.
+    const coachTab = [...document.querySelectorAll('.poker-tab')].find(b => /coach/i.test(b.textContent || ''));
+    if (coachTab) { coachTab.click(); await sleep(350); }
+    const coach = document.querySelector('[data-poker-coach-state]');
+    const coachState = coach ? coach.getAttribute('data-poker-coach-state') : null;
+    // With no reviewed source wired, the coach must never claim exact/prescriptive play.
+    const truthfulState = coachState !== null && coachState !== 'supported';
+    // If frequencies are shown without a supported source, the not-reviewed note is required.
+    const freqShown = Boolean(document.querySelector('.pk-coach-actions'));
+    const noteShown = Boolean(document.querySelector('.pk-coach-note'));
+    const freqHonest = !freqShown || coachState === 'supported' || noteShown;
+    const adviceAbsent = retiredAbsent && truthfulState && freqHonest;
     let action = false;
     for (let i = 0; i < 40; i += 1) {
       action = Boolean(document.querySelector(
@@ -607,9 +622,10 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
       if (action) break;
       await sleep(200);
     }
+    const details = { table, adviceAbsent, action, coachMounted: Boolean(coach), coachState, retiredAbsent, truthfulState, freqShown, freqHonest };
     return table && adviceAbsent && action
-      ? ok('poker seated; retired advice absent; human action reachable', { table, adviceAbsent, action })
-      : fail('poker did not reach seated table, advice-absent human action state', { table, adviceAbsent, action });
+      ? ok('poker seated; coach truthful; human action reachable', details)
+      : fail('poker did not reach seated table, truthful-coach human action state', details);
   }
 
   if (route === '/cases') {
@@ -726,7 +742,9 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
 }
 
 async function run() {
-    const baseUrl = argValue('baseUrl', 'http://127.0.0.1:5173').replace(/\/$/, '')
+    // Default to the preview port, matching auditA11y/auditContrast/verifyBetSheet.
+    // `npm run dev` users can still pass --baseUrl=http://127.0.0.1:5173 explicitly.
+    const baseUrl = argValue('baseUrl', 'http://127.0.0.1:4173').replace(/\/$/, '')
     const origin = new URL(baseUrl).origin
     const mode = argValue('mode', 'smoke')
     const isUxMode = mode === 'ux'
