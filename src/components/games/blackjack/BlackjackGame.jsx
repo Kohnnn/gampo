@@ -12,6 +12,8 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, scoreBlackjackHand } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
+import { dealerUpValue, isSoftHand, recommendBlackjackAction } from '../../../utils/blackjackStrategy'
+import { createBlackjackCount, dealCards, observeCards } from './blackjackCount'
 import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
@@ -69,53 +71,6 @@ function buildShoe(decks = 4) {
     return shoe
 }
 
-function isSoftHand(cards) {
-    let total = 0
-    let aces = 0
-    for (const card of cards) {
-        if (card.rank === 'A') { aces += 1; total += 11 }
-        else if (['K', 'Q', 'J'].includes(card.rank)) total += 10
-        else total += Number(card.rank)
-    }
-    while (total > 21 && aces > 0) { total -= 10; aces -= 1 }
-    return aces > 0 && total <= 21
-}
-
-function dealerUpValue(card) {
-    if (!card) return 0
-    if (card.rank === 'A') return 11
-    if (['K', 'Q', 'J', '10'].includes(card.rank)) return 10
-    return Number(card.rank)
-}
-
-function basicStrategyHint(player, dealerCard) {
-    if (!player?.length || !dealerCard) return 'Deal first.'
-    const score = scoreBlackjackHand(player)
-    const up = dealerUpValue(dealerCard)
-    if (score >= 17) return 'Stand · hard 17+ stays.'
-    if (score <= 8) return 'Hit · weak hard total.'
-    if (isSoftHand(player)) {
-        if (score >= 19) return 'Stand · soft 19+ is strong.'
-        if (score === 18) return up >= 9 ? 'Hit · soft 18 vs strong dealer.' : 'Stand · soft 18 vs weak dealer.'
-        return 'Hit · soft hands ride upward.'
-    }
-    if (score >= 13 && score <= 16) {
-        return up >= 7 ? `Hit · hard ${score} vs ${up}.` : `Stand · hard ${score} vs ${up}.`
-    }
-    if (score === 12) return up >= 4 && up <= 6 ? 'Stand · hard 12 vs 4-6.' : 'Hit · hard 12.'
-    if (score === 11) return 'Hit · hard 11 always wants more.'
-    if (score === 10) return 'Hit · hard 10.'
-    if (score === 9) return 'Hit · hard 9.'
-    return 'Hit.'
-}
-
-function hintActionFromText(hint) {
-    if (!hint) return null
-    if (hint.startsWith('Stand')) return 'stand'
-    if (hint.startsWith('Hit')) return 'hit'
-    return null
-}
-
 function suitGlyph(s) {
     if (s === 'H') return '\u2665'
     if (s === 'D') return '\u2666'
@@ -154,6 +109,7 @@ export default function BlackjackGame() {
     const [chipSlide, setChipSlide] = useState(null)
     const chipSlideTimer = useRef(null)
     const stageRef = useRef(null)
+    const countRef = useRef(createBlackjackCount(4 * 52))
 
     useEffect(() => () => {
         if (chipSlideTimer.current) window.clearTimeout(chipSlideTimer.current)
@@ -179,9 +135,14 @@ export default function BlackjackGame() {
     const machine = useRoundMachine({ onEvent: handleEvent })
 
     const drawTop = (sourceShoe) => [sourceShoe[0], sourceShoe.slice(1)]
-    const ensureShoe = (source) => (source.length < decks * 13) ? buildShoe(decks) : source
+    const resetShoe = (deckCount) => {
+        countRef.current = createBlackjackCount(deckCount * 52)
+        return buildShoe(deckCount)
+    }
+    const ensureShoe = (source) => (source.length < decks * 13) ? resetShoe(decks) : source
 
     const finishRound = useCallback((finalHands, finalDealer) => {
+        countRef.current = observeCards(countRef.current, finalDealer)
         const settlement = settleBlackjackHands(finalHands, finalDealer, insurance)
         const bestMultiplier = settlement.hands.reduce((best, hand) => Math.max(best, hand.result?.multiplier || 0), 0)
         const labels = settlement.hands.map((hand, index) => `H${index + 1} ${hand.result?.label || 'Loss'}`).join(' · ')
@@ -236,6 +197,7 @@ export default function BlackjackGame() {
             while (dealerKeepHitting()) {
                 let card
                 ;[card, nextShoe] = drawTop(nextShoe)
+                countRef.current = dealCards(countRef.current, [card])
                 nextDealer.push(card)
             }
         }
@@ -282,6 +244,8 @@ export default function BlackjackGame() {
             ;[card, nextShoe] = drawTop(nextShoe)
             initialDealer.push(card)
         }
+        countRef.current = dealCards(countRef.current, [...initialPlayer, ...initialDealer])
+        countRef.current = observeCards(countRef.current, [...initialPlayer, initialDealer[0]])
         setShoe(nextShoe)
         const initialHands = [makeBlackjackHand({ cards: initialPlayer, wager: betAmount, id: `hand-${Date.now()}` })]
         setHands(initialHands)
@@ -314,6 +278,7 @@ export default function BlackjackGame() {
             status: scoreBlackjackHand(nextCards) > 21 ? 'busted' : 'active',
         }
         const nextHands = hands.map((hand, index) => index === activeHandIndex ? nextHand : hand)
+        countRef.current = observeCards(dealCards(countRef.current, [card]), [card])
         setShoe(nextShoe)
         if (nextHand.status === 'busted') {
             window.setTimeout(() => advanceFromHand(nextHands, nextShoe), 300)
@@ -351,6 +316,7 @@ export default function BlackjackGame() {
             status: scoreBlackjackHand(nextCards) > 21 ? 'busted' : 'standing',
         }
         const nextHands = hands.map((hand, index) => index === activeHandIndex ? nextHand : hand)
+        countRef.current = observeCards(dealCards(countRef.current, [card]), [card])
         setShoe(nextShoe)
         window.setTimeout(() => advanceFromHand(nextHands, nextShoe), 300)
     }
@@ -383,6 +349,7 @@ export default function BlackjackGame() {
             ...splitHands,
             ...hands.slice(activeHandIndex + 1),
         ]
+        countRef.current = observeCards(dealCards(countRef.current, [firstCard, secondCard]), [firstCard, secondCard])
         setShoe(nextShoe)
         setHands(nextHands)
         setActiveBet(nextHands.reduce((sum, hand) => sum + (hand.wager || 0), 0))
@@ -407,7 +374,7 @@ export default function BlackjackGame() {
         showToast('bet', 'Insurance taken', `Side bet ${formatCredits(cost)}`)
     }
 
-    const onDecks = (n) => { setDecks(n); setShoe(buildShoe(n)) }
+    const onDecks = (n) => { setDecks(n); setShoe(resetShoe(n)) }
 
     const runStudy = (count = 500) => {
         if (studyRunning) return
@@ -425,8 +392,14 @@ export default function BlackjackGame() {
                 while (true) {
                     const score = scoreBlackjackHand(p)
                     if (score >= 21) break
-                    const hint = basicStrategyHint(p, d[0])
-                    if (hint.startsWith('Stand')) break
+                    const recommendation = recommendBlackjackAction({
+                        player: p,
+                        dealerCard: d[0],
+                        decks,
+                        hitsSoft17,
+                        available: { double: false, split: false, surrender: false },
+                    })
+                    if (recommendation.action === 'stand') break
                     p.push(local.shift())
                 }
                 while (true) {
@@ -452,10 +425,20 @@ export default function BlackjackGame() {
 
     const activeHand = hands[activeHandIndex] || hands[0] || makeBlackjackHand({ cards: [], wager: 0, status: 'idle', id: 'empty' })
     const activeScore = scoreBlackjackHand(activeHand.cards)
-    const hint = phase === 'playing' ? basicStrategyHint(activeHand.cards, dealer[0]) : 'Deal a hand to receive guidance.'
+    const canSplitActive = canSplitHand(activeHand, hands)
+    const canDoubleActive = canDoubleHand(activeHand)
+    const canSurrenderActive = canSurrenderHand(activeHand, activeHandIndex, hands)
+    const recommendation = recommendBlackjackAction({
+        player: activeHand.cards,
+        dealerCard: dealer[0],
+        decks,
+        hitsSoft17,
+        available: { hit: activeHand.status === 'active' && !activeHand.isSplitAces, stand: activeHand.status === 'active', split: canSplitActive, double: canDoubleActive, surrender: canSurrenderActive },
+    })
+    const hint = phase === 'playing' ? recommendation.reason : 'Deal a hand to receive guidance.'
     const recentProfit = useMemo(() => session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0), [session.history])
     const inRound = phase === 'playing'
-    const hintAction = hintActionFromText(hint)
+    const hintAction = recommendation.action
 
     // When a hand is dealt, bring the table/action stage into view so mobile
     // players see the cards and hit/stand controls instead of them landing
@@ -463,9 +446,6 @@ export default function BlackjackGame() {
     useScrollActionIntoView(stageRef, inRound, [inRound], { block: 'nearest' })
     const dealerVisible = dealer[0] ? `${dealer[0].rank}${suitGlyph(dealer[0].suit)} (${dealerUpValue(dealer[0])})` : '—'
     const playerTotalLabel = activeHand.cards.length ? `${activeScore}${isSoftHand(activeHand.cards) ? ' soft' : ''}` : '—'
-    const canSplitActive = canSplitHand(activeHand, hands)
-    const canDoubleActive = canDoubleHand(activeHand)
-    const canSurrenderActive = canSurrenderHand(activeHand, activeHandIndex, hands)
 
     return (
         <GameShell
