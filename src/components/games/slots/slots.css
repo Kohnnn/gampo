@@ -839,12 +839,19 @@
     opacity: 0;
 }
 
-/* Vertical reel scroll: symbols streak downward with motion blur, reading as a
-   spinning physical reel rather than a static jiggle. Purely cosmetic — the
-   outcome is already decided by resolveSlotSpin. */
+/* Vertical reel scroll: symbols sweep downward with motion blur, reading as a
+   spinning physical reel. Seamless loop — start and end frames match, so there
+   is no teleport/strobe at the cycle boundary (the old -58%->+58% keyframe hard-
+   snapped 116% of cell height every cycle). Directional downward sweep (0-82%)
+   plus a fast blurred wrap (82-100%) reads as a reel; the per-tick symbol swap
+   and blur sell the motion. Purely cosmetic — outcome decided by resolveSlotSpin.
+   ponytail: single element per cell caps this at a "buzz+swap" illusion; a true
+   continuous reel needs per-column symbol strips. Upgrade there if the swap pop
+   ever reads poorly. */
 @keyframes slotReelMotion {
-    0% { transform: translateY(-58%) scaleY(1.16); }
-    100% { transform: translateY(58%) scaleY(1.16); }
+    0% { transform: translateY(-20%) scaleY(1.08); }
+    82% { transform: translateY(20%) scaleY(1.08); }
+    100% { transform: translateY(-20%) scaleY(1.08); }
 }
 
 /* A blurred "reel window" look: while spinning, repurpose the idle-shine

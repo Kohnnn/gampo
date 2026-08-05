@@ -511,7 +511,7 @@ async function evaluatePage(client, sessionId, route) {
 }
 
 async function runMobileInteraction(client, sessionId, route, viewport) {
-    if (viewport.width >= 768) return { status: 'skipped', reason: 'desktop viewport' }
+    if (viewport.width >= 768 && route !== '/poker') return { status: 'skipped', reason: 'desktop viewport' }
     const expression = `
 (async () => {
   const route = ${JSON.stringify(route)};
@@ -594,11 +594,11 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
     if (!click.clicked) return fail('poker sit-down target was not clickable', click);
     // After sit-down, bots left of the blinds act first (BOT_THINK_MS each), so
     // the human's action bar appears after a variable delay. Poll for the seated
-    // table + GTO panel immediately, then wait up to ~8s for the human turn
+    // table and retired-advice absence, then wait up to ~8s for the human turn
     // (enabled action button) rather than a fixed sleep that races the bots.
     await sleep(500);
     const table = Boolean(document.querySelector('.poker-layout'));
-    const gto = Boolean(document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel="gto"]'));
+    const adviceAbsent = !document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel="gto"]');
     let action = false;
     for (let i = 0; i < 40; i += 1) {
       action = Boolean(document.querySelector(
@@ -607,9 +607,9 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
       if (action) break;
       await sleep(200);
     }
-    return table && gto && action
-      ? ok('poker seated; human action reachable')
-      : fail('poker did not reach human action state', { table, gto, action });
+    return table && adviceAbsent && action
+      ? ok('poker seated; retired advice absent; human action reachable', { table, adviceAbsent, action })
+      : fail('poker did not reach seated table, advice-absent human action state', { table, adviceAbsent, action });
   }
 
   if (route === '/cases') {

@@ -31,7 +31,8 @@ const appSource = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8')
 
 function missionRoutesFromSource() {
     const start = casinoSource.indexOf('const MISSION_ROUTES = {')
-    const end = casinoSource.indexOf('\n}\n\nfunction missionRouteFor', start)
+    const end = casinoSource.search(/\r?\n}\r?\n\r?\nfunction missionRouteFor/)
+
     expect(start, 'MISSION_ROUTES declaration is missing').toBeGreaterThanOrEqual(0)
     expect(end, 'MISSION_ROUTES closing boundary is missing').toBeGreaterThan(start)
     return Object.fromEntries([...casinoSource.slice(start, end).matchAll(/'([^']+)':\s*'([^']+)'/g)].map(([, id, path]) => [id, path]))

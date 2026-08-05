@@ -50,6 +50,19 @@ describe('browserSmoke CDP route isolation', () => {
         expect(source).toMatch(/return right <= left \|\| bottom <= top \? null/)
     })
 
+    it('requires seated table, retired-advice absence, and enabled human action in the Poker smoke branch', () => {
+        const pokerStart = source.indexOf("if (route === '/poker')")
+        const pokerEnd = source.indexOf("if (route === '/cases')", pokerStart)
+        const pokerBranch = source.slice(pokerStart, pokerEnd)
+
+        expect(pokerBranch).toContain("const adviceAbsent = !document.querySelector('.poker-mobile-gto-now, [data-poker-mobile-panel=\"gto\"]');")
+        expect(pokerBranch).toContain('return table && adviceAbsent && action')
+        expect(pokerBranch).toContain("? ok('poker seated; retired advice absent; human action reachable', { table, adviceAbsent, action })")
+        expect(pokerBranch).not.toContain('const gto =')
+        expect(pokerBranch).not.toContain('table && gto && action')
+        expect(source).toContain("if (viewport.width >= 768 && route !== '/poker') return { status: 'skipped', reason: 'desktop viewport' }")
+    })
+
     it('uses the clipped rectangle center while retaining visible blocked-target failures', () => {
         expect(source).toContain('const visible = el => Boolean(visibleRect(el));')
         expect(source).toContain('const visible = el => Boolean(visibleRect(el));')
