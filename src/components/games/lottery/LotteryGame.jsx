@@ -80,7 +80,7 @@ export default function LotteryGame() {
                 amount: profit,
                 message: `${hits}/5 numbers hit`,
             })
-            session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${hits}/5`, profit, betAmount, multiplier, meta: { picked: selected, drawn: next } })
+            session.record({ id: crypto.randomUUID(), label: `${hits}/5`, profit, betAmount, multiplier, meta: { picked: selected, drawn: next } })
             showToast(profit >= 0 ? 'win' : 'loss', `Lottery ${hits} hits`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
         }, 400 + next.length * 350 + 200)

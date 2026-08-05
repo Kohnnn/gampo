@@ -874,7 +874,7 @@ export default function CasesGame() {
         }
         sfx.play(won ? 'win' : 'lose')
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${caseData.name} x${roundRows}`,
             profit, betAmount: stake, multiplier: averageMultiplier,
             meta: { picks: picks.map(p => ({ id: p.skinId, rarity: p.rarity, multiplier: p.multiplier, valueGc: p.valueGc, openPriceGc: p.openPriceGc, wear: p.wear, statTrak: p.statTrak })) },

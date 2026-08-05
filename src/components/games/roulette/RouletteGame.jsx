@@ -25,24 +25,36 @@ const SPIN_PHASE_LABELS = {
     settled: 'Settled',
 }
 
+// Fake table crowd for the sim-bettor rail. `number` is the REAL nextRoll-derived
+// landed number passed in by the caller; these fake bettors only compare their fake
+// pick against it so the rail can render won/lost chips. Nothing here touches the
+// local player's bets, balance, or payout — that runs through settleBets/nextRoll.
 function makeSimPlayers(number = null) {
     // 2026-06-11: livelier table — 14–20 unique bettors per spin.
+    // gampo:allow-math-random-sim — how many fake bettors to render on the rail.
     const n = 14 + Math.floor(Math.random() * 7)
     const namePool = [...SIM_NAMES]
     for (let i = namePool.length - 1; i > 0; i -= 1) {
+        // gampo:allow-math-random-sim — name-pool shuffle for fake bettor display names.
         const j = Math.floor(Math.random() * (i + 1))
         ;[namePool[i], namePool[j]] = [namePool[j], namePool[i]]
     }
     return Array.from({ length: n }, (_, i) => {
+        // gampo:allow-math-random-sim — fake bettor stake shown on the rail, display only.
         const bet = [1, 5, 10, 25, 50][Math.floor(Math.random() * 5)]
+        // gampo:allow-math-random-sim — which fake bet type this rail row displays.
         const pickType = Math.random()
         const type = pickType < 0.5 ? 'color' : pickType < 0.75 ? 'dozen' : 'straight'
+        // gampo:allow-math-random-sim — fake bettor red/black pick for the rail.
         const colorPick = Math.random() < 0.5 ? 'red' : 'black'
+        // gampo:allow-math-random-sim — fake bettor straight-up number pick for the rail.
         const straight = Math.floor(Math.random() * 37)
+        // gampo:allow-math-random-sim — fake bettor dozen label for the rail.
         const label = type === 'color' ? colorPick : type === 'dozen' ? `${1 + Math.floor(Math.random() * 3)}st 12`.replace('1st', '1st').replace('2st', '2nd').replace('3st', '3rd') : `${straight}`
         const won = number === null ? null : type === 'color' ? colorOf(number) === colorPick : type === 'dozen' ? number > 0 && Math.ceil(number / 12) === Number(label[0]) : number === straight
         const payout = won ? bet * (type === 'straight' ? 35 : type === 'dozen' ? 3 : 2) : 0
         return {
+            // gampo:allow-math-random-id — React key for a fake rail row, never persisted.
             id: `${i}-${Math.random().toString(16).slice(2, 6)}`,
             name: namePool[i % namePool.length],
             bet,
@@ -55,7 +67,7 @@ function makeSimPlayers(number = null) {
 
 // Bet type ids: stored as { id, type, params, amount }
 function bestBetForCell(numbers, amount, type, params) {
-    return { id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, type, params, amount }
+    return { id: crypto.randomUUID(), type, params, amount }
 }
 
 function betLabel(type, params = {}) {
@@ -133,14 +145,14 @@ export default function RouletteGame() {
             return
         }
         sfx.play('chip', { volume: 0.5 })
-        setBets(lastChips.map(b => ({ ...b, id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}` })))
+        setBets(lastChips.map(b => ({ ...b, id: crypto.randomUUID() })))
     }
 
     const performPlay = ({ mode } = {}) => new Promise(resolve => {
         // If auto-loop or rebet fired without chips on the felt, restore the last snapshot.
         let activeBets = bets
         if (!activeBets.length && lastChips.length && (mode === 'auto' || mode === 'manual')) {
-            activeBets = lastChips.map(b => ({ ...b, id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}` }))
+            activeBets = lastChips.map(b => ({ ...b, id: crypto.randomUUID() }))
             setBets(activeBets)
         }
         if (!activeBets.length) {
@@ -224,7 +236,7 @@ export default function RouletteGame() {
                     message: `Landed ${number} ${colorOf(number)}`,
                 })
                 session.record({
-                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    id: crypto.randomUUID(),
                     label: `${number} ${colorOf(number)}`,
                     profit, betAmount: stake,
                     meta: { number, color: colorOf(number), legs: activeBets.length },

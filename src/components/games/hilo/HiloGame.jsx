@@ -156,7 +156,7 @@ export default function HiloGame() {
                 playSound(won ? 'win' : push ? 'click' : 'loss')
             }
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: push ? 'Push' : won ? `Win → ${renderRank(next.rank)}` : `Miss → ${renderRank(next.rank)}`,
                 profit, betAmount,
                 meta: { current: currentCard, next, direction },

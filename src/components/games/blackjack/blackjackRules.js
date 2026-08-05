@@ -17,8 +17,8 @@ export function makeBlackjackHand({
     surrendered = false,
     isSplitAces = false,
     fromSplit = false,
-    // gampo:allow-math-random-visual — hand DOM id, not payout-deciding.
-    id = `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+    // Hand DOM id, not payout-deciding — payout is decided by scoreBlackjackHand.
+    id = crypto.randomUUID(),
 } = {}) {
     return { id, cards, wager, status, doubled, surrendered, isSplitAces, fromSplit }
 }

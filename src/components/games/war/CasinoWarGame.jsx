@@ -99,7 +99,7 @@ export default function CasinoWarGame() {
                 addWinnings(betAmount * 2, 'Casino War return')
                 setHand({ player, dealer, outcome: 'win' })
                 setBurstKey(k => k + 1); playSound('win'); sfx.play('win')
-                session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: 'Win', profit: betAmount, betAmount, meta: { player, dealer } })
+                session.record({ id: crypto.randomUUID(), label: 'Win', profit: betAmount, betAmount, meta: { player, dealer } })
                 setToast({ kind: 'win', multiplier: 2, amount: betAmount, message: 'War win' })
                 machine.finish({ kind: 'win', profit: betAmount, multiplier: 2 })
                 showToast('win', 'War win', `+${formatCredits(betAmount)}`)
@@ -114,7 +114,7 @@ export default function CasinoWarGame() {
             } else {
                 setHand({ player, dealer, outcome: 'loss' })
                 playSound('loss'); sfx.play('lose')
-                session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: 'Loss', profit: -betAmount, betAmount, meta: { player, dealer } })
+                session.record({ id: crypto.randomUUID(), label: 'Loss', profit: -betAmount, betAmount, meta: { player, dealer } })
                 setToast({ kind: 'lose', amount: -betAmount, message: 'War loss' })
                 machine.finish({ kind: 'lose', profit: -betAmount, multiplier: 0 })
                 showToast('loss', 'War loss', `-${formatCredits(betAmount)}`)
@@ -127,7 +127,7 @@ export default function CasinoWarGame() {
         if (!tiedHand || slamming) return
         addWinnings(pendingBet / 2, 'Casino War surrender')
         const profit = -pendingBet / 2
-        session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: 'Surrender', profit, betAmount: pendingBet })
+        session.record({ id: crypto.randomUUID(), label: 'Surrender', profit, betAmount: pendingBet })
         setPhase('idle'); setTiedHand(null); setHand(null)
         showToast('loss', 'Surrender', `${formatCredits(profit)}`)
     }
@@ -145,12 +145,12 @@ export default function CasinoWarGame() {
                 setHand({ player: np, dealer: nd, outcome: 'tie-win' })
                 setBurstKey(k => k + 1); playSound('bigwin')
                 setBigWin({ trigger: Date.now(), profit: pendingBet, multiplier: 3 })
-                session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: 'Tie-win', profit: pendingBet, betAmount: pendingBet * 2 })
+                session.record({ id: crypto.randomUUID(), label: 'Tie-win', profit: pendingBet, betAmount: pendingBet * 2 })
                 showToast('win', 'Tie won', `+${formatCredits(pendingBet)}`)
             } else {
                 setHand({ player: np, dealer: nd, outcome: 'tie-loss' })
                 playSound('loss')
-                session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: 'Tie-loss', profit: -pendingBet * 2, betAmount: pendingBet * 2 })
+                session.record({ id: crypto.randomUUID(), label: 'Tie-loss', profit: -pendingBet * 2, betAmount: pendingBet * 2 })
                 showToast('loss', 'Tie lost', `-${formatCredits(pendingBet * 2)}`)
             }
             setPhase('idle'); setTiedHand(null)

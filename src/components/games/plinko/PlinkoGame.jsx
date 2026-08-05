@@ -246,7 +246,7 @@ export default function PlinkoGame() {
             const profit = returnAmount - cost
             if (returnAmount > 0) addWinnings(returnAmount, 'Plinko return')
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `${mult.toFixed(2)}× bin ${bi}`,
                 profit, betAmount: cost, multiplier: mult,
                 meta: { rows, risk, ballType, binIndex: bi },

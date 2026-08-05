@@ -150,7 +150,7 @@ export default function BlackjackGame() {
         setHands(settlement.hands)
         setOutcomeSummary(settlement)
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: labels || 'Blackjack',
             profit: settlement.profit,
             betAmount: settlement.wagered + insurance,

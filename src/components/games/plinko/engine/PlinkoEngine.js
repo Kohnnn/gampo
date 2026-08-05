@@ -123,8 +123,8 @@ class PlinkoEngine {
         if (!positions || positions.length === 0) return pad(WIDTH / 2);
 
         // Random pick from valid X positions for this bin
-        // gampo:allow-math-random-visual — initial drop X is visual jitter only; the
-        // payout bin is selected downstream via nextRoll('plinko') in PlinkoGame.jsx.
+        // The payout bin is selected downstream via nextRoll('plinko') in PlinkoGame.jsx.
+        // gampo:allow-math-random-visual — initial drop X is visual jitter only, not the bin.
         return positions[Math.floor(Math.random() * positions.length)];
     }
 

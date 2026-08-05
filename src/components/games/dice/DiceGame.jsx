@@ -160,7 +160,7 @@ export default function DiceGame() {
 
         // Session record + toast still fire immediately so totals stay accurate
         // even if the user navigates away during the animation.
-        session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: roll.toFixed(2), profit, betAmount, multiplier: won ? payout : 0, meta: { winChance, rollMode } })
+        session.record({ id: crypto.randomUUID(), label: roll.toFixed(2), profit, betAmount, multiplier: won ? payout : 0, meta: { winChance, rollMode } })
         showToast(won ? 'win' : 'loss', won ? 'Dice hit' : 'Dice miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         simSeqRef.current += 1
         setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('dice', {

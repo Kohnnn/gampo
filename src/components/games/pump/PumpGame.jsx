@@ -98,7 +98,7 @@ export default function PumpGame() {
             setBusted(true)
             setToast({ kind: 'lose', amount: -stake, message: `Burst at ${pumps + 1} pumps` })
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `Burst ${pumps + 1}`,
                 profit: -stake, betAmount: stake, multiplier: 0,
                 meta: { pumps: pumps + 1 },
@@ -128,7 +128,7 @@ export default function PumpGame() {
         }
         sfx.play('cashout')
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${m.toFixed(2)}× cashout`,
             profit, betAmount: stake, multiplier: m,
             meta: { pumps },

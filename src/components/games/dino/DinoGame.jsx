@@ -102,7 +102,7 @@ export default function DinoGame() {
         sfx.play('explode')
         engineRef.current?.die()
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `Crashed step ${steps}`,
             profit: -stake, betAmount: stake,
             meta: { difficulty, steps },
@@ -130,7 +130,7 @@ export default function DinoGame() {
         }
         setBurstKey(k => k + 1)
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${m.toFixed(2)}× cashout`,
             profit, betAmount: stake, multiplier: m,
             meta: { difficulty, steps },

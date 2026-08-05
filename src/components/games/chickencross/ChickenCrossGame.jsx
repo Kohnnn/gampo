@@ -92,6 +92,7 @@ export default function ChickenCrossGame() {
     const cross = () => {
         if (lane >= LANES) { cashout(); return }
         // Cosmetic-only car flyby (independent of game outcome).
+        // gampo:allow-math-random-visual — triggers a decorative car sprite, not the lane result.
         if (Math.random() < 0.3) setCarKey(k => k + 1)
         const safe = nextRoll('chickencross').roll < config.safe
         if (safe) {
@@ -105,7 +106,7 @@ export default function ChickenCrossGame() {
         playSound('explode')
         sfx.play('lose')
         setSplat(true)
-        session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `Splat L${lane}`, profit: -activeBet, betAmount: activeBet, meta: { risk, lane } })
+        session.record({ id: crypto.randomUUID(), label: `Splat L${lane}`, profit: -activeBet, betAmount: activeBet, meta: { risk, lane } })
         setToast({ kind: 'lose', amount: -activeBet, message: `Splat lane ${lane}` })
         machine.finish({ kind: 'bust', profit: -activeBet, multiplier: 0, lane })
         showToast('loss', 'Chicken hit', `-${formatCredits(activeBet)}`)
@@ -130,7 +131,7 @@ export default function ChickenCrossGame() {
         }
         sfx.play('cashout')
         setBurstKey(k => k + 1)
-        session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${multiplier}×`, profit, betAmount: activeBet, multiplier, meta: { risk, lane } })
+        session.record({ id: crypto.randomUUID(), label: `${multiplier}×`, profit, betAmount: activeBet, multiplier, meta: { risk, lane } })
         setToast({ kind: 'cashout', multiplier, amount: profit, message: 'Cashed out' })
         machine.finish({ kind: 'cashed', profit, multiplier, lane })
         showToast('win', 'Chicken cashed out', `+${formatCredits(profit)}`)

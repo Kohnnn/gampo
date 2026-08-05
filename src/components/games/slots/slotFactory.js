@@ -960,8 +960,8 @@ export function makeInitialGrid(config) {
 }
 
 export function randomVisualSymbol(config) {
-    // gampo:allow-math-random-visual — idle-grid visual pre-fill only; spinning uses
-    // the provably-fair nextRoll pipeline and payouts do not flow through this helper.
+    // Spinning uses the provably-fair nextRoll pipeline; payouts never flow through here.
+    // gampo:allow-math-random-visual — idle-grid pre-fill symbol only, never a spin result.
     return config.symbols[Math.floor(Math.random() * config.symbols.length)] || config.symbols[0]
 }
 

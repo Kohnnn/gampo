@@ -117,6 +117,7 @@ export default class DinoEngine {
             // Idle demo: scroll ground, bob the dino slightly, spawn occasional cactus.
             w.scroll = (w.scroll + dt * 220) % FRAMES.ground.w
             w.demoSpawnTimer += dt
+            // gampo:allow-math-random-sim — idle attract-loop spawn cadence, no stake in play.
             if (w.demoSpawnTimer > 2.5 + Math.random() * 1.5) {
                 w.demoSpawnTimer = 0
                 spawnObstacle(w, W + 120)
@@ -154,6 +155,7 @@ export default class DinoEngine {
 
         // Auto-spawn the next obstacle ahead. Spacing depends on speed.
         w.spawnTimer += dt
+        // gampo:allow-math-random-visual — obstacle spacing jitter; the run outcome is nextRoll-driven.
         const spacing = 1.0 + Math.random() * 0.9
         if (w.spawnTimer > spacing) {
             w.spawnTimer = 0
@@ -252,12 +254,16 @@ function createWorld() {
 }
 
 function spawnObstacle(w, x) {
-    // Random pick: 80% cactus, 20% bird (only when running).
+    // Obstacle shape/height is cosmetic: the dino run's stake outcome is decided by
+    // nextRoll in DinoGame.jsx, not by which sprite happens to spawn.
+    // gampo:allow-math-random-visual — obstacle kind mix (80% cactus / 20% bird), cosmetic only.
     const useBird = w.phase === 'running' && Math.random() < 0.2
     if (useBird) {
+        // gampo:allow-math-random-visual — bird flight height jitter, purely a sprite offset.
         const flightY = GROUND_Y - 30 - Math.random() * 30
         w.obstacles.push({ kind: 'bird-1', x, scale: 1.1, flightY, cleared: false })
     } else {
+        // gampo:allow-math-random-visual — which cactus sprite is drawn, cosmetic only.
         const kind = CACTI[Math.floor(Math.random() * CACTI.length)]
         w.obstacles.push({ kind, x, scale: 1.4, cleared: false })
     }

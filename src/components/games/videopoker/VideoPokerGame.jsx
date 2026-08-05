@@ -187,7 +187,7 @@ export default function VideoPokerGame() {
         })
         machine.finish({ kind: outcome.label, profit, multiplier: outcome.multiplier })
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: outcome.label,
             profit, betAmount: activeBet || profit + activeBet, multiplier: outcome.multiplier,
             meta: { hand: finalCards },

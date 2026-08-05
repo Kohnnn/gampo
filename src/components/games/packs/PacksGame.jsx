@@ -194,7 +194,7 @@ export default function PacksGame() {
             }
             sfx.play(won ? 'win' : 'lose')
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `${tierConf.label} · ${picks.map(p => p.name).join(', ')}`,
                 profit, betAmount: stake, multiplier: totalMult,
                 meta: { tier, picks: picks.map(p => p.name) },

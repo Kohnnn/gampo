@@ -127,7 +127,7 @@ export default function SnakesGame() {
             setPhase('busted')
             setToast({ kind: 'lose', amount: -stake, message: `Snake at rung ${rung + 1}` })
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `Snake at ${rung + 1}`,
                 profit: -stake, betAmount: stake, multiplier: 0,
                 meta: { rung: rung + 1, snakesPerRow },
@@ -163,7 +163,7 @@ export default function SnakesGame() {
         }
         sfx.play('cashout')
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${m.toFixed(2)}× rung ${r}`,
             profit, betAmount: stake, multiplier: m,
             meta: { rung: r, snakesPerRow },

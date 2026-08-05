@@ -233,7 +233,7 @@ export default function BaccaratGame() {
         })
         machine.finish({ kind: outcome, profit, multiplier: effectiveMult, playerScore, bankerScore })
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${outcome} ${playerScore}-${bankerScore}`,
             profit, betAmount: stake,
             meta: { outcome, playerScore, bankerScore, playerPair, bankerPair },

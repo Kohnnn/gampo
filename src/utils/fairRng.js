@@ -10,7 +10,7 @@ function randomHex(length = 32) {
     if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
         crypto.getRandomValues(bytes)
     } else {
-        // gampo:allow-math-random-visual — emergency fallback when Web Crypto is unavailable in a non-browser test environment. Real gameplay uses crypto.getRandomValues above.
+        // gampo:allow-math-random-fallback — emergency seed bytes only when Web Crypto is absent (non-browser test env). Real gameplay takes crypto.getRandomValues above.
         for (let i = 0; i < length; i++) bytes[i] = Math.floor(Math.random() * 256)
     }
     return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
@@ -161,7 +161,10 @@ export function nextRoll(gameId) {
     const roll = hmacRollSync(composite)
     saveState({ ...state, nonce })
     pushRecent({
-        id: `${nonce}-${Math.random().toString(16).slice(2, 6)}`,
+        // Internal React key for the recent-roll log. Not part of the composite, not
+        // hashed, not displayed, and not used to look up entries (the HMAC enrichment
+        // below matches on nonce + gameId).
+        id: crypto.randomUUID(),
         ts: Date.now(),
         gameId,
         nonce,
@@ -206,8 +209,8 @@ export async function nextRollAsync(gameId) {
     }
     saveState({ ...state, nonce })
     pushRecent({
-        // gampo:allow-math-random-visual — recent-roll DOM id, not payout-deciding.
-        id: `${nonce}-${Math.random().toString(16).slice(2, 6)}`,
+        // Internal React key for the recent-roll log — same rationale as the sync path.
+        id: crypto.randomUUID(),
         ts: Date.now(),
         gameId,
         nonce,

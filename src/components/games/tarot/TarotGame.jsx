@@ -120,7 +120,7 @@ export default function TarotGame() {
             }
             sfx.play(won ? 'win' : 'lose')
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `${pickedSuit} ${headlineMult.toFixed(2)}×`,
                 profit, betAmount, multiplier: headlineMult,
                         meta: { suit: pickedSuit, draws: draws.map(c => c.id) },
