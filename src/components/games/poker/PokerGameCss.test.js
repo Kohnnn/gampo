@@ -144,8 +144,18 @@ describe('poker decision coach and range browser', () => {
     it('derives coach state from the Phase 02 contract rather than local heuristics', () => {
         expect(source).toContain("import { normalizeDecisionContext, resolveDecision } from '../../../poker/strategy/decisionContract'")
         expect(source).toContain('normalizeDecisionContext({')
-        expect(source).toContain('resolveDecision({ context: normalized.context, source: null })')
+        expect(source).toContain('resolveDecision({ context: normalized.context, source: currentDecisionSource(normalized.context) })')
         expect(coach).toContain("import { presentDecision } from '../../../poker/strategy/coachView'")
+    })
+
+    it('takes its live strategy source only from the governed bridge', () => {
+        // The component must never hand resolveDecision a hand-built source object.
+        // Anything it passes has to come from strategySource, which cannot return a
+        // source unless a manifest survives validateManifest.
+        expect(source).toContain("import { currentDecisionSource } from '../../../poker/strategy/strategySource'")
+        expect(source).not.toMatch(/source:\s*\{/)
+        expect(source).not.toContain("reviewed: true")
+        expect(source).not.toContain("kind: 'authored-local'")
     })
 
     it('renders the truth state as a data attribute so state is not colour-only', () => {
