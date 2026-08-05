@@ -208,8 +208,7 @@ function Header() {
                         className={`credit-pill ${showCredits ? 'is-open' : ''}`}
                         onClick={() => setShowCredits(prev => !prev)}
                         aria-expanded={showCredits}
-                        aria-label="Practice credits balance and top-up"
-                        title="Practice credits — fake balance, tab-isolated. Click to top up or review activity."
+                        aria-label={`Practice credits balance ${formattedBalance}. Click to top up or review activity.`}
                     >
                         <CreditIcon size={18} />
                         <span className="credit-balance-amount">{formattedBalance}</span>
