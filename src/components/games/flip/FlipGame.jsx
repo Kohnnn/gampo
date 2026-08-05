@@ -134,7 +134,7 @@ export default function FlipGame() {
             playSound(won ? 'win' : 'loss')
         }
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${revealed === 'heads' ? 'H' : 'T'} ${won ? 'win' : 'miss'}`,
             profit, betAmount, multiplier: won ? PAYOUT : 0,
             meta: { side, revealed },

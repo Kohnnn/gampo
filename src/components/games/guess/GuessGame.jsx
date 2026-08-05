@@ -59,7 +59,7 @@ export default function GuessGame() {
                 amount: profit,
                 message: won ? `Hit ${next}` : `Rolled ${next} — you picked ${choice}`,
             })
-            session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: String(next), profit, betAmount, multiplier: won ? payout : 0, meta: { picked: choice } })
+            session.record({ id: crypto.randomUUID(), label: String(next), profit, betAmount, multiplier: won ? payout : 0, meta: { picked: choice } })
             showToast(won ? 'win' : 'loss', won ? 'Number hit' : 'Number missed', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
         }, 1100)

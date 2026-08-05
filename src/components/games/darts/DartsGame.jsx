@@ -169,7 +169,7 @@ export default function DartsGame() {
             playSound(won ? 'win' : 'loss')
         }
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label,
             profit, betAmount, multiplier: won ? multiplier : 0,
             meta: { target, outcome },

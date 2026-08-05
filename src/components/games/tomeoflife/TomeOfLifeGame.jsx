@@ -130,7 +130,7 @@ export default function TomeOfLifeGame() {
             playSound('explode')
             setToast({ kind: 'lose', amount: -currentStake, message: `Skull on page ${idx + 1}` })
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `Skull page ${idx + 1}`,
                 profit: -currentStake, betAmount: currentStake, multiplier: 0,
                 meta: { pageIndex: idx + 1 },
@@ -202,7 +202,7 @@ export default function TomeOfLifeGame() {
         }
         sfx.play(profit > 0 ? 'win' : 'lose')
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${mult.toFixed(2)}× page ${page}`,
             profit, betAmount: currentStake, multiplier: mult,
             meta: { pageReached: page },

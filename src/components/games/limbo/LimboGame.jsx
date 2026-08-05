@@ -149,7 +149,7 @@ export default function LimboGame() {
         } else {
             playSound(won ? 'win' : 'loss')
         }
-        session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${multiplier.toFixed(2)}×`, profit, betAmount, multiplier: won ? target : 0, meta: { target } })
+        session.record({ id: crypto.randomUUID(), label: `${multiplier.toFixed(2)}×`, profit, betAmount, multiplier: won ? target : 0, meta: { target } })
         showToast(won ? 'win' : 'loss', won ? 'Target cleared' : 'Below target', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         simSeqRef.current += 1
         setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('limbo', {

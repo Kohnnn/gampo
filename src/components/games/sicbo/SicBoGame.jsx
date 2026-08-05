@@ -128,7 +128,7 @@ export default function SicBoGame() {
                     message: `Rolled ${next.join('+')} = ${next.reduce((a, b) => a + b, 0)}`,
                 })
                 session.record({
-                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    id: crypto.randomUUID(),
                     label: `${next.join('+')}=${next.reduce((a, b) => a + b, 0)}`,
                     profit, betAmount: stake,
                     meta: { dice: next, total: next.reduce((a, b) => a + b, 0) },

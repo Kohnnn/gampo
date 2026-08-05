@@ -145,7 +145,7 @@ export default function MinesGame() {
                     playSound('explode')
                     sfx.play('lose')
                     session.record({
-                        id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                        id: crypto.randomUUID(),
                         label: `Auto bust ${picked.length} picks`,
                         profit: -betAmount,
                         betAmount,
@@ -168,7 +168,7 @@ export default function MinesGame() {
                 playSound(m >= 5 ? 'bigwin' : 'win')
                 sfx.play('cashout')
                 session.record({
-                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    id: crypto.randomUUID(),
                     label: `Auto ${m.toFixed(2)}×`,
                     profit,
                     betAmount,
@@ -208,7 +208,7 @@ export default function MinesGame() {
             sfx.play('lose')
             setBurstKey(k => k + 1)
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `Bust ${next.length} picks`,
                 profit: -stake, betAmount: stake,
                 meta: { bombs, hit: idx },
@@ -246,7 +246,7 @@ export default function MinesGame() {
         sfx.play('cashout')
         setBurstKey(k => k + 1)
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${m.toFixed(2)}× cashout`,
             profit, betAmount: stake, multiplier: m,
             meta: { bombs, picks: list.length },

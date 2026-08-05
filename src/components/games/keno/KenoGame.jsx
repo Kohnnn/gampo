@@ -145,7 +145,7 @@ export default function KenoGame() {
             } else {
                 playSound(returnAmount > 0 ? 'win' : 'loss')
             }
-            session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${hits}/${selected.length}`, profit, betAmount, multiplier })
+            session.record({ id: crypto.randomUUID(), label: `${hits}/${selected.length}`, profit, betAmount, multiplier })
             showToast(profit >= 0 ? 'win' : 'loss', `Keno ${hits} hits`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             simSeqRef.current += 1
             setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('keno', {

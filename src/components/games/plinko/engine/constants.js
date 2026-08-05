@@ -101,7 +101,7 @@ export function getBinColors(rowCount) {
 }
 
 // Get random number between min and max
-// gampo:allow-math-random-visual — visual physics helper only; never called from payout paths.
 export function getRandomBetween(min, max) {
+    // gampo:allow-math-random-visual — visual physics range helper, never called from a payout path.
     return Math.random() * (max - min) + min;
 }

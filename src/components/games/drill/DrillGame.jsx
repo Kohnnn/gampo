@@ -125,7 +125,7 @@ export default function DrillGame() {
             setPhase('busted')
             setToast({ kind: 'lose', amount: -stake, message: `Collapse at ${layer.name}` })
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `Collapse ${layer.name}`,
                 profit: -stake, betAmount: stake, multiplier: 0,
                 meta: { layer: layer.name, depth: depth + 1 },
@@ -160,7 +160,7 @@ export default function DrillGame() {
         }
         sfx.play('cashout')
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${m.toFixed(2)}× ${LAYERS[d - 1].name}`,
             profit, betAmount: stake, multiplier: m,
             meta: { depth: d, layer: LAYERS[d - 1].name },

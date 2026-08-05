@@ -168,7 +168,7 @@ export default function WheelGame() {
             } else {
                 playSound(won ? 'win' : 'loss')
             }
-            session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: `${multiplier}×`, profit, betAmount, multiplier, meta: { risk } })
+            session.record({ id: crypto.randomUUID(), label: `${multiplier}×`, profit, betAmount, multiplier, meta: { risk } })
             showToast(profit >= 0 ? 'win' : 'loss', `Wheel ${multiplier}×`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             simSeqRef.current += 1
             setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('wheel', {

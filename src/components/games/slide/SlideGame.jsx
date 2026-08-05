@@ -137,7 +137,7 @@ export default function SlideGame() {
             playSound(won ? 'win' : 'loss')
         }
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${won ? 'Hit' : 'Miss'} ${position.toFixed(1)}`,
             profit, betAmount, multiplier: won ? payout : 0,
             meta: { position, left, right, targetWidth, targetCenter },

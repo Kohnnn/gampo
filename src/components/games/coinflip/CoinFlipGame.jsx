@@ -55,7 +55,7 @@ export default function CoinFlipGame() {
                 amount: profit,
                 message: won ? 'Coin matched' : 'Coin missed',
             })
-            session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: next, profit, betAmount, multiplier: won ? payout : 0 })
+            session.record({ id: crypto.randomUUID(), label: next, profit, betAmount, multiplier: won ? payout : 0 })
             showToast(won ? 'win' : 'loss', won ? 'Coin matched' : 'Coin missed', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
         }, 900)

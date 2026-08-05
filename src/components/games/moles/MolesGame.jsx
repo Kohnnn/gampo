@@ -176,7 +176,7 @@ export default function MolesGame() {
             sfx.play(won ? 'win' : 'lose')
             machine.finish({ kind: won ? 'win' : 'lose', profit, multiplier, hits })
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: `${hits}/${picks.length} hits`,
                 profit, betAmount, multiplier: won ? multiplier : 0,
                 meta: { hits, picks, moleCount },

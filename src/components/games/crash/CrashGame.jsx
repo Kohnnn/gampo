@@ -68,30 +68,47 @@ const SIM_NAMES = ['Lyra', 'Reno', 'Kaia', 'Ozzy', 'Nia', 'Vex', 'Mika', 'Juno',
 const SIM_COLORS = ['#ff7ab6', '#6db7ff', '#ffcf5a', '#9bf08a', '#c08bff', '#ff9457', '#5be0d4', '#41d6ff', '#ffe680', '#7bd389']
 
 // Wave 28 / 2026-06-11: bigger sim crowd (18–30 players) with persona biases.
+//
+// Everything in here is set dressing for the player strip. `bust` is the REAL
+// nextRoll-derived bust point passed in by the caller; these fake players only
+// compare their fake target against it to decide whether to render as cashed.
+// No value produced below reaches the local player's stake, profit, or payout.
 function simulatePlayers(bust) {
+    // gampo:allow-math-random-sim — how many fake bettors to render this round.
     const n = 18 + Math.floor(Math.random() * 13)
     // Unique names: shuffle the pool and take the first n (pool is large enough).
     const namePool = [...SIM_NAMES]
     for (let i = namePool.length - 1; i > 0; i -= 1) {
+        // gampo:allow-math-random-sim — name-pool shuffle for fake bettor display names.
         const j = Math.floor(Math.random() * (i + 1))
         ;[namePool[i], namePool[j]] = [namePool[j], namePool[i]]
     }
     const out = []
     for (let i = 0; i < n; i++) {
         // Persona bias: roughly 30% cautious (low target), 50% mid, 15% gambler, 5% whale.
+        // gampo:allow-math-random-sim — picks which fake persona band this bettor displays as.
         const r = Math.random()
         let target
-        if (r < 0.3) target = 1.2 + Math.random() * 0.8           // cautious 1.2-2.0
-        else if (r < 0.8) target = 1.8 + Math.random() * 3.2     // mid 1.8-5.0
-        else if (r < 0.95) target = 4 + Math.random() * 12       // gambler 4-16
-        else target = 12 + Math.random() * 40                    // whale 12-52
-        // Bet sizes vary by persona too (rough proxy via target band)
+        // gampo:allow-math-random-sim — fake cautious-persona cashout target for display (1.2-2.0).
+        if (r < 0.3) target = 1.2 + Math.random() * 0.8
+        // gampo:allow-math-random-sim — fake mid-persona cashout target for display (1.8-5.0).
+        else if (r < 0.8) target = 1.8 + Math.random() * 3.2
+        // gampo:allow-math-random-sim — fake gambler-persona cashout target for display (4-16).
+        else if (r < 0.95) target = 4 + Math.random() * 12
+        // gampo:allow-math-random-sim — fake whale-persona cashout target for display (12-52).
+        else target = 12 + Math.random() * 40
+        // Bet sizes vary by persona too (rough proxy via target band). Display-only numbers.
+        // gampo:allow-math-random-sim — fake cautious-persona bet size shown in the player strip.
         const bet = r < 0.3 ? Math.round((1 + Math.random() * 9) * 100) / 100
+            // gampo:allow-math-random-sim — fake mid-persona bet size shown in the player strip.
             : r < 0.8 ? Math.round((2 + Math.random() * 28) * 100) / 100
-            : r < 0.95 ? Math.round((10 + Math.random() * 60) * 100) / 100
-            : Math.round((50 + Math.random() * 250) * 100) / 100
+                // gampo:allow-math-random-sim — fake gambler-persona bet size shown in the strip.
+                : r < 0.95 ? Math.round((10 + Math.random() * 60) * 100) / 100
+                    // gampo:allow-math-random-sim — fake whale-persona bet size shown in the strip.
+                    : Math.round((50 + Math.random() * 250) * 100) / 100
         const cashed = bust >= target
         out.push({
+            // gampo:allow-math-random-id — React key for a fake player row, never persisted.
             id: `${i}-${Math.random().toString(16).slice(2, 6)}`,
             name: namePool[i % namePool.length],
             color: SIM_COLORS[i % SIM_COLORS.length],
@@ -269,7 +286,7 @@ export default function CrashGame() {
                 const profit = outcome.profit
                 const eff = outcome.effective
                 session.record({
-                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    id: crypto.randomUUID(),
                     label: outcome.cashed ? `Cashed ${eff.toFixed(2)}×` : `Bust ${bust.toFixed(2)}×`,
                     profit, betAmount,
                     multiplier: outcome.cashed ? eff : 0,
@@ -310,7 +327,7 @@ export default function CrashGame() {
                 setPhase('cashed')
                 addWinnings(stakeRef.current * effective, 'Crash return')
                 session.record({
-                    id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                    id: crypto.randomUUID(),
                     label: `Cashed ${effective.toFixed(2)}×`,
                     profit,
                     betAmount,
@@ -379,7 +396,7 @@ export default function CrashGame() {
         setPhase('cashed')
         addWinnings(stakeRef.current * effective, 'Crash return')
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `Cashed ${effective.toFixed(2)}×`,
             profit,
             betAmount: stakeRef.current,

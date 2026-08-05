@@ -107,7 +107,7 @@ export default function TowerGame() {
         sfx.play('lose')
         setFellAt(level)
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `Fall L${level}`,
             profit: -activeBet, betAmount: activeBet,
             meta: { risk, level },
@@ -137,7 +137,7 @@ export default function TowerGame() {
         sfx.play('cashout')
         setBurstKey(k => k + 1)
         session.record({
-            id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+            id: crypto.randomUUID(),
             label: `${multiplier}×`,
             profit, betAmount: activeBet, multiplier,
             meta: { risk, level },

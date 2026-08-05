@@ -71,7 +71,7 @@ export default function ColorGame() {
                 amount: profit,
                 message: `Landed ${next.label}`,
             })
-            session.record({ id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`, label: next.label, profit, betAmount, multiplier: won ? payout : 0 })
+            session.record({ id: crypto.randomUUID(), label: next.label, profit, betAmount, multiplier: won ? payout : 0 })
             showToast(won ? 'win' : 'loss', `Color ${next.label}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             resolve({ profit })
         }, 1900)

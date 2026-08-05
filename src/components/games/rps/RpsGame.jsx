@@ -73,7 +73,7 @@ export default function RpsGame() {
                 message: push ? 'Push — stake returned' : won ? 'RPS win' : 'RPS miss',
             })
             session.record({
-                id: `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
+                id: crypto.randomUUID(),
                 label: push ? 'Push' : won ? 'Win' : 'Miss',
                 profit, betAmount, multiplier: won ? payout : 0,
                 meta: { player: player.id, dealer: dealer.id },
