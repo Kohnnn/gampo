@@ -8,6 +8,9 @@ import { applyAction, createInitialState, dealNext, legalActions, startHand } fr
 import { icmEquity } from '../../../poker/icm'
 import HeuristicBot from '../../../poker/bots/HeuristicBot'
 import { preloadGto } from '../../../poker/gto/loader'
+import { normalizeDecisionContext, resolveDecision } from '../../../poker/strategy/decisionContract'
+import CoachPanel from './CoachPanel'
+import RangeBrowser from './RangeBrowser'
 import HandHistoryTab, { recordHand } from './HandHistoryTab'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import './PokerGame.css'
@@ -378,6 +381,34 @@ export default function PokerGame() {
     }, [state, format])
 
     useScrollActionIntoView(actionsRef, Boolean(isHumanTurn), [isHumanTurn], { block: 'nearest' })
+
+    const decision = useMemo(() => {
+        if (!state || !human || !isHumanTurn) return { state: 'unavailable', reason: 'MISSING_HERO_TURN', provenance: null, result: null }
+        const normalized = normalizeDecisionContext({
+            game: state,
+            format,
+            heroId: human.id,
+            configuredSeatCount: SNG_SEATS,
+            legalActions: acts,
+            sng: format === 'sng' ? { payoutSignature: SNG_PAYOUTS, icmModel: 'malmuth-harville-v1' } : undefined,
+        })
+        if (!normalized.ok) return { state: 'unavailable', reason: normalized.reason, provenance: null, result: null }
+        return resolveDecision({ context: normalized.context, source: null })
+    }, [state, human, isHumanTurn, format, acts])
+
+    const coachTable = useMemo(() => {
+        if (!state || !human || !isHumanTurn) return null
+        const toCall = Math.max(0, (state.currentBet || 0) - (human.putIn || 0))
+        const rivals = state.players.filter(p => p.id !== human.id && (p.status === 'active' || p.status === 'allin'))
+        const biggestRival = rivals.reduce((max, p) => Math.max(max, (p.stack || 0) + (p.putIn || 0)), 0)
+        return {
+            pot: state.pot || 0,
+            toCall,
+            effectiveStack: Math.min((human.stack || 0) + (human.putIn || 0), biggestRival),
+            bb: state.bb || 0,
+            legalActions: acts.map(a => a.type),
+        }
+    }, [state, human, isHumanTurn, acts])
 
     useEffect(() => {
         if (!isHumanTurn && raiseOpen) setRaiseOpen(false)
@@ -1022,11 +1053,23 @@ export default function PokerGame() {
                         <aside className="poker-sidebar" data-ux-surface="aside">
                             <div className="poker-tabs">
                                 <button className={`poker-tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
+                                <button className={`poker-tab ${tab === 'coach' ? 'active' : ''}`} onClick={() => setTab('coach')}>Coach</button>
+                                <button className={`poker-tab ${tab === 'ranges' ? 'active' : ''}`} onClick={() => setTab('ranges')}>Ranges</button>
                                 <button className={`poker-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>Chat</button>
                             </div>
                             <div className="poker-sidebar-body" data-poker-mobile-panel="history" hidden={tab !== 'history'}>
                                 <HandHistoryTab liveState={state} />
                             </div>
+                            {tab === 'coach' && (
+                                <div className="poker-sidebar-body" data-poker-mobile-panel="coach">
+                                    <CoachPanel decision={decision} table={coachTable} sourceConfigured={false} />
+                                </div>
+                            )}
+                            {tab === 'ranges' && (
+                                <div className="poker-sidebar-body" data-poker-mobile-panel="ranges">
+                                    <RangeBrowser />
+                                </div>
+                            )}
                             {tab === 'chat' && (
                                 <div className="poker-sidebar-body poker-chat" data-poker-mobile-panel="chat">
                                     <h3>Table chat</h3>

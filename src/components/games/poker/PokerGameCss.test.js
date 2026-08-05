@@ -127,3 +127,79 @@ describe('poker layout CSS', () => {
         expect(source).toContain('data-ux-surface="controls"')
     })
 })
+
+describe('poker decision coach and range browser', () => {
+    const coach = readFileSync(new URL('./CoachPanel.jsx', import.meta.url), 'utf8')
+    const range = readFileSync(new URL('./RangeBrowser.jsx', import.meta.url), 'utf8')
+
+    it('mounts both surfaces without restoring retired advice identifiers', () => {
+        expect(source).toContain("import CoachPanel from './CoachPanel'")
+        expect(source).toContain("import RangeBrowser from './RangeBrowser'")
+        expect(source).toContain('<CoachPanel decision={decision}')
+        expect(source).toContain('<RangeBrowser />')
+        expect(source).toContain('data-poker-mobile-panel="coach"')
+        expect(source).toContain('data-poker-mobile-panel="ranges"')
+    })
+
+    it('derives coach state from the Phase 02 contract rather than local heuristics', () => {
+        expect(source).toContain("import { normalizeDecisionContext, resolveDecision } from '../../../poker/strategy/decisionContract'")
+        expect(source).toContain('normalizeDecisionContext({')
+        expect(source).toContain('resolveDecision({ context: normalized.context, source: null })')
+        expect(coach).toContain("import { presentDecision } from '../../../poker/strategy/coachView'")
+    })
+
+    it('renders the truth state as a data attribute so state is not colour-only', () => {
+        expect(coach).toContain('data-poker-coach-state={view.state}')
+        expect(coach).toContain('{view.headline}')
+        expect(coach).toContain('{view.summary}')
+        expect(range).toContain('data-poker-range-status={grid.status}')
+    })
+
+    it('keeps the range browser static, unreviewed, and independent of the live hand', () => {
+        expect(range).not.toContain('liveState')
+        expect(range).not.toContain('isHumanTurn')
+        expect(range).not.toContain('decision')
+        expect(range).toContain('{grid.disclosure}')
+        expect(source).not.toContain('<RangeBrowser decision')
+        expect(source).not.toContain('<RangeBrowser liveState')
+    })
+
+    it('styles both surfaces without reintroducing retired advice selectors', () => {
+        expect(css).toMatch(/\.pk-coach\s*\{[^}]*display:\s*flex/s)
+        expect(css).toMatch(/\.pk-coach-badge\.is-supported\s*\{/s)
+        expect(css).toMatch(/\.pk-coach-badge\.is-approximate\s*\{/s)
+        expect(css).toMatch(/\.pk-coach-badge\.is-error\s*\{/s)
+        expect(css).toMatch(/\.pk-range-grid\s*\{[^}]*display:\s*flex/s)
+        expect(css).toMatch(/\.pk-range-row\s*\{[^}]*grid-template-columns:\s*repeat\(13, minmax\(0, 1fr\)\)/s)
+        expect(css).toMatch(/\.pk-range-cell\s*\{[^}]*aspect-ratio:\s*1 \/ 1/s)
+        expect(css).toMatch(/\.pk-range-field select:focus-visible[\s\S]*outline:\s*2px solid/s)
+    })
+
+    it('keeps every sidebar tab reachable including mounted history', () => {
+        for (const label of ['History', 'Coach', 'Ranges', 'Chat']) {
+            expect(source).toContain(`>${label}</button>`)
+        }
+        expect(source).toContain('data-poker-mobile-panel="history" hidden={tab !== \'history\'}')
+    })
+
+    it('renders bounded arithmetic only when coverage is genuinely covered', () => {
+        const coach = readFileSync(new URL('./CoachPanel.jsx', import.meta.url), 'utf8')
+        expect(coach).toContain("coverage.status === 'covered'")
+        expect(coach).toContain('{coverage.ceiling}')
+        expect(coach).toContain('{coverage.confidence}')
+        expect(coach).toContain('data-poker-coverage-status')
+    })
+
+    it('never renders an arithmetic recommendation or certainty claim', () => {
+        const coach = readFileSync(new URL('./CoachPanel.jsx', import.meta.url), 'utf8')
+        expect(coach).not.toMatch(/you should|best play|recommend|optimal/i)
+        expect(coach).not.toMatch(/\bev\b|equity|solver|gto/i)
+    })
+
+    it('styles the coverage block distinctly from supported advice', () => {
+        expect(css).toMatch(/\.pk-coach-coverage\s*\{[^}]*border:\s*1px dashed/s)
+        expect(css).toMatch(/\.pk-coach-coverage-item\.is-warning\s*\{[^}]*border-left/s)
+        expect(css).toMatch(/\.pk-coach-coverage-ceiling\s*\{[^}]*font-style:\s*italic/s)
+    })
+})
+

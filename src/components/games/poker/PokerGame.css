@@ -1149,3 +1149,315 @@
     .pk-seat.seat-4,
     .pk-seat.seat-5 { left: 85%; }
 }
+
+/* --- Decision Coach and Range Browser ----------------------------------------- */
+/* Dense table-side console. Truth state is carried by data attributes and text,
+   never by colour alone. Amber is a data legend, matching the seat bars. */
+.pk-coach {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.pk-coach-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pk-coach-badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #23303c);
+    color: var(--text-secondary, #b9c4cf);
+}
+
+.pk-coach-badge.is-supported {
+    color: var(--accent-green, #00e701);
+    border-color: var(--pk-accent-line);
+    background: var(--pk-accent-soft);
+}
+
+.pk-coach-badge.is-approximate {
+    color: #f0c040;
+    border-color: rgba(240, 192, 64, 0.4);
+    background: rgba(240, 192, 64, 0.12);
+}
+
+.pk-coach-badge.is-unavailable,
+.pk-coach-badge.is-loading {
+    color: var(--text-secondary, #b9c4cf);
+}
+
+.pk-coach-badge.is-error {
+    color: #ff6b6b;
+    border-color: rgba(255, 107, 107, 0.4);
+}
+
+.pk-coach-review {
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-secondary, #b9c4cf);
+}
+
+.pk-coach-review.is-unreviewed { color: #f0c040; }
+
+.pk-coach-summary,
+.pk-coach-reason,
+.pk-coach-note {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--text-secondary, #b9c4cf);
+}
+
+.pk-coach-note { color: #f0c040; }
+
+.pk-coach-actions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pk-coach-action {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 8px;
+}
+
+.pk-coach-action-type {
+    font-size: 0.78rem;
+    text-transform: capitalize;
+    color: var(--text-primary, #eaf0f6);
+}
+
+.pk-coach-bar {
+    display: block;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.pk-coach-bar > i {
+    display: block;
+    height: 100%;
+    background: #f0c040;
+}
+
+.pk-coach-action-pct {
+    font-size: 0.78rem;
+    text-align: right;
+    color: var(--text-primary, #eaf0f6);
+}
+
+.pk-coach-source {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-color, #23303c);
+    font-size: 0.72rem;
+    color: var(--text-secondary, #b9c4cf);
+}
+
+.pk-range {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pk-range-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 8px;
+}
+
+.pk-range-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary, #b9c4cf);
+}
+
+.pk-range-field select {
+    min-height: 32px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #23303c);
+    background: var(--bg-secondary, #101c26);
+    color: var(--text-primary, #eaf0f6);
+    font-size: 0.82rem;
+}
+
+.pk-range-field select:focus-visible,
+.pk-range-cell:focus-visible {
+    outline: 2px solid var(--accent-green, #00e701);
+    outline-offset: 1px;
+}
+
+.pk-range-size {
+    font-size: 0.75rem;
+    color: #f0c040;
+    padding-bottom: 6px;
+}
+
+.pk-range-disclosure {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: #f0c040;
+}
+
+.pk-range-empty {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-secondary, #b9c4cf);
+}
+
+.pk-range-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    width: 100%;
+}
+
+.pk-range-row {
+    display: grid;
+    grid-template-columns: repeat(13, minmax(0, 1fr));
+    gap: 1px;
+}
+
+.pk-range-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1 / 1;
+    min-width: 0;
+    border-radius: 2px;
+    font-size: clamp(0.42rem, 1.5vw, 0.6rem);
+    font-variant-numeric: tabular-nums;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary, #b9c4cf);
+}
+
+.pk-range-cell.is-raise {
+    background: rgba(240, 192, 64, 0.85);
+    color: #12181f;
+}
+
+.pk-range-cell.is-call {
+    background: var(--pk-accent-line);
+    color: #12181f;
+}
+
+.pk-range-cell.is-check {
+    background: rgba(120, 180, 255, 0.6);
+    color: #12181f;
+}
+
+.pk-range-cell.is-out {
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(185, 196, 207, 0.45);
+}
+
+@media (max-width: 768px) {
+    .pk-coach-action { grid-template-columns: 46px minmax(0, 1fr) 40px; }
+    .pk-range-controls { gap: 6px; }
+    .pk-range-cell { font-size: clamp(0.38rem, 2vw, 0.55rem); }
+}
+
+/* Bounded arithmetic coverage (Phase 06) */
+.pk-coach-coverage {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.pk-coach-coverage-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 8px;
+}
+
+.pk-coach-coverage-tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.pk-coach-coverage-conf {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.pk-coach-coverage-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.pk-coach-coverage-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.pk-coach-coverage-item.is-warning {
+    border-left: 3px solid rgba(240, 180, 90, 0.85);
+}
+
+.pk-coach-coverage-label {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.pk-coach-coverage-value {
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+}
+
+.pk-coach-coverage-detail {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.58);
+}
+
+.pk-coach-coverage-ceiling {
+    margin: 8px 0 0;
+    font-size: 11px;
+    line-height: 1.45;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.5);
+}
