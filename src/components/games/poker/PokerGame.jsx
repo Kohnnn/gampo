@@ -8,7 +8,6 @@ import { applyAction, createInitialState, dealNext, legalActions, startHand } fr
 import { icmEquity } from '../../../poker/icm'
 import HeuristicBot from '../../../poker/bots/HeuristicBot'
 import { preloadGto } from '../../../poker/gto/loader'
-import GtoPanel from './GtoPanel'
 import HandHistoryTab, { recordHand } from './HandHistoryTab'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import './PokerGame.css'
@@ -149,7 +148,7 @@ function PokerCard({ card, hidden }) {
 export default function PokerGame() {
     useGameBgm('poker', 'idle')
     const navigate = useNavigate()
-    const { balance, placeBet, addWinnings, showToast } = useCredits()
+    const { balance, placeBet, addWinnings, grantPracticeCredits, showToast } = useCredits()
     const { play: playSound } = useAudio()
 
     const [state, setState] = useState(null)
@@ -161,7 +160,7 @@ export default function PokerGame() {
     const [chatInput, setChatInput] = useState('')
     const [raiseAmount, setRaiseAmount] = useState(null)
     const [raiseOpen, setRaiseOpen] = useState(false)
-    const [tab, setTab] = useState('gto')
+    const [tab, setTab] = useState('history')
     const [buyIn, setBuyIn] = useState(1000)
     const [format, setFormat] = useState('sng')
     const [handNumber, setHandNumber] = useState(1)
@@ -690,27 +689,6 @@ export default function PokerGame() {
             : actor
                 ? `${actor.name} thinking`
                 : 'Dealing'
-    const gtoNow = (() => {
-        if (!state || !human) return null
-        const hasRaise = acts.some(a => a.type === 'raise')
-        const hasCall = acts.some(a => a.type === 'call')
-        const hasCheck = acts.some(a => a.type === 'check')
-        const spr = state.pot > 0 ? ((human.stack || 0) / state.pot) : 0
-        if (!isHumanTurn) {
-            return { decision: tableStateLabel, raise: 0, call: 0, fold: 0, classLabel: 'Waiting', spr }
-        }
-        if (facingAmount > 0 && potOdds > 0.34) {
-            return { decision: 'Fold pressure', raise: 8, call: 22, fold: 70, classLabel: 'Risk control', spr }
-        }
-        if (hasRaise && facingAmount === 0) {
-            return { decision: 'Raise / check', raise: 58, call: hasCheck ? 42 : 0, fold: 0, classLabel: 'Open pressure', spr }
-        }
-        if (hasCall) {
-            return { decision: 'Call / raise', raise: hasRaise ? 28 : 0, call: 62, fold: 10, classLabel: 'Continue', spr }
-        }
-        return { decision: hasCheck ? 'Check' : 'Act', raise: hasRaise ? 35 : 0, call: hasCheck ? 65 : 0, fold: 0, classLabel: 'Low pressure', spr }
-    })()
-
     return (
             <div className="poker-page" data-ux-surface="shell">
             <div className="poker-titlebar" data-ux-surface="shell">
@@ -741,11 +719,20 @@ export default function PokerGame() {
                             onClick={() => setFormat('cash')}
                         >Cash game (5/10)</button>
                     </div>
+                    <span className="poker-buyin-label">Buy-in</span>
                     <div className="poker-buyin-options">
                         {BUY_INS.map(amount => (
                             <button type="button" key={amount} className={buyIn === amount ? 'active' : ''} disabled={balance < amount} onClick={() => setBuyIn(amount)}>{formatCredits(amount)}</button>
                         ))}
                     </div>
+                    {balance < BUY_INS[0] && (
+                        <div className="poker-lobby-lowbalance" role="status">
+                            <p>Your balance ({formatCredits(balance)}) is below the minimum buy-in of {formatCredits(BUY_INS[0])}.</p>
+                            <button type="button" className="poker-lobby-topup" onClick={() => grantPracticeCredits(BUY_INS[0] - balance)}>
+                                Add {formatCredits(BUY_INS[0] - balance)} practice credits
+                            </button>
+                        </div>
+                    )}
                     {sngComplete && sngResult && (
                         <div className="pk-sng-result" role="status">
                             <strong>
@@ -829,11 +816,11 @@ export default function PokerGame() {
                             </div>
                         )}
                         {format === 'cash' && (
-                            <button className="pk-info-topup" onClick={topUp} title="Top up to full buy-in">
+                            <button className="pk-info-topup" onClick={topUp} aria-label="Top up to full buy-in">
                                 Top Up
                             </button>
                         )}
-                        <button className="pk-info-cashout" onClick={() => cashOut(false)} title="Cash out and leave the table">
+                        <button className="pk-info-cashout" onClick={() => cashOut(false)} aria-label="Cash out and leave the table">
                             Cash Out
                         </button>
                     </div>
@@ -882,31 +869,6 @@ export default function PokerGame() {
                                     <button className="pk-act primary" onClick={cashOutAndExit}>Cash out & leave</button>
                                 </div>
                             </div>
-                        </div>
-                    )}
-
-                    {gtoNow && (
-                        <div className="poker-mobile-gto-now" data-poker-mobile-panel="gto">
-                            <div>
-                                <span>GTO Now</span>
-                                <strong>{gtoNow.decision}</strong>
-                                <em>{gtoNow.classLabel}</em>
-                            </div>
-                            <div className="poker-mobile-gto-bars" aria-label={`Raise ${gtoNow.raise} call ${gtoNow.call} fold ${gtoNow.fold}`}>
-                                <i className="raise" style={{ width: `${gtoNow.raise}%` }} />
-                                <i className="call" style={{ width: `${gtoNow.call}%` }} />
-                                <i className="fold" style={{ width: `${gtoNow.fold}%` }} />
-                            </div>
-                            <div className="poker-mobile-gto-mix" aria-hidden="true">
-                                <span className="raise">R {gtoNow.raise}%</span>
-                                <span className="call">C {gtoNow.call}%</span>
-                                <span className="fold">F {gtoNow.fold}%</span>
-                            </div>
-                            <dl>
-                                <div><dt>Hand</dt><dd>{heroCards}</dd></div>
-                                <div><dt>Pot odds</dt><dd>{facingAmount > 0 ? `${(potOdds * 100).toFixed(0)}%` : 'No bet'}</dd></div>
-                                <div><dt>SPR</dt><dd>{gtoNow.spr ? gtoNow.spr.toFixed(1) : '—'}</dd></div>
-                            </dl>
                         </div>
                     )}
 
@@ -1059,28 +1021,12 @@ export default function PokerGame() {
                         </div>
                         <aside className="poker-sidebar" data-ux-surface="aside">
                             <div className="poker-tabs">
-                                <button className={`poker-tab ${tab === 'gto' ? 'active' : ''}`} onClick={() => setTab('gto')}>GTO</button>
                                 <button className={`poker-tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
                                 <button className={`poker-tab ${tab === 'chat' ? 'active' : ''}`} onClick={() => setTab('chat')}>Chat</button>
                             </div>
-                            {tab === 'gto' && (
-                                <div className="poker-sidebar-body" data-poker-mobile-panel="gto">
-                                    <div className="poker-guide-card">
-                                        <span>Table brief</span>
-                                        <p>Practice-credit 6-max no-limit Hold'em. Use the GTO panel as a study reference, then compare the recommendation with pot odds, stack depth, and opponent style.</p>
-                                        <div>
-                                            <strong>Cashout</strong>
-                                            <em>Returns your stack; mid-hand cashout folds live cards.</em>
-                                        </div>
-                                    </div>
-                                    <GtoPanel state={state} />
-                                </div>
-                            )}
-                            {tab === 'history' && (
-                                <div className="poker-sidebar-body" data-poker-mobile-panel="history">
-                                    <HandHistoryTab liveState={state} />
-                                </div>
-                            )}
+                            <div className="poker-sidebar-body" data-poker-mobile-panel="history" hidden={tab !== 'history'}>
+                                <HandHistoryTab liveState={state} />
+                            </div>
                             {tab === 'chat' && (
                                 <div className="poker-sidebar-body poker-chat" data-poker-mobile-panel="chat">
                                     <h3>Table chat</h3>
