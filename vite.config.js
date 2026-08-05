@@ -24,6 +24,13 @@ export default defineConfig(({ mode }) => {
                 ignored: ['**/example/**'],
             },
         },
+        // example/ holds vendored legacy casino dumps (gitignored, zero tracked
+        // files). The watcher already skips it, but esbuild's dependency scan is
+        // separate and was crawling bower_components HTML in there, which failed
+        // the scan and disabled dep pre-bundling for the whole dev server.
+        optimizeDeps: {
+            entries: ['index.html', 'src/**/*.{js,jsx}'],
+        },
         build: {
             outDir: 'dist',
             // Plinko outcome tables are emitted as static JSON assets rather than
