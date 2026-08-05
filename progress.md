@@ -2,6 +2,10 @@ Original prompt: Implement GamPo as an educational fake-credit casino and sports
 
 ## Progress
 
+- 2026-08-02 — Slots Logic Correctness verified and archived at `process/general-plans/completed/slots-logic-correctness_29-07-26/`. Shipped injected-RNG payout coverage, source-board cascade wild attribution, live/script 20-award accounting with zero-award suppression, and settled-balance autoplay thresholds. Generated calibration changed only Coop Cluck scalar `0.0420588` → `0.0520109`. Evidence: deterministic raw/actual 12/12 then 12/8 parity with totalAwarded 20, focused 65/65, slots 136/136, full 794/794, final factory 55/55, build, `/slots` smoke, five browser probes, and all 20 official RTP verifier templates at default 200000 spins. The aggregate verifier exceeded one hour, so per-template fallback completed the same policy. Exact browser-storage byte equality after temporary seam removal was not observed and is not asserted; source/tests/build were revalidated and rendered balance returned to GC 985.00. Separate slots animation-hardening remains active and untouched.
+
+- 2026-08-01 — Poker Strategy Workstation Phase 01 Truth Boundary verified. Removed player-facing GTO/advice and retired fallback paths while preserving bot-only `preloadGto → postflopChart → HeuristicBot`, legal actions, History, Chat, fake-credit cashout, engine, payout, RNG, and SNG cashout. Evidence: focused Vitest 18/18, wording scan 408 files/0 violations, build 1,994 modules, and `/poker` smoke plus hybrid live checks at 375x667 and 1024x768 with `table=true`, `adviceAbsent=true`, and `action=true`. This corrects historical entries below that describe the former player-facing GTO panel; they remain historical, not current product state.
+
 - Replaced wallet storage/context with `CreditContext` and `gampo_*` localStorage keys.
 - Added shared probability helpers and game definition data.
 - Added a reusable education panel and simulator implementations for Dice, Limbo, Keno, Wheel, Roulette, Blackjack Trainer, and Slots.
