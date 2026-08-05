@@ -14,7 +14,24 @@ import {
 import { SLOT_FEATURE_CONTRACTS, getFeatureContract } from '../../../data/slotFeatureContracts'
 
 const slotsGameSource = readFileSync(new URL('./SlotsGame.jsx', import.meta.url), 'utf8')
+const slotFactorySource = readFileSync(new URL('./slotFactory.js', import.meta.url), 'utf8')
 const slotsCssSource = readFileSync(new URL('./slots.css', import.meta.url), 'utf8')
+
+function makeSeededRng(seed) {
+    let value = seed >>> 0
+    return () => {
+        value = Math.imul(value ^ (value >>> 15), value | 1) >>> 0
+        value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
+        return ((value ^ (value >>> 14)) >>> 0) / 4294967296
+    }
+}
+
+function forceSymbol(base, symbolId) {
+    return {
+        ...base,
+        symbols: base.symbols.map(symbol => ({ ...symbol, weight: symbol.id === symbolId ? 1 : 0 })),
+    }
+}
 
 beforeEach(() => {
     const store = new Map()
@@ -353,6 +370,53 @@ describe('resolveSlotSpin engine', () => {
         const lockIndex = 5
         const result = resolveSlotSpin(config, { stickyWilds: [lockIndex] })
         expect(result.cells[lockIndex].type).toBe('wild')
+    })
+
+    it('should slot engine — supplied RNG determines mystery, wheel, hold/respin, money, cascade replacements, and full result equality', () => {
+        const scenarios = [
+            forceSymbol(getSlotTemplate('wanted-revelation'), 'wanted'),
+            forceSymbol(getSlotTemplate('iron-fist'), 'gong'),
+            forceSymbol(getSlotTemplate('forge-anvil'), 'molten-coin'),
+            forceSymbol(getSlotTemplate('bass-bayou'), getSlotTemplate('bass-bayou').symbols.find(symbol => symbol.type === 'money').id),
+            getSlotTemplate('gummy-drops'),
+        ]
+
+        for (const config of scenarios) {
+            expect(resolveSlotSpin(config, { rng: makeSeededRng(0x51a7) })).toEqual(
+                resolveSlotSpin(config, { rng: makeSeededRng(0x51a7) }),
+            )
+        }
+    })
+
+    it('should slot engine — each cascade win wild boost derives from its source board', () => {
+        const config = {
+            id: 'cascade-wild-source-board',
+            rtpScalar: 1,
+            layout: { rows: 2, cols: 3, evaluation: 'cluster' },
+            features: {
+                clusterMin: 3,
+                cascade: { tumbleMultiplierLadder: [1, 2, 3] },
+                wildMultiplier: { multiplier: 2 },
+            },
+            symbols: [
+                { id: 'a', label: 'A', weight: 1, payout: 2 },
+                { id: 'wild', label: 'WILD', weight: 1, payout: 0, type: 'wild' },
+                { id: 'b', label: 'B', weight: 1, payout: 3 },
+                { id: 'scatter', label: 'SCATTER', weight: 1, payout: 0, type: 'scatter' },
+            ],
+        }
+        const values = [0.3, 0.1, 0.1, 0.9, 0.9, 0.9, 0.6, 0.6, 0.6, 0.9, 0.9, 0.9]
+        let index = 0
+        const result = resolveSlotSpin(config, { rng: () => values[index++] ?? 0.9, rtpScalar: 1 })
+
+        expect(result.cascadeFrames[0].stepPayout).toBe(4)
+        expect(result.cascadeFrames[1].stepPayout).toBe(6)
+        expect(result.cascadeFrames[0].cells[0].type).toBe('wild')
+        expect(result.cells[0].type).toBe('scatter')
+        expect(result.wildBoostHits).toBe(1)
+        expect(result.wins[0].wildBoost).toBe(2)
+        expect(result.wins[1].wildBoost).toBeUndefined()
+        expect(result.multiplier).toBe(10)
     })
 })
 

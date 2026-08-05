@@ -1009,7 +1009,7 @@ function isPaySymbol(item) {
 
 // ---- mystery symbol pre-reveal ----
 
-function applyMysteryReveal(cells, config) {
+function applyMysteryReveal(cells, config, rng) {
     const mystery = config.features?.mysterySymbol
     if (!mystery) return { cells, mysteryReveal: null }
     const candidates = (mystery.candidates || [])
@@ -1018,7 +1018,7 @@ function applyMysteryReveal(cells, config) {
     if (!candidates.length) return { cells, mysteryReveal: null }
     const triggered = cells.some(item => item.id === mystery.id || item.type === 'mystery')
     if (!triggered) return { cells, mysteryReveal: null }
-    const reveal = candidates[Math.floor(roll(config, 'mystery') * candidates.length)]
+    const reveal = candidates[Math.floor(roll(config, 'mystery', rng) * candidates.length)]
     const next = cells.map(item => (item.id === mystery.id || item.type === 'mystery') ? reveal : item)
     return { cells: next, mysteryReveal: reveal }
 }
@@ -1373,7 +1373,7 @@ function applyWildMultiplier(wins, cells, config) {
 // The wheel award is added to the spin multiplier and surfaced as a feature event so the
 // UI can render a wheel cinematic.
 
-function resolveMultiplierWheel(config) {
+function resolveMultiplierWheel(config, rng) {
     const wheel = config.features?.multiplierWheel
     if (!wheel || !Array.isArray(wheel.values) || !wheel.values.length) return null
     const weights = Array.isArray(wheel.weights) && wheel.weights.length === wheel.values.length
@@ -1381,7 +1381,7 @@ function resolveMultiplierWheel(config) {
         : wheel.values.map(() => 1)
     const total = weights.reduce((sum, w) => sum + w, 0)
     if (total <= 0) return null
-    const r = roll(config, 'wheel') * total
+    const r = roll(config, 'wheel', rng) * total
     let cumulative = 0
     for (let i = 0; i < wheel.values.length; i += 1) {
         cumulative += weights[i]
@@ -1397,7 +1397,7 @@ function resolveMultiplierWheel(config) {
 // When triggerCount+ trigger symbols land we simulate a 3x4 coin board respin sequence
 // deterministically and return the awarded jackpot tier.
 
-function resolveHoldAndRespin(config, cells) {
+function resolveHoldAndRespin(config, cells, rng) {
     const hr = config.features?.holdAndRespin
     if (!hr) return null
     const trigger = hr.triggerSymbolId
@@ -1417,11 +1417,11 @@ function resolveHoldAndRespin(config, cells) {
     let remaining = respins
     for (let step = 0; step < respins; step += 1) {
         let added = 0
-        const r = roll(config, `hold:step:${step}`)
+        const r = roll(config, `hold:step:${step}`, rng)
         // Each empty slot has ~r * 0.3 chance to fill, gated by filled count to avoid runaway.
         board = board.map((slot, idx) => {
             if (slot) return slot
-            const fillRoll = roll(config, `hold:fill:${step}:${idx}`)
+            const fillRoll = roll(config, `hold:fill:${step}:${idx}`, rng)
             if (fillRoll < 0.18 + r * 0.12) {
                 added += 1
                 return true
@@ -1498,7 +1498,7 @@ function resolveMultiplierOrbs(cells, config, rng) {
 }
 
 // ---- money symbol resolve ----
-function resolveMoneyValues(cells, config) {
+function resolveMoneyValues(cells, config, rng) {
     const moneyDefs = config.symbols.filter(item => item.type === 'money')
     if (!moneyDefs.length) return { moneyValues: [], moneyTotal: 0 }
     const moneyValues = []
@@ -1506,7 +1506,7 @@ function resolveMoneyValues(cells, config) {
     cells.forEach((item, index) => {
         if (item.type !== 'money') return
         const range = item.valueRange || [1, 5]
-        const r = roll(config, `money:${index}`)
+        const r = roll(config, `money:${index}`, rng)
         const value = round2(range[0] + r * (range[1] - range[0]))
         moneyValues.push({ index, value, symbol: item })
         moneyTotal = round2(moneyTotal + value)
@@ -1516,11 +1516,12 @@ function resolveMoneyValues(cells, config) {
 
 // ---- cascade tumble ----
 
-function cascadeTumble(cells, config, baseWins, baseIndexes, rng) {
+function cascadeTumble(cells, config, baseWins, baseIndexes, rng, baseWildBoostHits = 0) {
     const ladder = config.features?.cascade?.tumbleMultiplierLadder
-    if (!ladder || !baseWins.length) return { cells, cascadedWins: baseWins, cascadeSteps: 0, cascadeFrames: [] }
+    if (!ladder || !baseWins.length) return { cells, cascadedWins: baseWins, cascadeSteps: 0, cascadeFrames: [], wildBoostHits: baseWildBoostHits }
     let working = [...cells]
     let cascadedWins = [...baseWins]
+    let wildBoostHits = baseWildBoostHits
     let step = 0
     let lastIndexes = baseIndexes
     // Per-step frames so the UI can animate real tumbles (pop -> collapse ->
@@ -1546,24 +1547,25 @@ function cascadeTumble(cells, config, baseWins, baseIndexes, rng) {
             cascadeFrames.push({ cells: [...working], winCells: [], stepPayout: 0, stepMultiplier: 0 })
             break
         }
+        const { wins: wildBoostedWins, wildBoostHits: stepWildBoostHits } = applyWildMultiplier(next.wins, working, config)
+        wildBoostHits += stepWildBoostHits
         const stepMultiplier = ladder[Math.min(step + 1, ladder.length - 1)]
-        next.wins.forEach(win => {
-            cascadedWins.push({
-                ...win,
-                multiplier: round2(win.multiplier * stepMultiplier),
-                cascadeStep: step + 1,
-            })
-        })
+        const stepWins = wildBoostedWins.map(win => ({
+            ...win,
+            multiplier: round2(win.multiplier * stepMultiplier),
+            cascadeStep: step + 1,
+        }))
+        cascadedWins.push(...stepWins)
         cascadeFrames.push({
             cells: [...working],
             winCells: [...next.winningIndexes],
-            stepPayout: round2(next.wins.reduce((sum, w) => sum + w.multiplier * stepMultiplier, 0)),
+            stepPayout: round2(stepWins.reduce((sum, win) => sum + win.multiplier, 0)),
             stepMultiplier,
         })
         lastIndexes = next.winningIndexes
         step += 1
     }
-    return { cells: working, cascadedWins, cascadeSteps: step, cascadeFrames }
+    return { cells: working, cascadedWins, cascadeSteps: step, cascadeFrames, wildBoostHits }
 }
 
 // ---- main resolver ----
@@ -1627,11 +1629,11 @@ export function resolveSlotSpin(config, options = {}) {
     }
 
     // Mystery reveal pre-evaluate
-    const { cells: revealedCells, mysteryReveal } = applyMysteryReveal(cells, config)
+    const { cells: revealedCells, mysteryReveal } = applyMysteryReveal(cells, config, rng)
     cells = revealedCells
 
     // Money values
-    const { moneyValues, moneyTotal } = resolveMoneyValues(cells, config)
+    const { moneyValues, moneyTotal } = resolveMoneyValues(cells, config, rng)
 
     // Base evaluation
     const baseEval = evaluateBaseWins(cells, config)
@@ -1641,21 +1643,30 @@ export function resolveSlotSpin(config, options = {}) {
     // Cascade tumble (cluster / pay-anywhere / megaways).
     let cascadeSteps = 0
     let cascadeFrames = []
-    if (config.features?.cascade && (config.layout.evaluation === 'cluster' || config.layout.evaluation === 'pay-anywhere' || config.layout.evaluation === 'megaways')) {
-        const cascadeResult = cascadeTumble(cells, config, wins, winningIndexes, rng)
+    let wildBoostHits = 0
+    const isCascade = Boolean(config.features?.cascade && (config.layout.evaluation === 'cluster' || config.layout.evaluation === 'pay-anywhere' || config.layout.evaluation === 'megaways'))
+    if (isCascade) {
+        const baseWildBoost = applyWildMultiplier(wins, cells, config)
+        wins = baseWildBoost.wins
+        wildBoostHits = baseWildBoost.wildBoostHits
+        const cascadeResult = cascadeTumble(cells, config, wins, winningIndexes, rng, wildBoostHits)
         cells = cascadeResult.cells
         wins = cascadeResult.cascadedWins
         cascadeSteps = cascadeResult.cascadeSteps
         cascadeFrames = cascadeResult.cascadeFrames
+        wildBoostHits = cascadeResult.wildBoostHits
     }
 
     // Multiplier zones (Wave 9): scale wins crossing zone columns.
     const { wins: zonedWins, zoneHits } = applyMultiplierZones(wins, config)
     wins = zonedWins
 
-    // Wild multiplier (S3): wins whose cells include a wild pay x2/x3.
-    const { wins: wildBoostedWins, wildBoostHits } = applyWildMultiplier(wins, cells, config)
-    wins = wildBoostedWins
+    // Wild multiplier (S3): non-cascade wins whose final cells include a wild pay x2/x3.
+    if (!isCascade) {
+        const wildBoost = applyWildMultiplier(wins, cells, config)
+        wins = wildBoost.wins
+        wildBoostHits = wildBoost.wildBoostHits
+    }
 
     // Stacked-wild line boost: scale wins when a full wild reel formed.
     if (lineBoost > 1) {
@@ -1750,7 +1761,7 @@ export function resolveSlotSpin(config, options = {}) {
     // Multiplier wheel (Wave 9): only when free spins triggered and config has the wheel.
     let wheel = null
     if (triggeredFreeSpins) {
-        wheel = resolveMultiplierWheel(config)
+        wheel = resolveMultiplierWheel(config, rng)
         if (wheel) {
             multiplier += wheel.value
             featureEvents.push({
@@ -1762,7 +1773,7 @@ export function resolveSlotSpin(config, options = {}) {
     }
 
     // Hold-and-respin coin board (Wave 9): triggers when triggerCount+ COIN symbols land.
-    const holdAndRespin = resolveHoldAndRespin(config, cells)
+    const holdAndRespin = resolveHoldAndRespin(config, cells, rng)
     if (holdAndRespin?.award) {
         multiplier += holdAndRespin.award.multiplier
         featureEvents.push({

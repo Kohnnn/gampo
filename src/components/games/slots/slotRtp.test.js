@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { SLOT_TEMPLATES, resolveSlotSpin, __setSlotCalibrationRng } from './slotFactory'
 import { SLOT_RTP_SCALARS } from './slotRtpScalars'
 import { MAX_FREE_SPINS_PER_SESSION } from './slotConstants'
+
+const scriptSource = name => readFileSync(new URL(`../../../../scripts/${name}`, import.meta.url), 'utf8')
 
 function makeRng(seed) {
     let s = seed >>> 0
@@ -21,13 +24,20 @@ function measureRtp(config, rng, spins) {
         let total = 0
         const base = resolveSlotSpin(config)
         total += base.multiplier
-        let fs = base.triggeredFreeSpins ? award : 0
+        const initialAward = base.featureEvents?.find(event => event.type === 'free-spins')
+        let totalAwarded = Math.min(initialAward?.freeSpins || 0, MAX_FREE_SPINS_PER_SESSION)
+        let fs = totalAwarded
         let played = 0
         while (fs > 0 && played < MAX_FREE_SPINS_PER_SESSION) {
             fs -= 1; played += 1
             const spin = resolveSlotSpin(config)
             total += spin.multiplier
-            if (spin.triggeredFreeSpins && played + fs < MAX_FREE_SPINS_PER_SESSION) fs += award
+            const retrigger = spin.featureEvents?.find(event => event.type === 'free-spins')
+            const actualAward = Math.max(0, Math.min(retrigger?.freeSpins || 0, MAX_FREE_SPINS_PER_SESSION - totalAwarded))
+            if (actualAward > 0) {
+                fs += actualAward
+                totalAwarded += actualAward
+            }
         }
         sum += total
     }
@@ -36,6 +46,37 @@ function measureRtp(config, rng, spins) {
 }
 
 describe('slot RTP calibration', () => {
+    it('caps actual free-spin awards in each script accounting path', () => {
+        for (const name of ['calibrateSlots.mjs', 'verifySlotRtp.mjs']) {
+            const source = scriptSource(name)
+            expect(source).toContain('function applyFreeSpinAward')
+            expect(source).toContain("'coin-meter-fill'")
+            expect(source).toContain('MAX_FREE_SPINS_PER_SESSION - state.totalAwarded')
+            expect(source).toContain('function runAccountingSelfCheck()')
+            expect(source).toContain('rawAward: 12')
+            expect(source).toContain('actualAward, 8')
+            expect(source).toContain('state.totalAwarded, 20')
+        }
+    })
+
+    it('uses Coop coin-meter event awards instead of its scatter award', () => {
+        const coop = SLOT_TEMPLATES.find(template => template.id === 'coop-cluck')
+        const fixture = {
+            ...coop,
+            layout: { rows: 1, cols: 1, evaluation: 'lines' },
+            symbols: [{ id: 'egg', label: 'EGG', weight: 1, payout: 0, type: 'coin' }],
+            features: {
+                ...coop.features,
+                scatter: { ...coop.features.scatter, trigger: 2 },
+                coinMeter: { ...coop.features.coinMeter, fillTrigger: 1 },
+            },
+        }
+        const result = resolveSlotSpin(fixture, { rng: () => 0 })
+        const freeSpins = result.featureEvents.find(event => event.type === 'free-spins')
+        expect(freeSpins.source).toBe('coin-meter')
+        expect(freeSpins.freeSpins).toBe(4)
+    })
+
     it('every template has a calibrated scalar', () => {
         for (const t of SLOT_TEMPLATES) {
             expect(SLOT_RTP_SCALARS[t.id], `${t.id} missing scalar`).toBeGreaterThan(0)
