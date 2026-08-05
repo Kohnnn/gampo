@@ -19,6 +19,8 @@
         "audit:scroll": "node scripts/auditPlayfieldOverflow.mjs",
         "audit:all": "npm run audit:a11y && npm run audit:contrast && npm run audit:scroll && npm run verify:betsheet",
         "lint": "eslint .",
+        "lint:ratchet": "node scripts/lintRatchet.mjs",
+        "lint:ratchet:test": "node scripts/lintRatchet.test.mjs",
         "lint:rng-test": "node scripts/lintRngGuard.test.mjs",
         "wording:scan": "node scripts/wordingScan.mjs",
         "wording:scan:test": "node scripts/wordingScan.test.mjs",

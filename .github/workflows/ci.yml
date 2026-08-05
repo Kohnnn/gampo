@@ -21,7 +21,7 @@ jobs:
       - name: Real-money wording scan (Phase 3)
         run: npm run wording:scan
       - name: ESLint with RNG guard (Phase 3)
-        run: npm run lint
+        run: npm run lint:ratchet
       - name: Wording + RNG-guard focused tests (Phase 3)
         run: npm run wording:scan:test && npm run lint:rng-test
       - run: npm test
