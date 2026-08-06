@@ -12,7 +12,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
+import { funBoostFactor } from '../../../utils/funMode'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -124,6 +124,8 @@ export default function DiamondsGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [lastMultiplier, setLastMultiplier] = useState(0)
+    const funBoost = funBoostFactor(DIAMONDS_RTP)
+    const effectiveRtp = DIAMONDS_RTP * funBoost
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return
@@ -183,7 +185,7 @@ export default function DiamondsGame() {
                 bestIdx = i
             }
         })
-        const multiplier = payoutFor(bestCount, bestIdx === -1 ? GEMS.length - 1 : bestIdx, isFunMode() ? FUN_PAYOUT_BOOST : 1)
+        const multiplier = payoutFor(bestCount, bestIdx === -1 ? GEMS.length - 1 : bestIdx, funBoost)
         const won = multiplier > 0
         const returnAmount = won ? round2(betAmount * multiplier) : 0
         const profit = round2(returnAmount - betAmount)
@@ -253,7 +255,7 @@ export default function DiamondsGame() {
             }
             aside={
                 <>
-                    <StatsOverlay stats={session.stats} definition={definition} />
+                    <StatsOverlay stats={session.stats} definition={definition} effectiveRtp={effectiveRtp} />
                     <HistoryDrawer history={session.history} onClear={session.clear} />
                 </>
             }
@@ -282,7 +284,7 @@ export default function DiamondsGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('diamonds')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

@@ -6,12 +6,15 @@
 import { formatCredits } from '../../../utils/simulationMath'
 import { buildEvCoach, EV_VERDICT_LABELS } from '../../../utils/evCoach'
 
-export default function StatsOverlay({ stats, definition }) {
+export default function StatsOverlay({ stats, definition, effectiveRtp }) {
     if (!stats) return null
-    const targetRtp = definition?.rtp != null ? `${(definition.rtp * 100).toFixed(1)}%` : '—'
+    const runtimeDefinition = Number.isFinite(effectiveRtp)
+        ? { ...definition, rtp: effectiveRtp, houseEdge: 1 - effectiveRtp }
+        : definition
+    const targetRtp = runtimeDefinition?.rtp != null ? `${(runtimeDefinition.rtp * 100).toFixed(1)}%` : '—'
     const obs = stats.count >= 20 && stats.rtp != null ? `${(stats.rtp * 100).toFixed(1)}%` : 'Too few samples'
     const winRate = stats.count ? `${((stats.wins / stats.count) * 100).toFixed(1)}%` : '—'
-    const coach = buildEvCoach(definition || {}, stats)
+    const coach = buildEvCoach(runtimeDefinition || {}, stats)
     return (
         <div className="stats-overlay">
             <div className="so-row">
