@@ -60,4 +60,20 @@ jobs:
 
       - run: npm run build
 
+      # Slots Phase 4: must run AFTER build — it inspects real bundle output.
+      #
+      # SlotsGame.jsx exposes window.__gampoSlotQa, whose forceBonusState() sets
+      # freeSpins; a free spin takes the `stake === 0` path in performSpin and
+      # skips placeBet entirely. Shipped, that is free credits from the console.
+      # It DID ship until this gate existed. The seam is stripped by an
+      # `import.meta.env.DEV` check, which Vite statically eliminates — but
+      # swapping it for a runtime check still works in dev, still passes every
+      # unit test, and silently re-emits the seam. Only the built artefact
+      # proves absence, so this cannot move above `npm run build`.
+      - name: QA-seam production absence (inspects built output)
+        run: npm run guard:qa-seam
+
+      - name: QA-seam guard self-test (proves it bites on a planted leak)
+        run: npm run guard:qa-seam-test
+
       - run: npm audit --omit=dev --audit-level=high

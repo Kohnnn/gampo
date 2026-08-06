@@ -621,7 +621,24 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         }
     }, [showMobileInfo])
 
+    // QA seam — DEVELOPMENT ONLY.
+    //
+    // This effect exposes window.__gampoSlotQa so local probes can drive bonus
+    // state without patching modules or poking React fibers.
+    //
+    // The import.meta.env.DEV guard is load-bearing, not stylistic. Vite
+    // statically replaces that expression at build time, so `false && ...`
+    // lets the whole block dead-code eliminate out of the production bundle.
+    // Without it the global SHIPS, and forceBonusState() sets freeSpins to 8 —
+    // and a free spin takes the stake === 0 path in performSpin, skipping
+    // placeBet entirely. That is eight zero-cost spins that pay real credits to
+    // anyone who opens a console.
+    //
+    // Do not replace this with a runtime-only check (hostname, NODE_ENV read at
+    // runtime, etc.). Those still emit the code into the bundle. The absence is
+    // asserted against a real production build in slotQaSeam.test.js.
     useEffect(() => {
+        if (!import.meta.env.DEV) return undefined
         if (typeof window === 'undefined') return undefined
         const forceBonusState = () => {
             const trigger = Date.now()

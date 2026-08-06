@@ -28,6 +28,8 @@
         "lint:react-test": "node scripts/lintReact.test.mjs",
         "lint:rng-intent": "node scripts/lintRngIntent.mjs",
         "lint:rng-intent-test": "node scripts/lintRngIntent.test.mjs",
+        "guard:qa-seam": "node scripts/qaSeamAbsence.mjs",
+        "guard:qa-seam-test": "node scripts/qaSeamAbsence.test.mjs",
         "lint:rng-test": "node scripts/lintRngGuard.test.mjs",
         "wording:scan": "node scripts/wordingScan.mjs",
         "wording:scan:test": "node scripts/wordingScan.test.mjs",
