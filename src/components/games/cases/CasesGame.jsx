@@ -738,6 +738,7 @@ export default function CasesGame() {
         cancelHaptics()
         if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current)
         if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
+        if (autoRollTimerRef.current) window.clearTimeout(autoRollTimerRef.current)
     }, [clearRevealTimers])
 
     // Bring the spinning reel into view once it renders so mobile players see

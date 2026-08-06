@@ -12,6 +12,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, scoreBlackjackHand } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { dealerUpValue, isSoftHand, recommendBlackjackAction } from '../../../utils/blackjackStrategy'
 import { createBlackjackCount, dealCards, observeCards } from './blackjackCount'
 import { getBigWinThreshold,
@@ -110,6 +111,7 @@ export default function BlackjackGame() {
     const chipSlideTimer = useRef(null)
     const stageRef = useRef(null)
     const countRef = useRef(createBlackjackCount(4 * 52))
+    const { schedule } = useCancellableTimeouts()
 
     useEffect(() => () => {
         if (chipSlideTimer.current) window.clearTimeout(chipSlideTimer.current)
@@ -203,8 +205,8 @@ export default function BlackjackGame() {
         }
         setDealer(nextDealer)
         setShoe(nextShoe)
-        window.setTimeout(() => finishRound(finalHands, nextDealer), 220)
-    }, [dealer, finishRound, hitsSoft17, shoe])
+        schedule(() => finishRound(finalHands, nextDealer), 220)
+    }, [dealer, finishRound, hitsSoft17, schedule, shoe])
 
     const advanceFromHand = useCallback((nextHands, nextShoe = shoe, completedIndex = activeHandIndex) => {
         const nextIndex = nextPlayableHandIndex(nextHands, completedIndex)
@@ -259,7 +261,7 @@ export default function BlackjackGame() {
         setInsurance(0)
         setInsuranceOffered(initialDealer[0]?.rank === 'A')
         if (scoreBlackjackHand(initialPlayer) === 21) {
-            window.setTimeout(() => finishRound(initialHands, initialDealer), 320)
+            schedule(() => finishRound(initialHands, initialDealer), 320)
         }
         resolve({ profit: 0 })
     })
@@ -281,7 +283,7 @@ export default function BlackjackGame() {
         countRef.current = observeCards(dealCards(countRef.current, [card]), [card])
         setShoe(nextShoe)
         if (nextHand.status === 'busted') {
-            window.setTimeout(() => advanceFromHand(nextHands, nextShoe), 300)
+            schedule(() => advanceFromHand(nextHands, nextShoe), 300)
             return
         }
         setHands(nextHands)
@@ -318,7 +320,7 @@ export default function BlackjackGame() {
         const nextHands = hands.map((hand, index) => index === activeHandIndex ? nextHand : hand)
         countRef.current = observeCards(dealCards(countRef.current, [card]), [card])
         setShoe(nextShoe)
-        window.setTimeout(() => advanceFromHand(nextHands, nextShoe), 300)
+        schedule(() => advanceFromHand(nextHands, nextShoe), 300)
     }
 
     const surrender = () => {
@@ -420,7 +422,7 @@ export default function BlackjackGame() {
             setStudyResults({ count, win, loss, push, bj, bankroll, edge: (bankroll / count) * 100 })
             setStudyRunning(false)
         }
-        window.setTimeout(work, 30)
+        schedule(work, 30)
     }
 
     const activeHand = hands[activeHandIndex] || hands[0] || makeBlackjackHand({ cards: [], wager: 0, status: 'idle', id: 'empty' })

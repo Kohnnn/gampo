@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
@@ -108,7 +108,8 @@ export default function SicBoGame() {
                     const mult = settleBet(k, next)
                     if (mult) totalReturn += amount * mult
                 }
-                const profit = totalReturn - stake
+                totalReturn = round2(totalReturn)
+                const profit = round2(totalReturn - stake)
                 if (totalReturn > 0) addWinnings(totalReturn, 'Sic Bo return')
                 const effectiveMult = stake > 0 ? totalReturn / stake : 0
                 setLastWon(profit > 0)

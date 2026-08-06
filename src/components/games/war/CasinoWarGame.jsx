@@ -3,7 +3,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { getBigWinThreshold,
@@ -96,7 +96,7 @@ export default function CasinoWarGame() {
             setSlamming(false)
             sfx.play('reveal')
             if (pv > dv) {
-                addWinnings(betAmount * 2, 'Casino War return')
+                addWinnings(round2(betAmount * 2), 'Casino War return')
                 setHand({ player, dealer, outcome: 'win' })
                 setBurstKey(k => k + 1); playSound('win'); sfx.play('win')
                 session.record({ id: crypto.randomUUID(), label: 'Win', profit: betAmount, betAmount, meta: { player, dealer } })
@@ -125,8 +125,9 @@ export default function CasinoWarGame() {
 
     const surrender = () => {
         if (!tiedHand || slamming) return
-        addWinnings(pendingBet / 2, 'Casino War surrender')
-        const profit = -pendingBet / 2
+        const refund = round2(pendingBet / 2)
+        addWinnings(refund, 'Casino War surrender')
+        const profit = round2(refund - pendingBet)
         session.record({ id: crypto.randomUUID(), label: 'Surrender', profit, betAmount: pendingBet })
         setPhase('idle'); setTiedHand(null); setHand(null)
         showToast('loss', 'Surrender', `${formatCredits(profit)}`)
@@ -141,7 +142,7 @@ export default function CasinoWarGame() {
         schedule(() => {
             setSlamming(false)
             if (pv >= dv) {
-                addWinnings(pendingBet * 3, 'Casino War tie-win')
+                addWinnings(round2(pendingBet * 3), 'Casino War tie-win')
                 setHand({ player: np, dealer: nd, outcome: 'tie-win' })
                 setBurstKey(k => k + 1); playSound('bigwin')
                 setBigWin({ trigger: Date.now(), profit: pendingBet, multiplier: 3 })
