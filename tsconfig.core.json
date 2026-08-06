@@ -1,0 +1,50 @@
+{
+    // Phase 05 — thin type safety.
+    //
+    // Checker-only. Nothing here emits, and no source file is converted to
+    // TypeScript. `tsc` is a devDependency used as a linter for a small,
+    // hand-picked set of PURE modules: math, payout tables, and accounting
+    // helpers with no DOM and no JSX.
+    //
+    // The include list is deliberately explicit rather than a glob. A glob
+    // would silently pull in new files and, the first time one imported a
+    // component, drag JSX and the whole React type surface into scope. That is
+    // the cascade this phase is required to avoid. Adding a file here is a
+    // review decision.
+    //
+    // Deliberately EXCLUDED and why:
+    //   src/utils/fairRng.js   — touches window/crypto; needs DOM lib
+    //   src/utils/storage.js   — touches localStorage; needs DOM lib
+    //   any *.jsx              — JSX is out of scope for this phase
+    //   src/**/*.test.js       — test globals are not in this program
+    //
+    // Run: npm run typecheck:core
+    "compilerOptions": {
+        "noEmit": true,
+        "allowJs": true,
+        "checkJs": true,
+        "module": "esnext",
+        "target": "es2022",
+        "moduleResolution": "bundler",
+        // No "dom" lib on purpose. If a module added here needs DOM globals it
+        // is not a pure module, and the failure should be loud.
+        "lib": ["es2022"],
+        "strict": false,
+        "noImplicitAny": false,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": [
+        "types/core-globals.d.ts",
+        "src/components/games/crash/crashMath.js",
+        "src/components/games/plinko/engine/plinkoOutcomes.js",
+        "src/components/games/slots/slotAccounting.js",
+        "src/components/games/slots/slotPaylines.js",
+        "src/components/games/slots/slotPaytable.js",
+        "src/components/games/slots/slotRtpScalars.js",
+        "src/components/games/blackjack/blackjackCount.js",
+        "src/components/games/blackjack/blackjackRules.js",
+        "src/components/games/sicbo/bets.js",
+        "src/components/games/cases/caseEconomy.js"
+    ]
+}

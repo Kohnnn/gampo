@@ -20,7 +20,27 @@ function isPay(item) {
 }
 
 /**
- * @param {object} config a slot template (from getSlotTemplate)
+ * @typedef {object} SlotSymbol
+ * @property {string} [id]
+ * @property {string} [label]
+ * @property {string} [type] 'scatter' | 'wild' | 'coin' | 'money' | 'mystery' | pay symbol
+ * @property {number} [payout] base pay multiplier before the per-mode ladder
+ * @property {string} [asset]
+ *
+ * @typedef {object} SlotScatterFeature
+ * @property {number} [trigger]
+ * @property {number} [triggerCount] older templates spell it this way
+ * @property {number} [awardFreeSpins]
+ * @property {number} [pay]
+ *
+ * @typedef {object} SlotTemplateConfig
+ * @property {Array<SlotSymbol>} [symbols] pay/wild/scatter symbol definitions
+ * @property {{ evaluation?: string, cols?: number }} [layout] real templates carry the mode here
+ * @property {string} [evaluation] synthetic test configs sometimes set the mode directly
+ * @property {{ clusterMin?: number, payAnywhereMin?: number, maxWinMultiplier?: number, scatter?: SlotScatterFeature }} [features]
+ * @property {number} [maxWinMultiplier] top-level fallback used by synthetic configs only
+ *
+ * @param {SlotTemplateConfig} config a slot template (from getSlotTemplate)
  * @returns {{ mode, columns, rungs:number[], rows:Array, wild, scatter, maxWin }}
  */
 export function buildPaytable(config = {}) {
