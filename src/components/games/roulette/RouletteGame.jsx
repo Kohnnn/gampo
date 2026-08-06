@@ -3,8 +3,9 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
+import { useCancellableFrames, useCancellableTimeouts } from '../../../utils/scheduling'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast } from '../primitives'
 import { BOARD_NUMBERS, WHEEL_ORDER, buildRouletteCoverage, colorOf, makeBet } from './layout'
@@ -105,6 +106,8 @@ export default function RouletteGame() {
     const [ballRadius, setBallRadius] = useState('46%')
     const [bettingMs, setBettingMs] = useState(0)
     const bettingTickRef = useRef(null)
+    const { schedule, cancelAll } = useCancellableTimeouts()
+    const { requestFrame, cancelFrames } = useCancellableFrames()
     const wheelAreaRef = useRef(null)
     const [history, setHistory] = useState([])
     const [lastWon, setLastWon] = useState(null)
@@ -149,6 +152,19 @@ export default function RouletteGame() {
     }
 
     const performPlay = ({ mode } = {}) => new Promise(resolve => {
+        // A spin already in flight owns the scheduled settle. Starting another
+        // would queue a second settle against the same wheel and pay twice.
+        // BetPanel blocks this via `runningRound`, but the autoplay loop calls
+        // onPlay directly, so the guard has to live here too.
+        if (spinning) {
+            resolve({ profit: 0 })
+            return
+        }
+        // Any timers/frames left over from a previous round are dead weight the
+        // moment a new round starts; drop them so a stale phase reset can't
+        // fire into this spin.
+        cancelAll()
+        cancelFrames()
         // If auto-loop or rebet fired without chips on the felt, restore the last snapshot.
         let activeBets = bets
         if (!activeBets.length && lastChips.length && (mode === 'auto' || mode === 'manual')) {
@@ -197,23 +213,28 @@ export default function RouletteGame() {
             setBallRadius('46%')
             setWheelRotation(prev => prev + 360 * 6 + 96)
             setBallRotation(prev => prev - 360 * 9 + targetAngle + 4)
-            window.setTimeout(() => {
+            schedule(() => {
                 setSpinPhase('rolling')
                 sfx.play('tick', { volume: 0.38 })
             }, reducedMotion ? 20 : 160)
-            window.setTimeout(() => {
+            schedule(() => {
                 setSpinPhase('drop')
                 setBallRadius('28%')
                 sfx.play('tick', { volume: 0.58 })
             }, reducedMotion ? 40 : 1500)
-            window.setTimeout(() => {
+            schedule(() => {
                 // settle
-                let totalReturn = 0
+                let rawReturn = 0
                 for (const bet of activeBets) {
                     const m = makeBet(bet.type, bet.params)
-                    if (m.numbers.includes(number)) totalReturn += bet.amount * m.payout
+                    if (m.numbers.includes(number)) rawReturn += bet.amount * m.payout
                 }
-                const profit = totalReturn - stake
+                // Racetrack/sector bets pay 36/n, which is not exact in binary
+                // (Voisins is 36/17 = 2.1176...). Round the return once, here,
+                // so the credited amount, the recorded profit, and the number
+                // shown in the toast are all the same value.
+                const totalReturn = round2(rawReturn)
+                const profit = round2(totalReturn - stake)
                 if (totalReturn > 0) addWinnings(totalReturn, 'Roulette return')
                 const effectiveMult = stake > 0 ? totalReturn / stake : 0
                 setResult(number)
@@ -243,7 +264,7 @@ export default function RouletteGame() {
                 })
                 showToast(profit >= 0 ? 'win' : 'loss', `Roulette ${number}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
                 setBets([]) // clear placed bets after spin; lastChips snapshot keeps Auto/Rebet alive
-                window.setTimeout(() => setSpinPhase('idle'), 900)
+                schedule(() => setSpinPhase('idle'), 900)
                 resolve({ profit })
             }, spinMs)
         }
@@ -264,9 +285,9 @@ export default function RouletteGame() {
                     beginSpin()
                     return
                 }
-                bettingTickRef.current = window.requestAnimationFrame(beat)
+                bettingTickRef.current = requestFrame(beat)
             }
-            bettingTickRef.current = window.requestAnimationFrame(beat)
+            bettingTickRef.current = requestFrame(beat)
         }
     })
 
