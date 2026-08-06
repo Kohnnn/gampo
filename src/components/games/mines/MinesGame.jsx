@@ -13,7 +13,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { getBigWinThreshold,
@@ -163,8 +163,9 @@ export default function MinesGame() {
                     return
                 }
                 const m = multiplierFor(picked.length, bombs)
-                const profit = betAmount * m - betAmount
-                addWinnings(betAmount * m, 'Mines auto return')
+                const totalReturn = round2(betAmount * m)
+                const profit = round2(totalReturn - betAmount)
+                addWinnings(totalReturn, 'Mines auto return')
                 playSound(m >= 5 ? 'bigwin' : 'win')
                 sfx.play('cashout')
                 session.record({
@@ -235,8 +236,9 @@ export default function MinesGame() {
         const list = revealedOverride || revealed
         if (!inRound || list.length === 0) return
         const m = multiplierFor(list.length, bombs)
-        const profit = stake * m - stake
-        addWinnings(stake * m, 'Mines return')
+        const totalReturn = round2(stake * m)
+        const profit = round2(totalReturn - stake)
+        addWinnings(totalReturn, 'Mines return')
         if (m >= 5) {
             playSound('bigwin')
             setBigWin({ trigger: Date.now(), profit, multiplier: m })

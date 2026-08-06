@@ -11,7 +11,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
@@ -118,8 +118,9 @@ export default function DinoGame() {
     const cashOut = () => {
         if (!inRound || steps === 0) return
         const m = Number(Math.pow(config.growth, steps).toFixed(2))
-        const profit = stake * m - stake
-        addWinnings(stake * m, 'Dino return')
+        const totalReturn = round2(stake * m)
+        const profit = round2(totalReturn - stake)
+        addWinnings(totalReturn, 'Dino return')
         if (m >= 5) {
             playSound('bigwin')
             sfx.play('bigwin')

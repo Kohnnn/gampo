@@ -4,7 +4,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { getBigWinThreshold,
@@ -125,8 +125,8 @@ export default function TowerGame() {
 
     const cashout = useCallback(() => {
         if (level === 0) return
-        const returnAmount = activeBet * multiplier
-        const profit = returnAmount - activeBet
+        const returnAmount = round2(activeBet * multiplier)
+        const profit = round2(returnAmount - activeBet)
         addWinnings(returnAmount, 'Tower return')
         if (multiplier >= 5) {
             playSound('bigwin')
