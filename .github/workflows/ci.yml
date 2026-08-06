@@ -15,15 +15,49 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      # Phase 3: integrity + language guardrails run BEFORE tests/build so a
-      # regression is caught at the cheapest step (no test bootstrap, no build
-      # artefact, no minutes of CI spent after the fact).
-      - name: Real-money wording scan (Phase 3)
+
+      # Ordering rationale (Phase 3, extended Phase 5):
+      # cheapest and most specific gates first, so a regression is caught before
+      # any test bootstrap or build artefact costs CI minutes.
+
+      - name: Real-money wording scan
         run: npm run wording:scan
-      - name: ESLint with RNG guard (Phase 3)
+
+      - name: ESLint (ratchet — fails only on NEW findings)
         run: npm run lint:ratchet
-      - name: Wording + RNG-guard focused tests (Phase 3)
-        run: npm run wording:scan:test && npm run lint:rng-test
+
+      # Phase 5: the RNG intent gate is the ONLY thing that catches a
+      # payout-shaped Math.random() inside an exemption-listed file. ESLint
+      # alone reports nothing there by design, so without this step the Phase 4
+      # guard is unenforced on main.
+      - name: RNG intent gate (per-call-site annotations + count lock)
+        run: npm run lint:rng-intent
+
+      # Phase 5: the guards are only trustworthy if their own self-tests run.
+      # Each of these proves its gate still FAILS on a planted violation, which
+      # a green gate alone cannot demonstrate.
+      - name: Guard self-tests (prove each gate still bites)
+        run: |
+          npm run wording:scan:test
+          npm run lint:rng-test
+          npm run lint:rng-intent-test
+          npm run lint:ratchet:test
+          npm run lint:react-test
+
+      # Phase 5: checker-only TypeScript over a small set of pure math/payout
+      # modules. Bounded by an explicit include list in tsconfig.core.json.
+      - name: Thin type check (pure core modules only)
+        run: npm run typecheck:core
+
+      - name: Type-lane boundary test (proves it is real AND narrow)
+        run: npm run typecheck:core-test
+
+      # The full suite runs here on purpose. `test:ci:fast` exists as a local
+      # fast-feedback command, but the full run is only ~16s and the two files
+      # it would skip (slotFactory, slotRtp) are exactly the slot payout math —
+      # the last thing that should lose CI coverage to save a few seconds.
       - run: npm test
+
       - run: npm run build
+
       - run: npm audit --omit=dev --audit-level=high
