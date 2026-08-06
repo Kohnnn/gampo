@@ -54,10 +54,23 @@ import { getBonusCinematic, BONUS_CINEMATIC_MS } from './slotBonusCinematics'
 import { winTier, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, rollupDurationMs, rollupFrame } from './slotWinPresentation'
 import { buildPaytable } from './slotPaytable'
 import { describePaylines } from './slotPaylines'
+import { createOutcomeQueue, validateFreeSpinSession } from './slotQaSeam'
 import { buildSparkline } from './slotSparkline'
 import FreeSpinCounter from './FreeSpinCounter'
 import { applyFreeSpinAward, shouldStopAutoplay } from './slotAccounting'
 import './slots.css'
+
+// Dev-only QA outcome queue. Module-level so the browser probe gets one stable
+// handle regardless of which template is mounted, and so performSpin can read
+// it without taking a useCallback dependency.
+//
+// The ternary is deliberate. Writing `createOutcomeQueue()` unconditionally
+// would keep the identifier referenced, so the import — and therefore
+// slotQaSeam.js — would survive tree-shaking into production. Behind
+// `import.meta.env.DEV` Vite folds this to `null`, createOutcomeQueue becomes
+// unreferenced, and the whole module drops out. scripts/qaSeamAbsence.mjs
+// asserts that against real build output rather than trusting this comment.
+const qaOutcomeQueue = import.meta.env.DEV ? createOutcomeQueue() : null
 
 const FEATURE_LABELS = {
     'coin-meter': 'Coin meter',
@@ -698,12 +711,40 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             })
             return { templateId: config.id, featureEvents }
         }
-        const api = { forceBonusState }
-        window.__gampoSlotQa = { ...(window.__gampoSlotQa || {}), [config.id]: api, forceBonusState }
+        // Queue a fixture that replaces the resolver result for exactly one
+        // spin. Rejects loudly instead of silently settling a malformed outcome
+        // — bad accounting evidence is worse than no evidence.
+        const enqueueOutcome = outcome => {
+            const result = qaOutcomeQueue.enqueue(outcome)
+            if (!result.ok) throw new Error(`enqueueOutcome rejected: ${result.reason}`)
+            return { queued: result.value.queued }
+        }
+        // Install a free-spin session fixture. Named applyFreeSpinSession
+        // locally because setFreeSpinSession is already the React state setter
+        // in this scope; the QA surface still exposes it under the plan's name.
+        const applyFreeSpinSession = fixture => {
+            const result = validateFreeSpinSession(fixture)
+            if (!result.ok) throw new Error(`setFreeSpinSession rejected: ${result.reason}`)
+            setFreeSpinSession(result.value)
+            setFreeSpins(result.value ? Math.max(0, result.value.totalAwarded - result.value.played) : 0)
+            return { session: result.value }
+        }
+        const api = {
+            forceBonusState,
+            enqueueOutcome,
+            setFreeSpinSession: applyFreeSpinSession,
+            pendingOutcomes: () => qaOutcomeQueue.size(),
+            clearOutcomes: () => qaOutcomeQueue.clear(),
+        }
+        window.__gampoSlotQa = { ...(window.__gampoSlotQa || {}), [config.id]: api, ...api }
         window.dispatchEvent(new CustomEvent('gampo:slot-qa-ready', { detail: { templateId: config.id } }))
         return () => {
             if (window.__gampoSlotQa?.[config.id] === api) delete window.__gampoSlotQa[config.id]
             if (window.__gampoSlotQa?.forceBonusState === forceBonusState) delete window.__gampoSlotQa.forceBonusState
+            if (window.__gampoSlotQa?.enqueueOutcome === enqueueOutcome) delete window.__gampoSlotQa.enqueueOutcome
+            if (window.__gampoSlotQa?.setFreeSpinSession === applyFreeSpinSession) delete window.__gampoSlotQa.setFreeSpinSession
+            // Never leave a queued fixture behind for the next mount.
+            qaOutcomeQueue.clear()
         }
     }, [betAmount, cellPositions, config, grid])
 
@@ -1125,7 +1166,16 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             // Fun Mode (free-play only) inflates the calibrated scalar so wins
             // land bigger/more often. Off by default; never a real-casino mode.
             const funScalar = isFunMode() ? (config.rtpScalar ?? 1) * FUN_PAYOUT_BOOST : undefined
-            const result = resolveSlotSpin(config, {
+            // Dev-only QA seam: a queued fixture stands in for this one spin so
+            // local probes can drive deterministic accounting scenarios. The
+            // `import.meta.env.DEV &&` prefix is what lets Vite drop both the
+            // call and the imported module from production builds — asserted
+            // against real build output by scripts/qaSeamAbsence.mjs.
+            //
+            // consume() is one-shot and returns null when nothing is queued, so
+            // the production path below is byte-for-byte the normal one.
+            const queuedOutcome = import.meta.env.DEV ? qaOutcomeQueue.consume() : null
+            const result = queuedOutcome || resolveSlotSpin(config, {
                 bonusBuy: usedBonusBuy,
                 buyTier: tier,
                 freeSpin: usedFreeSpin,

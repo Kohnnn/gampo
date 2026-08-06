@@ -35,17 +35,41 @@ import { join, relative, extname } from 'node:path'
 
 const DEFAULT_TARGET = 'dist'
 
-// Tokens that only exist to support the dev QA seam. These survive minification
-// because they are object property names and event-name string literals, not
-// local bindings — the observed leak contained `__gampoSlotQa` and
-// `forceBonusState:a` verbatim in minified output.
+// Tokens that only exist to support the dev QA seam.
 //
-// If you rename part of the seam, rename it here too. A stale token list is a
-// guard that passes for the wrong reason.
+// IMPORTANT — what survives minification, and what does not.
+//
+// Object property names and string literals survive: the leak that shipped
+// contained `__gampoSlotQa` and `forceBonusState:a` verbatim. But top-level
+// FUNCTION NAMES do not. An early version of this list included
+// `createOutcomeQueue` and `validateQueuedOutcome`; when the queue was
+// deliberately ungated as a regression check, esbuild renamed those to `Ql`
+// and `Yl` and the guard reported "0 violations" against a bundle that
+// demonstrably contained the whole validator. The guard passed while the seam
+// leaked.
+//
+// So every entry below must be a string the minifier cannot rewrite:
+//   - property names reachable from window (mangling would break the API)
+//   - event-name literals
+//   - distinctive literals from validation messages
+//
+// Do NOT add bare function or local-variable names here. They will be renamed,
+// match nothing, and silently weaken the gate.
 const FORBIDDEN_TOKENS = [
+    // window-reachable API surface
     '__gampoSlotQa',
     'forceBonusState',
+    'enqueueOutcome',
+    'pendingOutcomes',
+    'clearOutcomes',
+    // event literal
     'gampo:slot-qa-ready',
+    // validation-message literals — these catch the seam's logic even when
+    // every surrounding identifier has been mangled.
+    'outcome must be a plain object',
+    'session must be a plain object or null',
+    'enqueueOutcome rejected',
+    'setFreeSpinSession rejected',
 ]
 
 const SCANNED_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.html', '.css'])
