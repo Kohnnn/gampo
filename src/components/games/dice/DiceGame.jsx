@@ -3,7 +3,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { dicePayout, formatCredits } from '../../../utils/simulationMath'
+import { dicePayout, formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -60,6 +61,7 @@ export default function DiceGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('dice', { count: 9, cap: 10 }))
+    const { schedule } = useCancellableTimeouts()
     const simSeqRef = useRef(0)
     const payout = dicePayout(winChance / 100)
 
@@ -117,8 +119,8 @@ export default function DiceGame() {
         const rollFloat = nextRoll('dice').roll
         const roll = rollFloat * 100
         const won = rollMode === 'under' ? roll < winChance : roll > (100 - winChance)
-        const returnAmount = won ? betAmount * payout : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = won ? round2(betAmount * payout) : 0
+        const profit = round2(returnAmount - betAmount)
         if (won) addWinnings(returnAmount, 'Dice return')
 
         // Pre-roll ticks -> reveal -> result. Drives both visuals and SFX
@@ -168,7 +170,7 @@ export default function DiceGame() {
         }), 10))
 
         // Resolve to the BetPanel autoplay loop after the animation budget.
-        setTimeout(() => resolve({ profit }), DICE_ROLL_DURATION_MS + 260)
+        schedule(() => resolve({ profit }), DICE_ROLL_DURATION_MS + 260)
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

@@ -3,7 +3,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { NumberRoll, Particles } from '../../fx'
@@ -27,6 +28,7 @@ export default function GuessGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
     const payout = 9.4
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
@@ -37,9 +39,9 @@ export default function GuessGame() {
         setSpinning(true)
         const next = Math.floor(nextRoll('guess').roll * 10)
         const won = next === choice
-        const returnAmount = won ? betAmount * payout : 0
-        const profit = returnAmount - betAmount
-        window.setTimeout(() => {
+        const returnAmount = won ? round2(betAmount * payout) : 0
+        const profit = round2(returnAmount - betAmount)
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Guess Number return')
             setResult(next)
             setLastWon(won)

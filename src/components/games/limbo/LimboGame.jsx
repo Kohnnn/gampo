@@ -8,7 +8,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { clamp, formatCredits, limboWinChance } from '../../../utils/simulationMath'
+import { clamp, formatCredits, limboWinChance, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -57,6 +58,7 @@ export default function LimboGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('limbo', { count: 9, cap: 10 }))
+    const { schedule } = useCancellableTimeouts()
     const simSeqRef = useRef(0)
     const chance = limboWinChance(target)
 
@@ -118,8 +120,8 @@ export default function LimboGame() {
         const multiplier = won
             ? target
             : 1 + (1 - Math.min(0.999, r)) * Math.max(0.1, target - 1)
-        const returnAmount = won ? betAmount * target : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = won ? round2(betAmount * target) : 0
+        const profit = round2(returnAmount - betAmount)
 
         const events = buildEvents(api => {
             api.push(ROUND_EVENTS.ROUND_START, { target }, 0)
@@ -156,7 +158,7 @@ export default function LimboGame() {
             seed: `limbo:${simSeqRef.current}:${target}:${multiplier.toFixed(2)}`,
         }), 10))
 
-        setTimeout(() => resolve({ profit }), RAMP_DURATION_MS + 260)
+        schedule(() => resolve({ profit }), RAMP_DURATION_MS + 260)
     })
 
     const gaugePct = last ? Math.min(100, ((last - 1) / Math.max(0.01, target - 1)) * 90) : 0

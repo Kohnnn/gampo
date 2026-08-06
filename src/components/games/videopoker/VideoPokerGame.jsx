@@ -3,7 +3,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -162,8 +162,8 @@ export default function VideoPokerGame() {
         let idx = 0
         const finalCards = cards.map((c, i) => held.includes(i) ? c : remainder[idx++])
         const outcome = evaluateHand(finalCards)
-        const returnAmount = activeBet * outcome.multiplier
-        const profit = returnAmount - activeBet
+        const returnAmount = round2(activeBet * outcome.multiplier)
+        const profit = round2(returnAmount - activeBet)
         if (returnAmount > 0) addWinnings(returnAmount, 'Video Poker return')
         setCards(finalCards)
         setPhase('idle')

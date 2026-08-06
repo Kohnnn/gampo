@@ -9,7 +9,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits, kenoPayout, sampleUniqueNumbers } from '../../../utils/simulationMath'
+import { formatCredits, kenoPayout, sampleUniqueNumbers, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -58,6 +59,7 @@ export default function KenoGame() {
     const [toast, setToast] = useState(null)
     const [lastMultiplier, setLastMultiplier] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('keno', { count: 9, cap: 10 }))
+    const { schedule } = useCancellableTimeouts()
     const simSeqRef = useRef(0)
     const stageRef = useRef(null)
     // Bring the draw grid into view when a round starts (mobile reachability).
@@ -109,8 +111,8 @@ export default function KenoGame() {
         const picks = sampleUniqueNumbers({ max: 40, count: 10, random: () => nextRoll('keno').roll })
         const hits = selected.filter(n => picks.includes(n)).length
         const multiplier = kenoPayout(selected.length, hits)
-        const returnAmount = betAmount * multiplier
-        const profit = returnAmount - betAmount
+        const returnAmount = round2(betAmount * multiplier)
+        const profit = round2(returnAmount - betAmount)
         const totalDuration = DRAW_DELAY_MS + picks.length * DRAW_INTERVAL_MS + 200
 
         const events = buildEvents(api => {
@@ -136,7 +138,7 @@ export default function KenoGame() {
 
         // Real engine effects fire at the same wallclock as the events so
         // visuals stay synchronized.
-        window.setTimeout(() => {
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Keno return')
             setBurstKey(k => k + 1); setDrawing(false)
             if (multiplier >= 8) {
