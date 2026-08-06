@@ -3,10 +3,11 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits, sampleUniqueNumbers } from '../../../utils/simulationMath'
+import { formatCredits, sampleUniqueNumbers, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './lottery.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -34,6 +35,7 @@ export default function LotteryGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [settling, setSettling] = useState(false)
+    const { schedule } = useCancellableTimeouts()
     const settleTimer = useRef(null)
 
     useEffect(() => () => {
@@ -53,19 +55,19 @@ export default function LotteryGame() {
         setToast(null)
         setDrawing(true); setDrawAnim([])
         const next = sampleUniqueNumbers({ max: 36, count: 5, random: () => nextRoll('lottery').roll })
-        next.forEach((n, i) => window.setTimeout(() => { playSound('flip'); setDrawAnim(prev => [...prev, n]) }, 400 + i * 350))
+        next.forEach((n, i) => schedule(() => { playSound('flip'); setDrawAnim(prev => [...prev, n]) }, 400 + i * 350))
         const hits = selected.filter(n => next.includes(n)).length
         const multiplier = TABLE[hits]
-        const returnAmount = betAmount * multiplier
-        const profit = returnAmount - betAmount
-        window.setTimeout(() => {
+        const returnAmount = round2(betAmount * multiplier)
+        const profit = round2(returnAmount - betAmount)
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Lottery return')
             setLastWon(returnAmount > 0)
             setBurstKey(k => k + 1)
             setDrawing(false)
             setSettling(true)
             if (settleTimer.current) window.clearTimeout(settleTimer.current)
-            settleTimer.current = window.setTimeout(() => setSettling(false), 220)
+            settleTimer.current = schedule(() => setSettling(false), 220)
             if (multiplier >= 8) {
                 playSound('bigwin')
                 sfx.play('win')

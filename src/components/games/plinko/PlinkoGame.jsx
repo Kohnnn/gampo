@@ -11,7 +11,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -33,6 +33,7 @@ import { getBigWinThreshold,
     useRoundMachine,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './plinko.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -104,6 +105,7 @@ export default function PlinkoGame() {
     const [engineReady, setEngineReady] = useState(false)
     const [toast, setToast] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('plinko', { count: 12, cap: 14 }))
+    const { schedule } = useCancellableTimeouts()
 
     // Wave 2 lightweight machine. Emits round-start on each drop and
     // round-result on each ball settlement; sim feed and physics flow
@@ -146,7 +148,7 @@ export default function PlinkoGame() {
                         settle({ binIndex, multiplier: payout.multiplier })
                     }
                     setHighlightBin(binIndex)
-                    window.setTimeout(() => setHighlightBin(null), 800)
+                    schedule(() => setHighlightBin(null), 800)
                 },
                 onBalanceChange: () => { },
             })
@@ -242,8 +244,8 @@ export default function PlinkoGame() {
             }
             const mult = Number((rawMult * ball.bonus).toFixed(4))
 
-            const returnAmount = betAmount * mult
-            const profit = returnAmount - cost
+            const returnAmount = round2(betAmount * mult)
+            const profit = round2(returnAmount - cost)
             if (returnAmount > 0) addWinnings(returnAmount, 'Plinko return')
             session.record({
                 id: crypto.randomUUID(),
@@ -286,7 +288,7 @@ export default function PlinkoGame() {
             if (dropped >= count) return
             performPlay({ betAmount, mode: 'auto' })
             dropped += 1
-            window.setTimeout(tick, 500)
+            schedule(tick, 500)
         }
         tick()
     }, [performPlay])

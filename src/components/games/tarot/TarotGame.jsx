@@ -9,7 +9,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -27,6 +27,7 @@ import { getBigWinThreshold,
     useRoundMachine,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import TarotCardArt from './TarotCardArt'
 import { contributionFor, drawSpread, expectedMultiplierForSuit, MATCH_BONUS, readingFor, SUITS, TARGET_RTP, topContributionForSuit } from './tarotModel'
@@ -52,6 +53,7 @@ export default function TarotGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
     const matchedCount = revealed.filter(r => r && r.matched).length
@@ -78,8 +80,8 @@ export default function TarotGame() {
         const draws = drawSpread(() => nextRoll('tarot').roll)
         const contributions = draws.map(c => ({ card: c, contribution: contributionFor(c, pickedSuit), matched: c.suit === pickedSuit }))
         const totalMult = Number(contributions.reduce((s, r) => s + r.contribution, 0).toFixed(3))
-        const returnAmount = betAmount * totalMult
-        const profit = returnAmount - betAmount
+        const returnAmount = round2(betAmount * totalMult)
+        const profit = round2(returnAmount - betAmount)
 
         machine.start([
             { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { suit: pickedSuit }, at: 0 },
@@ -88,7 +90,7 @@ export default function TarotGame() {
         ], { autoFinish: false })
 
         contributions.forEach((entry, i) => {
-            window.setTimeout(() => {
+            schedule(() => {
                 setRevealed(prev => {
                     const out = [...prev]
                     out[i] = entry
@@ -101,7 +103,7 @@ export default function TarotGame() {
         })
 
         const totalDelay = REVEAL_DELAY_MS + contributions.length * REVEAL_STAGGER_MS + 320
-        window.setTimeout(() => {
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Tarot return')
             const headlineMult = totalMult
             const won = profit > 0
