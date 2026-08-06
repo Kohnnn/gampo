@@ -15,7 +15,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -33,6 +33,7 @@ import { getBigWinThreshold,
     useRoundMachine,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './packs.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -130,6 +131,7 @@ export default function PacksGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
 
@@ -154,8 +156,8 @@ export default function PacksGame() {
 
         const picks = [weightedPick(tierConf.pool), weightedPick(tierConf.pool), weightedPick(tierConf.pool)]
         const totalMult = picks.reduce((s, p) => s + p.mult, 0) / 3 // mean of three picks vs stake
-        const returnAmount = stake * totalMult
-        const profit = returnAmount - stake
+        const returnAmount = round2(stake * totalMult)
+        const profit = round2(returnAmount - stake)
 
         machine.start([
             { index: 0, type: ROUND_EVENTS.ROUND_START, payload: { tier, stake }, at: 0 },
@@ -165,7 +167,7 @@ export default function PacksGame() {
 
         // Stagger reveals.
         picks.forEach((p, i) => {
-            window.setTimeout(() => {
+            schedule(() => {
                 setRevealed(prev => {
                     const out = [...prev]
                     out[i] = p
@@ -176,7 +178,7 @@ export default function PacksGame() {
         })
 
         const totalDelay = PACK_REVEAL_DELAY_MS + picks.length * REVEAL_STAGGER_MS + 320
-        window.setTimeout(() => {
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Packs return')
             const headlineMult = picks.reduce((m, p) => Math.max(m, p.mult || 0), 0)
             const won = profit > 0

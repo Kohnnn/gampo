@@ -22,7 +22,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -41,6 +41,7 @@ import { getBigWinThreshold,
     StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './drill.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -82,6 +83,7 @@ export default function DrillGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
 
@@ -132,7 +134,7 @@ export default function DrillGame() {
             })
             machine.finish({ kind: 'bust', profit: -stake, multiplier: 0, depth: depth + 1 })
             showToast('loss', 'Drill collapse', `-${formatCredits(stake)}`)
-            window.setTimeout(() => setPhase('idle'), 1200)
+            schedule(() => setPhase('idle'), 1200)
             return
         }
         const nextDepth = depth + 1
@@ -149,8 +151,9 @@ export default function DrillGame() {
         const d = Number.isFinite(overrideDepth) ? overrideDepth : depth
         if (d === 0) return
         const m = LAYERS[d - 1].multiplier
-        const profit = stake * m - stake
-        addWinnings(stake * m, 'Drill return')
+        const totalReturn = round2(stake * m)
+        const profit = round2(totalReturn - stake)
+        addWinnings(totalReturn, 'Drill return')
         setToast({ kind: 'cashout', multiplier: m, amount: profit, message: 'Cashed out' })
         if (m >= 5) {
             playSound('bigwin')
@@ -168,7 +171,7 @@ export default function DrillGame() {
         machine.finish({ kind: 'cashed', profit, multiplier: m, depth: d })
         showToast('win', 'Drill cashed out', `+${formatCredits(profit)}`)
         setPhase('cashed')
-        window.setTimeout(() => setPhase('idle'), 1200)
+        schedule(() => setPhase('idle'), 1200)
     }, [inRound, depth, stake, addWinnings, playSound, sfx, session, machine, showToast])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

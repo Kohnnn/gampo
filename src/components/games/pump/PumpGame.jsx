@@ -10,7 +10,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -29,6 +29,7 @@ import { getBigWinThreshold,
     StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './pump.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -57,6 +58,7 @@ export default function PumpGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
 
@@ -106,7 +108,7 @@ export default function PumpGame() {
             machine.finish({ kind: 'bust', profit: -stake, multiplier: 0, pumps: pumps + 1 })
             showToast('loss', 'Pump burst', `-${formatCredits(stake)}`)
             setPhase('busted')
-            window.setTimeout(() => setPhase('idle'), 1100)
+            schedule(() => setPhase('idle'), 1100)
             return
         }
         const next = pumps + 1
@@ -117,8 +119,9 @@ export default function PumpGame() {
     const cashOut = useCallback(() => {
         if (!inRound || pumps === 0) return
         const m = currentMult
-        const profit = stake * m - stake
-        addWinnings(stake * m, 'Pump return')
+        const totalReturn = round2(stake * m)
+        const profit = round2(totalReturn - stake)
+        addWinnings(totalReturn, 'Pump return')
         setToast({ kind: 'cashout', multiplier: m, amount: profit, message: 'Cashed out' })
         if (m >= 5) {
             playSound('bigwin')
@@ -136,7 +139,7 @@ export default function PumpGame() {
         machine.finish({ kind: 'cashed', profit, multiplier: m, pumps })
         showToast('win', 'Pump cashed out', `+${formatCredits(profit)}`)
         setPhase('cashed')
-        window.setTimeout(() => setPhase('idle'), 1100)
+        schedule(() => setPhase('idle'), 1100)
     }, [inRound, pumps, currentMult, stake, addWinnings, playSound, sfx, session, machine, showToast])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

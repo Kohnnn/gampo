@@ -13,7 +13,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -31,6 +31,7 @@ import { getBigWinThreshold,
     useRoundMachine,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './snakes.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -82,6 +83,7 @@ export default function SnakesGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
     const [bustHit, setBustHit] = useState(null) // { row, col }
 
     const machine = useRoundMachine({})
@@ -134,7 +136,7 @@ export default function SnakesGame() {
             })
             machine.finish({ kind: 'bust', profit: -stake, multiplier: 0, rung: rung + 1 })
             showToast('loss', 'Snake bite', `-${formatCredits(stake)}`)
-            window.setTimeout(() => setPhase('idle'), 1100)
+            schedule(() => setPhase('idle'), 1100)
             return
         }
         sfx.play('reveal')
@@ -152,8 +154,9 @@ export default function SnakesGame() {
         const r = Number.isFinite(overrideRung) ? overrideRung : rung
         if (r === 0) return
         const m = multiplierFor(r, snakesPerRow)
-        const profit = stake * m - stake
-        addWinnings(stake * m, 'Snakes return')
+        const totalReturn = round2(stake * m)
+        const profit = round2(totalReturn - stake)
+        addWinnings(totalReturn, 'Snakes return')
         setToast({ kind: 'cashout', multiplier: m, amount: profit, message: 'Cashed out' })
         if (m >= 5) {
             playSound('bigwin')
@@ -171,7 +174,7 @@ export default function SnakesGame() {
         machine.finish({ kind: 'cashed', profit, multiplier: m, rung: r })
         showToast('win', 'Snakes cashed out', `+${formatCredits(profit)}`)
         setPhase('cashed')
-        window.setTimeout(() => setPhase('idle'), 1100)
+        schedule(() => setPhase('idle'), 1100)
     }, [inRound, rung, snakesPerRow, stake, addWinnings, playSound, sfx, session, machine, showToast])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

@@ -13,7 +13,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { getBigWinThreshold,
@@ -32,6 +32,7 @@ import { getBigWinThreshold,
     useRoundMachine,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './moles.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -119,6 +120,7 @@ export default function MolesGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
 
@@ -145,8 +147,8 @@ export default function MolesGame() {
         const hits = picks.filter(p => placed.has(p)).length
         const multiplier = payoutFor(hits, picks.length, moleCount, isFunMode() ? FUN_PAYOUT_BOOST : 1)
         const won = multiplier > 0
-        const returnAmount = won ? betAmount * multiplier : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = won ? round2(betAmount * multiplier) : 0
+        const profit = round2(returnAmount - betAmount)
 
         setRunning(true)
         machine.start([
@@ -155,7 +157,7 @@ export default function MolesGame() {
             { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount }, at: 0 },
         ], { autoFinish: false })
 
-        window.setTimeout(() => {
+        schedule(() => {
             setMoles(placed)
             setRevealed(true)
             sfx.play('reveal')
@@ -184,7 +186,7 @@ export default function MolesGame() {
             showToast(profit >= 0 ? 'win' : 'loss', `Moles ${hits}/${picks.length}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
             setRunning(false)
             // Next round resets after settling
-            window.setTimeout(() => {
+            schedule(() => {
                 setRevealed(false)
                 setPicks([])
                 setMoles(null)
