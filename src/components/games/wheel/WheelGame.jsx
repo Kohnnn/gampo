@@ -4,6 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { getBigWinThreshold,
@@ -61,6 +62,7 @@ function normalizeWheel(shape, funBoosted) {
 }
 
 export default function WheelGame() {
+    const { schedule } = useCancellableTimeouts()
     useGameBgm('wheel', 'idle')
     const definition = findGameDefinition('wheel')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
@@ -160,7 +162,7 @@ export default function WheelGame() {
         })
         machine.start(events, { autoFinish: false })
 
-        window.setTimeout(() => {
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Wheel return')
             if (won && multiplier >= 5) {
                 playSound('bigwin')

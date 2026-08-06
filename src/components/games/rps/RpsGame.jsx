@@ -4,6 +4,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset, ResultToast, ActionLockOverlay } from '../primitives'
@@ -19,6 +20,7 @@ const OPTIONS = [
 ]
 
 export default function RpsGame() {
+    const { schedule } = useCancellableTimeouts()
     useGameBgm('rps', 'idle')
     const definition = findGameDefinition('rps')
     const { balance, placeBet, addWinnings, showToast } = useCredits()
@@ -52,7 +54,7 @@ export default function RpsGame() {
         playSound('tick')
         setToast(null)
         setPhase('slamming')
-        window.setTimeout(() => {
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'RPS return')
             setHouse(dealer)
             setLastWon(push ? null : won)

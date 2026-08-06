@@ -11,6 +11,7 @@ import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
@@ -107,6 +108,7 @@ function pickGem() {
 }
 
 export default function DiamondsGame() {
+    const { schedule } = useCancellableTimeouts()
     useGameBgm('diamonds', 'idle')
     const definition = findGameDefinition('diamonds') || { name: 'Diamonds', category: 'Arcade originals' }
     const { balance, placeBet, addWinnings, showToast } = useCredits()
@@ -220,7 +222,7 @@ export default function DiamondsGame() {
         })
         showToast(profit >= 0 ? 'win' : 'loss', label, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
 
-        setTimeout(() => resolve({ profit }), REVEAL_MS + 240)
+        schedule(() => resolve({ profit }), REVEAL_MS + 240)
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

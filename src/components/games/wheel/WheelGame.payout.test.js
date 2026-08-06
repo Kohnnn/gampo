@@ -81,6 +81,15 @@ describe('WheelGame settle source', () => {
     it('normalizes the segments to the target RTP', () => {
         expect(src).toContain("return shape.map(v => (v > 0 ? round2(v * scale) : 0))")
     })
+
+    it('settles through the cancellable scheduler', () => {
+        expect(src).toContain("const { schedule } = useCancellableTimeouts()")
+    })
+
+    it('leaves no unguarded timer behind', () => {
+        expect(src).not.toContain('window.setTimeout')
+        expect(src).not.toMatch(/(?<!\w)setTimeout\(/)
+    })
 })
 
 describe('WheelGame component parses', () => {
