@@ -48,6 +48,15 @@ describe('DiamondsGame settle source', () => {
     it('rounds the profit', () => {
         expect(src).toContain("const profit = round2(returnAmount - betAmount)")
     })
+
+    it('settles through the cancellable scheduler', () => {
+        expect(src).toContain("const { schedule } = useCancellableTimeouts()")
+    })
+
+    it('leaves no unguarded timer behind', () => {
+        expect(src).not.toContain('window.setTimeout')
+        expect(src).not.toMatch(/(?<!\w)setTimeout\(/)
+    })
 })
 
 describe('DiamondsGame component parses', () => {

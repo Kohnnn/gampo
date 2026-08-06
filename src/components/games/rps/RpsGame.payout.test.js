@@ -72,6 +72,15 @@ describe('RpsGame settle source', () => {
     it('refunds the stake on a push', () => {
         expect(src).toContain("const returnAmount = push ? betAmount :")
     })
+
+    it('settles through the cancellable scheduler', () => {
+        expect(src).toContain("const { schedule } = useCancellableTimeouts()")
+    })
+
+    it('leaves no unguarded timer behind', () => {
+        expect(src).not.toContain('window.setTimeout')
+        expect(src).not.toMatch(/(?<!\w)setTimeout\(/)
+    })
 })
 
 describe('RpsGame component parses', () => {
