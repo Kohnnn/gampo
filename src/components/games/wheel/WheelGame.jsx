@@ -6,7 +6,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
-import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
+import { funBoostedRtp } from '../../../utils/funMode'
 import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
@@ -53,10 +53,9 @@ const wheelShapes = {
 }
 
 // Scale a shape so its mean equals the target RTP (or a Fun-Mode-boosted RTP).
-function normalizeWheel(shape, funBoosted) {
+function normalizeWheel(shape, targetRtp) {
     const mean = shape.reduce((sum, v) => sum + v, 0) / shape.length
     if (mean <= 0) return shape.map(() => 0)
-    const targetRtp = funBoosted ? WHEEL_RTP * FUN_PAYOUT_BOOST : WHEEL_RTP
     const scale = targetRtp / mean
     return shape.map(v => (v > 0 ? round2(v * scale) : 0))
 }
@@ -82,7 +81,8 @@ export default function WheelGame() {
     const [toast, setToast] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('wheel', { count: 9, cap: 10 }))
     const simSeqRef = useRef(0)
-    const segments = normalizeWheel(wheelShapes[risk], isFunMode())
+    const effectiveRtp = funBoostedRtp(WHEEL_RTP)
+    const segments = normalizeWheel(wheelShapes[risk], effectiveRtp)
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return
@@ -217,7 +217,7 @@ export default function WheelGame() {
             }
             aside={
                 <>
-                    <StatsOverlay stats={session.stats} definition={definition} />
+                    <StatsOverlay stats={session.stats} definition={definition} effectiveRtp={effectiveRtp} />
                     <HistoryDrawer history={session.history} onClear={session.clear} />
                 </>
             }
@@ -243,7 +243,7 @@ export default function WheelGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('wheel')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={hitChance} payoutMultiplier={avgMultiplier} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={hitChance} payoutMultiplier={avgMultiplier} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

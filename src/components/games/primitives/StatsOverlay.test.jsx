@@ -30,6 +30,17 @@ describe('StatsOverlay', () => {
         expect(html).not.toContain('Too few samples')
     })
 
+    it('uses runtime RTP for target and EV coach math', () => {
+        const html = renderToStaticMarkup(
+            <StatsOverlay stats={makeStats(5)} definition={{ rtp: 0.96, houseEdge: 0.04 }} effectiveRtp={1} />,
+        )
+
+        expect(html).toContain('100.0%')
+        expect(html).toContain('0.0%')
+        expect(html).not.toContain('96.0%')
+        expect(html).not.toContain('4.0%')
+    })
+
     it('renders an EV coach verdict block', () => {
         const cold = renderToStaticMarkup(
             <StatsOverlay

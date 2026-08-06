@@ -1,4 +1,4 @@
-import { formatCredits, bankrollRisk, expectedValue } from '../utils/simulationMath'
+import { formatCredits, bankrollRisk, expectedValue, round2 } from '../utils/simulationMath'
 import { getGameEducation } from '../data/gameEducation'
 import '../styles/education.css'
 
@@ -13,12 +13,15 @@ function EducationPanel({
     payoutMultiplier,
     recentProfit = 0,
     balance = 0,
+    effectiveRtp,
 }) {
-    const rtp = definition?.rtp ?? 0.99
-    const edge = definition?.houseEdge ?? (1 - rtp)
+    const rtp = Number.isFinite(effectiveRtp) ? effectiveRtp : (definition?.rtp ?? 0.99)
+    const edge = Number.isFinite(effectiveRtp) ? 1 - effectiveRtp : (definition?.houseEdge ?? (1 - rtp))
     const probability = winProbability ?? rtp / Math.max(1.01, payoutMultiplier || 2)
     const multiplier = payoutMultiplier || (rtp / Math.max(0.01, probability))
-    const ev = expectedValue({ betAmount, winProbability: probability, payoutMultiplier: multiplier })
+    const ev = Number.isFinite(effectiveRtp)
+        ? round2((effectiveRtp - 1) * betAmount)
+        : expectedValue({ betAmount, winProbability: probability, payoutMultiplier: multiplier })
     const ruin = bankrollRisk({
         bankroll: balance,
         betAmount,

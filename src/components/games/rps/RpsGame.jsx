@@ -6,7 +6,7 @@ import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
-import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
+import { funBoostedRtp } from '../../../utils/funMode'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
@@ -40,7 +40,8 @@ export default function RpsGame() {
     // so RTP = payout/3 + 1/3. Solving for 97% RTP → payout = 1.91 (was 2.91,
     // which combined with the push refund gave a player-favourable 130% RTP).
     const RPS_RTP = 0.97
-    const payout = round2((isFunMode() ? RPS_RTP * FUN_PAYOUT_BOOST : RPS_RTP) * 3 - 1)
+    const effectiveRtp = funBoostedRtp(RPS_RTP)
+    const payout = round2(effectiveRtp * 3 - 1)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'RPS')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
@@ -109,7 +110,7 @@ export default function RpsGame() {
                     <div className="bp-bal-line"><span>Payout</span><strong>{payout.toFixed(2)}×</strong></div>
                 </BetPanel>
             }
-            aside={<><StatsOverlay stats={session.stats} definition={definition} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
+            aside={<><StatsOverlay stats={session.stats} definition={definition} effectiveRtp={effectiveRtp} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
             <CoreStageFrame minHeight={520} maxWidth={780} mobileScrollable className="rps-stage-frame">
             <div className={`rps-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
@@ -145,7 +146,7 @@ export default function RpsGame() {
             </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('rps')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={1 / 3} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={1 / 3} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

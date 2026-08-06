@@ -5,8 +5,8 @@
 //      edge (the correct pattern already used by Snakes/Slide), instead of
 //      hand-tuned constants that drift player-favourable.
 //   2. Fun Mode: a free-play-only toggle that boosts odds for entertainment.
-//      It is NEVER a real-casino mode — when boosted, effective RTP can exceed
-//      100%. It is gated to free play and clearly surfaced in the UI.
+//      It is NEVER a real-casino mode — boosted RTP is capped at 100% and is
+//      gated to free play and clearly surfaced in the UI.
 //
 // Fun Mode is a module-level singleton with a listener set (same pattern as
 // useProgress / useXp) so any consumer shares one source of truth without a
@@ -81,13 +81,25 @@ export function funPayout(multiplier) {
     return round2(m * FUN_PAYOUT_BOOST)
 }
 
+export function funBoostedRtp(rtp) {
+    const base = Number(rtp) || 0
+    if (!isFunMode()) return base
+    return Math.min(FUN_MAX_RTP, base * FUN_PAYOUT_BOOST)
+}
+
+export function funBoostFactor(baseRtp) {
+    const base = Number(baseRtp) || 0
+    if (base <= 0) return 1
+    return funBoostedRtp(base) / base
+}
+
 // RTP-lock: given the fair (zero-edge) payout multiplier for a win probability,
 // return the payout that yields exactly `rtp` long-run return. This is the
 // canonical "multiplier = fair × (1 − houseEdge)" pattern. Honors Fun Mode by
 // inflating the effective RTP (so the locked payout grows) in free play.
 export function rtpLockedMultiplier(winProbability, rtp) {
     const p = clamp(Number(winProbability) || 0, 0.0001, 1)
-    const targetRtp = isFunMode() ? Math.min(FUN_MAX_RTP, Number(rtp) * FUN_PAYOUT_BOOST) : Number(rtp)
+    const targetRtp = funBoostedRtp(rtp)
     return round2(targetRtp / p)
 }
 

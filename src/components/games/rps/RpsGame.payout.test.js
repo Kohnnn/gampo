@@ -66,7 +66,8 @@ describe('RpsGame settle source', () => {
     })
 
     it('derives the payout from the RTP', () => {
-        expect(src).toContain("const payout = round2((isFunMode() ? RPS_RTP * FUN_PAYOUT_BOOST : RPS_RTP) * 3 - 1)")
+        expect(src).toContain("const effectiveRtp = funBoostedRtp(RPS_RTP)")
+        expect(src).toContain("const payout = round2(effectiveRtp * 3 - 1)")
     })
 
     it('refunds the stake on a push', () => {

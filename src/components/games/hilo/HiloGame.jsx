@@ -5,7 +5,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
+import { funBoostedRtp } from '../../../utils/funMode'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -72,7 +72,8 @@ export default function HiloGame() {
     // so total RTP = winChance·payout + 1/13. Solve for the target so a tie
     // no longer pushes RTP over 100%. payout = (rtp − 1/13)/winChance.
     const HILO_RTP = 0.96
-    const hiloTargetRtp = (isFunMode() ? HILO_RTP * FUN_PAYOUT_BOOST : HILO_RTP) - (1 / 13)
+    const effectiveRtp = funBoostedRtp(HILO_RTP)
+    const hiloTargetRtp = effectiveRtp - (1 / 13)
     const payout = winChance > 0 ? Math.max(1.01, hiloTargetRtp / winChance) : 0
 
     const handleEvent = useCallback((ev) => {
@@ -215,7 +216,7 @@ export default function HiloGame() {
             }
             aside={
                 <>
-                    <StatsOverlay stats={session.stats} definition={definition} />
+                    <StatsOverlay stats={session.stats} definition={definition} effectiveRtp={effectiveRtp} />
                     <HistoryDrawer history={session.history} onClear={session.clear} />
                 </>
             }
@@ -241,7 +242,7 @@ export default function HiloGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('hilo')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={winChance || 0.01} payoutMultiplier={payout || 1} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={winChance || 0.01} payoutMultiplier={payout || 1} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

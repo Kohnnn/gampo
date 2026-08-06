@@ -15,7 +15,7 @@ import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
 import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
-import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
+import { funBoostFactor } from '../../../utils/funMode'
 import { getBigWinThreshold,
     BetPanel,
     BigWinOverlay,
@@ -121,6 +121,8 @@ export default function MolesGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const { schedule } = useCancellableTimeouts()
+    const funBoost = funBoostFactor(MOLES_RTP)
+    const effectiveRtp = MOLES_RTP * funBoost
 
     const machine = useRoundMachine({})
 
@@ -145,7 +147,7 @@ export default function MolesGame() {
 
         const placed = placeMoles(moleCount)
         const hits = picks.filter(p => placed.has(p)).length
-        const multiplier = payoutFor(hits, picks.length, moleCount, isFunMode() ? FUN_PAYOUT_BOOST : 1)
+        const multiplier = payoutFor(hits, picks.length, moleCount, funBoost)
         const won = multiplier > 0
         const returnAmount = won ? round2(betAmount * multiplier) : 0
         const profit = round2(returnAmount - betAmount)
@@ -234,7 +236,7 @@ export default function MolesGame() {
             }
             aside={
                 <>
-                    <StatsOverlay stats={session.stats} definition={definition} />
+                    <StatsOverlay stats={session.stats} definition={definition} effectiveRtp={effectiveRtp} />
                     <HistoryDrawer history={session.history} onClear={session.clear} />
                 </>
             }
@@ -268,7 +270,7 @@ export default function MolesGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('moles')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={(GRID - moleCount) / GRID} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={(GRID - moleCount) / GRID} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }
