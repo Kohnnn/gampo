@@ -47,8 +47,8 @@ export default function RpsGame() {
         const dealer = OPTIONS[Math.floor(nextRoll('rps').roll * 3)]
         const push = player.id === dealer.id
         const won = player.beats === dealer.id
-        const returnAmount = push ? betAmount : won ? betAmount * payout : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = push ? betAmount : won ? round2(betAmount * payout) : 0
+        const profit = round2(returnAmount - betAmount)
         playSound('tick')
         setToast(null)
         setPhase('slamming')

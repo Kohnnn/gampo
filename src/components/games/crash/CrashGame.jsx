@@ -11,7 +11,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits, clamp } from '../../../utils/simulationMath'
+import { formatCredits, clamp, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useTremor, triggerTremor } from '../../../utils/tremor'
 import { useSettings } from '../../../hooks/useSettings'
@@ -321,11 +321,12 @@ export default function CrashGame() {
             const cashRound = (m) => {
                 if (cashoutRef.current || !settleRef.current) return false
                 const effective = Number(m.toFixed(2))
-                const profit = stakeRef.current * (effective - 1)
+                const totalReturn = round2(stakeRef.current * effective)
+                const profit = round2(totalReturn - stakeRef.current)
                 cashoutRef.current = { effective, profit }
                 setCashedAt(effective)
                 setPhase('cashed')
-                addWinnings(stakeRef.current * effective, 'Crash return')
+                addWinnings(totalReturn, 'Crash return')
                 session.record({
                     id: crypto.randomUUID(),
                     label: `Cashed ${effective.toFixed(2)}×`,
@@ -390,11 +391,12 @@ export default function CrashGame() {
         const m = multiplier
         const effective = Number(m.toFixed(2))
         if (cashoutRef.current || !settleRef.current) return
-        const profit = stakeRef.current * (effective - 1)
+        const totalReturn = round2(stakeRef.current * effective)
+        const profit = round2(totalReturn - stakeRef.current)
         cashoutRef.current = { effective, profit }
         setCashedAt(effective)
         setPhase('cashed')
-        addWinnings(stakeRef.current * effective, 'Crash return')
+        addWinnings(totalReturn, 'Crash return')
         session.record({
             id: crypto.randomUUID(),
             label: `Cashed ${effective.toFixed(2)}×`,

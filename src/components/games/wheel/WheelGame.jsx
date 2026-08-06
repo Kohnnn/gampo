@@ -130,8 +130,8 @@ export default function WheelGame() {
         const { roll: r } = nextRoll('wheel')
         const idx = Math.floor(r * segments.length)
         const multiplier = segments[idx]
-        const returnAmount = betAmount * multiplier
-        const profit = returnAmount - betAmount
+        const returnAmount = round2(betAmount * multiplier)
+        const profit = round2(returnAmount - betAmount)
         const won = multiplier > 1
         const segmentLabel = `Segment ${idx + 1} · ${multiplier.toFixed(2)}×`
         const segAngle = 360 / segments.length

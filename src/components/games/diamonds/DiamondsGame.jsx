@@ -183,8 +183,8 @@ export default function DiamondsGame() {
         })
         const multiplier = payoutFor(bestCount, bestIdx === -1 ? GEMS.length - 1 : bestIdx, isFunMode() ? FUN_PAYOUT_BOOST : 1)
         const won = multiplier > 0
-        const returnAmount = won ? betAmount * multiplier : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = won ? round2(betAmount * multiplier) : 0
+        const profit = round2(returnAmount - betAmount)
         const matchedGemIndex = won ? bestIdx : null
 
         const events = buildEvents(api => {
