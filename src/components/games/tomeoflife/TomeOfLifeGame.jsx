@@ -13,7 +13,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -32,6 +32,7 @@ import { getBigWinThreshold,
     StageActionButton,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './tomeoflife.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -82,6 +83,7 @@ export default function TomeOfLifeGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
 
@@ -110,7 +112,7 @@ export default function TomeOfLifeGame() {
         ], { autoFinish: false })
         setPhase('playing')
         // Auto-reveal page 0 immediately so the player has feedback.
-        window.setTimeout(() => revealPage(0, betAmount, 0, false), REVEAL_DELAY_MS)
+        schedule(() => revealPage(0, betAmount, 0, false), REVEAL_DELAY_MS)
         resolve({ profit: 0 })
     })
 
@@ -138,7 +140,7 @@ export default function TomeOfLifeGame() {
             machine.finish({ kind: 'bust', profit: -currentStake, multiplier: 0, pageIndex: idx + 1 })
             showToast('loss', 'Tome bust', `-${formatCredits(currentStake)}`)
             setPhase('busted')
-            window.setTimeout(() => setPhase('idle'), 1200)
+            schedule(() => setPhase('idle'), 1200)
             return
         }
 
@@ -179,7 +181,7 @@ export default function TomeOfLifeGame() {
         if (pages[idx] !== null) return
         setRunning(true)
         sfx.play('click')
-        window.setTimeout(() => revealPage(idx, stake, accumMult, pendingDouble), REVEAL_DELAY_MS)
+        schedule(() => revealPage(idx, stake, accumMult, pendingDouble), REVEAL_DELAY_MS)
     }
 
     const cashOut = useCallback(() => {
@@ -189,8 +191,14 @@ export default function TomeOfLifeGame() {
     }, [inRound, accumMult, pageIndex, stake])
 
     const finishRound = (mult, page, currentStake) => {
-        const profit = currentStake * mult - currentStake
-        addWinnings(currentStake * mult, 'Tome of Life return')
+        // Symbol values (Sun 0.6, Moon 0.93) accumulate by addition, so the
+        // multiplier is routinely inexact in binary: Sun+Moon lands on
+        // 2.5300000000000002, and a stake of 5 then books a profit of
+        // 7.650000000000002. Round the return and the profit once here so the
+        // credited amount, the recorded profit, and the toast all agree.
+        const totalReturn = round2(currentStake * mult)
+        const profit = round2(totalReturn - currentStake)
+        addWinnings(totalReturn, 'Tome of Life return')
         setToast({ kind: profit > 0 ? 'cashout' : 'lose', multiplier: mult, amount: profit, message: profit > 0 ? `Tome ${mult.toFixed(2)}×` : 'No payout' })
         if (mult >= 5) {
             playSound('bigwin')
@@ -210,7 +218,7 @@ export default function TomeOfLifeGame() {
         machine.finish({ kind: profit > 0 ? 'cashed' : 'lose', profit, multiplier: mult, pageReached: page })
         showToast(profit > 0 ? 'win' : 'loss', `Tome ${mult.toFixed(2)}×`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         setPhase('cashed')
-        window.setTimeout(() => setPhase('idle'), 1200)
+        schedule(() => setPhase('idle'), 1200)
     }
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
