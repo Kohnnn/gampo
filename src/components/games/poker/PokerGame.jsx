@@ -14,6 +14,7 @@ import CoachPanel from './CoachPanel'
 import RangeBrowser from './RangeBrowser'
 import HandHistoryTab, { recordHand } from './HandHistoryTab'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
+import { useCancellableFrames, useCancellableTimeouts } from '../../../utils/scheduling'
 import './PokerGame.css'
 
 const BUY_INS = [1000, 5000, 25000, 100000, 500000]
@@ -172,6 +173,8 @@ export default function PokerGame() {
     const [sngPlacements, setSngPlacements] = useState([])
     const [sngResult, setSngResult] = useState(null)
     const prizePoolRef = useRef(0)
+    const { schedule } = useCancellableTimeouts()
+    const { requestFrame } = useCancellableFrames()
     const [bubbles, setBubbles] = useState({})
     const [confirmCashout, setConfirmCashout] = useState(false)
     const [pendingExit, setPendingExit] = useState(null)
@@ -244,11 +247,11 @@ export default function PokerGame() {
         if (motions.length) {
             setChipMotions(prev => [...prev.slice(-12), ...motions])
             const ids = motions.map(m => m.id)
-            window.setTimeout(() => {
+            schedule(() => {
                 setChipMotions(prev => prev.filter(m => !ids.includes(m.id)))
             }, 1100)
         }
-    }, [state])
+    }, [schedule, state])
 
     const enterPokerSession = (selectedFormat = format, selectedBuyIn = buyIn) => {
         if (balance < selectedBuyIn) {
@@ -280,7 +283,7 @@ export default function PokerGame() {
         setChipMotions([])
         setThinkProgress(0)
         playSound('deal')
-        window.requestAnimationFrame(() => {
+        requestFrame(() => {
             tableRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
         })
     }
@@ -339,7 +342,7 @@ export default function PokerGame() {
                 const text = botLine(persona, decision, state)
                 setChat(prev => [...prev.slice(-30), { id: Date.now(), user: p.name, text }])
                 setBubbles(prev => ({ ...prev, [p.id]: text }))
-                window.setTimeout(() => setBubbles(prev => {
+                schedule(() => setBubbles(prev => {
                     const next = { ...prev }
                     delete next[p.id]
                     return next
@@ -362,7 +365,7 @@ export default function PokerGame() {
             if (thinkRafRef.current) window.cancelAnimationFrame(thinkRafRef.current)
             setThinkProgress(0)
         }
-    }, [state, playSound, postflopChart])
+    }, [state, playSound, postflopChart, schedule])
 
     const acts = state ? legalActions(state) : []
     const human = state ? state.players.find(p => p.isHuman) : null
@@ -618,7 +621,7 @@ export default function PokerGame() {
         if (finalStack > 0) addWinnings(finalStack, 'Poker cashout')
         showToast('bet', 'Left the table', `Cashed out ${formatCredits(finalStack)}`)
         setState(null); setSeated(false); setSngComplete(false); setConfirmCashout(false); setRebuyPrompt(false)
-        if (afterCashout) window.setTimeout(afterCashout, 0)
+        if (afterCashout) schedule(afterCashout, 0)
     }
 
     const cashOutAndExit = () => {
@@ -630,7 +633,7 @@ export default function PokerGame() {
         const target = pendingExit
         showToast('loss', 'Left poker without cashing out', 'Table stack was abandoned')
         setState(null); setSeated(false); setSngComplete(false); setConfirmCashout(false); setRebuyPrompt(false); setPendingExit(null)
-        window.setTimeout(() => completePendingExit(target), 0)
+        schedule(() => completePendingExit(target), 0)
     }
 
     const topUp = () => {
