@@ -10,7 +10,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -29,6 +29,7 @@ import { getBigWinThreshold,
     useRoundMachine,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import EducationPanel from '../../EducationPanel'
 import './darts.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -79,6 +80,7 @@ export default function DartsGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [pointer, setPointer] = useState({ x: 0, y: 0 })
+    const { schedule } = useCancellableTimeouts()
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return
@@ -133,8 +135,12 @@ export default function DartsGame() {
         else if (outcome.kind === 'sector') { multiplier = SECTOR_PAYOUT; label = `Sector ${(outcome.hitSector + 1)}` }
         else if (outcome.kind === 'neighbor') { multiplier = NEIGHBOR_PAYOUT; label = 'Neighbor' }
         const won = multiplier > 0
-        const returnAmount = won ? betAmount * multiplier : 0
-        const profit = returnAmount - betAmount
+        // SECTOR_PAYOUT is 1.6, which is inexact in binary: a stake of 1 books
+        // a raw profit of 0.6000000000000001, and 140 of the first 200 whole
+        // stakes drift the same way. Round once here so the credited return,
+        // the recorded profit, and the toast all agree.
+        const returnAmount = won ? round2(betAmount * multiplier) : 0
+        const profit = round2(returnAmount - betAmount)
 
         // Pointer position: place dart inside the chosen sector ring.
         const sectorIdx = outcome.kind === 'bull' ? 0 : (outcome.hitSector ?? 0)
@@ -159,24 +165,30 @@ export default function DartsGame() {
 
         // Schedule pointer visual at the same wallclock as the reveal so
         // the dart "lands" with the events.
-        setTimeout(() => setPointer({ x, y }), THROW_MS - 80)
+        schedule(() => setPointer({ x, y }), THROW_MS - 80)
 
-        if (returnAmount > 0) addWinnings(returnAmount, 'Darts return')
-        if (won && multiplier >= 12) {
-            playSound('bigwin')
-            setBigWin({ trigger: Date.now(), profit, multiplier })
-        } else {
-            playSound(won ? 'win' : 'loss')
-        }
-        session.record({
-            id: crypto.randomUUID(),
-            label,
-            profit, betAmount, multiplier: won ? multiplier : 0,
-            meta: { target, outcome },
-        })
-        showToast(won ? 'win' : 'loss', label, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+        // Settlement has to land with ROUND_RESULT. Crediting and toasting
+        // synchronously here spoiled the outcome a full animation ahead: the
+        // balance jumped and the toast named the sector while the dart was
+        // still in flight.
+        schedule(() => {
+            if (returnAmount > 0) addWinnings(returnAmount, 'Darts return')
+            if (won && multiplier >= 12) {
+                playSound('bigwin')
+                setBigWin({ trigger: Date.now(), profit, multiplier })
+            } else {
+                playSound(won ? 'win' : 'loss')
+            }
+            session.record({
+                id: crypto.randomUUID(),
+                label,
+                profit, betAmount, multiplier: won ? multiplier : 0,
+                meta: { target, outcome },
+            })
+            showToast(won ? 'win' : 'loss', label, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+        }, THROW_MS)
 
-        setTimeout(() => resolve({ profit }), THROW_MS + 240)
+        schedule(() => resolve({ profit }), THROW_MS + 240)
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
