@@ -87,10 +87,33 @@ try {
         ['__gampoSlotQa', 'window.__gampoSlotQa={}'],
         ['forceBonusState', 'const x={forceBonusState:f}'],
         ['gampo:slot-qa-ready', 'new CustomEvent("gampo:slot-qa-ready")'],
+        ['enqueueOutcome', 'const x={enqueueOutcome:f}'],
+        ['pendingOutcomes', 'const x={pendingOutcomes:f}'],
+        ['clearOutcomes', 'const x={clearOutcomes:f}'],
+        ['outcome must be a plain object', 'return ce("outcome must be a plain object")'],
+        ['session must be a plain object or null', 'return ce("session must be a plain object or null")'],
+        ['enqueueOutcome rejected', 'throw new Error(`enqueueOutcome rejected: ${r}`)'],
+        ['setFreeSpinSession rejected', 'throw new Error(`setFreeSpinSession rejected: ${r}`)'],
     ]) {
         const dist = makeFakeDist({ 'chunk-1.js': snippet })
         const { status, output } = runGuard(dist)
         check(`NEG-2 detects ${token}`, status === 1 && output.includes(token), `got exit ${status}`)
+    }
+
+    // NEG-2b — regression for a real miss.
+    //
+    // The first version of the token list contained bare function names
+    // (createOutcomeQueue, validateQueuedOutcome). Against a genuinely leaking
+    // production bundle esbuild had renamed them to `Ql`/`Yl`, so the guard
+    // reported 0 violations while the entire validator sat in the chunk. This
+    // fixture is that exact minified shape: every identifier mangled, only
+    // string literals intact. It must still be caught.
+    {
+        const minified = 'function Ia(t){return typeof t=="object"}function Vl(t){return typeof t=="number"&&Number.isFinite(t)}const ql=["cells","featureEvents"];function Yl(t){if(!Ia(t))return ce("outcome must be a plain object");return ok(t)}'
+        const dist = makeFakeDist({ 'SlotsGame-CtjihWBC.js': minified })
+        const { status, output } = runGuard(dist)
+        check('NEG-2b catches a fully minified leak via literals', status === 1, `got exit ${status}`)
+        check('NEG-2b names the literal', output.includes('outcome must be a plain object'), output.trim())
     }
 
     // NEG-3

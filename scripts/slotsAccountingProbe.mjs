@@ -538,9 +538,9 @@ async function run() {
         report.scenarios = outcome.scenarios
         report.unreachableScenarios = [{
             id: 'end-to-end-ui-observed-award-and-stop',
-            status: 'unreachable-without-phase-04',
-            reason: 'forceBonusState() accepts no inputs and always installs totalAwarded=8; there is no seam to force a deterministic spin outcome, so a capped award and an autoplay stop cannot be observed off the rendered UI without the Phase 04 resolver injection seam.',
-            wouldRequire: 'deterministic resolver injection seam (Phase 04)',
+            status: 'closed-by-phase-04',
+            reason: 'Was unreachable while forceBonusState() accepted no inputs and always installed totalAwarded=8. The Phase 04 dev-only seam (setFreeSpinSession / enqueueOutcome) now allows a deterministic cap-boundary session and a forced spin outcome to be observed off the rendered UI.',
+            closedBy: 'scripts/slotsCappedAwardProbe.mjs',
         }]
 
         report.pageErrors = collectPageErrors(client, sessionId)
@@ -634,7 +634,7 @@ async function run() {
     if (originalFailure) throw originalFailure
 
     for (const scenario of report.scenarios) console.log(`  PASS ${scenario.id}`)
-    for (const scenario of report.unreachableScenarios) console.log(`  UNREACHABLE ${scenario.id} — ${scenario.wouldRequire}`)
+    for (const scenario of report.unreachableScenarios) console.log(`  CLOSED ${scenario.id} — see ${scenario.closedBy}`)
     console.log('Managed gampo_ storage semantically restored after reload (byte equality intentionally unasserted).')
 }
 

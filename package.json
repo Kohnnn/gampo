@@ -18,6 +18,8 @@
         "ux:benchmark": "node --experimental-websocket scripts/browserSmoke.mjs --mode=ux --out=output/ux-benchmark",
         "verify:betsheet": "node --experimental-websocket scripts/verifyBetSheet.mjs",
         "probe:slots-accounting": "node --experimental-websocket scripts/slotsAccountingProbe.mjs",
+    "probe:slots-qa-seam": "node --experimental-websocket scripts/slotsQaSeamProbe.mjs",
+    "probe:slots-capped-award": "node --experimental-websocket scripts/slotsCappedAwardProbe.mjs",
         "audit:a11y": "node --experimental-websocket scripts/auditA11y.mjs",
         "audit:contrast": "node --experimental-websocket scripts/auditContrast.mjs",
         "audit:scroll": "node scripts/auditPlayfieldOverflow.mjs",
