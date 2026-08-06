@@ -3,7 +3,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset, ResultToast, ActionLockOverlay, getBigWinThreshold } from '../primitives'
 import { Particles } from '../../fx'
@@ -29,6 +30,7 @@ export default function CoinFlipGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const { schedule } = useCancellableTimeouts()
     const payout = 1.96
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
@@ -39,9 +41,9 @@ export default function CoinFlipGame() {
         setFlipping(true)
         const next = nextRoll('coinflip').roll < 0.5 ? 'head' : 'tail'
         const won = next === choice
-        const returnAmount = won ? betAmount * payout : 0
-        const profit = returnAmount - betAmount
-        window.setTimeout(() => {
+        const returnAmount = won ? round2(betAmount * payout) : 0
+        const profit = round2(returnAmount - betAmount)
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Coin Flip return')
             setLastWon(won)
             setBurstKey(k => k + 1)

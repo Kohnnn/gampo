@@ -3,7 +3,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { isFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
@@ -64,6 +65,7 @@ export default function HiloGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [revealedFace, setRevealedFace] = useState(false)
+    const { schedule } = useCancellableTimeouts()
 
     const winChance = direction === 'higher' ? (13 - currentCard.rank) / 13 : (currentCard.rank - 1) / 13
     // RTP-lock incl. the tie refund. P(tie)=1/13 refunds the stake (EV 1/13),
@@ -123,8 +125,8 @@ export default function HiloGame() {
         const next = { rank: Math.floor(nextRoll('hilo').roll * 13) + 1, suit: pickSuit(() => nextRoll('hilo')) }
         const push = next.rank === currentCard.rank
         const won = direction === 'higher' ? next.rank > currentCard.rank : next.rank < currentCard.rank
-        const returnAmount = push ? betAmount : won ? betAmount * payout : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = push ? betAmount : won ? round2(betAmount * payout) : 0
+        const profit = round2(returnAmount - betAmount)
 
         const events = buildEvents(api => {
             api.push(ROUND_EVENTS.ROUND_START, { current: currentCard, direction }, 0)
@@ -145,7 +147,7 @@ export default function HiloGame() {
         })
         machine.start(events, { autoFinish: false })
 
-        window.setTimeout(() => {
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Hi-Lo return')
             setCurrentCard(next)
             setStreak(prev => won ? prev + 1 : 0)

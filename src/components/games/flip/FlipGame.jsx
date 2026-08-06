@@ -8,7 +8,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -54,6 +55,7 @@ export default function FlipGame() {
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
     const [spinning, setSpinning] = useState(false)
+    const { schedule } = useCancellableTimeouts()
 
     const handleEvent = useCallback((ev) => {
         if (!ev) return
@@ -106,8 +108,8 @@ export default function FlipGame() {
         const { roll } = nextRoll('flip')
         const revealed = roll < 0.5 ? 'heads' : 'tails'
         const won = revealed === side
-        const returnAmount = won ? betAmount * PAYOUT : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = won ? round2(betAmount * PAYOUT) : 0
+        const profit = round2(returnAmount - betAmount)
 
         const events = buildEvents(api => {
             api.push(ROUND_EVENTS.ROUND_START, { side }, 0)
@@ -141,7 +143,7 @@ export default function FlipGame() {
         })
         showToast(won ? 'win' : 'loss', won ? 'Flip win' : 'Flip miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
 
-        setTimeout(() => resolve({ profit }), FLIP_DURATION_MS + 260)
+        schedule(() => resolve({ profit }), FLIP_DURATION_MS + 260)
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

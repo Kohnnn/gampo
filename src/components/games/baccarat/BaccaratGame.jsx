@@ -4,7 +4,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -211,7 +211,8 @@ export default function BaccaratGame() {
             const mult = payouts[k] || 0
             totalReturn += amount * mult
         }
-        const profit = totalReturn - stake
+        totalReturn = round2(totalReturn)
+        const profit = round2(totalReturn - stake)
         if (totalReturn > 0) addWinnings(totalReturn, 'Baccarat return')
         const effectiveMult = stake > 0 ? totalReturn / stake : 0
         setHand(next)

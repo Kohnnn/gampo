@@ -9,7 +9,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { clamp, formatCredits } from '../../../utils/simulationMath'
+import { clamp, formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold,
     BetPanel,
@@ -52,6 +53,7 @@ export default function SlideGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
 
     const winChance = useMemo(() => Math.max(0.05, Math.min(0.95, targetWidth / 100)), [targetWidth])
     const payout = useMemo(() => Math.max(1.05, ((1 - HOUSE_EDGE) / winChance)), [winChance])
@@ -108,8 +110,8 @@ export default function SlideGame() {
         const { roll } = nextRoll('slide')
         const position = Math.round(roll * 1000) / 10 // 0..100 with 0.1 precision
         const won = position >= left && position <= right
-        const returnAmount = won ? betAmount * payout : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = won ? round2(betAmount * payout) : 0
+        const profit = round2(returnAmount - betAmount)
 
         const events = buildEvents(api => {
             api.push(ROUND_EVENTS.ROUND_START, { left, right }, 0)
@@ -144,7 +146,7 @@ export default function SlideGame() {
         })
         showToast(won ? 'win' : 'loss', won ? 'Slide hit' : 'Slide miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
 
-        setTimeout(() => resolve({ profit }), TRAVEL_MS + 240)
+        schedule(() => resolve({ profit }), TRAVEL_MS + 240)
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

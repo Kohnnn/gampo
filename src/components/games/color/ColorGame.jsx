@@ -3,7 +3,8 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
 import { findGameDefinition } from '../../../data/gameDefinitions'
-import { formatCredits } from '../../../utils/simulationMath'
+import { formatCredits, round2 } from '../../../utils/simulationMath'
+import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
@@ -35,6 +36,7 @@ export default function ColorGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
+    const { schedule } = useCancellableTimeouts()
     const payout = 3.84
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
@@ -46,12 +48,12 @@ export default function ColorGame() {
         const idx = Math.floor(nextRoll('color').roll * COLORS.length)
         const next = COLORS[idx]
         const won = next.id === choice
-        const returnAmount = won ? betAmount * payout : 0
-        const profit = returnAmount - betAmount
+        const returnAmount = won ? round2(betAmount * payout) : 0
+        const profit = round2(returnAmount - betAmount)
         const segAngle = 360 / COLORS.length
         const target = 5 * 360 + (360 - idx * segAngle - segAngle / 2)
         setRotation(prev => prev + (target - (prev % 360)))
-        window.setTimeout(() => {
+        schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Color Pick return')
             setResult(next)
             setLastWon(won)
