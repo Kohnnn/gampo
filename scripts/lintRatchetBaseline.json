@@ -808,16 +808,6 @@
       "messageIdentity": "id:unusedVar|text:'stringToBytes' is defined but never used."
     },
     {
-      "filePath": "src/utils/scheduling.js",
-      "line": 20,
-      "column": 17,
-      "ruleId": null,
-      "severity": 1,
-      "messageId": null,
-      "message": "Unused eslint-disable directive (no problems were reported from 'no-console').",
-      "messageIdentity": "text:Unused eslint-disable directive (no problems were reported from 'no-console')."
-    },
-    {
       "filePath": "src/utils/tremor.js",
       "line": 26,
       "column": 25,

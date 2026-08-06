@@ -17,7 +17,6 @@ export function useCancellableTimeouts() {
         const id = window.setTimeout(() => {
             timersRef.current.delete(id)
             try { fn() } catch (err) {
-                // eslint-disable-next-line no-console
                 console.warn('cancellable timeout threw:', err)
             }
         }, delay)
@@ -64,7 +63,6 @@ export function useCancellableFrames() {
         const id = window.requestAnimationFrame((time) => {
             framesRef.current.delete(id)
             try { fn(time) } catch (err) {
-                // eslint-disable-next-line no-console
                 console.warn('cancellable frame threw:', err)
             }
         })
