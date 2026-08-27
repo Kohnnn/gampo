@@ -14,9 +14,10 @@
 // Storage key: gampo_settings_v1
 
 import { useEffect, useState } from 'react'
-import { readJson, writeJson, removeKey } from '../utils/storage'
+import { readRaw, writeJson, removeKey } from '../utils/storage'
 
 const KEY = 'gampo_settings_v1'
+const LEGACY_REDUCE_MOTION_KEY = 'gampo_reduce_motion'
 
 export const ACCENT_THEMES = [
     { id: 'emerald', name: 'Emerald', value: '#00e701' },
@@ -41,9 +42,7 @@ const DEFAULTS = {
     animations: true, // master cosmetic-animation switch (separate from reduceMotion)
 }
 
-function readSettings() {
-    const parsed = readJson(KEY, null)
-    if (!parsed || typeof parsed !== 'object') return { ...DEFAULTS }
+function normalizeSettings(parsed) {
     return {
         accent: typeof parsed.accent === 'string' ? parsed.accent : DEFAULTS.accent,
         density: parsed.density === 'compact' ? 'compact' : 'cozy',
@@ -52,6 +51,30 @@ function readSettings() {
         quickSpin: parsed.quickSpin === undefined ? DEFAULTS.quickSpin : Boolean(parsed.quickSpin),
         animations: parsed.animations === undefined ? DEFAULTS.animations : Boolean(parsed.animations),
     }
+}
+
+function readSettings() {
+    const raw = readRaw(KEY)
+    if (raw !== null) {
+        try {
+            const parsed = JSON.parse(raw)
+            if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') return { ...DEFAULTS }
+            const normalized = normalizeSettings(parsed)
+            if (Object.prototype.hasOwnProperty.call(parsed, 'reduceMotion')) return normalized
+            const legacy = readRaw(LEGACY_REDUCE_MOTION_KEY)
+            if (legacy !== '0' && legacy !== '1') return normalized
+            const migrated = { ...normalized, reduceMotion: legacy === '1' }
+            if (writeJson(KEY, migrated)) removeKey(LEGACY_REDUCE_MOTION_KEY)
+            return migrated
+        } catch {
+            return { ...DEFAULTS }
+        }
+    }
+    const legacy = readRaw(LEGACY_REDUCE_MOTION_KEY)
+    if (legacy !== '0' && legacy !== '1') return { ...DEFAULTS }
+    const migrated = { ...DEFAULTS, reduceMotion: legacy === '1' }
+    if (writeJson(KEY, migrated)) removeKey(LEGACY_REDUCE_MOTION_KEY)
+    return migrated
 }
 
 const listeners = new Set()
@@ -96,7 +119,9 @@ export function setDensity(density) {
 }
 
 export function setReduceMotion(value) {
-    settings = { ...settings, reduceMotion: !!value }
+    const reduceMotion = Boolean(typeof value === 'function' ? value(settings.reduceMotion) : value)
+    if (reduceMotion === settings.reduceMotion) return
+    settings = { ...settings, reduceMotion }
     persist()
 }
 
@@ -118,6 +143,7 @@ export function setAnimations(value) {
 export function resetSettings() {
     settings = { ...DEFAULTS }
     removeKey(KEY)
+    removeKey(LEGACY_REDUCE_MOTION_KEY)
     applySettingsToDom()
     notify()
 }

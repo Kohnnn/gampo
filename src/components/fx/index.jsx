@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { setReduceMotion, useSettings } from '../../hooks/useSettings'
 import './fx.css'
 
 export function NumberRoll({ value, format = (v) => v, className = '' }) {
@@ -38,12 +39,6 @@ export function RippleButton({ children, className = '', ...rest }) {
 }
 
 export function useReduceMotion() {
-    const [reduce, setReduce] = useState(() => {
-        try { return localStorage.getItem('gampo_reduce_motion') === '1' } catch { return false }
-    })
-    useEffect(() => {
-        try { localStorage.setItem('gampo_reduce_motion', reduce ? '1' : '0') } catch { /* ignore */ }
-        document.documentElement.classList.toggle('gampo-reduce-motion', reduce)
-    }, [reduce])
-    return [reduce, setReduce]
+    const { reduceMotion } = useSettings()
+    return [reduceMotion, setReduceMotion]
 }

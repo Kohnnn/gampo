@@ -2091,6 +2091,16 @@ input:focus-visible,
            This was the root cause of "cannot scroll" across games. */
         overflow: visible !important;
         max-width: 100%;
+        /* QA: .gs-layout is a flex *item* of the column-flex .game-shell, so it
+           inherits flex-shrink:1 and collapses to height 0 when the shell is
+           short (landscape phones: 360px tall vs 2600px of content). That
+           crushed .gs-playfield to ~16px and pushed interactive surfaces
+           outside the shell's visible box entirely — /baccarat bet cells
+           measured as zero-area and were unclickable at 740x360 and 667x375.
+           Do not shrink: let content set the height and let .game-shell scroll.
+           The landscape block near the top of this file assumes a grid layout
+           and is inert here, since display:flex wins by !important. */
+        flex-shrink: 0;
     }
     .gs-aside {
         order: 3;
