@@ -32,10 +32,16 @@ export function describePaylines(config = {}) {
     }
 
     if (mode === 'megaways') {
+        const columnRows = config.layout?.columnRows
+        const ways = Array.isArray(columnRows) && columnRows.length
+            ? columnRows.reduce((m, v) => m * v, 1)
+            : 0
         return {
             mode,
             groups: [],
-            explain: 'Megaways: each reel shows a variable number of symbols, so the number of ways changes every spin. Adjacent matches from the left pay.',
+            explain: ways
+                ? `Megaways: reels show different symbol counts (${columnRows.join('-')}), giving a fixed ${ways.toLocaleString()} ways to win. Adjacent matches from the left pay.`
+                : 'Megaways: each reel shows a different number of symbols, so matches pay across far more ways than fixed lines. Adjacent matches from the left pay.',
         }
     }
 
