@@ -142,7 +142,13 @@ function buildHowToPlay(config, contract) {
     } else if (evalType === 'ways') {
         steps.push('Win when matching symbols line up from the left on adjacent reels — any position counts, so there are many ways to win.')
     } else if (evalType === 'megaways') {
-        steps.push('Reel heights change every spin, so the number of ways to win shifts — match symbols left-to-right on adjacent reels.')
+        const columnRows = config.layout?.columnRows
+        const ways = Array.isArray(columnRows) && columnRows.length
+            ? columnRows.reduce((m, v) => m * v, 1)
+            : 0
+        steps.push(ways
+            ? `Each reel shows a different number of symbols, so there are ${ways.toLocaleString()} ways to win — match symbols left-to-right on adjacent reels.`
+            : 'Each reel shows a different number of symbols, giving far more ways to win than fixed lines — match symbols left-to-right on adjacent reels.')
     } else if (evalType === 'pay-anywhere') {
         steps.push('Matching symbols pay from anywhere on the screen — you do not need them on a line.')
     } else {

@@ -1,29 +1,46 @@
-// useTremor — global screen-shake hook. Briefly toggles a `gampo-shake`
-// CSS class on a target element so any game can punch up high-multiplier
-// moments without each owning its own keyframes.
-//
-//   const tremorRef = useTremor()
-//   <div ref={tremorRef}>...</div>
-//   triggerTremor(tremorRef, 'lg')
-
 import { useRef, useEffect } from 'react'
+
+const owners = new WeakMap()
+const refOwners = new WeakMap()
+
+function cleanup(ref) {
+    const owned = refOwners.get(ref)
+    if (!owned || owners.get(owned.el)?.token !== owned.token) return
+    if (typeof window !== 'undefined' && owned.timer != null) window.clearTimeout(owned.timer)
+    owned.el.classList.remove('gampo-shake', 'gampo-shake-lg')
+    owners.delete(owned.el)
+    refOwners.delete(ref)
+}
 
 export function useTremor() {
     const ref = useRef(null)
-    useEffect(() => () => {
-        if (ref.current) ref.current.classList.remove('gampo-shake', 'gampo-shake-lg')
-    }, [])
+    useEffect(() => () => cleanup(ref), [ref])
     return ref
 }
 
 export function triggerTremor(ref, size = 'sm') {
     const el = ref?.current
-    if (!el) return
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (!el || typeof window === 'undefined' || typeof document === 'undefined') return
+    if (document.documentElement?.classList?.contains('gampo-reduce-motion')) return
+    if (typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const previous = owners.get(el)
+    if (previous?.timer != null) window.clearTimeout(previous.timer)
+    el.classList.remove('gampo-shake', 'gampo-shake-lg')
+    void el.offsetWidth
+
+    const token = {}
+    const owner = { token, timer: null }
     const cls = size === 'lg' ? 'gampo-shake-lg' : 'gampo-shake'
-    el.classList.remove(cls)
-    // Force reflow so re-applied class re-runs the animation.
-    void el.offsetWidth // eslint-disable-line no-unused-expressions
+    owners.set(el, owner)
+    refOwners.set(ref, { el, token, timer: null })
     el.classList.add(cls)
-    window.setTimeout(() => el.classList.remove(cls), size === 'lg' ? 700 : 400)
+    const timer = window.setTimeout(() => {
+        if (owners.get(el)?.token !== token) return
+        el.classList.remove('gampo-shake', 'gampo-shake-lg')
+        owners.delete(el)
+        if (refOwners.get(ref)?.token === token) refOwners.delete(ref)
+    }, size === 'lg' ? 700 : 400)
+    owner.timer = timer
+    refOwners.set(ref, { el, token, timer })
 }

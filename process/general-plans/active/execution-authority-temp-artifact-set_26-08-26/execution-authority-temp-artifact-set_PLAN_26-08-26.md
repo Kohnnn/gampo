@@ -1497,12 +1497,170 @@ The preceding PASS contract, envelope, test target, and EXECUTE handoff are hist
 
 ## Validate Contract
 
-Status: BLOCKED
+Status: PASS
 Date: 2026-08-27
 date: 2026-08-27
-generated-by: PLAN amendment placeholder
-supersedes: 2026-08-27 (outer-pvl — invalidated by original-handle and standalone-probe amendment)
+generated-by: outer-pvl
+supersedes: 2026-08-27 (outer-pvl — invalidated original-handle and standalone-probe amendment placeholder)
 
-**Gate: BLOCKED.** Fresh VALIDATE must replace this placeholder after validating AC-05/AD-03A original-handle identity/readback, exactly 64 self-checks, mandatory standalone creation substitution refusal, the Windows junction substitution workflow or privilege/policy-only SKIP, exact 29 writable paths, exact 20 evidence files, exact nine manifest paths, immutable `repair.patch` `160/33284331892c7a6cf5aca851d60e2af657121dd426da4ac71f06f5eb58e17f35`, corrected pending Report/verification/adversarial claims, permanent gaps, and risk `REJECT`. No execution-authority envelope is valid or emitted by PLAN.
+Gate: PASS
+Accepted by: session — user explicitly requested fresh independent deep VALIDATE, authorized plan-only gap repair, and reserved implementation/risk approval for fresh independent EVL.
+
+### Feasibility Probes Resolved
+
+Prior Feasibility: On Windows Node `v24.16.0`, does `fs.fstatSync(fd, { bigint: true })` provide a usable exact ordered `{ dev, ino, modeType }` tuple that equals postreadback `fs.lstatSync(path, { bigint: true })` for the same live `wx+` file? — verdict: VIABLE — handle and path both returned `dev: 2187374391`, `ino: 348747496144650796`, `modeType: 32768`; `S_IFMT: 61440`, `S_IFREG: 32768`; both tuples were usable, exact equality passed, positional readback matched, the one-byte EOF probe returned `0`, and identity-checked cleanup removed only the UUID-owned file. This licenses the mandatory defense-in-depth tuple on this host; it forbids treating it as universal Windows identity; universal filesystem stability and final pathname TOCTOU remain uncertain.
+
+### Layer 1 Dimensions
+
+| Layer 1 dimension | Status | Finding |
+|---|---|---|
+| Infra fit | PASS | Existing Windows Node 24 standard-library APIs support the exact original-handle contract; no dependency, application, container, network, or deployment surface is required. |
+| Test coverage | PASS | Every developed surface has named automated or hybrid coverage, including exact target-64 deterministic checks and both standalone controlled-substitution workflows. |
+| Breaking changes | PASS | The public temporary and legacy envelopes, receipt/PASS ordering, and legacy Report/Correction behavior remain frozen; only private enforcement and evidence are repaired. |
+| Security surface | PASS | The plan is fail-closed, bounded to exact paths, preserves permanent ceilings, and withholds final approval until independent EVL. |
+
+### Layer 2 Sections
+
+| Layer 2 section | Status | Mechanical feasibility, gaps, conflicts, and mitigation |
+|---|---|---|
+| Stage 0 — high-risk state and evidence setup | PASS | Exact pending states, schemas, native receipts, immutable patch handling, and secret-scan stops are specified; no plan gap remains. |
+| Stage 1 — original-handle validator repair | PASS | Replace close/reopen behavior with one `wx+` descriptor, exact bigint identity, positional readback/EOF, close-success gating, and fail-closed cleanup; current source contradiction is the planned implementation target, not a plan conflict. |
+| Stage 2 — fixtures, self-checks, and live probes | PASS | Existing 28 fixtures remain fixed; exactly four original-handle/readback checks raise 60 to 64; ordered standalone creation and junction substitution workflows are fully specified. |
+| Stage 3 — protocol and mirror parity | PASS | Canonical and mirrored paths exist; temporary later full-envelope reruns are forbidden while legacy initial/mid/completion cadence remains unchanged. |
+| Stage 4 — evidence and independent EVL | PASS | Exact 20-file evidence inventory, nine-path manifest set, immutable failed patch, raw commands, risk rejection, and independent approval sequence are complete. |
+
+**Totals: 0 FAILs / 0 CONCERNs / 9 PASSes**
+
+**Net Gate: PASS**
+
+### Exact Scope and State Contract
+
+- Writable scope: exactly 29 paths — three implementation/prompt paths, five risk paths, nineteen writable evidence paths, the selected plan, and the canonical Report.
+- Evidence inventory: exactly 20 files; `repair.patch` is the twentieth and is immutable/read-only, so only nineteen evidence paths are writable.
+- Manifest set: exactly nine ordinal-sorted paths, identical in baseline and after manifests; require `newPaths: []`, `deletedPaths: []`, `unexpectedPaths: []`.
+- Fixture/self-check target: exactly 28 fixtures (`3` pass, `25` negative) and exactly 64 self-checks.
+- Immutable failed patch: exactly `160` bytes / SHA-256 `33284331892c7a6cf5aca851d60e2af657121dd426da4ac71f06f5eb58e17f35`; status only `UNAVAILABLE_ACCEPTED_BY_AMENDMENT`; indexed, excluded from writable scope and success conjunction, never rewritten or represented as PASS.
+- Risk state through EXECUTE: `REPAIR REQUIRED` / `FAIL` / `REJECT`; only fresh independent EVL may write final `APPROVE`.
+- Permanent gaps: `PRE_EDIT_BASELINE_UNAVAILABLE`; `REPAIR_BASELINE_BYTES_UNRECOVERABLE`; universal Windows reparse-tag coverage unproven; residual pathname TOCTOU not eliminated; absent frontmatter validator non-green; ignored evidence not portable across cleanup or clone.
+
+### Test Gates
+
+| criterion id | behavior | strategy | proving test | gap-resolution |
+|---|---|---|---|---|
+| AC-02/03/07 | Plan, validator, and final legacy envelope are structurally executable. | Fully-Automated | Run separately: `node .claude/skills/vc-generate-plan/scripts/validate-plan-artifact.mjs process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/execution-authority-temp-artifact-set_PLAN_26-08-26.md`; `node --check .claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs`; `node .claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/execution-authority-temp-artifact-set_PLAN_26-08-26.md`. | B |
+| AC-01/02/03/04/05/07/11 | Exact fixtures and deterministic original-handle/readback/cleanup cases classify correctly. | Fully-Automated | `node .claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs --fixtures .claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope`; require exactly `28 fixture(s) (3 pass-case, 25 negative-case) and 64 self-check(s)`, zero `MISS`, four cleanup targets, and four original-handle/readback targets. | B |
+| AC-01/07/09 | All original legacy observable behavior remains byte-identical. | Fully-Automated | Enumerate the original ten non-temporary fixtures in ordinal order; invoke each with `spawnSync(process.execPath, [validator, fixture], { cwd, encoding: null, windowsHide: true, maxBuffer: 64 * 1024 * 1024 })`; compare before/after stdout Buffers, stderr Buffers, and integer exits exactly. | B |
+| AC-02/03/04/06 | Temporary validation preserves the exact ordered nine-key public summary. | Fully-Automated | Direct native validation of `.claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-temporary-artifact-set.md`; require ordered `status,authorityClass,selected_plan,mode,proof_path,scope_count,stop_condition_count,artifact_receipt_schema_version,artifact_paths`. | B |
+| AC-05/06/09 | Live creation binds write, identity, positional readback, EOF, close, collision, receipt, substitution refusal, retained proof, and separate cleanup. | Hybrid | `node .claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs --creation-probe`; mandatory PASS with exact ordered `execution-authority-creation-probe/v1` observation and no recursive deletion. | B |
+| AC-04/05/09 | Live junction alias and replacement cleanup are rejected safely. | Hybrid | `node .claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs --junction-probe`; PASS when exercised; SKIP only when privilege/policy prevents canonical setup before either controlled case; every other failure is FAIL. | B |
+| AC-08/10 | Syntax, exact lint, Claude/Codex parity, and protocol wiring remain valid. | Fully-Automated | Run separately: `node node_modules/eslint/bin/eslint.js --no-ignore .claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs`; `node .claude/skills/vc-audit-vc/scripts/validate-agent-parity.mjs`; `node .claude/skills/vc-audit-vc/scripts/validate-protocol-wiring.mjs`. | B |
+| AC-08/10 | Remaining Tier-1 harness and application regressions stay green. | Fully-Automated | Run separately: `node .claude/skills/vc-audit-vc/scripts/validate-skills.mjs`; `node .claude/skills/vc-audit-vc/scripts/validate-guide-sync.mjs`; `node .claude/skills/vc-audit-vc/scripts/validate-guide-sync.test.mjs`; `node .claude/skills/vc-audit-vc/scripts/validate-seeds.mjs`; `node .claude/skills/vc-audit-vc/scripts/validate-kit-portability.mjs`; `node .claude/skills/vc-audit-vc/scripts/validate-skill-invocation-wiring.mjs`; `npm run typecheck:core`; `npm test`. | B |
+| AC-08 | Missing frontmatter validator remains explicit and non-green. | Agent-Probe | `node .claude/skills/vc-audit-vc/scripts/validate-agent-frontmatter.mjs`; require expected non-zero `MODULE_NOT_FOUND` and receipt status `SKIP`, never PASS. | D |
+| AC-09 | Risk structures, exact scope, immutable patch, evidence retention, diff/EOF, and final independent judgment are truthful. | Fully-Automated + Agent-Probe | Run both `vc-risk-evidence-pack` validators; compare complete nine-path manifest sets and hash-derived changes; require exact 20 evidence files and 29 writable envelope paths; reopen/hash all evidence; verify immutable patch identity; run scoped `git diff --check`; require one final LF after `## EOF`; then fresh independent EVL reopens complete differing bytes and all receipts before any APPROVE. | B |
+
+Failing stub:
+```js
+test("should bind creation and readback to one original wx+ handle with exact bigint identity and EOF", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: original-handle identity and positional readback")
+})
+```
+
+Failing stub:
+```js
+test("should refuse live creation and junction cleanup substitutions before independent nonrecursive cleanup", () => {
+  throw new Error("NOT IMPLEMENTED — TDD stub for: standalone controlled substitution refusal")
+})
+```
+
+Legacy line form:
+- Authority implementation: Fully-automated syntax, plan/envelope, target-64 fixture/self-check, all-ten legacy-byte, temporary-summary, lint, parity, wiring, typecheck, and full-suite gates | hybrid creation/junction probes | agent-probe independent EVL | known-gap universal Windows identity/reparse/race ceilings.
+- Evidence integrity: Fully-automated schema, scope29/evidence20/manifest9, immutable-patch, retention, diff, whitespace, and EOF gates | agent-probe complete-byte independent review | known-gap absent frontmatter validator and unrecoverable historical bytes.
+
+### Execute-Agent Instructions
+
+1. Validate this absent-`authorityClass` legacy `phase-report/v1` envelope before the first side effect, at the legacy midpoint Report checkpoint, and before the completion Report/exit summary.
+2. Confirm the final plan receipt returned by VALIDATE and immutable patch identity before writing. Capture the exact nine-path baseline and all-ten legacy-before native receipts.
+3. Keep the original `fs.openSync(path, "wx+")` descriptor open. Write all bytes through that descriptor, `fs.fsyncSync`, freeze exact usable ordered `{ dev, ino, modeType }` from `fs.fstatSync(handle, { bigint: true })`, and require `modeType = mode & BigInt(fs.constants.S_IFMT)` to equal `BigInt(fs.constants.S_IFREG)` with a nonzero `dev`/`ino` pair.
+4. While the descriptor remains open, rerun the complete root lexical-chain, frozen-root equality, ancestry/reparse, containment, destination regular/non-symbolic-link, destination realpath, and bigint path-identity checks. Compare only exact `dev`, `ino`, and `modeType` equality.
+5. Read exactly the frozen byte length positionally through the original descriptor from offset `0`; reject zero/short reads; require a one-byte positional read at exact expected length to return `0`; verify exact bytes, schema marker, byte count, and SHA-256. Close exactly once in `finally`; emit the unchanged public receipt only after close succeeds.
+6. On creation failure, clean only after close and only when fresh usable path identity/type exactly equals frozen handle identity. Missing/substituted/mismatched paths remain with `manual-cleanup-required`.
+7. Implement the exact ordered standalone creation and junction probe observations. Each normal case and controlled substitution refusal must prove retained paths before separate fresh-identity-checked `unlinkSync`/empty-directory `rmdirSync` cleanup. Never use `rmSync`, recursive deletion, tree traversal, or identity-blind deletion.
+8. Preserve all public schemas/key orders and permanent gaps. Refresh exactly nineteen writable evidence files; never rewrite `repair.patch`; do not touch any A4.6, application, dependency, Git, build/deploy, network/provider/secret, or external-service surface.
+9. EXECUTE leaves risk and independent EVL at `REJECT`. A fresh independent reviewer alone may set final `APPROVE` after complete-byte and raw-receipt review.
+
+### Open Gaps
+
+- Universal Windows `dev`/`ino` stability and all reparse tags remain outside the Node standard-library guarantee.
+- The final pathname identity-check-to-unlink race remains; no race-elimination claim is permitted.
+- Historical implementation and repair-baseline before bytes remain unrecoverable.
+- The frontmatter validator remains absent and non-green.
+- Ignored evidence remains non-portable across cleanup or clone.
+
+### What This Coverage Does NOT Prove
+
+VALIDATE proves plan feasibility and exact contracts, not implementation completion. The live feasibility probe proves this host/runtime observation only. Deterministic checks and bounded live probes do not prove every Windows filesystem or reparse tag and do not eliminate races. Full Vitest does not prove filesystem authority. Structural risk validators do not prove evidence truth. Current-state review cannot reconstruct historical bytes. Final implementation and risk approval require fresh independent EVL.
+
+### Execution Authority & Evidence Envelope
+
+```json execution-authority-envelope/v1
+{
+  "selected_plan": "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/execution-authority-temp-artifact-set_PLAN_26-08-26.md",
+  "authority_mode": {
+    "mode": "standing-granted",
+    "proof_path": "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/execution-authority-temp-artifact-set_AUTOPILOT_GOAL_26-08-26.md"
+  },
+  "allowed_scope": [
+    ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs",
+    ".claude/agents/vc-execute-agent.md",
+    ".codex/agents/vc-execute-agent.toml",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/risk-gate.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/context-snippets.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/verification.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/review-decision.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/adversarial-validation.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/index.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/pre-edit-baseline.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/repair-baseline-manifest.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/repair-after-manifest.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/legacy-before.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/legacy-after.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/fixture-suite.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/validator-syntax.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/temporary-pass.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/creation-probe.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/junction-probe.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/eslint.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/typecheck-core.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/npm-test.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/tier1-audits.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/frontmatter-known-gap.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/risk-gates.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/diff-gates.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/harness/evidence/independent-evl.json",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/execution-authority-temp-artifact-set_PLAN_26-08-26.md",
+    "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/execution-authority-temp-artifact-set_REPORT_26-08-26.md"
+  ],
+  "stop_conditions": [
+    "The immutable repair.patch differs from exact 160/33284331892c7a6cf5aca851d60e2af657121dd426da4ac71f06f5eb58e17f35, is rewritten, represented as PASS, or included in the success conjunction.",
+    "Either PRE_EDIT_BASELINE_UNAVAILABLE or REPAIR_BASELINE_BYTES_UNRECOVERABLE is omitted, historical before bytes or patch provenance are claimed reconstructed, or scope29/evidence20/manifest9 drifts.",
+    "Any original legacy fixture stdout bytes, stderr bytes, numeric exit, validation order, error source, PASS shape, Report or Correction behavior, public schema, path grammar, receipt order, A4.6 reference, or compatibility contract changes.",
+    "The original wx+ handle is not kept open through exact identity and positional readback/EOF verification, any required postreadback check is skipped, close does not gate receipt emission, or identity is unusable or mismatched.",
+    "Any standalone creation or junction controlled-substitution refusal, retained-path proof, identity-checked nonrecursive cleanup, target-64 self-check, or mandatory gate fails beyond the named privilege/policy junction SKIP and absent-frontmatter SKIP.",
+    "Any cleanup uses recursive deletion, rmSync, tree traversal, identity-blind unlink or rmdir, deletes after mismatch, or fails to return manual-cleanup-required with exact retained paths.",
+    "Any risk, status, evidence, receipt, Report, index, or independent-review claim is inaccurate, premature, or approved by the executor rather than fresh independent EVL.",
+    "Any A4.6, candidate, application, dependency, Git, build, deploy, network, provider, secret, external-service, deletion, irreversible, destructive, or cost-generating action is requested, any write target falls outside exact allowed_scope, or any standing hard stop is reached."
+  ],
+  "artifact_path": "process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/execution-authority-temp-artifact-set_REPORT_26-08-26.md",
+  "artifact_schema_version": "phase-report/v1"
+}
+```
+
+### EXECUTE Handoff
+
+- Selected plan: `process/general-plans/active/execution-authority-temp-artifact-set_26-08-26/execution-authority-temp-artifact-set_PLAN_26-08-26.md`.
+- Gate: PASS for planning feasibility; implementation and evidence remain `REPAIR REQUIRED` / `REJECT`.
+- Strategy: one sequential EXECUTE owner because validator, mirrors, evidence, Report, and risk state overlap; fresh independent EVL follows.
+- Start: validate the final envelope and plan receipt, verify immutable patch identity, capture exact baseline/legacy-before evidence, then implement the original-handle contract red-first.
+- End: leave final risk `REJECT`; hand all 20 evidence files and complete differing bytes to a fresh independent EVL reviewer.
 
 ## EOF
