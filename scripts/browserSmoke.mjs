@@ -41,6 +41,11 @@ const DEFAULT_ROUTES = [
 const DEFAULT_VIEWPORTS = [
     { width: 375, height: 667 },
     { width: 480, height: 800 },
+    // Landscape phones. These were missing, which hid a class of bugs: at 667-740px
+    // wide the mobile rules (max-width:768px) apply while the short height exposes
+    // collapse and overflow issues the portrait sizes never reach.
+    { width: 667, height: 375 },
+    { width: 740, height: 360 },
     { width: 1024, height: 768 },
     { width: 1610, height: 870 },
 ]
@@ -369,6 +374,39 @@ async function evaluatePage(client, sessionId, route) {
   const uxPrimary = Array.from(document.querySelectorAll('[data-ux-primary-action]'))
     .find(el => isVisible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true');
   const action = controls.find(control => pattern.test(control.text));
+  // visibleRect clamps to viewportHeight, so a CTA below the fold reads as missing.
+  // On short landscape viewports that produced a false failure for content pages
+  // whose CTA legitimately sits further down a scrollable page. isRendered keeps the
+  // display/visibility/clipped-ancestor rules but drops the viewport clamp, so we can
+  // tell "absent" apart from "present, needs a scroll".
+  const isRendered = el => {
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    if (rect.width <= 0 || rect.height <= 0 || style.visibility === 'hidden' || style.display === 'none') return false;
+    // Re-anchor geometry at each scroll container: once an ancestor can scroll, the
+    // element can be brought anywhere inside that ancestor's box, so outer clipping
+    // must be judged against the container, not the element's current position.
+    let ref = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+      const parentStyle = getComputedStyle(parent);
+      if (parentStyle.display === 'none' || parentStyle.visibility === 'hidden') return false;
+      const parentRect = parent.getBoundingClientRect();
+      const scrollsX = ['auto', 'scroll'].includes(parentStyle.overflowX) && parent.scrollWidth > parent.clientWidth + 1;
+      const scrollsY = ['auto', 'scroll'].includes(parentStyle.overflowY) && parent.scrollHeight > parent.clientHeight + 1;
+      if (['hidden', 'clip'].includes(parentStyle.overflowX)
+        && (ref.right <= parentRect.left || ref.left >= parentRect.right)) return false;
+      if (['hidden', 'clip'].includes(parentStyle.overflowY)
+        && (ref.bottom <= parentRect.top || ref.top >= parentRect.bottom)) return false;
+      if (scrollsX) { ref.left = parentRect.left; ref.right = parentRect.right; }
+      if (scrollsY) { ref.top = parentRect.top; ref.bottom = parentRect.bottom; }
+    }
+    return true;
+  };
+  const reachableAction = Array.from(document.querySelectorAll('button, a, input, select, [role="button"]'))
+    .filter(isRendered)
+    .map(el => (el.innerText || el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') || el.value || '').trim().replace(/\\s+/g, ' '))
+    .find(text => pattern.test(text));
   const mobilePrimarySelector = [
     '[data-mobile-hit-target="primary"]',
     '[data-mobile-primary-action]',
@@ -485,6 +523,7 @@ async function evaluatePage(client, sessionId, route) {
     brokenImages,
     visibleControlCount: controls.length,
     keyActionVisible: Boolean(action || uxPrimary),
+    keyActionReachable: Boolean(action || uxPrimary || reachableAction),
     keyAction: action || null,
     uxPrimaryAction: uxPrimary ? describe(uxPrimary) : null,
      loadingBlocking,
@@ -556,11 +595,28 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
       height: Math.round(rect.height),
     };
   };
-  const findTarget = selector => Array.from(document.querySelectorAll(selector))
-    .find(el => visible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true');
+  const findTarget = selector => {
+    const candidates = Array.from(document.querySelectorAll(selector))
+      .filter(el => !el.disabled && el.getAttribute('aria-disabled') !== 'true');
+    // Prefer something already on screen; otherwise accept a rendered-but-below-fold
+    // control, which clickTarget will scroll to. Without this fallback, short
+    // landscape viewports report "missing" for controls that are present and usable.
+    return candidates.find(visible) || candidates.find(el => {
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+    });
+  };
   const clickTarget = selector => {
     const el = findTarget(selector);
     if (!el) return { clicked: false, missing: true, selector };
+     // A real user scrolls to a control before tapping it. On short landscape
+     // viewports the target is often rendered correctly but below the fold, which
+     // previously read as "not clickable". Scroll first, then judge.
+     const preRect = el.getBoundingClientRect();
+     if (preRect.top < 0 || preRect.bottom > innerHeight || preRect.left < 0 || preRect.right > innerWidth) {
+       try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch { /* older engines */ }
+     }
      const rect = visibleRect(el);
      if (!rect) return { clicked: false, missing: true, selector };
      const x = Math.max(0, Math.min(innerWidth - 1, (rect.left + rect.right) / 2));
@@ -893,7 +949,7 @@ async function run() {
             || item.errors.length
             || !item.ready
             || isFailure(item)
-            || !item.keyActionVisible
+            || !(item.keyActionReachable ?? item.keyActionVisible)
             || item.mobileActionHit?.blocked
             || item.interaction?.status === 'failed'
         ))

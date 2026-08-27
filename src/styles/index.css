@@ -1907,6 +1907,23 @@ body {
         padding: 0 12px;
     }
 
+    /* QA: flex items default to min-width:auto, so the credit pill refused to
+       shrink and escaped .header-right — measured right:671 on a 667px-wide
+       viewport (clipped off-screen). The 480px block below already sets these,
+       but landscape phones (667x375, 740x360) sit above that breakpoint and
+       below the desktop layout, so nothing applied. */
+    .header-credits,
+    .credit-pill {
+        min-width: 0;
+    }
+
+    .credit-balance-amount {
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
     .app-sidebar {
         display: none;
     }
