@@ -86,6 +86,12 @@ describe('truthful learning contract', () => {
         expect(casinoSource).toMatch(/return MISSION_ROUTES\[mission\.id\] \|\| '\/originals'/)
     })
 
+    it('labels realized house take without attributing variance to the theoretical edge', () => {
+        expect(insightsSource).toContain('<span>Realized house take (all time)</span>')
+        expect(insightsSource).toContain('Net credits lost across {formatCredits(allTime.wagered)} wagered')
+        expect(insightsSource).not.toContain('What the edge has cost')
+    })
+
     it('qualifies the Insights estimate while preserving its formatting, range, calculation, and comparison', () => {
         const paragraph = insightsSource.match(/<p className="insights-band">([\s\S]*?)<\/p>/)?.[1]
         expect(paragraph, 'insights-band paragraph is missing').toBeTruthy()

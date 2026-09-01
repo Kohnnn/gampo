@@ -325,7 +325,6 @@ function summarise(catalogTotal = 0) {
         favoriteDrops: favoriteDrops.length,
         uniqueVariants: list.length,
         catalogTotal,
-        completionPct: catalogTotal > 0 ? Math.min(100, Math.round((list.length / catalogTotal) * 100)) : 0,
         bestMultiplier,
         bestValueGc,
         totalValueGc,

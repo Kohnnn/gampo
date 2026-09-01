@@ -1,5 +1,7 @@
 // useCaseCollection tests — Wave 31 schema (skinId + wear + statTrak variants).
 
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
     archiveDrop,
@@ -11,6 +13,7 @@ import {
     resetCases,
     restoreDrop,
     toggleFavorite,
+    useCaseCollection,
     variantKey,
 } from './useCaseCollection'
 
@@ -162,6 +165,31 @@ describe('useCaseCollection v2', () => {
         const a = variantKey({ skinId: 'x', wear: 'FN', statTrak: false, souvenir: false })
         const b = variantKey({ skinId: 'x', wear: 'FN', statTrak: false, souvenir: false })
         expect(a).toBe(b)
+    })
+
+    it('preserves the used summary fields without completionPct', () => {
+        recordDrop(baseSkin)
+        let summary
+        function Probe() {
+            summary = useCaseCollection({ catalogTotal: 12 }).summary
+            return null
+        }
+
+        renderToStaticMarkup(createElement(Probe))
+
+        expect(summary).toEqual({
+            totalDrops: 1,
+            activeDrops: 1,
+            archivedDrops: 0,
+            favoriteDrops: 0,
+            uniqueVariants: 1,
+            catalogTotal: 12,
+            bestMultiplier: 4.2,
+            bestValueGc: 12.5,
+            totalValueGc: 12.5,
+            bestSkin: expect.objectContaining({ skinId: 'sk1' }),
+        })
+        expect(summary).not.toHaveProperty('completionPct')
     })
 })
 

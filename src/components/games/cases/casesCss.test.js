@@ -8,6 +8,11 @@ describe('cases CSS polish', () => {
         expect(css).toMatch(/\.cases-skin-card\.cases-skin-locked img\s*\{[^}]*grayscale\(1\)/s)
     })
 
+    it('omits the unused pokedex progress bar selectors', () => {
+        expect(css).not.toMatch(/\.cases-pokedex-bar\s*\{/)
+        expect(css).not.toMatch(/\.cases-pokedex-bar span\s*\{/)
+    })
+
     it('keeps the case reel deceleration paced for a full reveal', () => {
         expect(css).toContain('--case-spin-ms')
         expect(css).toContain('--case-tile-px')
