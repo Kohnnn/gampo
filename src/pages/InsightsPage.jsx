@@ -74,9 +74,9 @@ export default function InsightsPage() {
                                 <em>{allTime.reliable ? `${allTime.count} rounds — meaningful sample` : `${allTime.count} rounds — still mostly luck`}</em>
                             </div>
                             <div className="insights-rtp-figure">
-                                <span>House take (all time)</span>
+                                <span>Realized house take (all time)</span>
                                 <strong>{formatCredits(allTime.houseTake)}</strong>
-                                <em>What the edge has cost across {formatCredits(allTime.wagered)} wagered</em>
+                                <em>Net credits lost across {formatCredits(allTime.wagered)} wagered</em>
                             </div>
                         </div>
                         {theoretical.band && (
