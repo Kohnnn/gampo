@@ -24,6 +24,17 @@
   { "name": "v2-sportsbook-live-path-denied", "path": "live_pathspecs.0", "value": "src/sportsbook/live.js" },
   { "name": "v2-nineteenth-row-denied", "path": "rows", "operation": "duplicate-last" },
   { "name": "v2-unknown-semantic-denied", "path": "rows.0.semantic.kind", "value": "eval/v1" },
-  { "name": "v2-evidence-outside-owned-root", "path": "rows.0.evidence.pre_receipt", "value": "/fixture/repository/outside.json" }
+  { "name": "v2-evidence-outside-owned-root", "path": "rows.0.evidence.pre_receipt", "value": "/fixture/repository/outside.json" },
+  { "name": "v2-registry-root-equals-operation-root", "path": "registry_root", "value": "/fixture/repository/.agent/operation" },
+  { "name": "v2-runtime-root-equals-registry-root", "path": "runtime_root", "value": "/fixture/repository/.agent/operation/registry" },
+  { "name": "v2-evidence-root-beneath-runtime-root", "path": "evidence_root", "value": "/fixture/repository/.agent/operation/runtime/evidence" },
+  { "name": "v2-registry-root-outside-operation-root", "path": "registry_root", "value": "/fixture/repository/outside-registry" },
+  { "name": "v2-operation-root-filesystem-root", "path": "operation_root", "value": "/" },
+  { "name": "v2-home-beneath-evidence-root", "path": "rows.0.env.HOME", "value": "/fixture/repository/.agent/operation/evidence/home" },
+  { "name": "v2-archive-beneath-evidence-root", "path": "rows.17.semantic.parameters.archive_path", "value": "/fixture/repository/.agent/operation/evidence/tree.tar" },
+  { "name": "v2-evidence-equals-evidence-root", "path": "rows.0.evidence.pre_receipt", "value": "/fixture/repository/.agent/operation/evidence" },
+  { "name": "v2-evidence-beneath-registry-root", "path": "rows.0.evidence.pre_receipt", "value": "/fixture/repository/.agent/operation/registry/pre.json" },
+  { "name": "v2-case-folded-duplicate-destination", "path": "rows.1.evidence.pre_receipt", "value": "/FIXTURE/REPOSITORY/.AGENT/OPERATION/EVIDENCE/1-PRE.JSON" },
+  { "name": "v2-separator-normalized-duplicate-destination", "path": "rows.1.evidence.pre_receipt", "value": "/fixture/repository/.agent/operation/evidence//1-pre.json" }
 ]
 ```
