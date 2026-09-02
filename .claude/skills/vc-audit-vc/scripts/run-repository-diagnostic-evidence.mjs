@@ -581,7 +581,7 @@ const COMMAND_REGISTRY_SCHEMA = "repository-diagnostic-command-registry/v1";
 const COMMAND_HEAD_OID = "2e19490896ced8eb1d10f809283b160ca40d15d0";
 const COMMAND_TREE_OID = "fe836928c9ce6c154cd080d4280505800b163ad5";
 const COMMAND_CHROME = "/home/compute_01/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";
-const COMMAND_REGISTRY_KEYS = ["schema", "version", "repository_root", "allowed_roots", "environment_allowlist", "head_oid", "tree_oid", "live_pathspecs", "tree_pathspecs", "ignore_paths", "rows"];
+const COMMAND_REGISTRY_KEYS = ["schema", "version", "repository_root", "operation_root", "registry_root", "runtime_root", "evidence_root", "environment_allowlist", "head_oid", "tree_oid", "live_pathspecs", "tree_pathspecs", "ignore_paths", "rows"];
 const COMMAND_ROW_KEYS = ["ordinal", "id", "action", "capability_class", "executable", "argv", "cwd", "env", "env_allowlist", "timeout_ms", "max_buffer_bytes", "expected", "semantic", "evidence"];
 const EXPECTED_KEYS = ["exit_code", "signal", "stdout_policy", "stderr_policy"];
 const STREAM_POLICY_KEYS = ["schema", "bytes", "sha256", "semantic_kind"];
@@ -627,6 +627,66 @@ function safeExisting(target, type, label, observations = {}) {
   const item = lstat(target);
   if (item.isSymbolicLink() || (type === "file" ? !item.isFile() : !item.isDirectory())) fail("REGISTRY_PATH", `${label} must be a non-alias ${type}`);
   if (realpath(target) !== target) fail("REGISTRY_PATH", `${label} must equal its real path`);
+  return { item, realpath: realpath(target) };
+}
+
+function canonicalPathKey(value) {
+  return path.normalize(value).replaceAll("\\", "/").normalize("NFKC").toLowerCase();
+}
+
+function strictDescendant(parent, child, label) {
+  const parentKey = canonicalPathKey(parent);
+  const childKey = canonicalPathKey(child);
+  if (childKey === parentKey || !childKey.startsWith(`${parentKey}/`)) fail("REGISTRY_PATH", `${label} must be strictly beneath its owner root`);
+}
+
+function filesystemIdentity(item) {
+  return `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}`;
+}
+
+export function validateRoleRoots(roots, options = {}) {
+  exactKeys(roots, ["operation_root", "registry_root", "runtime_root", "evidence_root"], "role roots");
+  const observations = options.observations ?? {};
+  const labels = Object.keys(roots);
+  const observed = new Map();
+  for (const label of labels) {
+    const value = absoluteNormalized(roots[label], label);
+    if (canonicalPathKey(value) === canonicalPathKey(path.parse(value).root)) fail("REGISTRY_PATH", `${label} cannot equal a filesystem root`);
+    if (!options.skipFilesystem) observed.set(label, safeExisting(value, "directory", label, observations));
+  }
+  for (const label of labels.slice(1)) strictDescendant(roots.operation_root, roots[label], label);
+  for (let left = 1; left < labels.length; left++) for (let right = left + 1; right < labels.length; right++) {
+    const leftLabel = labels[left];
+    const rightLabel = labels[right];
+    const leftKey = canonicalPathKey(roots[leftLabel]);
+    const rightKey = canonicalPathKey(roots[rightLabel]);
+    if (leftKey === rightKey || leftKey.startsWith(`${rightKey}/`) || rightKey.startsWith(`${leftKey}/`)) fail("REGISTRY_PATH", `${leftLabel} and ${rightLabel} must be pairwise disjoint`);
+    if (!options.skipFilesystem) {
+      const leftObserved = observed.get(leftLabel);
+      const rightObserved = observed.get(rightLabel);
+      const leftReal = canonicalPathKey(leftObserved.realpath);
+      const rightReal = canonicalPathKey(rightObserved.realpath);
+      if (leftReal === rightReal || leftReal.startsWith(`${rightReal}/`) || rightReal.startsWith(`${leftReal}/`) || filesystemIdentity(leftObserved.item) === filesystemIdentity(rightObserved.item)) fail("REGISTRY_PATH", `${leftLabel} and ${rightLabel} alias or overlap by realpath or identity`);
+    }
+  }
+  return observed;
+}
+
+export function freezeBoundedRegistry(target, registryRoot, options = {}) {
+  strictDescendant(registryRoot, target, "diagnostic registry");
+  const lstat = options.lstat ?? lstatBigInt;
+  const realpath = options.realpath ?? fs.realpathSync.native;
+  const read = options.read ?? fs.readFileSync;
+  const before = lstat(target);
+  if (!before.isFile() || before.isSymbolicLink()) fail("REGISTRY_PATH", "diagnostic registry must be a regular non-reparse file");
+  if (before.size <= 0n || before.size > 1048576n) fail("REGISTRY_BOUNDS", "diagnostic registry bytes must be between 1 and 1048576");
+  const rootReal = realpath(registryRoot);
+  const targetReal = realpath(target);
+  strictDescendant(rootReal, targetReal, "diagnostic registry realpath");
+  const bytes = read(target);
+  const after = lstat(target);
+  if (BigInt(bytes.length) !== before.size || filesystemIdentity(before) !== filesystemIdentity(after) || before.size !== after.size || before.mtimeNs !== after.mtimeNs || realpath(target) !== targetReal) fail("REGISTRY_IDENTITY", "diagnostic registry identity or exact byte length drifted during bounded read");
+  return { bytes: Buffer.from(bytes), sha256: sha256(bytes), identity: filesystemIdentity(after), realpath: targetReal, bytesLength: bytes.length };
 }
 
 function validateCommandEnvironment(row, registry, policy) {
@@ -639,7 +699,8 @@ function validateCommandEnvironment(row, registry, policy) {
   const expected = gitLike
     ? { HOME: row.env.HOME, LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: "/usr/bin:/bin", TZ: "UTC", ...(row.executable === policy.git ? { GIT_CONFIG_NOSYSTEM: "1" } : {}) }
     : { HOME: row.env.HOME, LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: nodePath, TZ: "UTC" };
-  if (!registry.allowed_roots.some((root) => row.env.HOME.startsWith(`${root}${path.sep}`)) || JSON.stringify(row.env) !== JSON.stringify(expected)) fail("REGISTRY_ENV", `row ${row.ordinal} env is not the exact isolated environment`);
+  strictDescendant(registry.runtime_root, row.env.HOME, `row ${row.ordinal} HOME`);
+  if (JSON.stringify(row.env) !== JSON.stringify(expected)) fail("REGISTRY_ENV", `row ${row.ordinal} env is not the exact isolated environment`);
 }
 
 function validateStreamPolicy(value, semanticKind, label) {
@@ -682,13 +743,12 @@ export function validateCommandRegistry(registry, options = {}) {
   if (registry.schema !== COMMAND_REGISTRY_SCHEMA || registry.version !== 1) fail("REGISTRY_SCHEMA", "command registry schema/version is invalid");
   const policy = commandPolicy(options.policy);
   if (absoluteNormalized(registry.repository_root, "repository_root") !== policy.repositoryRoot) fail("REGISTRY_PATH", "repository_root is not authorized");
-  if (!Array.isArray(registry.allowed_roots) || registry.allowed_roots.length !== 3 || new Set(registry.allowed_roots).size !== registry.allowed_roots.length) fail("REGISTRY_PATH", "allowed_roots must contain repository, runtime, and evidence roots exactly once");
-  for (const [index, root] of registry.allowed_roots.entries()) {
-    absoluteNormalized(root, `allowed_roots[${index}]`);
-    if (!options.skipFilesystem) safeExisting(root, "directory", `allowed_roots[${index}]`, options.observations);
-  }
-  const [repositoryRoot, runtimeRoot, evidenceRoot] = registry.allowed_roots;
-  if (repositoryRoot !== registry.repository_root || !runtimeRoot.startsWith(`${repositoryRoot}${path.sep}`) || !evidenceRoot.startsWith(`${runtimeRoot}${path.sep}`)) fail("REGISTRY_PATH", "allowed_roots ordering or ownership is invalid");
+  const repositoryRoot = registry.repository_root;
+  const operationRoot = registry.operation_root;
+  const registryRoot = registry.registry_root;
+  const runtimeRoot = registry.runtime_root;
+  const evidenceRoot = registry.evidence_root;
+  validateRoleRoots({ operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot }, options);
   exactArray(registry.environment_allowlist, COMMAND_ENV_ALLOWLIST, "environment_allowlist");
   if (registry.head_oid !== (options.headOid ?? COMMAND_HEAD_OID) || registry.tree_oid !== (options.treeOid ?? COMMAND_TREE_OID)) fail("REGISTRY_SCHEMA", "head_oid/tree_oid do not equal the frozen objects");
   exactArray(registry.live_pathspecs, options.livePathspecs ?? COMMAND_LIVE_PATHS, "live_pathspecs");
@@ -705,7 +765,7 @@ export function validateCommandRegistry(registry, options = {}) {
     ids.add(row.id);
     absoluteNormalized(row.executable, `row ${row.ordinal} executable`);
     absoluteNormalized(row.cwd, `row ${row.ordinal} cwd`);
-    if (!registry.allowed_roots.includes(row.cwd) || (row.cwd !== policy.repositoryRoot && !row.cwd.startsWith(`${policy.repositoryRoot}${path.sep}`))) fail("REGISTRY_PATH", `row ${row.ordinal} cwd is not allowed`);
+    if (row.cwd !== policy.repositoryRoot) fail("REGISTRY_PATH", `row ${row.ordinal} cwd is not the repository root`);
     if (!options.skipFilesystem) {
       safeExisting(row.executable, "file", `row ${row.ordinal} executable`, options.observations);
       safeExisting(row.cwd, "directory", `row ${row.ordinal} cwd`, options.observations);
@@ -727,13 +787,17 @@ export function validateCommandRegistry(registry, options = {}) {
     exactKeys(row.evidence, EVIDENCE_KEYS, `row ${row.ordinal} evidence`);
     for (const [role, destination] of Object.entries(row.evidence)) {
       absoluteNormalized(destination, `row ${row.ordinal} evidence.${role}`);
-      if (!destination.startsWith(`${evidenceRoot}${path.sep}`) || destination.includes(`${path.sep}src${path.sep}sportsbook${path.sep}`) || destinations.has(destination)) fail("REGISTRY_PATH", `row ${row.ordinal} evidence destination is unsafe or duplicated`);
-      destinations.add(destination);
+      strictDescendant(evidenceRoot, destination, `row ${row.ordinal} evidence.${role}`);
+      const destinationKey = canonicalPathKey(destination);
+      if (destination.includes(`${path.sep}src${path.sep}sportsbook${path.sep}`) || destinations.has(destinationKey)) fail("REGISTRY_PATH", `row ${row.ordinal} evidence destination is unsafe or duplicated`);
+      destinations.add(destinationKey);
     }
     if (!commandShape(row, registry, policy)) fail("REGISTRY_CAPABILITY", `row ${row.ordinal} tuple is not structurally authorized`);
   }
   if (timeoutTotal > 900000 || bufferTotal > 16777216) fail("REGISTRY_BOUNDS", "registry aggregate bounds exceeded");
-  return { registry, policy, destinations: [...destinations] };
+  const archiveRow = registry.rows.find((row) => row.semantic.kind === "git-archive-tar/v1");
+  if (archiveRow) strictDescendant(runtimeRoot, archiveRow.semantic.parameters.archive_path, "archive_path");
+  return { registry, policy, destinations: registry.rows.flatMap((row) => Object.values(row.evidence)) };
 }
 
 function decodeText(bytes, label) {
@@ -844,7 +908,7 @@ export function executeCommandRegistry(registry, options = {}) {
   const spawn = options.spawn ?? spawnSync;
   const semantic = options.semantic ?? validateCommandSemantic;
   const receipts = [];
-  const evidenceRoot = registry.allowed_roots[2];
+  const evidenceRoot = registry.evidence_root;
   const persist = options.persistEvidence !== false;
   if (persist) {
     for (const destination of validated.destinations) if (fs.existsSync(destination)) fail("EEXIST", `evidence destination already exists: ${destination}`);
@@ -984,8 +1048,10 @@ function lifecycleProbe(scenario) {
 
 export function commandRegistryFixture(overrides = {}) {
   const repositoryRoot = overrides.repositoryRoot ?? "/fixture/repository";
-  const runtimeRoot = overrides.runtimeRoot ?? `${repositoryRoot}/.agent/runtime`;
-  const evidenceRoot = overrides.evidenceRoot ?? `${runtimeRoot}/evidence`;
+  const operationRoot = overrides.operationRoot ?? `${repositoryRoot}/.agent/operation`;
+  const registryRoot = overrides.registryRoot ?? `${operationRoot}/registry`;
+  const runtimeRoot = overrides.runtimeRoot ?? `${operationRoot}/runtime`;
+  const evidenceRoot = overrides.evidenceRoot ?? `${operationRoot}/evidence`;
   const home = overrides.home ?? `${runtimeRoot}/home`;
   const policy = commandPolicy(overrides.policy ?? { repositoryRoot, node: "/fixture/bin/node", git: "/usr/bin/git", chrome: "/fixture/bin/chrome", npmCli: "/fixture/npm-cli.js", viteCli: "/fixture/vite.js", planValidator: "/fixture/validate-plan.mjs", phaseValidator: "/fixture/validate-phase.mjs", umbrellaValidator: "/fixture/validate-umbrella.mjs", goalValidator: "/fixture/validate-goal.mjs", envelopeValidator: "/fixture/validate-envelope.mjs" });
   const head = overrides.headOid ?? "a".repeat(40);
@@ -1030,7 +1096,26 @@ export function commandRegistryFixture(overrides = {}) {
     fixtureOutputs.push({ stdout, stderr });
     return { ordinal: index + 1, id, action: "spawn", capability_class: capability, executable, argv, cwd: repositoryRoot, env, env_allowlist: Object.keys(env), timeout_ms: capability === "diagnostic-validator" || kind === "git-archive-tar/v1" ? 60000 : 30000, max_buffer_bytes: 1024, expected: { exit_code: 0, signal: null, stdout_policy: stream(stdout), stderr_policy: stream(stderr) }, semantic: { kind, parameters }, evidence: { pre_receipt: `${evidenceRoot}/${index + 1}-pre.json`, post_receipt: `${evidenceRoot}/${index + 1}-post.json`, stdout_receipt: `${evidenceRoot}/${index + 1}-stdout.bin`, stderr_receipt: `${evidenceRoot}/${index + 1}-stderr.bin` } };
   });
-  return { registry: { schema: COMMAND_REGISTRY_SCHEMA, version: 1, repository_root: repositoryRoot, allowed_roots: [repositoryRoot, runtimeRoot, evidenceRoot], environment_allowlist: COMMAND_ENV_ALLOWLIST, head_oid: head, tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows }, policy, archivePath, fixtureOutputs };
+  return { registry: { schema: COMMAND_REGISTRY_SCHEMA, version: 1, repository_root: repositoryRoot, operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot, environment_allowlist: COMMAND_ENV_ALLOWLIST, head_oid: head, tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows }, policy, archivePath, fixtureOutputs };
+}
+
+function roleRootChecks() {
+  const base = "/fixture/repository/.agent/operation";
+  const valid = { operation_root: base, registry_root: `${base}/registry`, runtime_root: `${base}/runtime`, evidence_root: `${base}/evidence` };
+  validateRoleRoots(valid, { skipFilesystem: true });
+  const checks = [{ name: "v2-role-roots-positive-disjoint", status: "PASS" }];
+  for (const role of ["registry_root", "runtime_root", "evidence_root"]) {
+    checks.push(expectReject(`v2-${role}-equal-operation`, () => validateRoleRoots({ ...valid, [role]: base }, { skipFilesystem: true }), "REGISTRY_PATH"));
+    checks.push(expectReject(`v2-${role}-outside-operation`, () => validateRoleRoots({ ...valid, [role]: `/fixture/outside/${role}` }, { skipFilesystem: true }), "REGISTRY_PATH"));
+  }
+  for (const [left, right] of [["registry_root", "runtime_root"], ["registry_root", "evidence_root"], ["runtime_root", "evidence_root"]]) {
+    checks.push(expectReject(`v2-role-equal-${left}-${right}`, () => validateRoleRoots({ ...valid, [right]: valid[left] }, { skipFilesystem: true }), "REGISTRY_PATH"));
+    checks.push(expectReject(`v2-role-ancestor-${left}-${right}`, () => validateRoleRoots({ ...valid, [right]: `${valid[left]}/child` }, { skipFilesystem: true }), "REGISTRY_PATH"));
+    checks.push(expectReject(`v2-role-ancestor-${right}-${left}`, () => validateRoleRoots({ ...valid, [left]: `${valid[right]}/child` }, { skipFilesystem: true }), "REGISTRY_PATH"));
+  }
+  checks.push(expectReject("v2-role-case-alias", () => validateRoleRoots({ ...valid, runtime_root: valid.registry_root.toUpperCase() }, { skipFilesystem: true }), "REGISTRY_PATH"));
+  checks.push(expectReject("v2-role-separator-alias", () => validateRoleRoots({ ...valid, runtime_root: `${base}//registry` }, { skipFilesystem: true }), "REGISTRY_PATH"));
+  return checks;
 }
 
 function commandRegistryChecks() {
@@ -1103,12 +1188,12 @@ function selfCheck() {
     expectReject("literal-nul", () => decodeLiteralInput(Buffer.from([0x61, 0, 0x62])), "LITERAL_NUL"),
     expectReject("literal-cr", () => decodeLiteralInput(Buffer.from("a\r\n")), "LITERAL_CR"),
   ];
-  checks.push(...schemaMutationChecks(), ...commandRegistryChecks());
+  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks());
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-evidence-"));
   try {
     const paths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(root, `${name}.json`)]));
     const success = runDiagnosticLifecycle({ attemptId: "fixture-attempt", evidenceRoot: root, execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: paths.terminal, resultArtifactPath: paths.result, failureArtifactPath: paths.failure, cleanupArtifactPath: paths.cleanup, cleanupTargets: [] });
-    if (success.status !== "PASS" || success.events.join(",") !== "terminal-published,result-or-failure-published,cleanup-started,cleanup-published") fail("SELF_CHECK", "publication-before-cleanup success order failed");
+    if (success.status !== "PASS" || success.events.join(",") !== "terminal-published,result-or-failure-published,cleanup-started,cleanup-published") fail("SELF_CHECK", `publication-before-cleanup success order failed: ${JSON.stringify({ status: success.status, primaryError: success.primaryError, events: success.events })}`);
     for (const receipt of Object.values(success.receipts)) exactKeys(receipt, RECEIPT_KEYS, "self-check artifact receipt");
     checks.push({ name: "lifecycle-success-order", status: "PASS" }, { name: "artifact-receipt-closed-schema", status: "PASS" });
     const calls = [];

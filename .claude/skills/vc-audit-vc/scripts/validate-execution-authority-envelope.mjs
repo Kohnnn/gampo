@@ -59,6 +59,8 @@ import {
   validateDiagnosticRegistry as validateDiagnosticRegistryContract,
   executeDiagnosticRegistry,
   validateCommandRegistry,
+  validateRoleRoots,
+  freezeBoundedRegistry,
   commandRegistryFixture,
 } from "./run-repository-diagnostic-evidence.mjs";
 
@@ -101,7 +103,7 @@ const DIAGNOSTIC_AUTHORITY_CLASS = "repository-diagnostic-evidence-set/v1";
 const DIAGNOSTIC_V2_AUTHORITY_CLASS = "repository-diagnostic-evidence-set/v2";
 const COMMAND_HEAD_OID_V2 = "2e19490896ced8eb1d10f809283b160ca40d15d0";
 const COMMAND_TREE_OID_V2 = "fe836928c9ce6c154cd080d4280505800b163ad5";
-const DIAGNOSTIC_V2_FIELDS = ["selected_plan", "authority_mode", "authorityClass", "evidence_root", "diagnostic_runner", "diagnostic_registry", "allowed_scope", "scope_count", "stop_conditions", "stop_condition_count", "artifact_receipt_schema_version"];
+const DIAGNOSTIC_V2_FIELDS = ["selected_plan", "authority_mode", "authorityClass", "operation_root", "registry_root", "runtime_root", "evidence_root", "diagnostic_runner", "diagnostic_registry", "allowed_scope", "scope_count", "stop_conditions", "stop_condition_count", "artifact_receipt_schema_version"];
 const DIAGNOSTIC_RUNNER_KEYS = ["schema", "runner_path", "runner_bytes", "runner_sha256", "runner_blob_oid", "runner_commit_oid"];
 const DIAGNOSTIC_V2_REGISTRY_KEYS = ["schema", "registry_path", "registry_bytes", "registry_sha256", "row_count", "rows"];
 const DIAGNOSTIC_RECEIPT_SCHEMA = "repository-diagnostic-artifact-receipt/v1";
@@ -131,7 +133,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "4054c980bdc4134e15b3c7c3385d963426e50ac5658be2b93f409182d63f1d05";
+const RUNNER_SHA256 = "7f3912e772e0d2b5696e8c407037444b9109187582f5b310e2cea4535fe42c1b";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
 const CLEANUP_RECEIPT_SCHEMA = "fixture-residue-cleanup-receipt/v2";
 const CLEANUP_FIELDS = [
@@ -830,7 +832,11 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
   const proof = normalizePath(envelope.authority_mode.proof_path, "authority_mode.proof_path");
   if (!fs.existsSync(path.resolve(ROOT, proof.path))) block(`authority_mode.proof_path does not exist`);
   if (envelope.authority_mode.mode === "standing-granted") verifyStandingAuthority(proof.path, planLabel); else verifyExplicitAuthority(proof.path, selected.path, planLabel);
+  const operationRoot = normalizeNativeAbsolute(envelope.operation_root, "operation_root");
+  const registryRoot = normalizeNativeAbsolute(envelope.registry_root, "registry_root");
+  const runtimeRoot = normalizeNativeAbsolute(envelope.runtime_root, "runtime_root");
   const evidenceRoot = normalizeNativeAbsolute(envelope.evidence_root, "evidence_root");
+  try { validateRoleRoots({ operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot }); } catch (error) { block(`diagnostic role roots rejected: ${error.message}`); }
   validateExactKeys(envelope.diagnostic_runner, DIAGNOSTIC_RUNNER_KEYS, "diagnostic_runner");
   if (Object.keys(envelope.diagnostic_runner).some((key, index) => key !== DIAGNOSTIC_RUNNER_KEYS[index])) block(`diagnostic_runner keys are not in canonical order`);
   const runner = envelope.diagnostic_runner;
@@ -850,9 +856,10 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
   const binding = envelope.diagnostic_registry;
   if (binding.schema !== "repository-diagnostic-command-registry/v1") block(`diagnostic_registry schema is invalid`);
   const registryPath = normalizeNativeAbsolute(binding.registry_path, "diagnostic_registry.registry_path");
-  if (!registryPath.startsWith(`${evidenceRoot}${path.sep}`)) block(`diagnostic registry must be strictly beneath evidence_root`);
-  const registryBytes = safeBoundFile(registryPath, "diagnostic_registry.registry_path");
-  if (!Number.isSafeInteger(binding.registry_bytes) || binding.registry_bytes !== registryBytes.length || !sha256Pattern(binding.registry_sha256) || createHash("sha256").update(registryBytes).digest("hex") !== binding.registry_sha256) block(`diagnostic registry bytes/SHA drifted`);
+  let registryFreeze;
+  try { registryFreeze = freezeBoundedRegistry(registryPath, registryRoot); } catch (error) { block(`diagnostic registry binding rejected: ${error.message}`); }
+  const registryBytes = registryFreeze.bytes;
+  if (!Number.isSafeInteger(binding.registry_bytes) || binding.registry_bytes !== registryBytes.length || !sha256Pattern(binding.registry_sha256) || registryFreeze.sha256 !== binding.registry_sha256) block(`diagnostic registry bytes/SHA drifted`);
   let registry;
   try {
     findDuplicateKeys(decodeLiteralInput(registryBytes), planLabel);
@@ -863,6 +870,9 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
   if (!Buffer.from(`${JSON.stringify(registry, null, 2)}\n`).equals(registryBytes)) block(`diagnostic registry JSON is not canonical`);
   if (binding.row_count !== 18 || binding.row_count !== registry.rows?.length || JSON.stringify(binding.rows) !== JSON.stringify(registry.rows)) block(`diagnostic registry count/rows drifted`);
   try { validateCommandRegistry(registry); } catch (error) { block(`diagnostic registry capability rejected: ${error.message}`); }
+  let preSpawnFreeze;
+  try { preSpawnFreeze = freezeBoundedRegistry(registryPath, registryRoot); } catch (error) { block(`diagnostic registry pre-spawn recheck rejected: ${error.message}`); }
+  if (preSpawnFreeze.identity !== registryFreeze.identity || preSpawnFreeze.bytesLength !== registryFreeze.bytesLength || preSpawnFreeze.sha256 !== registryFreeze.sha256 || preSpawnFreeze.realpath !== registryFreeze.realpath) block(`diagnostic registry drifted before first spawn`);
   if (!Array.isArray(envelope.allowed_scope) || envelope.scope_count !== envelope.allowed_scope.length || envelope.allowed_scope.length !== 72) block(`v2 allowed_scope must contain exactly 72 row evidence destinations`);
   const destinations = registry.rows.flatMap((row) => Object.values(row.evidence));
   if (JSON.stringify(envelope.allowed_scope) !== JSON.stringify(destinations)) block(`v2 allowed_scope must equal registry evidence destinations`);
@@ -872,9 +882,13 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
 }
 
 function runV2PostcommitCheck() {
-  const runtimeRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-v2-"));
-  const evidenceRoot = path.join(runtimeRoot, "evidence");
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-v2-"));
+  const registryRoot = path.join(operationRoot, "registry");
+  const runtimeRoot = path.join(operationRoot, "runtime");
+  const evidenceRoot = path.join(operationRoot, "evidence");
   const home = path.join(runtimeRoot, "home");
+  fs.mkdirSync(registryRoot);
+  fs.mkdirSync(runtimeRoot);
   fs.mkdirSync(evidenceRoot);
   fs.mkdirSync(home);
   const runnerPath = path.resolve(ROOT, RUNNER_PATH);
@@ -896,14 +910,17 @@ function runV2PostcommitCheck() {
       envelopeValidator: path.join(ROOT, "./.claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"),
     };
     const selectedPlan = ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-repository-diagnostic-evidence-set.md";
-    const fixture = commandRegistryFixture({ repositoryRoot: ROOT, runtimeRoot, evidenceRoot, home, policy, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2, selectedPlan, selectedPlanAbsolute: path.join(ROOT, selectedPlan), umbrella: path.join(ROOT, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/visual-animation-assets-umbrella_PLAN_07-08-26.md"), goal: path.join(ROOT, ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md"), archivePath: path.join(runtimeRoot, "tree.tar") });
+    const fixture = commandRegistryFixture({ repositoryRoot: ROOT, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2, selectedPlan, selectedPlanAbsolute: path.join(ROOT, selectedPlan), umbrella: path.join(ROOT, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/visual-animation-assets-umbrella_PLAN_07-08-26.md"), goal: path.join(ROOT, ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md"), archivePath: path.join(runtimeRoot, "tree.tar") });
     const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
-    const registryPath = path.join(runtimeRoot, `variable-registry-${randomUUID()}.json`);
+    const registryPath = path.join(registryRoot, `variable-registry-${randomUUID()}.json`);
     fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
     const model = {
       selected_plan: selectedPlan,
       authority_mode: { mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md" },
       authorityClass: DIAGNOSTIC_V2_AUTHORITY_CLASS,
+      operation_root: operationRoot,
+      registry_root: registryRoot,
+      runtime_root: runtimeRoot,
       evidence_root: evidenceRoot,
       diagnostic_runner: { schema: "repository-diagnostic-runner-binding/v1", runner_path: runnerPath, runner_bytes: runnerBytes.length, runner_sha256: createHash("sha256").update(runnerBytes).digest("hex"), runner_blob_oid: blobOid, runner_commit_oid: commitOid },
       diagnostic_registry: { schema: "repository-diagnostic-command-registry/v1", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: createHash("sha256").update(registryBytes).digest("hex"), row_count: 18, rows: fixture.registry.rows },
@@ -916,7 +933,7 @@ function runV2PostcommitCheck() {
     const result = validateRepositoryDiagnosticV2Envelope(model, selectedPlan, normalizePath(selectedPlan, "selected plan"));
     return { schema: "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", commit_oid: commitOid, runner_blob_oid: blobOid, runner_bytes: runnerBytes.length, runner_sha256: model.diagnostic_runner.runner_sha256, registry_path_variable: path.basename(registryPath).startsWith("variable-registry-"), registry_bytes: registryBytes.length, registry_sha256: model.diagnostic_registry.registry_sha256, row_count: 18, scope_count: 72, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size };
   } finally {
-    fs.rmSync(runtimeRoot, { recursive: true, force: true });
+    fs.rmSync(operationRoot, { recursive: true, force: true });
   }
 }
 
@@ -2404,7 +2421,7 @@ function runRepositoryDiagnosticGroupedEnvelopeCases(fixturePath) {
     runRepositoryDiagnosticGroupedV2Cases(fixturePath);
   } catch (error) {
     if (!(error instanceof Blocked)) throw error;
-    block(`${fixturePath} all ${cases.length} v1 and 7 v2 grouped repository diagnostic envelope case(s) rejected`);
+      block(`${fixturePath} all ${cases.length} v1 and ${JSON.parse(collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-envelope-negative-cases/v2").body.join("\n")).length} v2 grouped repository diagnostic envelope case(s) rejected`);
   }
   block(`${fixturePath} all ${cases.length} grouped repository diagnostic envelope case(s) rejected`);
 }
