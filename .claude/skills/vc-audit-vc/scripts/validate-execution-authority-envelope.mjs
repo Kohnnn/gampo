@@ -59,8 +59,11 @@ import {
   validateDiagnosticRegistry as validateDiagnosticRegistryContract,
   executeDiagnosticRegistry,
   validateCommandRegistry,
+  bindRegistryRoleRoots,
   validateRoleRoots,
-  freezeBoundedRegistry,
+  freezeBoundedRegistryAuthority,
+  recheckAuthorityBoundary,
+  runV2ExecutionOracle,
   commandRegistryFixture,
 } from "./run-repository-diagnostic-evidence.mjs";
 
@@ -133,7 +136,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "7f3912e772e0d2b5696e8c407037444b9109187582f5b310e2cea4535fe42c1b";
+const RUNNER_SHA256 = "279f54db48e3f523309207c64fb79d02d33c8466570bb38cd9b27997e39d4fcf";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
 const CLEANUP_RECEIPT_SCHEMA = "fixture-residue-cleanup-receipt/v2";
 const CLEANUP_FIELDS = [
@@ -856,8 +859,9 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
   const binding = envelope.diagnostic_registry;
   if (binding.schema !== "repository-diagnostic-command-registry/v1") block(`diagnostic_registry schema is invalid`);
   const registryPath = normalizeNativeAbsolute(binding.registry_path, "diagnostic_registry.registry_path");
+  const envelopeRoots = { operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot };
   let registryFreeze;
-  try { registryFreeze = freezeBoundedRegistry(registryPath, registryRoot); } catch (error) { block(`diagnostic registry binding rejected: ${error.message}`); }
+  try { registryFreeze = freezeBoundedRegistryAuthority(registryPath, envelopeRoots); } catch (error) { block(`diagnostic registry binding rejected: ${error.message}`); }
   const registryBytes = registryFreeze.bytes;
   if (!Number.isSafeInteger(binding.registry_bytes) || binding.registry_bytes !== registryBytes.length || !sha256Pattern(binding.registry_sha256) || registryFreeze.sha256 !== binding.registry_sha256) block(`diagnostic registry bytes/SHA drifted`);
   let registry;
@@ -869,10 +873,9 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
   }
   if (!Buffer.from(`${JSON.stringify(registry, null, 2)}\n`).equals(registryBytes)) block(`diagnostic registry JSON is not canonical`);
   if (binding.row_count !== 18 || binding.row_count !== registry.rows?.length || JSON.stringify(binding.rows) !== JSON.stringify(registry.rows)) block(`diagnostic registry count/rows drifted`);
+  try { bindRegistryRoleRoots(registry, envelopeRoots); } catch (error) { block(`diagnostic registry root binding rejected: ${error.message}`); }
   try { validateCommandRegistry(registry); } catch (error) { block(`diagnostic registry capability rejected: ${error.message}`); }
-  let preSpawnFreeze;
-  try { preSpawnFreeze = freezeBoundedRegistry(registryPath, registryRoot); } catch (error) { block(`diagnostic registry pre-spawn recheck rejected: ${error.message}`); }
-  if (preSpawnFreeze.identity !== registryFreeze.identity || preSpawnFreeze.bytesLength !== registryFreeze.bytesLength || preSpawnFreeze.sha256 !== registryFreeze.sha256 || preSpawnFreeze.realpath !== registryFreeze.realpath) block(`diagnostic registry drifted before first spawn`);
+  try { recheckAuthorityBoundary(registryFreeze, "B02"); } catch (error) { block(`diagnostic registry pre-spawn recheck rejected: ${error.message}`); }
   if (!Array.isArray(envelope.allowed_scope) || envelope.scope_count !== envelope.allowed_scope.length || envelope.allowed_scope.length !== 72) block(`v2 allowed_scope must contain exactly 72 row evidence destinations`);
   const destinations = registry.rows.flatMap((row) => Object.values(row.evidence));
   if (JSON.stringify(envelope.allowed_scope) !== JSON.stringify(destinations)) block(`v2 allowed_scope must equal registry evidence destinations`);
@@ -887,6 +890,7 @@ function runV2PostcommitCheck() {
   const runtimeRoot = path.join(operationRoot, "runtime");
   const evidenceRoot = path.join(operationRoot, "evidence");
   const home = path.join(runtimeRoot, "home");
+  let registryPath;
   fs.mkdirSync(registryRoot);
   fs.mkdirSync(runtimeRoot);
   fs.mkdirSync(evidenceRoot);
@@ -912,7 +916,7 @@ function runV2PostcommitCheck() {
     const selectedPlan = ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-repository-diagnostic-evidence-set.md";
     const fixture = commandRegistryFixture({ repositoryRoot: ROOT, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2, selectedPlan, selectedPlanAbsolute: path.join(ROOT, selectedPlan), umbrella: path.join(ROOT, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/visual-animation-assets-umbrella_PLAN_07-08-26.md"), goal: path.join(ROOT, ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md"), archivePath: path.join(runtimeRoot, "tree.tar") });
     const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
-    const registryPath = path.join(registryRoot, `variable-registry-${randomUUID()}.json`);
+    registryPath = path.join(registryRoot, `variable-registry-${randomUUID()}.json`);
     fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
     const model = {
       selected_plan: selectedPlan,
@@ -930,10 +934,19 @@ function runV2PostcommitCheck() {
       stop_condition_count: 4,
       artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
     };
-    const result = validateRepositoryDiagnosticV2Envelope(model, selectedPlan, normalizePath(selectedPlan, "selected plan"));
-    return { schema: "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", commit_oid: commitOid, runner_blob_oid: blobOid, runner_bytes: runnerBytes.length, runner_sha256: model.diagnostic_runner.runner_sha256, registry_path_variable: path.basename(registryPath).startsWith("variable-registry-"), registry_bytes: registryBytes.length, registry_sha256: model.diagnostic_registry.registry_sha256, row_count: 18, scope_count: 72, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size };
+    validateRepositoryDiagnosticV2Envelope(model, selectedPlan, normalizePath(selectedPlan, "selected plan"));
+    fs.unlinkSync(registryPath);
+    fs.rmdirSync(home);
+    fs.rmdirSync(evidenceRoot);
+    fs.rmdirSync(runtimeRoot);
+    fs.rmdirSync(registryRoot);
+    fs.rmdirSync(operationRoot);
+    const oracle = runV2ExecutionOracle({ repositoryRoot: ROOT, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2 });
+    const { authorityFreeze: _authorityFreeze, ...record } = oracle;
+    return { ...record, commit_oid: commitOid, runner_blob_oid: blobOid, runner_bytes: runnerBytes.length, runner_sha256: model.diagnostic_runner.runner_sha256, registry_bytes: registryBytes.length, registry_sha256: model.diagnostic_registry.registry_sha256 };
   } finally {
-    fs.rmSync(operationRoot, { recursive: true, force: true });
+    if (fs.existsSync(registryPath)) fs.unlinkSync(registryPath);
+    for (const target of [home, evidenceRoot, runtimeRoot, registryRoot, operationRoot]) if (fs.existsSync(target)) fs.rmdirSync(target);
   }
 }
 
@@ -2440,13 +2453,16 @@ function runRepositoryDiagnosticGroupedV2Cases(fixturePath) {
   if (!raw) return null;
   const fixture = commandRegistryFixture();
   const options = { policy: fixture.policy, skipFilesystem: true, headOid: fixture.registry.head_oid, treeOid: fixture.registry.tree_oid };
+  const envelopeRoots = { operation_root: fixture.registry.operation_root, registry_root: fixture.registry.registry_root, runtime_root: fixture.registry.runtime_root, evidence_root: fixture.registry.evidence_root };
   const cases = JSON.parse(raw);
   const misses = [];
   for (const item of cases) {
     const candidate = structuredClone(fixture.registry);
     if (item.operation === "duplicate-last") candidate.rows.push(structuredClone(candidate.rows.at(-1)));
+    else if (item.operation === "delete") delete candidate[item.path];
     else setFixtureMutation(candidate, item);
     try {
+      bindRegistryRoleRoots(candidate, envelopeRoots, options);
       validateCommandRegistry(candidate, options);
       misses.push(item.name);
     } catch {}
@@ -2474,6 +2490,14 @@ function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
       invokeMutatedProductionValidation(item.name, [{ path: DIAGNOSTIC_FIXTURE_PATH, apply: (bytes) => rebindRegistryDigest(Buffer.from(bytes.toString("utf8").replaceAll(item.from, item.to))) }], item.reason);
     } else if (item.kind === "runner-self-check") {
       invokeMutatedProductionValidation(item.name, [{ path: RUNNER_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(item.from, item.to)) }], "runner source bytes do not match");
+    } else if (item.kind === "oracle-regression") {
+      const fixture = commandRegistryFixture();
+      if (item.value === "root-mismatch") {
+        try { bindRegistryRoleRoots({ ...fixture.registry, runtime_root: fixture.registry.evidence_root }, { operation_root: fixture.registry.operation_root, registry_root: fixture.registry.registry_root, runtime_root: fixture.registry.runtime_root, evidence_root: fixture.registry.evidence_root }, { skipFilesystem: true }); throw new Error(`${item.name} unexpectedly passed`); } catch (error) { if (error.code !== "REGISTRY_ROOT_BINDING") throw error; }
+      } else {
+        const result = runDiagnosticLifecycle({ attemptId: "grouped-leak", execute: () => { throw Object.assign(new Error("execution failure"), { code: "EXECUTION" }); }, terminalArtifactPath: "terminal", resultArtifactPath: "result", failureArtifactPath: "failure", cleanupArtifactPath: "cleanup", cleanupTargets: [{ path: "/outside", identity: { dev: "1", ino: "2", modeType: String(fs.constants.S_IFREG) } }], runtimeRoot: "/runtime" }, { create: (target, bytes) => ({ schema: DIAGNOSTIC_RECEIPT_SCHEMA, artifactPath: target, artifactSchemaVersion: "fixture/v1", bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), exclusiveCreate: true, regularNonReparse: true, readbackMatches: true, status: "PASS" }) });
+        if (result.status !== "FAIL" || !result.cleanup.manualCleanupRequired) throw new Error(`${item.name} unexpectedly passed`);
+      }
     } else {
       throw new Error(`${fixturePath} has unknown production mutation case ${item.name}`);
     }
