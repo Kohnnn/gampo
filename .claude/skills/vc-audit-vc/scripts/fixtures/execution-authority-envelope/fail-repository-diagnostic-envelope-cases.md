@@ -1,5 +1,7 @@
 # Fixture — Repository Diagnostic Envelope Negative Cases
 
+All 64 v2 cases require full production-envelope validation with real isolated topology, canonical bound registry bytes, filesystem checks enabled, and exact identity-ledger teardown.
+
 ## Validate Contract
 
 ```json repository-diagnostic-envelope-negative-cases/v1

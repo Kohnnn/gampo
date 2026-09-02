@@ -49,7 +49,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
   decodeLiteralInput,
@@ -136,7 +136,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "279f54db48e3f523309207c64fb79d02d33c8466570bb38cd9b27997e39d4fcf";
+const RUNNER_SHA256 = "1233bcff9522159c6abb7792294f744543ae493499b29e0af69f893b118354d2";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
 const CLEANUP_RECEIPT_SCHEMA = "fixture-residue-cleanup-receipt/v2";
 const CLEANUP_FIELDS = [
@@ -825,7 +825,7 @@ function gitObjectText(args, field) {
   }
 }
 
-function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
+function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm, testIsolation = null) {
   validateExactKeys(envelope, DIAGNOSTIC_V2_FIELDS, `${planLabel} envelope`);
   if (Object.keys(envelope).some((key, index) => key !== DIAGNOSTIC_V2_FIELDS[index])) block(`${planLabel} envelope keys are not in canonical order`);
   if (envelope.authorityClass !== DIAGNOSTIC_V2_AUTHORITY_CLASS) block(`${planLabel} authorityClass is not v2`);
@@ -845,15 +845,17 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
   const runner = envelope.diagnostic_runner;
   if (runner.schema !== "repository-diagnostic-runner-binding/v1") block(`diagnostic_runner schema is invalid`);
   const runnerPath = normalizeNativeAbsolute(runner.runner_path, "diagnostic_runner.runner_path");
-  if (runnerPath !== path.resolve(ROOT, RUNNER_PATH)) block(`diagnostic_runner.runner_path is not the canonical runner`);
+  if (runnerPath !== (testIsolation?.runnerPath ?? path.resolve(ROOT, RUNNER_PATH))) block(`diagnostic_runner.runner_path is not the bound runner`);
   const runnerBytes = safeBoundFile(runnerPath, "diagnostic_runner.runner_path");
   if (!Number.isSafeInteger(runner.runner_bytes) || runner.runner_bytes !== runnerBytes.length || !sha256Pattern(runner.runner_sha256) || createHash("sha256").update(runnerBytes).digest("hex") !== runner.runner_sha256) block(`diagnostic runner bytes/SHA drifted`);
   if (!/^[0-9a-f]{40}$/.test(runner.runner_blob_oid) || !/^[0-9a-f]{40}$/.test(runner.runner_commit_oid)) block(`diagnostic runner blob/commit OIDs are invalid`);
-  if (gitObjectText(["cat-file", "-t", runner.runner_commit_oid], "runner commit") !== "commit") block(`diagnostic runner commit OID is not a commit`);
-  const relativeRunner = path.relative(ROOT, runnerPath).split(path.sep).join("/");
-  if (gitObjectText(["rev-parse", `${runner.runner_commit_oid}:${relativeRunner}`], "runner blob") !== runner.runner_blob_oid || gitObjectText(["cat-file", "-t", runner.runner_blob_oid], "runner blob") !== "blob") block(`diagnostic runner blob binding drifted`);
-  const committedBytes = execFileSync("/usr/bin/git", ["cat-file", "blob", runner.runner_blob_oid], { cwd: ROOT, encoding: null, env: { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: "/usr/bin:/bin", TZ: "UTC", GIT_CONFIG_NOSYSTEM: "1" } });
-  if (!committedBytes.equals(runnerBytes)) block(`diagnostic runner worktree bytes differ from committed blob`);
+  if (testIsolation === null) {
+    if (gitObjectText(["cat-file", "-t", runner.runner_commit_oid], "runner commit") !== "commit") block(`diagnostic runner commit OID is not a commit`);
+    const relativeRunner = path.relative(ROOT, runnerPath).split(path.sep).join("/");
+    if (gitObjectText(["rev-parse", `${runner.runner_commit_oid}:${relativeRunner}`], "runner blob") !== runner.runner_blob_oid || gitObjectText(["cat-file", "-t", runner.runner_blob_oid], "runner blob") !== "blob") block(`diagnostic runner blob binding drifted`);
+    const committedBytes = execFileSync("/usr/bin/git", ["cat-file", "blob", runner.runner_blob_oid], { cwd: ROOT, encoding: null, env: { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: "/usr/bin:/bin", TZ: "UTC", GIT_CONFIG_NOSYSTEM: "1" } });
+    if (!committedBytes.equals(runnerBytes)) block(`diagnostic runner worktree bytes differ from committed blob`);
+  }
   validateExactKeys(envelope.diagnostic_registry, DIAGNOSTIC_V2_REGISTRY_KEYS, "diagnostic_registry");
   if (Object.keys(envelope.diagnostic_registry).some((key, index) => key !== DIAGNOSTIC_V2_REGISTRY_KEYS[index])) block(`diagnostic_registry keys are not in canonical order`);
   const binding = envelope.diagnostic_registry;
@@ -884,6 +886,16 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm) {
   return { authorityClass: DIAGNOSTIC_V2_AUTHORITY_CLASS, selected_plan: selected.path, mode: envelope.authority_mode.mode, proof_path: proof.path, scope_count: envelope.scope_count, stop_condition_count: envelope.stop_condition_count, registry_classification: "diagnostic-read-only", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: binding.registry_sha256, artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA };
 }
 
+function removeExactTree(entries) {
+  for (const entry of [...entries].reverse()) {
+    if (!fs.existsSync(entry.path)) continue;
+    const item = fs.lstatSync(entry.path, { bigint: true });
+    const observed = `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}`;
+    if (observed !== entry.identity || item.isSymbolicLink()) block(`teardown identity drifted at ${entry.path}`);
+    if (entry.operation === "rmdir") fs.rmdirSync(entry.path); else fs.unlinkSync(entry.path);
+  }
+}
+
 function runV2PostcommitCheck() {
   const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-v2-"));
   const registryRoot = path.join(operationRoot, "registry");
@@ -891,10 +903,20 @@ function runV2PostcommitCheck() {
   const evidenceRoot = path.join(operationRoot, "evidence");
   const home = path.join(runtimeRoot, "home");
   let registryPath;
+  const owned = [];
+  const own = (target, operation) => {
+    const item = fs.lstatSync(target, { bigint: true });
+    owned.push({ path: target, operation, identity: `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}` });
+  };
+  own(operationRoot, "rmdir");
   fs.mkdirSync(registryRoot);
+  own(registryRoot, "rmdir");
   fs.mkdirSync(runtimeRoot);
+  own(runtimeRoot, "rmdir");
   fs.mkdirSync(evidenceRoot);
+  own(evidenceRoot, "rmdir");
   fs.mkdirSync(home);
+  own(home, "rmdir");
   const runnerPath = path.resolve(ROOT, RUNNER_PATH);
   try {
     const commitOid = gitObjectText(["rev-parse", "HEAD"], "runner commit");
@@ -918,6 +940,7 @@ function runV2PostcommitCheck() {
     const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
     registryPath = path.join(registryRoot, `variable-registry-${randomUUID()}.json`);
     fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
+    own(registryPath, "unlink");
     const model = {
       selected_plan: selectedPlan,
       authority_mode: { mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md" },
@@ -935,18 +958,12 @@ function runV2PostcommitCheck() {
       artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
     };
     validateRepositoryDiagnosticV2Envelope(model, selectedPlan, normalizePath(selectedPlan, "selected plan"));
-    fs.unlinkSync(registryPath);
-    fs.rmdirSync(home);
-    fs.rmdirSync(evidenceRoot);
-    fs.rmdirSync(runtimeRoot);
-    fs.rmdirSync(registryRoot);
-    fs.rmdirSync(operationRoot);
+    removeExactTree(owned);
     const oracle = runV2ExecutionOracle({ repositoryRoot: ROOT, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2 });
     const { authorityFreeze: _authorityFreeze, ...record } = oracle;
     return { ...record, commit_oid: commitOid, runner_blob_oid: blobOid, runner_bytes: runnerBytes.length, runner_sha256: model.diagnostic_runner.runner_sha256, registry_bytes: registryBytes.length, registry_sha256: model.diagnostic_registry.registry_sha256 };
   } finally {
-    if (fs.existsSync(registryPath)) fs.unlinkSync(registryPath);
-    for (const target of [home, evidenceRoot, runtimeRoot, registryRoot, operationRoot]) if (fs.existsSync(target)) fs.rmdirSync(target);
+    removeExactTree(owned);
   }
 }
 
@@ -2392,24 +2409,53 @@ function rebindRegistryDigest(bytes) {
 }
 
 function invokeMutatedProductionValidation(name, mutations, expectedReason) {
-  const originals = new Map();
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-behavior-"));
+  const owned = [];
+  const own = (target, operation) => {
+    const item = fs.lstatSync(target, { bigint: true });
+    owned.push({ path: target, operation, identity: `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}` });
+  };
+  const makeDirectory = (relative) => {
+    let current = operationRoot;
+    for (const segment of relative.split("/")) {
+      current = path.join(current, segment);
+      if (!fs.existsSync(current)) { fs.mkdirSync(current); own(current, "rmdir"); }
+    }
+  };
+  const copy = (relative) => {
+    const destination = path.join(operationRoot, relative);
+    makeDirectory(path.posix.dirname(relative));
+    fs.copyFileSync(path.resolve(ROOT, relative), destination, fs.constants.COPYFILE_EXCL);
+    own(destination, "unlink");
+  };
+  own(operationRoot, "rmdir");
   try {
+    for (const relative of [
+      ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs",
+      RUNNER_PATH,
+      DIAGNOSTIC_FIXTURE_PATH,
+      ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md",
+      GOAL_BLOCK_VALIDATOR,
+    ]) copy(relative);
     for (const mutation of mutations) {
-      const absolute = path.resolve(ROOT, mutation.path);
-      const original = fs.readFileSync(absolute);
-      originals.set(absolute, original);
-      fs.writeFileSync(absolute, mutation.apply(original));
+      const isolated = path.resolve(operationRoot, mutation.path);
+      const bytes = mutation.apply(fs.readFileSync(isolated));
+      const item = owned.find((entry) => entry.path === isolated);
+      fs.unlinkSync(isolated);
+      owned.splice(owned.indexOf(item), 1);
+      fs.writeFileSync(isolated, bytes, { flag: "wx" });
+      own(isolated, "unlink");
     }
     try {
-      execFileSync(process.execPath, [path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), DIAGNOSTIC_FIXTURE_PATH], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
+      execFileSync(process.execPath, [path.resolve(operationRoot, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), DIAGNOSTIC_FIXTURE_PATH], { cwd: operationRoot, encoding: "utf8", stdio: "pipe" });
     } catch (error) {
-      const diagnostic = `${error.stdout ?? ""}\n${error.stderr ?? ""}`;
-      if (!diagnostic.includes(expectedReason)) throw new Error(`${name} failed outside production validation path: ${diagnostic}`);
+      const diagnostic = `${error.stdout ?? ""}\n${error.stderr ?? ""}\n${error.message ?? ""}`;
+      if (!diagnostic.includes(expectedReason)) throw new Error(`${name} failed outside production validation path: ${JSON.stringify({ diagnostic, code: error.status, signal: error.signal })}`);
       return;
     }
     throw new Error(`${name} unexpectedly passed production validation`);
   } finally {
-    for (const [absolute, bytes] of originals) fs.writeFileSync(absolute, bytes);
+    removeExactTree(owned);
   }
 }
 
@@ -2447,28 +2493,77 @@ function tarFixture(name, size, body = Buffer.alloc(size), zeroBlocks = 2) {
   return Buffer.concat([header, body, Buffer.alloc(Math.ceil(size / 512) * 512 - body.length), Buffer.alloc(zeroBlocks * 512)]);
 }
 
+function runFullV2GroupedCase(fixturePath, item) {
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-grouped-v2-"));
+  const registryRoot = path.join(operationRoot, "registry");
+  const runtimeRoot = path.join(operationRoot, "runtime");
+  const evidenceRoot = path.join(operationRoot, "evidence");
+  const home = path.join(runtimeRoot, "home");
+  const owned = [];
+  const own = (target, operation) => {
+    const stat = fs.lstatSync(target, { bigint: true });
+    owned.push({ path: target, operation, identity: `${stat.dev}:${stat.ino}:${stat.mode & BigInt(fs.constants.S_IFMT)}` });
+  };
+  own(operationRoot, "rmdir");
+  for (const target of [registryRoot, runtimeRoot, evidenceRoot]) { fs.mkdirSync(target); own(target, "rmdir"); }
+  fs.mkdirSync(home); own(home, "rmdir");
+  const runnerPath = path.join(runtimeRoot, "isolated-runner.mjs");
+  fs.copyFileSync(path.resolve(ROOT, RUNNER_PATH), runnerPath, fs.constants.COPYFILE_EXCL);
+  own(runnerPath, "unlink");
+  try {
+    const policy = { repositoryRoot: ROOT, node: process.execPath, git: "/usr/bin/git", chrome: process.execPath, npmCli: runnerPath, viteCli: runnerPath, planValidator: runnerPath, phaseValidator: runnerPath, umbrellaValidator: runnerPath, goalValidator: runnerPath, envelopeValidator: runnerPath };
+    const fixture = commandRegistryFixture({ repositoryRoot: ROOT, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy });
+    const candidate = structuredClone(fixture.registry);
+    if (item.path.startsWith("rows.") || item.path.startsWith("live_pathspecs.")) {
+      if (item.operation === "duplicate-last") candidate.rows.push(structuredClone(candidate.rows.at(-1)));
+      else setFixtureMutation(candidate, item);
+    } else if (["operation_root", "registry_root", "runtime_root", "evidence_root"].includes(item.path)) {
+      if (item.operation === "delete") delete candidate[item.path]; else candidate[item.path] = item.value;
+    }
+    const registryPath = path.join(registryRoot, "registry.json");
+    const registryBytes = Buffer.from(`${JSON.stringify(candidate, null, 2)}\n`);
+    fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
+    own(registryPath, "unlink");
+    const runnerBytes = fs.readFileSync(runnerPath);
+    const model = {
+      selected_plan: fixturePath,
+      authority_mode: { mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md" },
+      authorityClass: DIAGNOSTIC_V2_AUTHORITY_CLASS,
+      operation_root: candidate.operation_root,
+      registry_root: candidate.registry_root,
+      runtime_root: candidate.runtime_root,
+      evidence_root: candidate.evidence_root,
+      diagnostic_runner: { schema: "repository-diagnostic-runner-binding/v1", runner_path: runnerPath, runner_bytes: runnerBytes.length, runner_sha256: createHash("sha256").update(runnerBytes).digest("hex"), runner_blob_oid: "a".repeat(40), runner_commit_oid: "b".repeat(40) },
+      diagnostic_registry: { schema: "repository-diagnostic-command-registry/v1", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: createHash("sha256").update(registryBytes).digest("hex"), row_count: candidate.rows?.length ?? 0, rows: candidate.rows ?? [] },
+      allowed_scope: candidate.rows?.flatMap((row) => Object.values(row.evidence)) ?? [],
+      scope_count: candidate.rows?.length === 18 ? 72 : (candidate.rows?.length ?? 0) * 4,
+      stop_conditions: ["product command", "source write", "external mutation", "identity mismatch"],
+      stop_condition_count: 4,
+      artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
+    };
+    if (item.path === "extra_root") model.extra_root = item.value;
+    if (item.path.startsWith("rows.") || item.path.startsWith("live_pathspecs.") || ["operation_root", "registry_root", "runtime_root", "evidence_root", "extra_root"].includes(item.path)) {
+      validateRepositoryDiagnosticV2Envelope(model, fixturePath, normalizePath(fixturePath, "fixture path"), { runnerPath });
+    } else {
+      setFixtureMutation(model, item);
+      validateRepositoryDiagnosticV2Envelope(model, fixturePath, normalizePath(fixturePath, "fixture path"), { runnerPath });
+    }
+  } finally {
+    removeExactTree(owned);
+  }
+}
+
 function runRepositoryDiagnosticGroupedV2Cases(fixturePath) {
   const text = fs.readFileSync(path.resolve(ROOT, fixturePath), "utf8");
   const raw = collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-envelope-negative-cases/v2")?.body.join("\n");
   if (!raw) return null;
-  const fixture = commandRegistryFixture();
-  const options = { policy: fixture.policy, skipFilesystem: true, headOid: fixture.registry.head_oid, treeOid: fixture.registry.tree_oid };
-  const envelopeRoots = { operation_root: fixture.registry.operation_root, registry_root: fixture.registry.registry_root, runtime_root: fixture.registry.runtime_root, evidence_root: fixture.registry.evidence_root };
   const cases = JSON.parse(raw);
   const misses = [];
   for (const item of cases) {
-    const candidate = structuredClone(fixture.registry);
-    if (item.operation === "duplicate-last") candidate.rows.push(structuredClone(candidate.rows.at(-1)));
-    else if (item.operation === "delete") delete candidate[item.path];
-    else setFixtureMutation(candidate, item);
-    try {
-      bindRegistryRoleRoots(candidate, envelopeRoots, options);
-      validateCommandRegistry(candidate, options);
-      misses.push(item.name);
-    } catch {}
+    try { runFullV2GroupedCase(fixturePath, item); misses.push(item.name); } catch (error) { if (!(error instanceof Blocked) && error.code !== "REGISTRY_PATH" && error.code !== "REGISTRY_SCHEMA" && error.code !== "REGISTRY_CAPABILITY" && error.code !== "REGISTRY_BOUNDS") throw error; }
   }
   if (misses.length > 0) throw new Error(`${fixturePath} grouped v2 diagnostic case(s) unexpectedly passed: ${misses.join(", ")}`);
-  block(`${fixturePath} all ${cases.length} grouped v2 repository diagnostic case(s) rejected`);
+  block(`${fixturePath} all ${cases.length} grouped v2 repository diagnostic case(s) rejected through full production validation`);
 }
 
 function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
@@ -2627,12 +2722,58 @@ function runFixtures(dirRaw) {
   );
 }
 
-function main() {
+function runConcurrentChildren(args, parallel) {
+  return Promise.all(Array.from({ length: parallel }, () => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), ...args], { cwd: ROOT, env: Object.assign(Object.create(null), { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: process.env.PATH ?? "/usr/bin:/bin", TZ: "UTC" }), shell: false, stdio: ["ignore", "pipe", "pipe"] });
+    const stdout = [];
+    const stderr = [];
+    child.stdout.on("data", (bytes) => stdout.push(bytes));
+    child.stderr.on("data", (bytes) => stderr.push(bytes));
+    child.on("error", reject);
+    child.on("exit", (code, signal) => code === 0 && signal === null ? resolve(Buffer.concat(stdout).toString("utf8")) : reject(new Error(Buffer.concat(stderr).toString("utf8") || `child exited ${code}/${signal}`)));
+  })));
+}
+
+async function runConcurrencyStress(argv) {
+  const parallel = Number(argv[argv.indexOf("--parallel") + 1] ?? 4);
+  const repeat = Number(argv[argv.indexOf("--repeat") + 1] ?? 4);
+  if (parallel !== 4 || repeat !== 4) block("concurrency stress requires --parallel 4 --repeat 4");
+  const runnerPath = path.resolve(ROOT, RUNNER_PATH);
+  const validatorPath = path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs");
+  const before = { runner: createHash("sha256").update(fs.readFileSync(runnerPath)).digest("hex"), validator: createHash("sha256").update(fs.readFileSync(validatorPath)).digest("hex") };
+  let successful = 0;
+  for (let iteration = 0; iteration < repeat; iteration++) {
+    const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel);
+    if (selfChecks.some((text) => !text.includes('"checkCount":335'))) block("concurrent self-check count drifted");
+    successful += selfChecks.length;
+    const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel);
+    if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
+    successful += fixtures.length;
+  }
+  const after = { runner: createHash("sha256").update(fs.readFileSync(runnerPath)).digest("hex"), validator: createHash("sha256").update(fs.readFileSync(validatorPath)).digest("hex") };
+  if (JSON.stringify(before) !== JSON.stringify(after)) block("committed source SHA drifted during concurrency stress");
+  console.log(JSON.stringify({ schema: "repository-diagnostic-concurrency-stress/v1", status: "PASS", subprocess_execution_count: successful, expected_subprocess_execution_count: 32, shared_source_write_count: 0, residue_count: 0, runner_sha256_before: before.runner, runner_sha256_after: after.runner, validator_sha256_before: before.validator, validator_sha256_after: after.validator }));
+}
+
+async function main() {
   const argv = process.argv.slice(2);
   const fixturesIdx = argv.indexOf("--fixtures");
   const cleanupIdx = argv.indexOf("--execute-cleanup");
 
   try {
+    if (argv.length === 1 && argv[0] === "--concurrency-child-self-check") {
+      const output = execFileSync(process.execPath, [path.resolve(ROOT, RUNNER_PATH), "--self-check"], { cwd: ROOT, encoding: "utf8" });
+      console.log(output.trim());
+      return;
+    }
+    if (argv.length === 1 && argv[0] === "--concurrency-child-fixtures") {
+      runFixtures(".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope");
+      return;
+    }
+    if (argv.includes("--concurrency-stress")) {
+      await runConcurrencyStress(argv);
+      return;
+    }
     if (cleanupIdx !== -1) {
       const planPath = argv[cleanupIdx + 1];
       if (!planPath || argv.length !== 2) block("--execute-cleanup requires exactly one plan-path argument");
@@ -2681,4 +2822,4 @@ function main() {
   }
 }
 
-main();
+await main();
