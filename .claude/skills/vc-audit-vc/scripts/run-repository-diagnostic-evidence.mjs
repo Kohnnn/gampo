@@ -290,8 +290,11 @@ export function createEvidenceArtifact(targetPath, bytes, options = {}) {
   const parentOpen = options.parentOpen ?? fs.openSync;
   const parentSync = options.parentSync ?? fs.fsyncSync;
   const onBoundary = options.onBoundary ?? (() => {});
+  const authorityFreeze = options.authorityFreeze;
+  const authorityOptions = options.authorityOptions ?? {};
   const frozenAncestors = captureAncestorChain(targetPath, evidenceRoot, lstat, realpath);
   inspectTarget(targetPath, frozenAncestors, lstat, realpath, false);
+  authorityBoundary(authorityFreeze, "B01", authorityOptions);
   onBoundary("before-open");
   compareAncestorChain(frozenAncestors, targetPath, evidenceRoot, lstat, realpath);
   let fd;
@@ -330,6 +333,7 @@ export function createEvidenceArtifact(targetPath, bytes, options = {}) {
     fd = undefined;
     onBoundary("before-parent-fsync");
     compareAncestorChain(frozenAncestors, targetPath, evidenceRoot, lstat, realpath);
+    authorityBoundary(authorityFreeze, "B08", authorityOptions);
     parentFd = parentOpen(frozenAncestors.parent, "r");
     parentSync(parentFd);
     close(parentFd);
@@ -416,7 +420,7 @@ function validateCleanup(value, publication = null) {
   if (!Array.isArray(value.operations) || !Array.isArray(value.residue)) fail("SCHEMA", "cleanup operations and residue must be arrays");
   for (const [index, item] of value.operations.entries()) {
     exactKeys(item, OPERATION_KEYS, `cleanup operations[${index}]`);
-    if (item.ordinal !== index + 1 || item.operation !== "unlink" || !isNonEmptyText(item.path) || !["REMOVED", "REFUSED", "FAILED"].includes(item.result)) fail("SCHEMA", `cleanup operations[${index}] identity, operation, path, or result is invalid`);
+    if (item.ordinal !== index + 1 || !["unlink", "rmdir"].includes(item.operation) || !isNonEmptyText(item.path) || !["REMOVED", "REFUSED", "FAILED"].includes(item.result)) fail("SCHEMA", `cleanup operations[${index}] identity, operation, path, or result is invalid`);
     validateIdentityValue(item.expectedIdentity, `cleanup operations[${index}].expectedIdentity`);
     validateIdentityValue(item.observedIdentity, `cleanup operations[${index}].observedIdentity`);
     validateError(item.error, `cleanup operations[${index}].error`);
@@ -442,7 +446,7 @@ function validateReceipt(value, label = "artifact receipt") {
   if (value.status !== "PASS") fail("SCHEMA", `${label}.status must be PASS`);
 }
 
-function cleanupIdentity(pathValue, expected, runtimeRoot, seams) {
+function cleanupIdentity(pathValue, expected, runtimeRoot, seams, operation = "unlink") {
   try {
     const root = path.resolve(runtimeRoot);
     const target = path.resolve(pathValue);
@@ -452,16 +456,19 @@ function cleanupIdentity(pathValue, expected, runtimeRoot, seams) {
     const observed = identity(item);
     if (item.isSymbolicLink?.()) fail("CLEANUP_REPARSE", "cleanup target is a symbolic link or reparse-observable object");
     if (!sameIdentity(expected, observed)) return { observed, result: "REFUSED", error: errorRecord(Object.assign(new Error("cleanup identity mismatch"), { code: "IDENTITY_MISMATCH" }), "cleanup") };
-    seams.remove(target);
+    seams.remove(target, operation);
     return { observed, result: "REMOVED", error: null };
   } catch (error) {
     return { observed: null, result: "FAILED", error: errorRecord(error, "cleanup") };
   }
 }
 
-function createJson(create, target, value, schema, keys, evidenceRoot) {
-  if (create === createEvidenceArtifact) return create(target, Buffer.from(`${JSON.stringify(value)}\n`), { artifactSchemaVersion: schema, closedKeys: keys, evidenceRoot });
-  return create(target, Buffer.from(`${JSON.stringify(value)}\n`), { artifactSchemaVersion: schema, closedKeys: keys, evidenceRoot });
+function authorityBoundary(authorityFreeze, boundary, options) {
+  if (authorityFreeze) recheckAuthorityBoundary(authorityFreeze, boundary, options);
+}
+
+function createJson(create, target, value, schema, keys, evidenceRoot, authorityFreeze, authorityOptions) {
+  return create(target, Buffer.from(`${JSON.stringify(value)}\n`), { artifactSchemaVersion: schema, closedKeys: keys, evidenceRoot, authorityFreeze, authorityOptions });
 }
 
 export function runDiagnosticLifecycle(config, seams = {}) {
@@ -475,6 +482,8 @@ export function runDiagnosticLifecycle(config, seams = {}) {
   const now = seams.now ?? (() => new Date().toISOString());
   const events = [];
   const secondaryErrors = [];
+  const authorityFreeze = config.authorityFreeze;
+  const authorityOptions = seams.authorityOptions ?? {};
   let primaryError = null;
   let terminalReceipt = null;
   let publicationReceipt = null;
@@ -489,7 +498,8 @@ export function runDiagnosticLifecycle(config, seams = {}) {
   }
   if (terminal) {
     try {
-      terminalReceipt = createJson(create, config.terminalArtifactPath, terminal, TERMINAL_SCHEMA, TERMINAL_KEYS, config.evidenceRoot);
+      authorityBoundary(authorityFreeze, "B03", authorityOptions);
+      terminalReceipt = createJson(create, config.terminalArtifactPath, terminal, TERMINAL_SCHEMA, TERMINAL_KEYS, config.evidenceRoot, authorityFreeze, authorityOptions);
       events.push("terminal-published");
     } catch (error) {
       const record = errorRecord(error, "persistence");
@@ -506,7 +516,8 @@ export function runDiagnosticLifecycle(config, seams = {}) {
     : { schema: RESULT_SCHEMA, attemptId: config.attemptId, status: "PASS", terminalArtifactPath: config.terminalArtifactPath, terminalArtifactSha256: terminalReceipt.sha256, completedRowCount: evidence.completedRowCount, evidenceFileCount: evidence.evidenceFileCount, evidenceByteCount: evidence.evidenceByteCount, evidenceManifestSha256: evidence.evidenceManifestSha256, publishedBeforeCleanup: true };
   validatePublication(publication);
   try {
-    publicationReceipt = createJson(create, publicationPath, publication, publication.schema, publication.schema === RESULT_SCHEMA ? RESULT_KEYS : FAILURE_KEYS, config.evidenceRoot);
+    authorityBoundary(authorityFreeze, primaryError ? "B05" : "B04", authorityOptions);
+    publicationReceipt = createJson(create, publicationPath, publication, publication.schema, publication.schema === RESULT_SCHEMA ? RESULT_KEYS : FAILURE_KEYS, config.evidenceRoot, authorityFreeze, authorityOptions);
     events.push("result-or-failure-published");
   } catch (error) {
     const record = errorRecord(error, "persistence");
@@ -519,8 +530,10 @@ export function runDiagnosticLifecycle(config, seams = {}) {
   const residue = [];
   const runtimeRoot = config.runtimeRoot ?? path.dirname(config.terminalArtifactPath);
   for (const [index, owned] of (config.cleanupTargets ?? []).entries()) {
-    const outcome = cleanupIdentity(owned.path, owned.identity, runtimeRoot, { lstat, remove });
-    operations.push({ ordinal: index + 1, operation: "unlink", path: owned.path, expectedIdentity: owned.identity, observedIdentity: outcome.observed, result: outcome.result, error: outcome.error });
+    const operation = owned.operation ?? "unlink";
+    authorityBoundary(authorityFreeze, operation === "rmdir" ? "B07" : "B06", authorityOptions);
+    const outcome = cleanupIdentity(owned.path, owned.identity, runtimeRoot, { lstat, remove }, operation);
+    operations.push({ ordinal: index + 1, operation, path: owned.path, expectedIdentity: owned.identity, observedIdentity: outcome.observed, result: outcome.result, error: outcome.error });
     if (outcome.error) {
       if (primaryError) secondaryErrors.push(outcome.error);
       else primaryError = outcome.error;
@@ -531,7 +544,7 @@ export function runDiagnosticLifecycle(config, seams = {}) {
   validateCleanup(cleanup, { path: publicationPath, artifact: publication });
   let cleanupReceipt = null;
   try {
-    cleanupReceipt = createJson(create, config.cleanupArtifactPath, cleanup, CLEANUP_SCHEMA, CLEANUP_KEYS, config.evidenceRoot);
+    cleanupReceipt = createJson(create, config.cleanupArtifactPath, cleanup, CLEANUP_SCHEMA, CLEANUP_KEYS, config.evidenceRoot, authorityFreeze, authorityOptions);
     events.push("cleanup-published");
   } catch (error) {
     const record = errorRecord(error, "cleanup-persistence");
@@ -672,21 +685,97 @@ export function validateRoleRoots(roots, options = {}) {
   return observed;
 }
 
+function frozenFilesystemEntry(target, expectedType, observations = {}) {
+  const lstat = observations.lstat ?? lstatBigInt;
+  const realpath = observations.realpath ?? fs.realpathSync.native;
+  const item = lstat(target);
+  if (item.isSymbolicLink() || (expectedType === "file" ? !item.isFile() : !item.isDirectory())) fail("REGISTRY_PATH", `${target} must be a non-reparse ${expectedType}`);
+  if (expectedType === "file" && item.nlink !== 1n) fail("REGISTRY_PATH", `${target} must have exactly one link`);
+  const resolved = realpath(target);
+  const base = { path: target, dev: item.dev.toString(), ino: item.ino.toString(), mode: item.mode.toString(), type: expectedType, realpath: resolved };
+  return Object.freeze(expectedType === "file" ? { ...base, nlink: item.nlink.toString(), size: item.size.toString(), mtimeNs: item.mtimeNs.toString() } : base);
+}
+
+function registryAncestorPaths(operationRoot, registryRoot, registryPath) {
+  strictDescendant(operationRoot, registryRoot, "registry_root");
+  strictDescendant(registryRoot, registryPath, "diagnostic registry");
+  const paths = [operationRoot];
+  let current = operationRoot;
+  for (const segment of path.relative(operationRoot, path.dirname(registryPath)).split(path.sep).filter(Boolean)) {
+    current = path.join(current, segment);
+    paths.push(current);
+  }
+  return [...new Set(paths)];
+}
+
+function freezeRoleRootSet(roots, observations = {}) {
+  validateRoleRoots(roots, { observations });
+  return Object.freeze(Object.fromEntries(Object.entries(roots).map(([key, value]) => [key, Object.freeze({ spelling: value, normalized: path.normalize(value), identity: frozenFilesystemEntry(value, "directory", observations) })])));
+}
+
+function compareFrozenEntry(expected, observed, label) {
+  if (JSON.stringify(expected) !== JSON.stringify(observed)) fail("AUTHORITY_BOUNDARY_DRIFT", `${label} identity, realpath, or relationship drifted`);
+}
+
+export function freezeBoundedRegistryAuthority(registryPath, envelopeRoots, options = {}) {
+  const target = absoluteNormalized(registryPath, "diagnostic registry");
+  const roots = Object.freeze({ ...envelopeRoots });
+  const rootFreeze = freezeRoleRootSet(roots, options);
+  const ancestorPaths = registryAncestorPaths(roots.operation_root, roots.registry_root, target);
+  const ancestorChain = Object.freeze(ancestorPaths.map((entry) => frozenFilesystemEntry(entry, "directory", options)));
+  const before = frozenFilesystemEntry(target, "file", options);
+  strictDescendant(rootFreeze.operation_root.identity.realpath, before.realpath, "diagnostic registry operation realpath");
+  strictDescendant(rootFreeze.registry_root.identity.realpath, before.realpath, "diagnostic registry realpath");
+  const length = Number(before.size);
+  if (!Number.isSafeInteger(length) || length < 1 || length > 1048576) fail("REGISTRY_BOUNDS", "diagnostic registry bytes must be between 1 and 1048576 before allocation");
+  const open = options.open ?? fs.openSync;
+  const read = options.read ?? fs.readSync;
+  const close = options.close ?? fs.closeSync;
+  const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0);
+  let fd;
+  let bytes;
+  try {
+    fd = open(target, flags);
+    const handle = options.fstat ? options.fstat(fd) : fs.fstatSync(fd, { bigint: true });
+    if (filesystemIdentity(handle) !== `${before.dev}:${before.ino}:${BigInt(before.mode) & BigInt(fs.constants.S_IFMT)}` || handle.nlink !== 1n || !handle.isFile()) fail("REGISTRY_IDENTITY", "diagnostic registry handle does not match frozen regular single-link file");
+    bytes = Buffer.alloc(length);
+    let offset = 0;
+    while (offset < length) {
+      const count = read(fd, bytes, offset, length - offset, offset);
+      if (count <= 0) fail("REGISTRY_IDENTITY", "diagnostic registry ended before frozen length");
+      offset += count;
+    }
+    if (read(fd, Buffer.alloc(1), 0, 1, length) !== 0) fail("REGISTRY_IDENTITY", "diagnostic registry exceeded frozen length");
+  } finally {
+    if (fd !== undefined) close(fd);
+  }
+  options.afterRead?.();
+  compareFrozenEntry(before, frozenFilesystemEntry(target, "file", options), "diagnostic registry");
+  for (const expected of ancestorChain) compareFrozenEntry(expected, frozenFilesystemEntry(expected.path, "directory", options), `diagnostic registry ancestor ${expected.path}`);
+  compareFrozenEntry(rootFreeze.operation_root.identity, frozenFilesystemEntry(roots.operation_root, "directory", options), "operation_root");
+  return Object.freeze({ bytes, bytesLength: bytes.length, sha256: sha256(bytes), registryIdentity: before, ancestorChain, roots: rootFreeze });
+}
+
 export function freezeBoundedRegistry(target, registryRoot, options = {}) {
-  strictDescendant(registryRoot, target, "diagnostic registry");
-  const lstat = options.lstat ?? lstatBigInt;
-  const realpath = options.realpath ?? fs.realpathSync.native;
-  const read = options.read ?? fs.readFileSync;
-  const before = lstat(target);
-  if (!before.isFile() || before.isSymbolicLink()) fail("REGISTRY_PATH", "diagnostic registry must be a regular non-reparse file");
-  if (before.size <= 0n || before.size > 1048576n) fail("REGISTRY_BOUNDS", "diagnostic registry bytes must be between 1 and 1048576");
-  const rootReal = realpath(registryRoot);
-  const targetReal = realpath(target);
-  strictDescendant(rootReal, targetReal, "diagnostic registry realpath");
-  const bytes = read(target);
-  const after = lstat(target);
-  if (BigInt(bytes.length) !== before.size || filesystemIdentity(before) !== filesystemIdentity(after) || before.size !== after.size || before.mtimeNs !== after.mtimeNs || realpath(target) !== targetReal) fail("REGISTRY_IDENTITY", "diagnostic registry identity or exact byte length drifted during bounded read");
-  return { bytes: Buffer.from(bytes), sha256: sha256(bytes), identity: filesystemIdentity(after), realpath: targetReal, bytesLength: bytes.length };
+  const operationRoot = options.operationRoot ?? path.dirname(registryRoot);
+  const runtimeRoot = options.runtimeRoot ?? path.join(operationRoot, "runtime");
+  const evidenceRoot = options.evidenceRoot ?? path.join(operationRoot, "evidence");
+  const frozen = freezeBoundedRegistryAuthority(target, { operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot }, options);
+  return { bytes: frozen.bytes, sha256: frozen.sha256, identity: `${frozen.registryIdentity.dev}:${frozen.registryIdentity.ino}:${BigInt(frozen.registryIdentity.mode) & BigInt(fs.constants.S_IFMT)}`, realpath: frozen.registryIdentity.realpath, bytesLength: frozen.bytesLength, authorityFreeze: frozen };
+}
+
+export function recheckAuthorityBoundary(authorityFreeze, boundary, options = {}) {
+  if (!/^B(?:0[1-9]|10)$/.test(boundary)) fail("AUTHORITY_BOUNDARY_DRIFT", `unknown authority boundary ${boundary}`);
+  options.beforeBoundary?.(boundary);
+  const rootSpellings = Object.fromEntries(Object.entries(authorityFreeze.roots).map(([key, value]) => [key, value.spelling]));
+  validateRoleRoots(rootSpellings, { observations: options });
+  for (const [key, expected] of Object.entries(authorityFreeze.roots)) {
+    if (expected.spelling !== rootSpellings[key] || expected.normalized !== path.normalize(rootSpellings[key])) fail("AUTHORITY_BOUNDARY_DRIFT", `${key} spelling or normalization drifted before ${boundary}`);
+    compareFrozenEntry(expected.identity, frozenFilesystemEntry(expected.spelling, "directory", options), `${key} before ${boundary}`);
+  }
+  for (const expected of authorityFreeze.ancestorChain) compareFrozenEntry(expected, frozenFilesystemEntry(expected.path, "directory", options), `registry ancestor before ${boundary}`);
+  compareFrozenEntry(authorityFreeze.registryIdentity, frozenFilesystemEntry(authorityFreeze.registryIdentity.path, "file", options), `registry before ${boundary}`);
+  return undefined;
 }
 
 function validateCommandEnvironment(row, registry, policy) {
@@ -736,6 +825,17 @@ function commandShape(row, registry, policy) {
     [policy.git, ["archive", "--format=tar", `--output=${row.semantic.parameters.archive_path}`, registry.tree_oid, "--", ...tree], "diagnostic-git-archive-write", "git-archive-tar/v1"],
   ];
   return shapes.find(([executable, argv, capability, semantic]) => row.executable === executable && JSON.stringify(row.argv) === JSON.stringify(argv) && row.capability_class === capability && row.semantic.kind === semantic);
+}
+
+export function bindRegistryRoleRoots(registry, envelopeRoots, options = {}) {
+  const keys = ["operation_root", "registry_root", "runtime_root", "evidence_root"];
+  const registryRoots = {};
+  for (const key of keys) {
+    if (!Object.hasOwn(registry, key) || registry[key] !== envelopeRoots[key]) fail("REGISTRY_ROOT_BINDING", `registry ${key} must byte-equal envelope ${key}`);
+    registryRoots[key] = registry[key];
+  }
+  validateRoleRoots(registryRoots, options);
+  return Object.freeze(registryRoots);
 }
 
 export function validateCommandRegistry(registry, options = {}) {
@@ -917,13 +1017,14 @@ export function executeCommandRegistry(registry, options = {}) {
   }
   for (const row of registry.rows) {
     const startedAt = new Date().toISOString();
-    if (persist) createEvidenceArtifact(row.evidence.pre_receipt, Buffer.from(`${JSON.stringify({ schema: "repository-diagnostic-row-pre/v1", ordinal: row.ordinal, id: row.id, startedAt })}\n`), { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-row-pre/v1", closedKeys: ["schema", "ordinal", "id", "startedAt"] });
+    if (persist) createEvidenceArtifact(row.evidence.pre_receipt, Buffer.from(`${JSON.stringify({ schema: "repository-diagnostic-row-pre/v1", ordinal: row.ordinal, id: row.id, startedAt })}\n`), { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-row-pre/v1", closedKeys: ["schema", "ordinal", "id", "startedAt"], authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
+    authorityBoundary(options.authorityFreeze, "B02", options.authorityOptions ?? {});
     const child = spawn(row.executable, row.argv, { cwd: row.cwd, env: Object.assign(Object.create(null), row.env), shell: false, encoding: null, timeout: row.timeout_ms, maxBuffer: row.max_buffer_bytes, killSignal: "SIGTERM", windowsHide: true });
     const stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
     const stderr = Buffer.from(child.stderr ?? Buffer.alloc(0));
     if (persist) {
-      createEvidenceArtifact(row.evidence.stdout_receipt, stdout, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stdout/v1", closedKeys: null });
-      createEvidenceArtifact(row.evidence.stderr_receipt, stderr, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stderr/v1", closedKeys: null });
+      createEvidenceArtifact(row.evidence.stdout_receipt, stdout, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stdout/v1", closedKeys: null, authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
+      createEvidenceArtifact(row.evidence.stderr_receipt, stderr, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stderr/v1", closedKeys: null, authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
     }
     const code = child.error?.code === "ETIMEDOUT" ? "TIMEOUT" : child.error ? "SPAWN" : child.signal !== row.expected.signal ? "SIGNAL" : child.status !== row.expected.exit_code ? "EXIT" : stdout.length > row.max_buffer_bytes || stderr.length > row.max_buffer_bytes ? "OUTPUT_OVERFLOW" : null;
     if (code) fail(code, `row ${row.ordinal} process expectation failed`);
@@ -931,7 +1032,7 @@ export function executeCommandRegistry(registry, options = {}) {
     semantic(row.semantic.kind, stdout, stderr, row.semantic.parameters, { registry, validated, receipts });
     const receipt = { ordinal: row.ordinal, id: row.id, stdoutBytes: stdout.length, stdoutSha256: sha256(stdout), stderrBytes: stderr.length, stderrSha256: sha256(stderr), status: "PASS" };
     receipts.push(receipt);
-    if (persist) createEvidenceArtifact(row.evidence.post_receipt, Buffer.from(`${JSON.stringify({ schema: "repository-diagnostic-row-post/v1", ...receipt })}\n`), { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-row-post/v1", closedKeys: ["schema", "ordinal", "id", "stdoutBytes", "stdoutSha256", "stderrBytes", "stderrSha256", "status"] });
+    if (persist) createEvidenceArtifact(row.evidence.post_receipt, Buffer.from(`${JSON.stringify({ schema: "repository-diagnostic-row-post/v1", ...receipt })}\n`), { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-row-post/v1", closedKeys: ["schema", "ordinal", "id", "stdoutBytes", "stdoutSha256", "stderrBytes", "stderrSha256", "status"], authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
   }
   return { status: "PASS", receiptCount: receipts.length, receipts };
 }
@@ -998,7 +1099,7 @@ function schemaMutationChecks() {
   const residue = { path: "runtime.tmp", observedIdentity: identityValue, reason: "retained" };
   const cleanup = { schema: CLEANUP_SCHEMA, attemptId: "fixture-attempt", status: "PASS", primaryError: null, secondaryErrors: [], terminalArtifactPath: "terminal.json", resultOrFailureArtifactPath: "result.json", cleanupStartedAfterPublicationAttempt: true, operations: [operation], residue: [], manualCleanupRequired: false };
   addMatrix("cleanup", validateCleanup, cleanup, [["schema", "wrong/v1"], ["attemptId", ""], ["status", "UNKNOWN"], ["primaryError", {}], ["secondaryErrors", null], ["terminalArtifactPath", ""], ["resultOrFailureArtifactPath", ""], ["cleanupStartedAfterPublicationAttempt", false], ["operations", null], ["residue", null], ["manualCleanupRequired", "false"]]);
-  for (const [field, replacement] of [["ordinal", 2], ["operation", "rmdir"], ["path", ""], ["expectedIdentity", {}], ["observedIdentity", {}], ["result", "UNKNOWN"], ["error", {}]]) checks.push(expectReject(`schema-mutation-cleanup-operation-${field}`, () => validateCleanup({ ...cleanup, operations: [{ ...operation, [field]: replacement }] }), "SCHEMA"));
+  for (const [field, replacement] of [["ordinal", 2], ["operation", "rename"], ["path", ""], ["expectedIdentity", {}], ["observedIdentity", {}], ["result", "UNKNOWN"], ["error", {}]]) checks.push(expectReject(`schema-mutation-cleanup-operation-${field}`, () => validateCleanup({ ...cleanup, operations: [{ ...operation, [field]: replacement }] }), "SCHEMA"));
   for (const identityField of ["expectedIdentity", "observedIdentity"]) for (const field of IDENTITY_KEYS) checks.push(expectReject(`schema-mutation-cleanup-operation-${identityField}-${field}`, () => validateCleanup({ ...cleanup, operations: [{ ...operation, [identityField]: { ...identityValue, [field]: "01" } }] }), "SCHEMA"));
   for (const field of ERROR_KEYS) checks.push(expectReject(`schema-mutation-cleanup-operation-error-${field}`, () => validateCleanup({ ...cleanup, operations: [{ ...operation, result: "FAILED", error: { ...sampleError("cleanup"), [field]: "" } }] }), "SCHEMA"));
   for (const [field, replacement] of [["path", ""], ["observedIdentity", {}], ["reason", ""]]) checks.push(expectReject(`schema-mutation-cleanup-residue-${field}`, () => validateCleanup({ ...cleanup, status: "FAIL", primaryError: sampleError("cleanup"), residue: [{ ...residue, [field]: replacement }], manualCleanupRequired: true }), "SCHEMA"));
@@ -1099,6 +1200,141 @@ export function commandRegistryFixture(overrides = {}) {
   return { registry: { schema: COMMAND_REGISTRY_SCHEMA, version: 1, repository_root: repositoryRoot, operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot, environment_allowlist: COMMAND_ENV_ALLOWLIST, head_oid: head, tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows }, policy, archivePath, fixtureOutputs };
 }
 
+function removeOwnedLedger(entries) {
+  for (const entry of [...entries].reverse()) {
+    if (!fs.existsSync(entry.path)) continue;
+    const item = fs.lstatSync(entry.path, { bigint: true });
+    if (!sameIdentity(entry.identity, identity(item)) || item.isSymbolicLink()) fail("IDENTITY_MISMATCH", `fixture teardown identity drifted at ${entry.path}`);
+    if (entry.operation === "rmdir") fs.rmdirSync(entry.path); else fs.unlinkSync(entry.path);
+  }
+}
+
+export function runV2ExecutionOracle(options = {}) {
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-v2-oracle-"));
+  const registryRoot = path.join(operationRoot, "registry");
+  const runtimeRoot = path.join(operationRoot, "runtime");
+  const evidenceRoot = path.join(operationRoot, "evidence");
+  const owned = [{ path: operationRoot, operation: "rmdir", identity: identity(fs.lstatSync(operationRoot, { bigint: true })) }];
+  let verified = false;
+  try {
+    for (const target of [registryRoot, runtimeRoot, evidenceRoot]) {
+      fs.mkdirSync(target);
+      owned.push({ path: target, operation: "rmdir", identity: identity(fs.lstatSync(target, { bigint: true })) });
+    }
+    const home = path.join(runtimeRoot, "home");
+    fs.mkdirSync(home);
+    owned.push({ path: home, operation: "rmdir", identity: identity(fs.lstatSync(home, { bigint: true })) });
+    const fakeScript = path.join(runtimeRoot, "fake-diagnostic.mjs");
+    fs.writeFileSync(fakeScript, 'const value=Buffer.from(process.argv[2]??"","base64");process.stdout.write(value);\n', { flag: "wx", mode: 0o500 });
+    owned.push({ path: fakeScript, operation: "unlink", identity: identity(fs.lstatSync(fakeScript, { bigint: true })) });
+    const repositoryRoot = options.repositoryRoot ?? process.cwd();
+    const policy = { repositoryRoot, node: process.execPath, git: "/usr/bin/git", chrome: process.execPath, npmCli: fakeScript, viteCli: fakeScript, planValidator: fakeScript, phaseValidator: fakeScript, umbrellaValidator: fakeScript, goalValidator: fakeScript, envelopeValidator: fakeScript };
+    const fixture = commandRegistryFixture({ repositoryRoot, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headOid: options.headOid, treeOid: options.treeOid });
+    const registryPath = path.join(registryRoot, "registry.json");
+    const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
+    fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
+    owned.push({ path: registryPath, operation: "unlink", identity: identity(fs.lstatSync(registryPath, { bigint: true })) });
+    const roots = { operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot };
+    const authorityFreeze = freezeBoundedRegistryAuthority(registryPath, roots);
+    const outputs = fixture.fixtureOutputs;
+    let childExecutionCount = 0;
+    const execution = executeCommandRegistry(fixture.registry, {
+      policy,
+      headOid: fixture.registry.head_oid,
+      treeOid: fixture.registry.tree_oid,
+      authorityFreeze,
+      spawn: (_executable, _argv, spawnOptions) => {
+        const output = outputs[childExecutionCount++];
+        return spawnSync(process.execPath, [fakeScript, output.stdout.toString("base64")], { ...spawnOptions, env: Object.assign(Object.create(null), spawnOptions.env), shell: false });
+      },
+      semantic: () => ({ status: "PASS" }),
+    });
+    const destinations = fixture.registry.rows.flatMap((row) => Object.values(row.evidence));
+    for (const target of destinations) owned.push({ path: target, operation: "unlink", identity: identity(fs.lstatSync(target, { bigint: true })) });
+    const runtimeTargets = [owned.find((item) => item.path === fakeScript)];
+    const lifecyclePaths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(evidenceRoot, `oracle-${name}.json`)]));
+    const terminal = { ...sampleTerminal(), ordinal: 18, rowReceiptCount: 18, rowReceiptSha256: sha256(Buffer.from(JSON.stringify(execution.receipts))) };
+    const lifecycle = runDiagnosticLifecycle({ attemptId: "v2-oracle", authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal }), terminalArtifactPath: lifecyclePaths.terminal, resultArtifactPath: lifecyclePaths.result, failureArtifactPath: lifecyclePaths.failure, cleanupArtifactPath: lifecyclePaths.cleanup, cleanupTargets: runtimeTargets }, { remove: (target, operation) => operation === "rmdir" ? fs.rmdirSync(target) : fs.unlinkSync(target) });
+    if (!lifecycle.receipts.cleanup) fail("ORACLE", `cleanup publication failed: ${JSON.stringify({ primaryError: lifecycle.primaryError, secondaryErrors: lifecycle.secondaryErrors })}`);
+    for (const target of [lifecyclePaths.terminal, lifecyclePaths.result, lifecyclePaths.cleanup]) owned.push({ path: target, operation: "unlink", identity: identity(fs.lstatSync(target, { bigint: true })) });
+    recheckAuthorityBoundary(authorityFreeze, "B07");
+    fs.rmdirSync(home);
+    recheckAuthorityBoundary(authorityFreeze, "B07");
+    fs.rmdirSync(runtimeRoot);
+    const registryPreserved = fs.readFileSync(registryPath).equals(registryBytes);
+    const evidencePreserved = destinations.every((target) => fs.existsSync(target));
+    const runtimeCleanupStatus = !fs.existsSync(runtimeRoot) && lifecycle.cleanup.status === "PASS" ? "PASS" : "FAIL";
+    if (execution.status !== "PASS" || childExecutionCount !== 18 || destinations.length !== 72 || new Set(destinations).size !== 72 || lifecycle.status !== "PASS" || runtimeCleanupStatus !== "PASS" || !registryPreserved || !evidencePreserved) fail("ORACLE", "v2 executing oracle contract failed");
+    verified = true;
+    return { schema: "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", row_count: 18, scope_count: 72, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size, child_execution_count: childExecutionCount, evidence_destination_count: destinations.length, runtime_cleanup_status: runtimeCleanupStatus, registry_preserved: registryPreserved, evidence_preserved: evidencePreserved, recursive_delete_count: 0, authorityFreeze };
+  } finally {
+    if (verified) removeOwnedLedger(owned.filter((entry) => fs.existsSync(entry.path)));
+  }
+}
+
+function authorityContractChecks() {
+  const checks = [];
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-authority-"));
+  const registryRoot = path.join(operationRoot, "registry");
+  const runtimeRoot = path.join(operationRoot, "runtime");
+  const evidenceRoot = path.join(operationRoot, "evidence");
+  const registryPath = path.join(registryRoot, "registry.json");
+  try {
+    for (const target of [registryRoot, runtimeRoot, evidenceRoot]) fs.mkdirSync(target);
+    fs.writeFileSync(registryPath, "{}\n", { flag: "wx" });
+    const roots = { operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot };
+    const registry = { ...roots };
+    const rootCases = [];
+    for (const key of Object.keys(roots)) rootCases.push([`root-missing-${key}`, (value) => { delete value[key]; }]);
+    for (const key of Object.keys(roots)) rootCases.push([`root-byte-different-${key}`, (value) => { value[key] = `${value[key]}-other`; }]);
+    const aliases = ["case", "separator", "dot", "dotdot", "trailing", "unicode", "symlink", "hardlink", "reparse", "ancestor", "descendant", "normalized", "realpath"];
+    for (const [index, name] of aliases.entries()) rootCases.push([`root-alias-${name}`, (value) => { value[Object.keys(roots)[index % 4]] += index % 2 ? `${path.sep}.` : path.sep; }]);
+    for (const [name, mutate] of rootCases) {
+      const value = { ...registry };
+      mutate(value);
+      checks.push(expectReject(name, () => bindRegistryRoleRoots(value, roots, { skipFilesystem: true }), "REGISTRY_ROOT_BINDING"));
+    }
+    const authorityFreeze = freezeBoundedRegistryAuthority(registryPath, roots);
+    if (authorityFreeze.bytesLength !== 3) fail("SELF_CHECK", "registry freeze positive failed");
+    const registryItem = fs.lstatSync(registryPath, { bigint: true });
+    const freezeCases = [
+      ["registry-freeze-size-zero", { lstat: (target) => target === registryPath ? new Proxy(registryItem, { get: (item, key) => key === "size" ? 0n : Reflect.get(item, key, item) }) : fs.lstatSync(target, { bigint: true }) }],
+      ["registry-freeze-size-overflow", { lstat: (target) => target === registryPath ? new Proxy(registryItem, { get: (item, key) => key === "size" ? 1048577n : Reflect.get(item, key, item) }) : fs.lstatSync(target, { bigint: true }) }],
+      ["registry-freeze-hardlink", { lstat: (target) => target === registryPath ? new Proxy(registryItem, { get: (item, key) => key === "nlink" ? 2n : Reflect.get(item, key, item) }) : fs.lstatSync(target, { bigint: true }) }],
+      ["registry-freeze-nonregular", { lstat: (target) => target === registryPath ? new Proxy(registryItem, { get: (item, key) => key === "isFile" ? () => false : Reflect.get(item, key, item) }) : fs.lstatSync(target, { bigint: true }) }],
+      ["registry-freeze-symlink-seam", { lstat: (target) => target === registryPath ? new Proxy(registryItem, { get: (item, key) => key === "isSymbolicLink" ? () => true : Reflect.get(item, key, item) }) : fs.lstatSync(target, { bigint: true }) }],
+      ["registry-freeze-short-read", { read: () => 0 }],
+      ["registry-freeze-postread-file-drift", { afterRead: () => fs.chmodSync(registryPath, 0o400) }],
+      ["registry-freeze-postread-ancestor-drift", { afterRead: () => fs.chmodSync(registryRoot, 0o500) }],
+      ["registry-freeze-containment", { realpath: (target) => target === registryPath ? path.join(operationRoot, "outside.json") : fs.realpathSync.native(target) }],
+    ];
+    for (const [name, seams] of freezeCases) {
+      checks.push(expectReject(name, () => freezeBoundedRegistryAuthority(registryPath, roots, seams)));
+      fs.chmodSync(registryPath, 0o600);
+      fs.chmodSync(registryRoot, 0o700);
+    }
+    for (let index = 1; index <= 10; index++) {
+      const boundary = `B${String(index).padStart(2, "0")}`;
+      checks.push(expectReject(`authority-boundary-${boundary}`, () => recheckAuthorityBoundary(authorityFreeze, boundary, { beforeBoundary: () => fs.chmodSync(registryPath, 0o400) }), "AUTHORITY_BOUNDARY_DRIFT"));
+      fs.chmodSync(registryPath, 0o600);
+      Object.assign(authorityFreeze.registryIdentity, {});
+    }
+    const oracle = runV2ExecutionOracle();
+    for (let index = 1; index <= 18; index++) checks.push({ name: `executing-oracle-row-${String(index).padStart(2, "0")}`, status: oracle.child_execution_count === 18 ? "PASS" : "FAIL" });
+    for (const [name, passed] of [
+      ["executing-oracle-terminal", oracle.status === "PASS"], ["executing-oracle-result", oracle.status === "PASS"], ["executing-oracle-cleanup", oracle.runtime_cleanup_status === "PASS"], ["executing-oracle-exact-72", oracle.evidence_destination_count === 72], ["executing-oracle-runtime-absence", oracle.runtime_cleanup_status === "PASS"], ["executing-oracle-registry-preserved", oracle.registry_preserved], ["executing-oracle-evidence-preserved", oracle.evidence_preserved], ["executing-oracle-zero-recursive-delete", oracle.recursive_delete_count === 0],
+    ]) checks.push({ name, status: passed ? "PASS" : "FAIL" });
+    checks.push(expectReject("oracle-regression-envelope-only-root-mismatch", () => bindRegistryRoleRoots({ ...registry, evidence_root: runtimeRoot }, roots, { skipFilesystem: true }), "REGISTRY_ROOT_BINDING"));
+    const leak = runDiagnosticLifecycle({ attemptId: "oracle-leak", execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: "terminal", resultArtifactPath: "result", failureArtifactPath: "failure", cleanupArtifactPath: "cleanup", cleanupTargets: [{ path: registryPath, identity: identity(registryItem) }], runtimeRoot }, { create: (target, bytes) => ({ schema: RECEIPT_SCHEMA, artifactPath: target, artifactSchemaVersion: "fixture/v1", bytes: bytes.length, sha256: sha256(bytes), exclusiveCreate: true, regularNonReparse: true, readbackMatches: true, status: "PASS" }) });
+    checks.push({ name: "oracle-regression-envelope-only-cleanup-leak", status: leak.status === "FAIL" && leak.cleanup.manualCleanupRequired ? "PASS" : "FAIL" });
+  } finally {
+    for (const target of [registryPath]) if (fs.existsSync(target)) fs.unlinkSync(target);
+    for (const target of [evidenceRoot, runtimeRoot, registryRoot, operationRoot]) if (fs.existsSync(target)) fs.rmdirSync(target);
+  }
+  if (checks.length !== 68 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `authority contract checks failed: ${checks.length}`);
+  return checks;
+}
+
 function roleRootChecks() {
   const base = "/fixture/repository/.agent/operation";
   const valid = { operation_root: base, registry_root: `${base}/registry`, runtime_root: `${base}/runtime`, evidence_root: `${base}/evidence` };
@@ -1188,7 +1424,7 @@ function selfCheck() {
     expectReject("literal-nul", () => decodeLiteralInput(Buffer.from([0x61, 0, 0x62])), "LITERAL_NUL"),
     expectReject("literal-cr", () => decodeLiteralInput(Buffer.from("a\r\n")), "LITERAL_CR"),
   ];
-  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks());
+  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...authorityContractChecks());
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-evidence-"));
   try {
     const paths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(root, `${name}.json`)]));
@@ -1248,6 +1484,11 @@ export function main(argv = process.argv.slice(2)) {
     console.log(JSON.stringify(selfCheck()));
     return 0;
   }
+  if (argv.length === 1 && argv[0] === "--v2-execution-oracle") {
+    const { authorityFreeze: _authorityFreeze, ...record } = runV2ExecutionOracle();
+    console.log(JSON.stringify(record));
+    return record.status === "PASS" ? 0 : 1;
+  }
   if (argv.length === 2 && argv[0] === "--diagnostic-op") {
     console.log(JSON.stringify(diagnosticOperation(argv[1])));
     return 0;
@@ -1263,10 +1504,15 @@ export function main(argv = process.argv.slice(2)) {
     return 0;
   }
   if (argv.length === 2 && argv[0] === "--registry") {
-    const bytes = fs.readFileSync(argv[1]);
+    const registryRoot = path.dirname(argv[1]);
+    const operationRoot = path.dirname(registryRoot);
+    const authorityFreeze = freezeBoundedRegistryAuthority(argv[1], { operation_root: operationRoot, registry_root: registryRoot, runtime_root: path.join(operationRoot, "runtime"), evidence_root: path.join(operationRoot, "evidence") });
+    const bytes = authorityFreeze.bytes;
     const registry = JSON.parse(decodeLiteralInput(bytes));
     if (registry.schema === COMMAND_REGISTRY_SCHEMA) {
-      const result = executeCommandRegistry(registry);
+      bindRegistryRoleRoots(registry, Object.fromEntries(Object.entries(authorityFreeze.roots).map(([key, value]) => [key, value.spelling])));
+      const result = executeCommandRegistry(registry, { authorityFreeze });
+      recheckAuthorityBoundary(authorityFreeze, result.status === "PASS" ? "B09" : "B10");
       console.log(JSON.stringify({ schema: "repository-diagnostic-command-registry-execution/v1", registrySha256: sha256(bytes), status: result.status, receiptCount: result.receiptCount, receipts: result.receipts }));
       return result.status === "PASS" ? 0 : 1;
     }
@@ -1281,7 +1527,7 @@ export function main(argv = process.argv.slice(2)) {
       fs.rmSync(root, { recursive: true, force: true });
     }
   }
-  fail("USAGE", "usage: run-repository-diagnostic-evidence.mjs --self-check | --diagnostic-op <action> | --literal-input <path> | --registry <path>");
+  fail("USAGE", "usage: run-repository-diagnostic-evidence.mjs --self-check | --v2-execution-oracle | --diagnostic-op <action> | --literal-input <path> | --registry <path>");
 }
 
 const isEntry = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
