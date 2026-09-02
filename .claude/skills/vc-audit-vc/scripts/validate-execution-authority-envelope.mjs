@@ -51,6 +51,14 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import {
+  decodeLiteralInput,
+  parseTarEntries,
+  createEvidenceArtifact,
+  runDiagnosticLifecycle,
+  validateDiagnosticRegistry as validateDiagnosticRegistryContract,
+  executeDiagnosticRegistry,
+} from "./run-repository-diagnostic-evidence.mjs";
 
 const ROOT = process.cwd();
 
@@ -87,6 +95,35 @@ const TEMP_TARGET_KEYS = ["artifact_path", "artifact_schema_version"];
 const TEMP_AUTHORITY_CLASS = "temporary-artifact-set/v1";
 const TEMP_RECEIPT_SCHEMA = "execution-temp-artifact-receipt/v1";
 const TEMP_ROOT = "C:\\Users\\Admin\\AppData\\Local\\Temp\\opencode";
+const DIAGNOSTIC_AUTHORITY_CLASS = "repository-diagnostic-evidence-set/v1";
+const DIAGNOSTIC_RECEIPT_SCHEMA = "repository-diagnostic-artifact-receipt/v1";
+const DIAGNOSTIC_FIELDS = [
+  "selected_plan", "authority_mode", "authorityClass", "evidence_root", "diagnostic_registry",
+  "allowed_scope", "scope_count", "stop_conditions", "stop_condition_count", "artifact_receipt_schema_version",
+];
+const DIAGNOSTIC_REGISTRY_KEYS = ["schema", "registry_path", "registry_sha256", "row_count", "rows"];
+const DIAGNOSTIC_REGISTRY_ROW_KEYS = ["ordinal", "command_id", "capability", "executable", "argv", "action", "lifecycle", "artifact_roles"];
+const DIAGNOSTIC_TARGET_KEYS = ["ordinal", "artifact_path", "artifact_role", "artifact_schema_version", "create_only"];
+const DIAGNOSTIC_REGISTRY_SCHEMA = "repository-diagnostic-registry/v1";
+const DIAGNOSTIC_REGISTRY_FILE_KEYS = ["schema", "fixture_mode", "rows"];
+const DIAGNOSTIC_RECEIPT_KEYS = ["schema", "runnerPath", "runnerSha256", "registryPath", "registrySha256", "executionStatus", "terminalCount", "terminalSha256", "status"];
+const DIAGNOSTIC_RECEIPT_SCHEMA_VERSION = "repository-diagnostic-behavioral-execution-receipt/v1";
+const DIAGNOSTIC_FIXTURE_PATH = ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-repository-diagnostic-evidence-set.md";
+const DIAGNOSTIC_ROLES = new Set(["bootstrap", "terminal", "result", "failure", "cleanup", "manifest", "stdout", "stderr", "row-receipt"]);
+const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
+  ["bootstrap", "phase02-bootstrap-source/v1"],
+  ["terminal", "phase02-executor-terminal/v1"],
+  ["result", "phase02-attempt-result/v1"],
+  ["failure", "phase02-bootstrap-failure/v1"],
+  ["cleanup", "phase02-attempt-cleanup/v1"],
+  ["manifest", "phase02-evidence-manifest/v1"],
+  ["stdout", "phase02-stdout/v1"],
+  ["stderr", "phase02-stderr/v1"],
+  ["row-receipt", "phase02-row-receipt/v1"],
+]);
+const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
+const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
+const RUNNER_SHA256 = "fe6030d630f12395897f63c3175041b217ec2be7718d0083054d8eba9c0f980b";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
 const CLEANUP_RECEIPT_SCHEMA = "fixture-residue-cleanup-receipt/v2";
 const CLEANUP_FIELDS = [
@@ -644,6 +681,118 @@ function validateCleanupEnvelope(envelope, planLabel, planNorm, observations = d
   };
 }
 
+function sha256Pattern(value) {
+  return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+}
+
+function parseExactFixtureBlock(filePath, info, keys, label) {
+  const bytes = fs.readFileSync(path.resolve(ROOT, filePath));
+  const text = decodeLiteralInput(bytes);
+  const matches = collectFenceBodies(text.split("\n")).filter((item) => item.info === info);
+  if (matches.length !== 1) block(`${label} must have exactly one ${info} block`);
+  const raw = `${matches[0].body.join("\n")}\n`;
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch (error) {
+    block(`${label} is not strict JSON: ${error.message}`);
+  }
+  validateExactKeys(value, keys, label);
+  if (Object.keys(value).some((key, index) => key !== keys[index])) block(`${label} keys are not in canonical order`);
+  return { bytes: Buffer.from(raw), value };
+}
+
+function validateDiagnosticRegistry(registry, planLabel) {
+  validateExactKeys(registry, DIAGNOSTIC_REGISTRY_KEYS, `${planLabel} diagnostic_registry`);
+  if (Object.keys(registry).some((key, index) => key !== DIAGNOSTIC_REGISTRY_KEYS[index])) block(`${planLabel} diagnostic_registry keys are not in canonical order`);
+  if (registry.schema !== DIAGNOSTIC_REGISTRY_SCHEMA) block(`${planLabel} diagnostic_registry.schema must be "${DIAGNOSTIC_REGISTRY_SCHEMA}"`);
+  const registryPath = normalizePath(registry.registry_path, "diagnostic_registry.registry_path");
+  if (registryPath.path !== DIAGNOSTIC_FIXTURE_PATH) block(`${planLabel} diagnostic registry path must equal the canonical fixture path`);
+  if (!sha256Pattern(registry.registry_sha256)) block(`${planLabel} diagnostic_registry.registry_sha256 must be a lowercase SHA-256`);
+  const parsed = parseExactFixtureBlock(registryPath.path, "json repository-diagnostic-registry/v1", DIAGNOSTIC_REGISTRY_FILE_KEYS, `${planLabel} diagnostic registry file`);
+  const actualSha256 = createHash("sha256").update(parsed.bytes).digest("hex");
+  if (actualSha256 !== registry.registry_sha256) block(`${planLabel} diagnostic registry bytes do not match registry_sha256`);
+  if (JSON.stringify(parsed.value.rows) !== JSON.stringify(registry.rows)) block(`${planLabel} diagnostic registry declared rows do not match registry file bytes`);
+  if (!Array.isArray(registry.rows) || registry.rows.length === 0) block(`${planLabel} diagnostic_registry.rows must be non-empty`);
+  if (!Number.isInteger(registry.row_count) || registry.row_count !== registry.rows.length) block(`${planLabel} diagnostic_registry.row_count must equal rows length`);
+  try {
+    validateDiagnosticRegistryContract(parsed.value);
+  } catch (error) {
+    block(`${planLabel} diagnostic registry capability rejected: ${error.message}`);
+  }
+  const coveredRoles = new Set(registry.rows.flatMap((row) => row.artifact_roles));
+  return { registryPath: registryPath.path, registryBytes: parsed.bytes, registryValue: parsed.value, coveredRoles };
+}
+
+function validateRepositoryDiagnosticEnvelope(envelope, planLabel, planNorm) {
+  validateExactKeys(envelope, DIAGNOSTIC_FIELDS, `${planLabel} envelope`);
+  if (Object.keys(envelope).some((key, index) => key !== DIAGNOSTIC_FIELDS[index])) block(`${planLabel} envelope keys are not in canonical order`);
+  if (envelope.authorityClass !== DIAGNOSTIC_AUTHORITY_CLASS) block(`${planLabel} authorityClass "${envelope.authorityClass}" is unknown`);
+  validateAuthority(envelope.authority_mode, planLabel);
+  const selected = normalizePath(envelope.selected_plan, "selected_plan");
+  if (!fs.existsSync(path.resolve(ROOT, selected.path)) || selected.path !== planNorm.path) block(`selected_plan "${selected.path}" does not match the validated plan`);
+  const proof = normalizePath(envelope.authority_mode.proof_path, "authority_mode.proof_path");
+  if (!fs.existsSync(path.resolve(ROOT, proof.path))) block(`authority_mode.proof_path "${proof.path}" does not exist on disk`);
+  if (envelope.authority_mode.mode === "standing-granted") verifyStandingAuthority(proof.path, planLabel);
+  else verifyExplicitAuthority(proof.path, selected.path, planLabel);
+  const evidenceRoot = normalizePath(envelope.evidence_root, "evidence_root");
+  if (DIAGNOSTIC_PRODUCT_ROOTS.has(evidenceRoot.path.split("/")[0])) block(`${planLabel} evidence_root is a product or build path`);
+  const { registryPath, registryBytes, registryValue, coveredRoles } = validateDiagnosticRegistry(envelope.diagnostic_registry, planLabel);
+  if (!registryPath.startsWith(`${evidenceRoot.path}/`)) block(`${planLabel} diagnostic_registry.registry_path must be strictly beneath evidence_root`);
+  if (!Array.isArray(envelope.allowed_scope) || envelope.allowed_scope.length === 0) block(`${planLabel} allowed_scope must be a non-empty diagnostic artifact array`);
+  if (!Number.isInteger(envelope.scope_count) || envelope.scope_count !== envelope.allowed_scope.length) block(`${planLabel} scope_count must equal allowed_scope length`);
+  validateStopConditions(envelope.stop_conditions, planLabel);
+  if (!Number.isInteger(envelope.stop_condition_count) || envelope.stop_condition_count !== envelope.stop_conditions.length) block(`${planLabel} stop_condition_count must equal stop_conditions length`);
+  if (envelope.artifact_receipt_schema_version !== DIAGNOSTIC_RECEIPT_SCHEMA) block(`${planLabel} artifact_receipt_schema_version must be "${DIAGNOSTIC_RECEIPT_SCHEMA}"`);
+  const paths = [];
+  const canonicalTargets = new Set();
+  const targetedRoles = new Set();
+  for (const [index, target] of envelope.allowed_scope.entries()) {
+    validateExactKeys(target, DIAGNOSTIC_TARGET_KEYS, `${planLabel} allowed_scope[${index}]`);
+    if (Object.keys(target).some((key, keyIndex) => key !== DIAGNOSTIC_TARGET_KEYS[keyIndex])) block(`${planLabel} allowed_scope[${index}] keys are not in canonical order`);
+    if (target.ordinal !== index + 1) block(`${planLabel} allowed_scope ordinals must be contiguous and sorted`);
+    if (!DIAGNOSTIC_ROLES.has(target.artifact_role)) block(`${planLabel} allowed_scope has unknown artifact role "${target.artifact_role}"`);
+    if (target.artifact_schema_version !== DIAGNOSTIC_ROLE_SCHEMAS.get(target.artifact_role)) block(`${planLabel} allowed_scope artifact schema does not match role "${target.artifact_role}"`);
+    if (targetedRoles.has(target.artifact_role)) block(`${planLabel} allowed_scope contains duplicate artifact role "${target.artifact_role}"`);
+    targetedRoles.add(target.artifact_role);
+    if (target.create_only !== true) block(`${planLabel} every diagnostic target must set create_only to true`);
+    const normalized = normalizePath(target.artifact_path, `allowed_scope[${index}].artifact_path`);
+    if (!normalized.path.startsWith(`${evidenceRoot.path}/`)) block(`${planLabel} diagnostic target must be strictly beneath evidence_root`);
+    if (DIAGNOSTIC_PRODUCT_ROOTS.has(normalized.path.split("/")[0])) block(`${planLabel} diagnostic target is a product or build path`);
+    if (canonicalTargets.has(normalized.path)) block(`${planLabel} allowed_scope contains duplicate or alias target "${normalized.path}"`);
+    canonicalTargets.add(normalized.path);
+    paths.push(normalized.path);
+    if (!coveredRoles.has(target.artifact_role)) block(`${planLabel} diagnostic target role "${target.artifact_role}" is not executable by a registry row`);
+  }
+  for (const role of DIAGNOSTIC_ROLES) if (!targetedRoles.has(role)) block(`${planLabel} allowed_scope is missing required artifact role "${role}"`);
+  const fixtureText = fs.readFileSync(path.resolve(ROOT, DIAGNOSTIC_FIXTURE_PATH), "utf8");
+  const runnerDeclaration = fixtureText.match(/^Fixed runner: `([^`]+)`\nFixed runner SHA-256: `([0-9a-f]{64})`$/m);
+  if (!runnerDeclaration) block(`${planLabel} fixture has no exact fixed runner path/digest declaration`);
+  if (runnerDeclaration[1] !== RUNNER_PATH || runnerDeclaration[2] !== RUNNER_SHA256) block(`${planLabel} fixture runner declaration does not match canonical path/digest`);
+  const runnerBytes = fs.readFileSync(path.resolve(ROOT, runnerDeclaration[1]));
+  const runnerSha256 = createHash("sha256").update(runnerBytes).digest("hex");
+  if (runnerSha256 !== runnerDeclaration[2]) block(`${planLabel} fixed diagnostic runner source bytes do not match the fixture-declared digest`);
+  if (decodeLiteralInput(Buffer.from("fixture\n")) !== "fixture\n" || typeof parseTarEntries !== "function" || typeof createEvidenceArtifact !== "function" || typeof runDiagnosticLifecycle !== "function") block(`${planLabel} fixed diagnostic runner exports are not functional`);
+  const receipt = parseExactFixtureBlock(DIAGNOSTIC_FIXTURE_PATH, `json ${DIAGNOSTIC_RECEIPT_SCHEMA_VERSION}`, DIAGNOSTIC_RECEIPT_KEYS, `${planLabel} behavioral execution receipt`).value;
+  if (receipt.schema !== DIAGNOSTIC_RECEIPT_SCHEMA_VERSION || receipt.runnerPath !== RUNNER_PATH || receipt.runnerSha256 !== runnerSha256 || receipt.registryPath !== registryPath || receipt.registrySha256 !== createHash("sha256").update(registryBytes).digest("hex") || receipt.executionStatus !== "PASS" || receipt.status !== "PASS") block(`${planLabel} behavioral execution receipt binding is invalid`);
+  const times = ["2026-09-03T00:00:00.000Z", "2026-09-03T00:00:01.000Z", "2026-09-03T00:00:02.000Z", "2026-09-03T00:00:03.000Z"];
+  const execution = executeDiagnosticRegistry(registryValue, { runnerPath: path.resolve(ROOT, RUNNER_PATH), attemptId: "authority-validation", now: () => times.shift() });
+  const terminalBytes = Buffer.from(`${JSON.stringify(execution.receipts)}\n`);
+  if (execution.status !== receipt.executionStatus || execution.receipts.length !== receipt.terminalCount || createHash("sha256").update(terminalBytes).digest("hex") !== receipt.terminalSha256) block(`${planLabel} actual diagnostic execution result does not match its behavioral receipt`);
+  return {
+    authorityClass: DIAGNOSTIC_AUTHORITY_CLASS,
+    selected_plan: selected.path,
+    mode: envelope.authority_mode.mode,
+    proof_path: proof.path,
+    scope_count: envelope.scope_count,
+    stop_condition_count: envelope.stop_condition_count,
+    registry_classification: "diagnostic-only",
+    registry_path: registryPath,
+    artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
+    artifact_paths: paths,
+  };
+}
+
 function validateTemporaryEnvelope(envelope, planLabel, planNorm, observations) {
   validateExactKeys(envelope, TEMP_REQUIRED_FIELDS, `${planLabel} envelope`);
   if (envelope.authorityClass !== TEMP_AUTHORITY_CLASS) {
@@ -753,6 +902,9 @@ function validatePlan(planPathRaw, observations = defaultFsObservations(), clean
     }
     if (envelope.authorityClass === CLEANUP_AUTHORITY_CLASS) {
       return validateCleanupEnvelope(envelope, planLabel, planNorm, cleanupObservations);
+    }
+    if (envelope.authorityClass === DIAGNOSTIC_AUTHORITY_CLASS) {
+      return validateRepositoryDiagnosticEnvelope(envelope, planLabel, planNorm);
     }
     block(`${planLabel} authorityClass "${envelope.authorityClass}" is unknown`);
   }
@@ -2050,6 +2202,111 @@ function setFixtureMutation(target, mutation) {
   else parent[key] = mutation.value;
 }
 
+function diagnosticBaseline(fixturePath) {
+  const baselinePath = path.join(path.dirname(fixturePath), "pass-repository-diagnostic-evidence-set.md");
+  const text = fs.readFileSync(path.resolve(ROOT, baselinePath), "utf8");
+  const raw = collectFenceBodies(extractValidateContract(text, baselinePath)).find((item) => item.info === `json ${ENVELOPE_SCHEMA}`)?.body.join("\n");
+  if (!raw) block(`${baselinePath} has no diagnostic baseline envelope`);
+  const baseline = JSON.parse(raw);
+  baseline.selected_plan = fixturePath;
+  return baseline;
+}
+
+function expectDiagnosticRejection(name, run) {
+  try {
+    run();
+  } catch {
+    return;
+  }
+  throw new Error(`repository diagnostic grouped case unexpectedly passed: ${name}`);
+}
+
+function rebindRegistryDigest(bytes) {
+  let text = bytes.toString("utf8");
+  const match = text.match(/```json repository-diagnostic-registry\/v1\n([\s\S]*?)```/);
+  if (!match) return bytes;
+  const digest = createHash("sha256").update(Buffer.from(match[1])).digest("hex");
+  text = text.replace(/("registry_sha256": ")[0-9a-f]{64}(")/, `$1${digest}$2`);
+  text = text.replace(/("registrySha256": ")[0-9a-f]{64}(")/, `$1${digest}$2`);
+  return Buffer.from(text);
+}
+
+function invokeMutatedProductionValidation(name, mutations, expectedReason) {
+  const originals = new Map();
+  try {
+    for (const mutation of mutations) {
+      const absolute = path.resolve(ROOT, mutation.path);
+      const original = fs.readFileSync(absolute);
+      originals.set(absolute, original);
+      fs.writeFileSync(absolute, mutation.apply(original));
+    }
+    try {
+      execFileSync(process.execPath, [path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), DIAGNOSTIC_FIXTURE_PATH], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
+    } catch (error) {
+      const diagnostic = `${error.stdout ?? ""}\n${error.stderr ?? ""}`;
+      if (!diagnostic.includes(expectedReason)) throw new Error(`${name} failed outside production validation path: ${diagnostic}`);
+      return;
+    }
+    throw new Error(`${name} unexpectedly passed production validation`);
+  } finally {
+    for (const [absolute, bytes] of originals) fs.writeFileSync(absolute, bytes);
+  }
+}
+
+function runRepositoryDiagnosticGroupedEnvelopeCases(fixturePath) {
+  const text = fs.readFileSync(path.resolve(ROOT, fixturePath), "utf8");
+  const raw = collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-envelope-negative-cases/v1")?.body.join("\n");
+  if (!raw) return null;
+  const cases = JSON.parse(raw);
+  if (!Array.isArray(cases) || cases.length === 0) block(`${fixturePath} grouped diagnostic envelope cases must be non-empty`);
+  const misses = [];
+  for (const item of cases) {
+    const candidate = structuredClone(diagnosticBaseline(fixturePath));
+    setFixtureMutation(candidate, item);
+    try {
+      expectDiagnosticRejection(item.name, () => validateRepositoryDiagnosticEnvelope(candidate, fixturePath, normalizePath(fixturePath, "fixture path")));
+    } catch {
+      misses.push(item.name);
+    }
+  }
+  if (misses.length > 0) throw new Error(`${fixturePath} grouped diagnostic envelope case(s) unexpectedly passed: ${misses.join(", ")}`);
+  block(`${fixturePath} all ${cases.length} grouped repository diagnostic envelope case(s) rejected`);
+}
+
+function tarFixture(name, size, body = Buffer.alloc(size), zeroBlocks = 2) {
+  const header = Buffer.alloc(512);
+  header.write(name, 0, 100, "utf8");
+  header.write(size.toString(8).padStart(11, "0") + "\0", 124, 12, "ascii");
+  header.write("0", 156, 1, "ascii");
+  return Buffer.concat([header, body, Buffer.alloc(Math.ceil(size / 512) * 512 - body.length), Buffer.alloc(zeroBlocks * 512)]);
+}
+
+function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
+  const text = fs.readFileSync(path.resolve(ROOT, fixturePath), "utf8");
+  const raw = collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-behavior-negative-cases/v1")?.body.join("\n");
+  if (!raw) return null;
+  const cases = JSON.parse(raw);
+  if (!Array.isArray(cases) || cases.length === 0) block(`${fixturePath} grouped diagnostic behavior cases must be non-empty`);
+  for (const item of cases) {
+    if (item.kind === "source") {
+      invokeMutatedProductionValidation(item.name, [{ path: RUNNER_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace("usage: run-repository-diagnostic-evidence.mjs", "TODO")) }], "runner source bytes do not match");
+    } else if (item.kind === "receipt" && item.value === "inventory-only") {
+      invokeMutatedProductionValidation(item.name, [{ path: DIAGNOSTIC_FIXTURE_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(/```json repository-diagnostic-behavioral-execution-receipt\/v1[\s\S]*?```/, "Inventory only")) }], "behavioral execution receipt must have exactly one");
+    } else if (item.kind === "receipt" && item.value === "missing") {
+      invokeMutatedProductionValidation(item.name, [{ path: DIAGNOSTIC_FIXTURE_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(/```json repository-diagnostic-behavioral-execution-receipt\/v1[\s\S]*?```/, "")) }], "behavioral execution receipt must have exactly one");
+    } else if (item.kind === "receipt-field") {
+      invokeMutatedProductionValidation(item.name, [{ path: DIAGNOSTIC_FIXTURE_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(item.from, item.to)) }], item.reason);
+    } else if (item.kind === "registry-field") {
+      invokeMutatedProductionValidation(item.name, [{ path: DIAGNOSTIC_FIXTURE_PATH, apply: (bytes) => rebindRegistryDigest(Buffer.from(bytes.toString("utf8").replaceAll(item.from, item.to))) }], item.reason);
+    } else if (item.kind === "runner-self-check") {
+      invokeMutatedProductionValidation(item.name, [{ path: RUNNER_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(item.from, item.to)) }], "runner source bytes do not match");
+    } else {
+      throw new Error(`${fixturePath} has unknown production mutation case ${item.name}`);
+    }
+  }
+  block(`${fixturePath} all ${cases.length} grouped repository diagnostic behavior case(s) rejected through production validation`);
+}
+
 function runCleanupGroupedCases(fixturePath) {
   const text = fs.readFileSync(path.resolve(ROOT, fixturePath), "utf8");
   const section = extractValidateContract(text, fixturePath);
@@ -2127,7 +2384,9 @@ function runFixtures(dirRaw) {
       const cleanupObservations = name.includes("cleanup") || name.includes("fixture-residue")
         ? cleanupFixtureObservations(rel)
         : defaultCleanupObservations();
-      const groupedResult = runCleanupGroupedCases(rel);
+      const diagnosticEnvelopeResult = runRepositoryDiagnosticGroupedEnvelopeCases(rel);
+      const diagnosticBehaviorResult = diagnosticEnvelopeResult === null ? runRepositoryDiagnosticGroupedBehaviorCases(rel) : diagnosticEnvelopeResult;
+      const groupedResult = diagnosticBehaviorResult === null ? runCleanupGroupedCases(rel) : diagnosticBehaviorResult;
       if (groupedResult === null) validatePlan(rel, observations, cleanupObservations);
     } catch (err) {
       if (!(err instanceof Blocked)) throw err;
