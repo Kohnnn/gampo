@@ -139,7 +139,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "be9eaf1629d786504fa96311439eb05b7647d4b658c5bce64a344b381ab64416";
+const RUNNER_SHA256 = "fd29da6a5e16146b7febe63091c6c37b93e8fb59366fb62ef29d3080bfba8075";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
@@ -1018,6 +1018,22 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm, t
   return accepted;
 }
 
+function publicValidationSummary(summary) {
+  if (summary.authorityClass !== DIAGNOSTIC_V2_AUTHORITY_CLASS) return { status: "PASS", ...summary };
+  return {
+    schema: "execution-authority-validation/v1",
+    status: "PASS",
+    authorityClass: summary.authorityClass,
+    selected_plan: summary.selected_plan,
+    mode: summary.mode,
+    proof_path: summary.proof_path,
+    scope_count: summary.scope_count,
+    stop_condition_count: summary.stop_condition_count,
+    artifact_receipt_schema_version: summary.artifact_receipt_schema_version,
+    artifact_destination_count: summary.scope_count,
+  };
+}
+
 function removeFixturePath(target, operation = "unlink") {
   const item = fs.lstatSync(target, { bigint: true });
   const observed = `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}`;
@@ -1035,7 +1051,7 @@ function removeExactTree(entries) {
   }
 }
 
-function runV2PostcommitCheck() {
+function runV2PostcommitCheck(options = {}) {
   const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-v2-"));
   const registryRoot = path.join(operationRoot, "registry");
   const runtimeRoot = path.join(operationRoot, "runtime");
@@ -1076,7 +1092,7 @@ function runV2PostcommitCheck() {
       goalValidator: path.join(ROOT, GOAL_BLOCK_VALIDATOR),
       envelopeValidator: path.join(ROOT, "./.claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"),
     };
-    const selectedPlan = ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-repository-diagnostic-evidence-set.md";
+    const selectedPlan = options.selectedPlan ?? ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-repository-diagnostic-evidence-set.md";
     const fixture = commandRegistryFixture({ repositoryRoot: ROOT, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headCommitOid: commitOid, headTreeOid: treeOid, selectedPlan, selectedPlanAbsolute: path.join(ROOT, selectedPlan), umbrella: path.join(ROOT, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/visual-animation-assets-umbrella_PLAN_07-08-26.md"), goal: path.join(ROOT, ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md"), archivePath: path.join(runtimeRoot, "tree.tar") });
     const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
     registryPath = path.join(registryRoot, `variable-registry-${randomUUID()}.json`);
@@ -1100,7 +1116,9 @@ function runV2PostcommitCheck() {
       stop_condition_count: REQUIRED_STOP_CATEGORIES.length,
       artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
     };
-    validateRepositoryDiagnosticV2Envelope(model, selectedPlan, normalizePath(selectedPlan, "selected plan"));
+    const validationIsolation = options.validationOnly ? { runnerPath, registryOptions: { policy, headCommitOid: commitOid, headTreeOid: treeOid } } : null;
+    const validation = publicValidationSummary(validateRepositoryDiagnosticV2Envelope(model, selectedPlan, normalizePath(selectedPlan, "selected plan"), validationIsolation));
+    if (options.validationOnly) return validation;
     removeExactTree(owned);
     const sourcePaths = [runnerPath, path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs")];
     const sourceSnapshotsBefore = sourcePaths.map(sourceSnapshot);
@@ -3087,7 +3105,7 @@ async function runConcurrencyStress(argv) {
   try {
     for (let iteration = 0; iteration < repeat; iteration++) {
       const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
-      if (selfChecks.some((text) => !text.includes('"checkCount":345'))) block("concurrent self-check count drifted");
+      if (selfChecks.some((text) => !text.includes('"checkCount":417'))) block("concurrent self-check count drifted");
       successful += selfChecks.length;
       const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
       if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
@@ -3135,6 +3153,10 @@ async function main() {
       }
       return;
     }
+    if (argv.length === 2 && argv[0] === "--v2-validation-fixture") {
+      console.log(JSON.stringify(runV2PostcommitCheck({ validationOnly: true, selectedPlan: argv[1] }), null, 2));
+      return;
+    }
     if (argv.length === 1 && argv[0] === "--v2-postcommit-check") {
       console.log(JSON.stringify(runV2PostcommitCheck(), null, 2));
       return;
@@ -3163,7 +3185,7 @@ async function main() {
       );
     }
     const summary = validatePlan(target);
-    console.log(JSON.stringify({ status: "PASS", ...summary }, null, 2));
+    console.log(JSON.stringify(publicValidationSummary(summary), null, 2));
   } catch (err) {
     if (!(err instanceof Blocked)) throw err;
     console.error(`AUTHORITY_ENVELOPE_BLOCKED: ${err.message}. ${REMEDIATION}`);

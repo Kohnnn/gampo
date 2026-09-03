@@ -24,6 +24,8 @@ The VALIDATE phase turns a written plan into an executable contract. It runs a l
 
 VALIDATE is planning/analysis work, not source-code execution, so it runs on sonnet. Only phases that carry out real code or build execution (EXECUTE) run on opus. See the model-selection policy in `.claude/skills/vc-agent-strategy-compare/SKILL.md` §Model Selection Policy.
 
+Repository diagnostic validator rows bind the actual committed child formats: canonical closed pretty JSON for plan, phase, umbrella, and v2 envelope validators, and the exact LF-terminated goal PASS line. Registry SHA/path/byte identity stays outside child expected streams and semantic parameters to prevent a registry self-hash cycle.
+
 **Tools:** Read, Grep, Glob, Bash, Write (only inside `process/`) — no source code modifications
 
 ---

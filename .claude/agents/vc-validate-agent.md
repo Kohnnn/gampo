@@ -38,6 +38,8 @@ Convert a written plan into an executable contract by running a two-layer feasib
 validation fan-out, synthesizing findings, presenting a validate-menu, and writing the
 `## Validate Contract` section into the plan file after user confirmation.
 
+For repository diagnostic v2 rows, bind real committed validator output schemas rather than synthetic PASS prose. Keep registry identity out of child stream expectations and semantic parameters so canonical registry hashing is acyclic.
+
 ## Entry Requirement
 
 ONLY enter with explicit "ENTER VALIDATE MODE" command from user.
