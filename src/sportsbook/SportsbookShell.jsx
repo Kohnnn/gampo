@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, Radio, RefreshCcw } from 'lucide-react'
+import { RefreshCcw } from 'lucide-react'
 import { useGameBgm } from '../audio/useBgm'
 import { useCredits } from '../context/CreditContext'
 import { formatCredits } from '../utils/simulationMath'
 import { buildSyntheticSportsbookData, driftSyntheticEvents, modelBoardWindow } from './sportsbookData'
 import { loadSportsbookFeed } from './sportsbookFeed'
-import { BET_MODES } from './sportsbookMath'
+import { BET_MODES, valueSimulatedCashout } from './sportsbookMath'
 import {
     DEFAULT_BETSLIP_SETTINGS,
     acceptSelectionOdds,
@@ -20,7 +20,14 @@ import {
     validateTicket,
 } from './sportsbookState'
 import { parseSportsbookRoute, sportsbookPathForView } from './sportsbookRoutes'
-import { readJson, writeJson } from '../utils/storage'
+import { deriveSportsbookShellState, presentFeedCondition, presentRestoreResult } from './sportsbookPresentation'
+import {
+    SPORTSBOOK_TICKETS_V1_KEY,
+    SPORTSBOOK_TICKETS_V2_KEY,
+    commitSportsbookAccounting,
+    persistMigratedSportsbookTickets,
+    restoreSportsbookTickets,
+} from './sportsbookPersistence'
 import BetSlip from './components/BetSlip'
 import EventDetail from './components/EventDetail'
 import EventList from './components/EventList'
@@ -31,15 +38,19 @@ import SportsHome from './components/SportsHome'
 import { OddsFormatProvider } from './components/OddsFormatContext'
 import '../styles/sportsbook.css'
 
-const TICKETS_STORAGE_KEY = 'gampo_sportsbook_tickets_v1'
-
 function initialFeed() {
     return buildSyntheticSportsbookData()
 }
 
 function loadStoredTickets() {
-    const stored = readJson(TICKETS_STORAGE_KEY, [])
-    return Array.isArray(stored) ? stored.filter(ticket => ticket && typeof ticket === 'object' && ticket.id).slice(0, 20) : []
+    try {
+        const restored = restoreSportsbookTickets(localStorage.getItem(SPORTSBOOK_TICKETS_V2_KEY), localStorage.getItem(SPORTSBOOK_TICKETS_V1_KEY))
+        if (!restored.ok || restored.migration !== 'required') return { ...restored, migrationPersisted: null }
+        const persisted = persistMigratedSportsbookTickets({ tickets: restored.tickets, savedAt: Date.now() })
+        return { ...restored, tickets: persisted.ok ? restored.tickets : [], migrationPersisted: persisted.ok }
+    } catch {
+        return { ok: false, tickets: [], quarantine: [], sourceVersion: null, migration: 'unavailable', code: 'restore-failed', migrationPersisted: null }
+    }
 }
 
 function seedCreditedIds(tickets) {
@@ -93,18 +104,26 @@ function settlementToastKey(ticket) {
     return ticket?.settlementKey || ticket?.id || null
 }
 
+export function coordinateSportsbookPublication(commit, publishers) {
+    const committed = commit()
+    if (!committed?.ok) return committed
+    publishers.forEach(publish => publish())
+    return committed
+}
+
 function SportsbookShell() {
     useGameBgm('sports', 'idle')
     const navigate = useNavigate()
     const location = useLocation()
-    const { balance, placeBet, addWinnings, showToast } = useCredits()
+    const { balance, transactions, runCreditTransactionsTransactional, placeBetTransactional, addWinningsTransactional, showToast } = useCredits()
     const routeViewState = useMemo(() => parseSportsbookRoute(location.pathname), [location.pathname])
     const [sports, setSports] = useState(() => initialFeed().sports)
     const [leagues, setLeagues] = useState(() => initialFeed().leagues)
     const [events, setEvents] = useState(() => initialFeed().events)
     const [viewState, setViewState] = useState(routeViewState)
     const [selections, setSelections] = useState([])
-    const [tickets, setTickets] = useState(loadStoredTickets)
+    const [restoreResult] = useState(loadStoredTickets)
+    const [tickets, setTickets] = useState(() => restoreResult.tickets)
     const [stake, setStake] = useState(10)
     const [mode, setMode] = useState(BET_MODES.SINGLES)
     const [settings, setSettings] = useState(DEFAULT_BETSLIP_SETTINGS)
@@ -114,10 +133,17 @@ function SportsbookShell() {
     const [mobileSlipOpen, setMobileSlipOpen] = useState(false)
     const [placing, setPlacing] = useState(false)
     const [feedErrors, setFeedErrors] = useState([])
-    const [feedLoaded, setFeedLoaded] = useState(false)
-    const [quotas, setQuotas] = useState({})
-    const [marquee, setMarquee] = useState(null)
-    const [feedMode, setFeedMode] = useState('fallback')
+    const [feedPending, setFeedPending] = useState(true)
+    const [feedFailed, setFeedFailed] = useState(false)
+    const [feedState, setFeedState] = useState({ status: 'empty' })
+    const [generatedAt, setGeneratedAt] = useState(null)
+    const [providerSources, setProviderSources] = useState({})
+    const [feedEvents, setFeedEvents] = useState([])
+    const [lastSuccessfulSnapshot, setLastSuccessfulSnapshot] = useState(null)
+    const [ticketAnnouncement, setTicketAnnouncement] = useState('')
+    const [ticketAnnouncementKey, setTicketAnnouncementKey] = useState(0)
+    const mobileSlipRef = useRef(null)
+    const mobileSlipOpenerRef = useRef(null)
     const driftTick = useRef(0)
     const boardWindowRef = useRef(modelBoardWindow())
     const creditedTicketIds = useRef(seedCreditedIds(tickets))
@@ -130,18 +156,18 @@ function SportsbookShell() {
             setSports(feed.sports)
             setLeagues(feed.leagues)
             setEvents(feed.events)
+            setFeedEvents(feed.feedEvents || [])
             setFeedErrors(feed.errors || [])
-            setQuotas(feed.quotas || {})
-            setMarquee(feed.marquee || null)
-            setFeedLoaded(feed.feedSource === 'live' || feed.feedSource === 'blended' || feed.feedEvents?.length > 0)
-            setFeedMode(feed.feedSource || 'fallback')
+            setFeedState(feed.feedState || { status: 'empty' })
+            setGeneratedAt(feed.generatedAt || null)
+            setProviderSources(feed.providerSources || {})
+            setFeedPending(false)
+            const failed = feed.feedState?.status === 'error'
+            setFeedFailed(failed)
+            if (!failed && feed.feedEvents?.length) setLastSuccessfulSnapshot(feed)
         })
         return () => { mounted = false }
     }, [])
-
-    useEffect(() => {
-        writeJson(TICKETS_STORAGE_KEY, tickets)
-    }, [tickets])
 
     useEffect(() => {
         const timer = window.setInterval(() => {
@@ -176,32 +202,68 @@ function SportsbookShell() {
         })
         const changed = result.tickets.some((ticket, index) => ticketSettlementChanged(tickets[index], ticket))
         if (!changed) return
+        const terminalChanged = result.tickets.some((ticket, index) => ticket?.status === 'settled' && ticketSettlementChanged(tickets[index], ticket))
 
-        const payoutsByTicketId = new Map(result.payouts.map(payout => [payout.ticketId, payout]))
-        result.tickets.forEach((ticket, index) => {
-            if (ticket?.status !== 'settled' || !ticketSettlementChanged(tickets[index], ticket)) return
-            const toastKey = settlementToastKey(ticket)
-            if (toastKey && settledToastIds.current.has(toastKey)) return
-            const payout = payoutsByTicketId.get(ticket.id)
-            if (payout) {
-                creditedTicketIds.current.add(payout.ticketId)
-                if (payout.settlementKey) creditedTicketIds.current.add(payout.settlementKey)
-                addWinnings(payout.amount, 'Sportsbook practice return')
-            }
-            if (toastKey) settledToastIds.current.add(toastKey)
-            showToast(ticket.profit >= 0 ? 'win' : 'loss', 'Sportsbook settled', `${ticket.profit >= 0 ? '+' : ''}${formatCredits(ticket.profit)}`)
+        const entries = result.payouts.map(payout => ({
+            type: 'win',
+            label: 'Sportsbook practice return',
+            amount: payout.amount,
+            transactionId: `${payout.settlementKey}:credit`,
+        }))
+        const commit = ({ nextBalance, nextTransactions }) => commitSportsbookAccounting({
+            tickets: result.tickets,
+            nextBalance,
+            nextTransactions,
+            savedAt: Date.now(),
         })
-        setTickets(result.tickets)
-    }, [events, tickets, addWinnings, showToast])
+        const committed = coordinateSportsbookPublication(
+            () => entries.length
+                ? runCreditTransactionsTransactional(entries, commit)
+                : commit({ nextBalance: balance, nextTransactions: transactions }),
+            [
+                () => setTickets(result.tickets),
+                () => { if (terminalChanged) setTicketAnnouncement('Practice ticket lifecycle updated.') },
+                () => result.tickets.forEach((ticket, index) => {
+                    if (ticket?.status !== 'settled' || !ticketSettlementChanged(tickets[index], ticket)) return
+                    const toastKey = settlementToastKey(ticket)
+                    if (toastKey && settledToastIds.current.has(toastKey)) return
+                    creditedTicketIds.current.add(ticket.id)
+                    if (ticket.settlementKey) creditedTicketIds.current.add(ticket.settlementKey)
+                    if (toastKey) settledToastIds.current.add(toastKey)
+                    showToast(ticket.profit >= 0 ? 'win' : 'loss', 'Sportsbook settled', `${ticket.profit >= 0 ? '+' : ''}${formatCredits(ticket.profit)}`)
+                }),
+            ],
+        )
+        if (!committed.ok) showToast('error', 'Sportsbook settlement unavailable', committed.code)
+    }, [events, tickets, balance, transactions, runCreditTransactionsTransactional, showToast])
 
     const selectedIds = useMemo(() => new Set(selections.map(selection => selection.selectionId)), [selections])
     const leagueMap = useMemo(() => new Map(leagues.map(league => [league.id, league])), [leagues])
     const sportMap = useMemo(() => new Map(sports.map(sport => [sport.id, sport])), [sports])
-    const activeEvent = events.find(event => event.id === viewState.eventId) || null
-    const visibleEvents = useMemo(() => filterEvents(events, viewState), [events, viewState])
-    const totalQuotaRemaining = Object.values(quotas).reduce((sum, quota) => sum + (Number(quota?.remaining) || 0), 0)
-    const feedSource = feedLoaded ? feedMode : 'fallback'
+    const shellState = deriveSportsbookShellState({ requestPending: feedPending, requestFailed: feedFailed, lastSuccessfulSnapshot, feedState, generatedAt, providerSources, errors: feedErrors, feedEvents, events })
+    const renderedEvents = shellState.events
+    const activeEvent = renderedEvents.find(event => event.id === viewState.eventId) || null
+    const visibleEvents = filterEvents(renderedEvents, viewState)
+    const sourceNames = [...new Set(shellState.events.flatMap(event => [event.source, ...(event.offers || []).flatMap(offer => [offer.bookmaker, offer.provider])]).filter(Boolean))]
+    const feedPresentation = presentFeedCondition({ ...shellState, sources: sourceNames, errors: feedErrors })
+    const restorePresentation = presentRestoreResult(restoreResult)
+    const feedSource = shellState.state === 'model-only' ? 'fallback' : 'blended'
     const betSlipStatus = deriveBetSlipStatus({ selections, stake, settings, placing, lastTicket: tickets[0] })
+    const selectionValidation = useMemo(() => validateTicket({ selections, stake, balance, settings, mode }), [selections, stake, balance, settings, mode])
+    useEffect(() => {
+        if (selections.length && !selectionValidation.valid) setTicketAnnouncement(current => current === selectionValidation.reason ? current : selectionValidation.reason)
+    }, [selections.length, selectionValidation.valid, selectionValidation.reason])
+    const cashoutValuationsByTicketId = useMemo(() => new Map(tickets.map(ticket => [ticket.id, valueSimulatedCashout({ ticket, events })])), [tickets, events])
+
+    useEffect(() => {
+        const dialog = mobileSlipRef.current
+        if (!dialog) return
+        if (mobileSlipOpen && !dialog.open) {
+            dialog.showModal()
+            dialog.querySelector('[aria-label="Close bet slip"]')?.focus()
+        }
+        if (!mobileSlipOpen && dialog.open) dialog.close()
+    }, [mobileSlipOpen])
 
     const navigateSportsbook = (next) => {
         const nextState = {
@@ -221,58 +283,115 @@ function SportsbookShell() {
     }
 
     const handleToggleSelection = (selectionId) => {
-        setSelections(current => toggleSelection(current, events, selectionId))
+        setSelections(current => {
+            const next = toggleSelection(current, events, selectionId)
+            if (!current.some(selection => selection.selectionId === selectionId) && next === current) setTicketAnnouncement('This bookmaker offer cannot be added to the practice ticket.')
+            return next
+        })
         if (window.matchMedia('(max-width: 768px)').matches) setMobileSlipOpen(true)
     }
 
     const refreshFeed = async () => {
+        if (feedPending) return
+        setFeedPending(true)
         const feed = await loadSportsbookFeed()
+        const failed = feed.feedState?.status === 'error'
+        setFeedErrors(feed.errors || [])
+        setFeedState(feed.feedState || { status: 'empty' })
+        setGeneratedAt(feed.generatedAt || null)
+        setProviderSources(feed.providerSources || {})
+        setFeedFailed(failed)
+        setFeedPending(false)
+        if (failed && lastSuccessfulSnapshot) return
         setSports(feed.sports)
         setLeagues(feed.leagues)
         setEvents(feed.events)
-        setFeedErrors(feed.errors || [])
-        setQuotas(feed.quotas || {})
-        setMarquee(feed.marquee || null)
-        setFeedLoaded(feed.feedSource === 'live' || feed.feedSource === 'blended' || feed.feedEvents?.length > 0)
-        setFeedMode(feed.feedSource || 'fallback')
+        setFeedEvents(feed.feedEvents || [])
+        if (!failed && feed.feedEvents?.length) setLastSuccessfulSnapshot(feed)
     }
 
     const placePracticeTicket = () => {
         const validation = validateTicket({ selections, stake, balance, settings, mode })
         if (!validation.valid) {
+            setTicketAnnouncement(validation.reason)
             showToast('error', 'Practice ticket unavailable', validation.reason)
             return
         }
 
         setPlacing(true)
-        if (!placeBet(stake, 'Sportsbook practice ticket')) {
+        let ticket
+        try {
+            ticket = createPracticeTicket({ selections, stake, mode, settings })
+        } catch (error) {
             setPlacing(false)
-            showToast('error', 'Practice balance too low', `Need ${formatCredits(stake)}`)
+            showToast('error', 'Practice ticket unavailable', error.code || 'validation-failed')
             return
         }
-
-        const ticket = createPracticeTicket({ selections, stake, mode, settings })
-        setTickets(current => [ticket, ...current].slice(0, 20))
-        setSelections([])
-        setPlacing(false)
-        showToast('bet', 'Practice ticket accepted', `${selections.length} selection${selections.length === 1 ? '' : 's'}`)
+        if (tickets.some(current => current.id === ticket.id)) {
+            setPlacing(false)
+            showToast('error', 'Practice ticket unavailable', 'duplicate-ticket-id')
+            return
+        }
+        const nextTickets = [ticket, ...tickets].slice(0, 20)
+        const committed = coordinateSportsbookPublication(
+            () => placeBetTransactional(stake, 'Sportsbook practice ticket', `${ticket.id}:debit`, ({ nextBalance, nextTransactions }) => commitSportsbookAccounting({
+                tickets: nextTickets,
+                nextBalance,
+                nextTransactions,
+                savedAt: Date.now(),
+            })),
+            [
+                () => setTickets(nextTickets),
+                () => setSelections([]),
+                () => setPlacing(false),
+                () => {
+                    setTicketAnnouncement(`Practice ticket accepted. ${formatCredits(stake)} fake-credit stake committed.`)
+                    setTicketAnnouncementKey(current => current + 1)
+                },
+                () => showToast('bet', 'Practice ticket accepted', `${selections.length} selection${selections.length === 1 ? '' : 's'}`),
+            ],
+        )
+        if (!committed.ok) {
+            setPlacing(false)
+            setTicketAnnouncement('Practice ticket could not be saved. Your fake-credit balance was not changed.')
+            showToast('error', 'Practice ticket unavailable', committed.code)
+        }
     }
 
-    const handleCashOut = (ticketId) => {
+    const handleCashOut = (ticketId, displayedValuationFingerprint) => {
         const target = tickets.find(item => item.id === ticketId)
         if (!target || (target.status !== 'active' && target.status !== 'accepted')) return
-        const cashed = cashOutTicket(target, Date.now())
-        if (cashed.status !== 'cashed_out' || cashed === target) {
-            showToast('error', 'Cash out unavailable', 'No cash-out offer for this practice ticket right now.')
+        const valuation = valueSimulatedCashout({ ticket: target, events })
+        if (!valuation.available || valuation.valuationFingerprint !== displayedValuationFingerprint) {
+            showToast('error', 'Cash out unavailable', 'valuation-mismatch')
             return
         }
-        if (creditedTicketIds.current.has(ticketId)) return
-        creditedTicketIds.current.add(ticketId)
-        if (cashed.settlementKey) creditedTicketIds.current.add(cashed.settlementKey)
-        settledToastIds.current.add(settlementToastKey(cashed) || ticketId)
-        addWinnings(cashed.payout, 'Sportsbook practice cash-out')
-        setTickets(current => current.map(item => (item.id === ticketId ? cashed : item)))
-        showToast('win', 'Practice ticket cashed out', `Returned ${formatCredits(cashed.payout)}`)
+        if (creditedTicketIds.current.has(ticketId) || creditedTicketIds.current.has(`${target.id}:cashout:${valuation.valuationFingerprint}`)) return
+        const cashed = cashOutTicket(target, valuation, Date.now())
+        if (cashed === target) {
+            showToast('error', 'Cash out unavailable', 'valuation-mismatch')
+            return
+        }
+        const nextTickets = tickets.map(item => item.id === ticketId ? cashed : item)
+        const committed = coordinateSportsbookPublication(
+            () => addWinningsTransactional(cashed.payout, 'Sportsbook simulated cash-out', cashed.cashOut.transactionId, ({ nextBalance, nextTransactions }) => commitSportsbookAccounting({
+                tickets: nextTickets,
+                nextBalance,
+                nextTransactions,
+                savedAt: cashed.settledAt,
+            })),
+            [
+                () => setTickets(nextTickets),
+                () => {
+                    creditedTicketIds.current.add(ticketId)
+                    creditedTicketIds.current.add(cashed.settlementKey)
+                    settledToastIds.current.add(settlementToastKey(cashed) || ticketId)
+                    setTicketAnnouncement(`Simulated cash-out accepted. Returned ${formatCredits(cashed.payout)} fake credits.`)
+                    showToast('win', 'Practice ticket cashed out', `Returned ${formatCredits(cashed.payout)}`)
+                },
+            ],
+        )
+        if (!committed.ok) showToast('error', 'Cash out unavailable', committed.code)
     }
 
     return (
@@ -281,24 +400,29 @@ function SportsbookShell() {
             <section className="sb-main" aria-labelledby="sportsbook-heading" data-ux-surface="stage">
                 <header className="sb-topbar" data-ux-surface="shell">
                     <div>
-                        <span>Gampo Sportsbook</span>
+                        <span>Gampo Sportsbook · fake-credit simulator</span>
                         <h1 id="sportsbook-heading">{titleForView(viewState, sports)}</h1>
                     </div>
-                    <div className="sb-topbar-actions">
-                        {feedLoaded ? <small><Radio size={12} /> real-event feed connected</small> : <small>synthetic practice fallback · generated model prices · fake credits</small>}
-                        {feedErrors.length ? <small className="is-warning"><AlertTriangle size={12} /> {feedErrors[0]}</small> : null}
-                        {totalQuotaRemaining ? <small>API quota {totalQuotaRemaining}</small> : null}
-                        <button type="button" onClick={refreshFeed}><RefreshCcw size={15} /> Refresh</button>
-                    </div>
+                    <button type="button" onClick={refreshFeed} disabled={!feedPresentation.retryable || feedPending} aria-describedby={feedPending ? 'sportsbook-feed-status-copy' : undefined}><RefreshCcw size={15} /> Refresh</button>
                 </header>
+
+                <section className={`sb-feed-status is-${feedPresentation.state}`} role="status" aria-live="polite" aria-atomic="true">
+                    <div><strong>{feedPresentation.heading}</strong><span id="sportsbook-feed-status-copy">{feedPresentation.body}</span></div>
+                    <dl>
+                        <div><dt>Last refresh</dt><dd>{feedPresentation.refreshed}</dd></div>
+                        <div><dt>Sources</dt><dd>{feedPresentation.sources.join(', ') || 'No attributable source'}</dd></div>
+                    </dl>
+                </section>
+                {restorePresentation.message && !restorePresentation.blocking ? <p className="sb-restore-notice" role="status" aria-live="polite" aria-atomic="true">{restorePresentation.message}</p> : null}
+                <div key={ticketAnnouncementKey} className="sb-ticket-announcement" role="status" aria-live="polite" aria-atomic="true">{ticketAnnouncement}</div>
+                {(feedPresentation.state === 'error' || restorePresentation.blocking) ? <p className="sb-blocking-alert" role="alert" aria-live="assertive">{restorePresentation.blocking ? restorePresentation.message : feedPresentation.error || feedPresentation.body}</p> : null}
 
                 {viewState.view === 'home' ? (
                     <SportsHome
-                        events={events}
+                        events={renderedEvents}
                         sports={sports}
                         leagues={leagues}
                         feedSource={feedSource}
-                        marquee={marquee}
                         selectedIds={selectedIds}
                         onToggleSelection={handleToggleSelection}
                         onOpenEvent={openEvent}
@@ -315,7 +439,7 @@ function SportsbookShell() {
                         onBack={() => navigateSportsbook({ view: activeEvent?.sportId ? 'sport' : 'home', sportId: activeEvent?.sportId })}
                     />
                 ) : viewState.view === 'my-bets' ? (
-                    <MyBetsPanel tickets={tickets} events={events} onCashOut={handleCashOut} />
+                    <MyBetsPanel tickets={tickets} events={events} cashoutValuationsByTicketId={cashoutValuationsByTicketId} onCashOut={handleCashOut} />
                 ) : (
                     <EventList
                         title={titleForView(viewState, sports)}
@@ -333,6 +457,7 @@ function SportsbookShell() {
                     selections={selections}
                     tickets={tickets}
                     events={events}
+                    cashoutValuationsByTicketId={cashoutValuationsByTicketId}
                     stake={stake}
                     mode={mode}
                     settings={settings}
@@ -350,12 +475,21 @@ function SportsbookShell() {
                 />
             </div>
 
-            {mobileSlipOpen ? (
-                <div className="sb-mobile-slip" data-ux-surface="dock">
+            <dialog
+                ref={mobileSlipRef}
+                className="sb-mobile-slip"
+                aria-labelledby="mobile-bet-slip-heading"
+                onCancel={() => setMobileSlipOpen(false)}
+                onClose={() => {
+                    setMobileSlipOpen(false)
+                    mobileSlipOpenerRef.current?.focus()
+                }}
+            >
                     <BetSlip
                         selections={selections}
                         tickets={tickets}
                         events={events}
+                        cashoutValuationsByTicketId={cashoutValuationsByTicketId}
                         stake={stake}
                         mode={mode}
                         settings={settings}
@@ -370,16 +504,16 @@ function SportsbookShell() {
                         onAcceptOdds={selectionId => setSelections(current => acceptSelectionOdds(current, selectionId))}
                         onPlace={placePracticeTicket}
                         onCashOut={handleCashOut}
-                        onClose={() => setMobileSlipOpen(false)}
+                        onClose={() => mobileSlipRef.current?.close()}
+                        headingId="mobile-bet-slip-heading"
                     />
-                </div>
-            ) : null}
+            </dialog>
 
             <SearchOverlay
                 open={searchOpen}
                 query={searchQuery}
                 category={searchCategory}
-                events={events}
+                events={renderedEvents}
                 sports={sports}
                 leagues={leagues}
                 onQueryChange={setSearchQuery}
@@ -389,6 +523,7 @@ function SportsbookShell() {
             />
 
             <MobileSportsNav
+                ref={mobileSlipOpenerRef}
                 selectionCount={selections.length}
                 onOpenBetSlip={() => setMobileSlipOpen(true)}
             />

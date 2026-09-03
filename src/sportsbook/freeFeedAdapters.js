@@ -19,6 +19,47 @@ function unitFromSeed(seed, offset = '') {
     return (hashString(`${seed}:${offset}`) % 10000) / 10000
 }
 
+const START_BUCKET_MS = 15 * 60 * 1000
+const CURRENT_AGE_MS = 5 * 60 * 1000
+
+function normalizeIdentity(value) {
+    return String(value || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+}
+
+function canonicalIdentity({ sportId, home, away, leagueName, startsAt, source, providerEventId }) {
+    const participants = [normalizeIdentity(home), normalizeIdentity(away)].sort()
+    const startMs = Date.parse(startsAt)
+    const competition = normalizeIdentity(leagueName)
+    if (!participants[0] || participants[0] === participants[1] || !Number.isFinite(startMs)) {
+        const key = `isolated:${source}:${providerEventId || hashString(`${home}:${away}:${startsAt}`)}`
+        return { canonicalKey: key, id: `event-${hashString(key).toString(36)}`, startsAt: Number.isFinite(startMs) ? new Date(startMs).toISOString() : null }
+    }
+    const bucket = Math.floor(startMs / START_BUCKET_MS)
+    const key = [normalizeIdentity(sportId), participants.join('|'), competition, bucket].join(':')
+    return { canonicalKey: key, id: `event-${hashString(key).toString(36)}`, startsAt: new Date(startMs).toISOString() }
+}
+
+function freshnessFor(observedAt, referenceAt) {
+    const observedMs = Date.parse(observedAt)
+    const referenceMs = Date.parse(referenceAt)
+    if (!Number.isFinite(observedMs) || !Number.isFinite(referenceMs) || observedMs > referenceMs) return 'unknown'
+    return referenceMs - observedMs <= CURRENT_AGE_MS ? 'current' : 'stale'
+}
+
+function eligibilityFor({ bookmaker, decimalOdds, freshness, model = false }) {
+    if (model) return { submittable: false, ineligibilityReason: 'model-estimate' }
+    if (!bookmaker) return { submittable: false, ineligibilityReason: 'missing-bookmaker' }
+    if (!Number.isFinite(Number(decimalOdds)) || Number(decimalOdds) <= 1) return { submittable: false, ineligibilityReason: 'invalid-odds' }
+    if (freshness === 'stale') return { submittable: false, ineligibilityReason: 'stale-offer' }
+    if (freshness !== 'current') return { submittable: false, ineligibilityReason: 'unknown-freshness' }
+    return { submittable: true, ineligibilityReason: null }
+}
+
 const FAMOUS_NAME_TOKENS = [
     'argentina', 'brazil', 'france', 'germany', 'spain', 'england', 'portugal', 'netherlands', 'italy', 'belgium',
     'manchester', 'arsenal', 'liverpool', 'chelsea', 'real madrid', 'barcelona', 'bayern', 'psg', 'inter', 'milan',
@@ -131,7 +172,7 @@ function selectionStatus(decimalOdds, previousOdds) {
     return 'available'
 }
 
-function makeWinnerMarket({ eventId, sportId, home, away, source, prices, estimated = false, startsAt, score }) {
+function makeWinnerMarket({ eventId, sportId, home, away, source, prices, estimated = false, startsAt, score, bookmaker = null, observedAt = null }) {
     const hasDraw = sportId === 'soccer' || Boolean(prices?.draw)
     const resolved = {
         ...fallbackOdds(eventId, { hasDraw, sportId, home, away, startsAt, score }),
@@ -169,6 +210,8 @@ function makeWinnerMarket({ eventId, sportId, home, away, source, prices, estima
                 boosted: false,
                 trueProbability: probabilities[index] || 0,
                 source: selectionSource,
+                bookmaker,
+                observedAt,
                 estimated,
                 status: selectionStatus(decimalOdds, previousOdds),
             }
@@ -176,37 +219,81 @@ function makeWinnerMarket({ eventId, sportId, home, away, source, prices, estima
     }
 }
 
-function normalizedEvent({ id, sportId, source, leagueName, region, startsAt, status, home, away, homeLogo = null, awayLogo = null, score = null, prices = {}, marketGroups = null, tags = [] }) {
+function normalizedEvent({ id, providerEventId: suppliedProviderEventId, sportId, source, leagueName, region, startsAt, status, home, away, homeLogo = null, awayLogo = null, score = null, prices = {}, marketGroups = null, tags = [], observedAt = null, referenceAt = null, sourceContext = null }) {
     if (!home || !away) return null
+    const providerEventId = String(suppliedProviderEventId ?? id ?? '')
+    const identity = canonicalIdentity({ sportId, home, away, leagueName, startsAt, source, providerEventId })
     const league = feedLeagueMeta({ sportId, source, leagueName, region })
     const hasRealPrices = Object.values(prices || {}).some(value => Number(value) > 1)
     const estimated = !marketGroups?.length && !hasRealPrices
     const resolvedTags = ['feed', source, ...tags]
     if (estimated) resolvedTags.push('estimated-odds')
+    const compatibilityGroups = marketGroups?.length ? marketGroups : [makeWinnerMarket({ eventId: id, sportId, home, away, source, prices, estimated, startsAt, score })]
+    const offers = []
+    const modelEstimates = []
+    const projectedGroups = compatibilityGroups.map(group => ({
+        ...group,
+        selections: group.selections.map(selection => {
+            const bookmaker = selection.bookmaker || null
+            const observation = selection.observedAt || observedAt || referenceAt
+            const freshness = freshnessFor(observation, referenceAt)
+            const model = estimated || selection.estimated || selection.source === 'synthetic-estimate'
+            const eligibility = eligibilityFor({ bookmaker, decimalOdds: selection.decimalOdds, freshness, model })
+            const canonicalOutcome = ['home', 'away'].includes(selection.side)
+                ? normalizeIdentity(selection.side === 'home' ? home : away)
+                : normalizeIdentity(selection.side)
+            const common = {
+                ...selection,
+                id: `${identity.id}-${slugify(source)}-${slugify(providerEventId)}-${group.id}-${slugify(canonicalOutcome)}-${slugify(selection.line ?? 'no-line')}-${slugify(bookmaker || 'unknown-bookmaker')}`,
+                eventId: identity.id,
+                canonicalEventId: identity.id,
+                provider: model ? 'gampo-model' : source,
+                providerEventId,
+                bookmaker: model ? null : bookmaker,
+                marketId: group.id,
+                marketLabel: group.label,
+                outcome: canonicalOutcome,
+                observedAt: observation || null,
+                freshness,
+                sourceContext: { payloadGroup: sourceContext || source, observationSource: selection.observedAt ? 'bookmaker' : observedAt ? 'provider-event' : referenceAt ? 'payload-generated-at' : 'unknown' },
+                ...eligibility,
+                suspended: !eligibility.submittable,
+            }
+            if (model) modelEstimates.push(common)
+            else offers.push(common)
+            return common
+        }),
+    }))
     return {
-        id,
+        id: identity.id,
+        canonicalEventId: identity.id,
+        canonicalKey: identity.canonicalKey,
         sportId,
         leagueId: league.leagueId,
         region: league.region,
-        startsAt: startsAt || new Date().toISOString(),
+        startsAt: identity.startsAt,
         status,
-        clock: status === 'live' ? 'Live' : '',
-        period: '',
+        clock: null,
+        period: null,
         home,
         away,
         homeLogo,
         awayLogo,
         participants: [home, away],
         score,
-        liveStats: {
-            tickets: 1400 + (hashString(id) % 12000),
-            possession: 45 + (hashString(`${id}:possession`) % 14),
-            attack: 42 + (hashString(`${id}:attack`) % 22),
+        sourceRefs: [{ provider: source, eventId: providerEventId }],
+        facts: {
+            scheduleMetadata: { role: 'schedule-metadata', provider: source, observedAt: observedAt || referenceAt || null, startsAt: identity.startsAt, competition: leagueName || null },
+            scoreStatus: { role: 'score-status', provider: source, observedAt: observedAt || referenceAt || null, score, status: status || null },
+            scheduleMetadataObservations: [{ role: 'schedule-metadata', provider: source, observedAt: observedAt || referenceAt || null, startsAt: identity.startsAt, competition: leagueName || null }],
+            scoreStatusObservations: [{ role: 'score-status', provider: source, observedAt: observedAt || referenceAt || null, score, status: status || null }],
         },
-        popularity: 2600 + (hashString(`${id}:popularity`) % 9000),
+        offers,
+        modelEstimates,
+        feedState: { status: offers.some(offer => offer.freshness === 'current') ? 'current' : offers.length ? 'stale' : 'empty' },
         tags: resolvedTags,
-        marketGroups: marketGroups?.length ? marketGroups : [makeWinnerMarket({ eventId: id, sportId, home, away, source, prices, estimated, startsAt, score })],
-        bookmakerTitle: estimated ? 'Estimated odds' : source,
+        marketGroups: projectedGroups,
+        bookmakerTitle: estimated ? 'Estimated odds' : [...new Set(offers.map(offer => offer.bookmaker).filter(Boolean))].join(', ') || null,
         source,
         oddsMode: estimated ? 'estimated' : 'real',
     }
@@ -220,22 +307,19 @@ function americanToDecimal(value) {
     return roundCurrency(1 + 100 / Math.abs(raw))
 }
 
-function bestSportsGameOddsPrice(odd) {
-    let best = null
-    for (const [bookmakerId, entry] of Object.entries(odd?.byBookmaker || {})) {
-        if (entry?.available === false) continue
+function sportsGameOddsPrices(odd) {
+    return Object.entries(odd?.byBookmaker || {}).flatMap(([bookmakerId, entry]) => {
+        if (entry?.available === false) return []
         const decimalOdds = americanToDecimal(entry?.odds)
-        if (decimalOdds <= 1) continue
-        if (!best || decimalOdds > best.decimalOdds) {
-            best = {
-                bookmakerId,
-                decimalOdds,
-                spread: entry?.spread,
-                overUnder: entry?.overUnder,
-            }
-        }
-    }
-    return best
+        if (decimalOdds <= 1) return []
+        return [{
+            bookmakerId,
+            decimalOdds,
+            spread: entry?.spread,
+            overUnder: entry?.overUnder,
+            observedAt: entry?.lastUpdated || entry?.updatedAt || entry?.timestamp || null,
+        }]
+    })
 }
 
 function parseSportsGameOddId(oddId) {
@@ -268,6 +352,8 @@ function providerMarketGroup({ eventId, id, label, source, outcomes }) {
                 label: outcome.label,
                 side: outcome.side,
                 line: outcome.line,
+                bookmaker: outcome.bookmaker || null,
+                observedAt: outcome.observedAt || null,
                 decimalOdds,
                 previousOdds,
                 suspended: false,
@@ -303,30 +389,29 @@ function lineLabel(label, line) {
 }
 
 function sportsGameOddsMarkets(event, { eventId, sportId, home, away }) {
-    const winner = {}
-    const spread = {}
-    const total = {}
+    const winner = []
+    const spread = []
+    const total = []
 
     for (const [oddId, odd] of Object.entries(event?.odds || {})) {
         const parsed = parseSportsGameOddId(oddId)
         if (!parsed || parsed.periodID !== 'game') continue
-        const best = bestSportsGameOddsPrice(odd)
-        if (!best) continue
+        for (const price of sportsGameOddsPrices(odd)) {
+            if (parsed.betTypeID === 'ml' || parsed.betTypeID === 'ml3way') {
+                if (parsed.sideID === 'home') winner.push({ side: 'home', label: home, decimalOdds: price.decimalOdds, bookmaker: price.bookmakerId, observedAt: price.observedAt })
+                if (parsed.sideID === 'away') winner.push({ side: 'away', label: away, decimalOdds: price.decimalOdds, bookmaker: price.bookmakerId, observedAt: price.observedAt })
+                if (parsed.sideID === 'draw') winner.push({ side: 'draw', label: 'Draw', decimalOdds: price.decimalOdds, bookmaker: price.bookmakerId, observedAt: price.observedAt })
+            }
 
-        if (parsed.betTypeID === 'ml' || parsed.betTypeID === 'ml3way') {
-            if (parsed.sideID === 'home') winner.home = { side: 'home', label: home, decimalOdds: best.decimalOdds }
-            if (parsed.sideID === 'away') winner.away = { side: 'away', label: away, decimalOdds: best.decimalOdds }
-            if (parsed.sideID === 'draw') winner.draw = { side: 'draw', label: 'Draw', decimalOdds: best.decimalOdds }
-        }
+            if (parsed.betTypeID === 'sp') {
+                if (parsed.sideID === 'home') spread.push({ side: 'home', label: lineLabel(home, price.spread), line: price.spread, decimalOdds: price.decimalOdds, bookmaker: price.bookmakerId, observedAt: price.observedAt })
+                if (parsed.sideID === 'away') spread.push({ side: 'away', label: lineLabel(away, price.spread), line: price.spread, decimalOdds: price.decimalOdds, bookmaker: price.bookmakerId, observedAt: price.observedAt })
+            }
 
-        if (parsed.betTypeID === 'sp') {
-            if (parsed.sideID === 'home') spread.home = { side: 'home', label: lineLabel(home, best.spread), line: best.spread, decimalOdds: best.decimalOdds }
-            if (parsed.sideID === 'away') spread.away = { side: 'away', label: lineLabel(away, best.spread), line: best.spread, decimalOdds: best.decimalOdds }
-        }
-
-        if (parsed.betTypeID === 'ou') {
-            if (parsed.sideID === 'over') total.over = { side: 'over', label: lineLabel('Over', best.overUnder), line: best.overUnder, decimalOdds: best.decimalOdds }
-            if (parsed.sideID === 'under') total.under = { side: 'under', label: lineLabel('Under', best.overUnder), line: best.overUnder, decimalOdds: best.decimalOdds }
+            if (parsed.betTypeID === 'ou') {
+                if (parsed.sideID === 'over') total.push({ side: 'over', label: lineLabel('Over', price.overUnder), line: price.overUnder, decimalOdds: price.decimalOdds, bookmaker: price.bookmakerId, observedAt: price.observedAt })
+                if (parsed.sideID === 'under') total.push({ side: 'under', label: lineLabel('Under', price.overUnder), line: price.overUnder, decimalOdds: price.decimalOdds, bookmaker: price.bookmakerId, observedAt: price.observedAt })
+            }
         }
     }
 
@@ -334,23 +419,23 @@ function sportsGameOddsMarkets(event, { eventId, sportId, home, away }) {
         providerMarketGroup({
             eventId,
             id: 'winner',
-            label: sportId === 'soccer' && winner.draw ? '1x2' : 'Winner',
+            label: sportId === 'soccer' && winner.some(outcome => outcome.side === 'draw') ? '1x2' : 'Winner',
             source: 'sportsgameodds',
-            outcomes: [winner.home, winner.draw, winner.away].filter(Boolean),
+            outcomes: winner,
         }),
         providerMarketGroup({
             eventId,
             id: 'spread',
             label: sportId === 'ice-hockey' ? 'Puck Line' : sportId === 'baseball' ? 'Run Line' : 'Spread',
             source: 'sportsgameodds',
-            outcomes: [spread.home, spread.away].filter(Boolean),
+            outcomes: spread,
         }),
         providerMarketGroup({
             eventId,
             id: 'total',
             label: sportId === 'soccer' || sportId === 'ice-hockey' ? 'Total Goals' : 'Total Points',
             source: 'sportsgameodds',
-            outcomes: [total.over, total.under].filter(Boolean),
+            outcomes: total,
         }),
     ].filter(Boolean)
 }
@@ -361,7 +446,7 @@ function sportsGameOddsStatus(status = {}) {
     return 'prematch'
 }
 
-export function normalizeSportsGameOddsEvent(event) {
+export function normalizeSportsGameOddsEvent(event, context = {}) {
     const eventId = `sportsgameodds-${event?.eventID || event?.id}`
     const sportId = sportIdFromText(`${event?.sportID || ''} ${event?.leagueID || ''}`)
     const home = teamName(event?.teams?.home || event?.homeTeam, 'Home')
@@ -370,6 +455,7 @@ export function normalizeSportsGameOddsEvent(event) {
 
     return normalizedEvent({
         id: eventId,
+        providerEventId: event?.eventID || event?.id,
         sportId,
         source: 'sportsgameodds',
         leagueName: event?.leagueID || 'SportsGameOdds Feed',
@@ -382,6 +468,9 @@ export function normalizeSportsGameOddsEvent(event) {
         awayLogo: imageUrl(event?.teams?.away?.logo, event?.teams?.away?.image, event?.awayTeam?.logo, event?.awayTeam?.image),
         score: event?.score || null,
         marketGroups,
+        observedAt: event?.lastUpdated || event?.updatedAt || null,
+        referenceAt: context.generatedAt || null,
+        sourceContext: 'sportsGameOdds',
         tags: ['primary-odds'],
     })
 }
@@ -455,7 +544,14 @@ function extractOddsApiIoPrices(event, oddsPayload) {
 
     const bookmakers = entry?.bookmakers || direct.bookmakers || {}
     const bookmakerValues = Array.isArray(bookmakers) ? bookmakers : Object.values(bookmakers)
+    let bookmakerName = null
+    let observedAt = entry?.updatedAt || entry?.lastUpdated || entry?.timestamp || null
+    const outcomesByBookmaker = []
     for (const bookmaker of bookmakerValues) {
+        const currentBookmaker = bookmaker?.title || bookmaker?.name || bookmaker?.key || bookmaker?.id || null
+        const currentObservedAt = bookmaker?.updatedAt || bookmaker?.lastUpdated || bookmaker?.timestamp || observedAt
+        bookmakerName ||= currentBookmaker
+        observedAt ||= currentObservedAt
         const markets = bookmaker?.markets || bookmaker?.bets || bookmaker?.odds || []
         for (const market of Array.isArray(markets) ? markets : Object.values(markets)) {
             const name = String(market?.name || market?.key || market?.market || '').toLowerCase()
@@ -466,24 +562,33 @@ function extractOddsApiIoPrices(event, oddsPayload) {
                     const label = String(outcome?.name || outcome?.value || outcome?.label || '').toLowerCase()
                     const price = firstNumber(outcome?.price, outcome?.odd, outcome?.odds)
                     if (!price) continue
-                    if (label.includes(String(event?.home || '').toLowerCase())) prices.home = price
-                    else if (label.includes(String(event?.away || '').toLowerCase())) prices.away = price
-                    else if (label.includes('draw') || label === 'x') prices.draw = price
+                    if (label.includes(String(event?.home || '').toLowerCase())) {
+                        prices.home = price
+                        outcomesByBookmaker.push({ side: 'home', label: event?.home, decimalOdds: price, bookmaker: currentBookmaker, observedAt: outcome?.updatedAt || currentObservedAt })
+                    } else if (label.includes(String(event?.away || '').toLowerCase())) {
+                        prices.away = price
+                        outcomesByBookmaker.push({ side: 'away', label: event?.away, decimalOdds: price, bookmaker: currentBookmaker, observedAt: outcome?.updatedAt || currentObservedAt })
+                    } else if (label.includes('draw') || label === 'x') {
+                        prices.draw = price
+                        outcomesByBookmaker.push({ side: 'draw', label: 'Draw', decimalOdds: price, bookmaker: currentBookmaker, observedAt: outcome?.updatedAt || currentObservedAt })
+                    }
                 }
             }
         }
     }
 
-    return prices
+    return { prices, bookmaker: bookmakerName, observedAt, outcomesByBookmaker }
 }
 
-export function normalizeOddsApiIoEvent(event, oddsPayload = []) {
+export function normalizeOddsApiIoEvent(event, oddsPayload = [], context = {}) {
     const home = event?.home || event?.homeTeam || event?.home_team || event?.participants?.[0]?.name
     const away = event?.away || event?.awayTeam || event?.away_team || event?.participants?.[1]?.name
     const sportId = sportIdFromText(`${event?.sport || ''} ${event?.sportSlug || ''} ${event?.league || ''}`)
     const status = String(event?.status || '').toLowerCase().includes('live') ? 'live' : 'prematch'
+    const extracted = extractOddsApiIoPrices(event, oddsPayload)
     return normalizedEvent({
         id: `oddsapiio-${event?.id}`,
+        providerEventId: event?.id,
         sportId,
         source: 'odds-api-io',
         leagueName: event?.league?.name || event?.league || event?.competition || 'Odds API IO Feed',
@@ -495,7 +600,15 @@ export function normalizeOddsApiIoEvent(event, oddsPayload = []) {
         homeLogo: imageUrl(event?.homeLogo, event?.home_logo, event?.homeTeam?.logo, event?.participants?.[0]?.logo, event?.participants?.[0]?.image),
         awayLogo: imageUrl(event?.awayLogo, event?.away_logo, event?.awayTeam?.logo, event?.participants?.[1]?.logo, event?.participants?.[1]?.image),
         score: event?.score || null,
-        prices: extractOddsApiIoPrices(event, oddsPayload),
+        prices: extracted.prices,
+        marketGroups: extracted.outcomesByBookmaker.length
+            ? [providerMarketGroup({ eventId: `oddsapiio-${event?.id}`, id: 'winner', label: extracted.prices.draw ? '1x2' : 'Winner', source: 'odds-api-io', outcomes: extracted.outcomesByBookmaker })]
+            : Object.values(extracted.prices).some(value => Number(value) > 1)
+                ? [makeWinnerMarket({ eventId: `oddsapiio-${event?.id}`, sportId, home, away, source: 'odds-api-io', prices: extracted.prices, startsAt: event?.startTime || event?.start_time || event?.commence_time || event?.date, score: event?.score || null, bookmaker: extracted.bookmaker, observedAt: extracted.observedAt })]
+                : null,
+        observedAt: event?.updatedAt || event?.lastUpdated || null,
+        referenceAt: context.generatedAt || null,
+        sourceContext: 'oddsApiIo',
     })
 }
 
@@ -511,31 +624,40 @@ function apiFootballOddsMap(odds = []) {
     for (const entry of odds) {
         const fixtureId = entry?.fixture?.id || entry?.fixture?.fixture?.id
         if (!fixtureId) continue
-        const bookmaker = entry?.bookmakers?.[0]
-        const bet = bookmaker?.bets?.find(item => item?.id === 1 || /match winner|winner|1x2/i.test(item?.name || ''))
-        const values = bet?.values || []
         const prices = {}
-        for (const value of values) {
-            const label = String(value?.value || '').toLowerCase()
-            const odd = firstNumber(value?.odd)
-            if (!odd) continue
-            if (label === 'home') prices.home = odd
-            else if (label === 'away') prices.away = odd
-            else if (label === 'draw') prices.draw = odd
+        const outcomesByBookmaker = []
+        for (const bookmaker of entry?.bookmakers || []) {
+            const bet = bookmaker?.bets?.find(item => item?.id === 1 || /match winner|winner|1x2/i.test(item?.name || ''))
+            for (const value of bet?.values || []) {
+                const label = String(value?.value || '').toLowerCase()
+                const odd = firstNumber(value?.odd)
+                if (!odd || !['home', 'away', 'draw'].includes(label)) continue
+                prices[label] = odd
+                outcomesByBookmaker.push({
+                    side: label,
+                    label: label === 'draw' ? 'Draw' : label,
+                    decimalOdds: odd,
+                    bookmaker: bookmaker?.name || bookmaker?.title || bookmaker?.key || null,
+                    observedAt: value?.updatedAt || entry?.update || entry?.updatedAt || bookmaker?.updatedAt || null,
+                })
+            }
         }
-        if (Object.keys(prices).length) map.set(String(fixtureId), prices)
+        if (Object.keys(prices).length) map.set(String(fixtureId), { prices, outcomesByBookmaker })
     }
     return map
 }
 
-export function normalizeApiFootballFixture(item, oddsByFixture = new Map()) {
+export function normalizeApiFootballFixture(item, oddsByFixture = new Map(), context = {}) {
     const fixtureId = item?.fixture?.id
     const home = item?.teams?.home?.name
     const away = item?.teams?.away?.name
     const homeGoals = item?.goals?.home
     const awayGoals = item?.goals?.away
+    const extracted = oddsByFixture.get(String(fixtureId)) || {}
+    const prices = extracted.prices || extracted
     return normalizedEvent({
         id: `apifootball-${fixtureId}`,
+        providerEventId: fixtureId,
         sportId: 'soccer',
         source: 'api-football',
         leagueName: item?.league?.name || 'API-Football Fixtures',
@@ -547,7 +669,19 @@ export function normalizeApiFootballFixture(item, oddsByFixture = new Map()) {
         homeLogo: imageUrl(item?.teams?.home?.logo),
         awayLogo: imageUrl(item?.teams?.away?.logo),
         score: Number.isFinite(homeGoals) && Number.isFinite(awayGoals) ? { home: homeGoals, away: awayGoals } : null,
-        prices: oddsByFixture.get(String(fixtureId)) || {},
+        prices,
+        marketGroups: extracted.outcomesByBookmaker?.length
+            ? [providerMarketGroup({
+                eventId: `apifootball-${fixtureId}`,
+                id: 'winner',
+                label: prices.draw ? '1x2' : 'Winner',
+                source: 'api-football',
+                outcomes: extracted.outcomesByBookmaker.map(outcome => ({ ...outcome, label: outcome.side === 'home' ? home : outcome.side === 'away' ? away : 'Draw' })),
+            })]
+            : null,
+        observedAt: item?.fixture?.timestamp ? new Date(Number(item.fixture.timestamp) * 1000).toISOString() : null,
+        referenceAt: context.generatedAt || null,
+        sourceContext: 'apiFootball',
     })
 }
 
@@ -614,7 +748,7 @@ export function normalizeApiSportsMultiSportEvent(item) {
         source: `api-sports-${apiSport}`,
         leagueName: item?.league?.name || item?.competition?.name || item?.championship?.name || `${label} Feed`,
         region: item?.country?.name || item?.league?.country || item?.competition?.location?.country || 'API-SPORTS',
-        startsAt: item?.date || item?.game?.date?.date || item?.race?.date || item?.fight?.date || new Date().toISOString(),
+        startsAt: item?.date || item?.game?.date?.date || item?.race?.date || item?.fight?.date,
         status: apiSportsStatus(item?.status || item?.game?.status || item?.race?.status),
         home,
         away,
@@ -650,77 +784,116 @@ function oddsApiSportId(title = '') {
     return found?.[0] || 'soccer'
 }
 
-export function normalizeTheOddsApiEvent(event, region = 'us') {
+export function normalizeTheOddsApiEvent(event, region = 'us', context = {}) {
     const fixture = fixtureFromOddsApi(event, null, region)
     if (!fixture?.markets?.length) return null
     const sportId = oddsApiSportId(`${fixture.sport} ${event.sport_key || ''}`)
     const eventId = `theoddsapi-${fixture.id}`
-    const probabilities = deVigProbabilities(fixture.markets.map(market => market.decimalOdds))
-    const marketGroups = [{
-        id: 'winner',
-        label: fixture.markets.length > 2 ? '1x2' : 'Winner',
-        displayMode: 'compact',
-        collapsed: false,
-        selections: fixture.markets.map((market, index) => {
-            const decimalOdds = roundCurrency(market.decimalOdds)
-            return {
-                id: `${eventId}-winner-${market.outcome}-${index}`,
-                eventId,
-                marketId: 'winner',
-                label: market.label,
-                side: market.outcome,
+    const outcomes = (event?.bookmakers || []).flatMap(bookmaker => {
+        const market = (bookmaker?.markets || []).find(candidate => candidate?.key === 'h2h')
+        return (market?.outcomes || []).flatMap(outcome => {
+            const decimalOdds = Number(outcome?.price)
+            if (!Number.isFinite(decimalOdds) || decimalOdds <= 1) return []
+            return [{
+                side: outcome.name === fixture.home ? 'home' : outcome.name === fixture.away ? 'away' : 'draw',
+                label: outcome.name,
                 decimalOdds,
-                previousOdds: roundCurrency(market.openingOdds || market.decimalOdds),
-                suspended: decimalOdds <= 1,
-                boosted: false,
-                trueProbability: probabilities[index] || market.trueProbability || 0,
-                source: 'the-odds-api',
-                status: decimalOdds <= 1 ? 'suspended' : 'available',
-            }
-        }),
-    }]
+                bookmaker: bookmaker.title || bookmaker.key || null,
+                observedAt: market?.last_update || bookmaker?.last_update || event?.last_update || event?.lastUpdate || null,
+            }]
+        })
+    })
+    const marketGroups = [providerMarketGroup({ eventId, id: 'winner', label: outcomes.some(outcome => outcome.side === 'draw') ? '1x2' : 'Winner', source: 'the-odds-api', outcomes })].filter(Boolean)
     return normalizedEvent({
         id: eventId,
+        providerEventId: fixture.id,
         sportId,
         source: 'the-odds-api',
         leagueName: fixture.league || `${region.toUpperCase()} Feed`,
         region: region.toUpperCase(),
-        startsAt: event.commence_time || new Date().toISOString(),
+        startsAt: event.commence_time,
         status: 'prematch',
         home: fixture.home,
         away: fixture.away,
         homeLogo: imageUrl(event?.home_logo, event?.homeLogo),
         awayLogo: imageUrl(event?.away_logo, event?.awayLogo),
         marketGroups,
+        observedAt: event?.last_update || event?.lastUpdate || null,
+        referenceAt: context.generatedAt || null,
+        sourceContext: 'theOddsApi',
         tags: ['primary-odds'],
     })
 }
 
-export function normalizeFreeProviderPayload(payload = {}) {
-    const apiFootballOdds = apiFootballOddsMap(payload?.apiFootball?.odds || [])
-    const events = [
-        ...(payload?.sportsGameOdds?.events || []).map(normalizeSportsGameOddsEvent),
-        ...(payload?.pandascore?.matches || []).map(normalizePandaScoreMatch),
-        ...(payload?.oddsApiIo?.events || []).map(event => normalizeOddsApiIoEvent(event, payload?.oddsApiIo?.odds || [])),
-        ...(payload?.apiFootball?.fixtures || []).map(item => normalizeApiFootballFixture(item, apiFootballOdds)),
-        ...(payload?.apiFootball?.multiSport || []).map(normalizeApiSportsMultiSportEvent),
-        ...(payload?.theOddsApi?.events || []).map(event => normalizeTheOddsApiEvent(event, event?._gampoRegion || 'us')),
-    ].filter(Boolean)
+function aggregateCanonicalEvents(events) {
+    const byKey = new Map()
+    for (const event of events) {
+        const existing = byKey.get(event.canonicalKey)
+        if (!existing) {
+            byKey.set(event.canonicalKey, event)
+            continue
+        }
+        const sourceRefs = [...existing.sourceRefs, ...event.sourceRefs].filter((ref, index, refs) => (
+            refs.findIndex(candidate => candidate.provider === ref.provider && candidate.eventId === ref.eventId) === index
+        ))
+        const offers = [...existing.offers, ...event.offers].filter((offer, index, list) => {
+            const identity = [offer.canonicalEventId, offer.provider, offer.providerEventId, offer.bookmaker, offer.marketId, offer.outcome, offer.line, offer.decimalOdds, offer.observedAt].join('|')
+            return list.findIndex(candidate => [candidate.canonicalEventId, candidate.provider, candidate.providerEventId, candidate.bookmaker, candidate.marketId, candidate.outcome, candidate.line, candidate.decimalOdds, candidate.observedAt].join('|') === identity) === index
+        })
+        const modelEstimates = [...existing.modelEstimates, ...event.modelEstimates]
+        const groups = new Map()
+        for (const group of [...existing.marketGroups, ...event.marketGroups]) {
+            const current = groups.get(group.id)
+            groups.set(group.id, current ? { ...current, selections: [...current.selections, ...group.selections] } : group)
+        }
+        byKey.set(event.canonicalKey, {
+            ...existing,
+            source: sourceRefs.map(ref => ref.provider).join('+'),
+            sourceRefs,
+            facts: {
+                ...existing.facts,
+                scheduleMetadataObservations: [...existing.facts.scheduleMetadataObservations, ...event.facts.scheduleMetadataObservations],
+                scoreStatusObservations: [...existing.facts.scoreStatusObservations, ...event.facts.scoreStatusObservations],
+            },
+            offers,
+            modelEstimates,
+            marketGroups: [...groups.values()],
+            feedState: { status: offers.some(offer => offer.freshness === 'current') ? 'current' : offers.length ? 'stale' : 'empty' },
+        })
+    }
+    return [...byKey.values()].sort((a, b) => a.id.localeCompare(b.id))
+}
 
-    const seen = new Set()
+function aggregateFeedState(events, errors) {
+    if (!events.length) return { status: errors.length ? 'error' : 'empty' }
+    if (errors.length) return { status: 'partial' }
+    if (!events.some(event => event.offers.some(offer => offer.freshness === 'current'))) return { status: 'stale' }
+    return { status: 'current' }
+}
+
+export function normalizeFreeProviderPayload(payload = {}) {
+    const context = { generatedAt: payload?.generatedAt || null }
+    const apiFootballOdds = apiFootballOddsMap(payload?.apiFootball?.odds || [])
+    const normalized = [
+        ...(payload?.sportsGameOdds?.events || []).map(event => normalizeSportsGameOddsEvent(event, context)),
+        ...(payload?.pandascore?.matches || []).map(match => normalizePandaScoreMatch(match, context)),
+        ...(payload?.oddsApiIo?.events || []).map(event => normalizeOddsApiIoEvent(event, payload?.oddsApiIo?.odds || [], context)),
+        ...(payload?.apiFootball?.fixtures || []).map(item => normalizeApiFootballFixture(item, apiFootballOdds, context)),
+        ...(payload?.apiFootball?.multiSport || []).map(item => normalizeApiSportsMultiSportEvent(item, context)),
+        ...(payload?.theOddsApi?.events || []).map(event => normalizeTheOddsApiEvent(event, event?._gampoRegion || 'us', context)),
+    ].filter(Boolean)
+    const events = aggregateCanonicalEvents(normalized)
+    const errors = payload?.errors || []
+
     return {
-        events: events.filter(event => {
-            const key = `${event.source}:${event.home}:${event.away}:${event.startsAt}`
-            if (seen.has(key)) return false
-            seen.add(key)
-            return true
-        }),
-        errors: payload?.errors || [],
+        events,
+        errors,
         quotas: payload?.quotas || {},
         sources: payload?.sources || {},
         marquee: payload?.marquee || null,
         inSeason: payload?.theOddsApi?.inSeason || [],
-        generatedAt: payload?.generatedAt || null,
+        generatedAt: context.generatedAt,
         cached: Boolean(payload?.cached),
+        feedState: aggregateFeedState(events, errors),
     }
 }

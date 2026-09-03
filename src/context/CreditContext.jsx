@@ -50,6 +50,45 @@ function roundCredits(value) {
     return Math.max(0, Number(value.toFixed(2)))
 }
 
+export function prepareCreditTransactions(balance, transactions, entries, timestamp = new Date()) {
+    if (!Array.isArray(entries) || entries.length === 0 || !Array.isArray(transactions)) return { ok: false, code: 'commit-rejected' }
+    const knownIds = new Set(transactions.map(transaction => transaction.id))
+    const batchIds = new Set()
+    let nextBalance = balance
+    const prepared = []
+    for (const entry of entries) {
+        const amount = Number(entry?.amount)
+        if (!entry || !['bet', 'win'].includes(entry.type) || !String(entry.label || '').trim() || !String(entry.transactionId || '').trim()) return { ok: false, code: entry?.type === 'win' ? 'invalid-payout' : 'invalid-debit' }
+        if (knownIds.has(entry.transactionId) || batchIds.has(entry.transactionId)) return { ok: false, code: 'duplicate-transaction' }
+        if (!Number.isFinite(amount) || amount <= 0) return { ok: false, code: entry.type === 'win' ? 'invalid-payout' : 'invalid-debit' }
+        if (entry.type === 'bet' && amount > nextBalance) return { ok: false, code: 'balance-insufficient' }
+        batchIds.add(entry.transactionId)
+        nextBalance = roundCredits(nextBalance + (entry.type === 'win' ? amount : -amount))
+        prepared.push({
+            id: entry.transactionId,
+            timestamp,
+            type: entry.type,
+            label: entry.label,
+            amount: entry.type === 'win' ? roundCredits(amount) : -roundCredits(amount),
+            balance: nextBalance,
+        })
+    }
+    return { ok: true, code: null, nextBalance, nextTransactions: [...prepared, ...transactions].slice(0, 100) }
+}
+
+export function commitPreparedCreditTransactions(prepared, commit, publish) {
+    if (!prepared?.ok) return { ok: false, code: prepared?.code || 'commit-rejected' }
+    let committed
+    try {
+        committed = commit({ nextBalance: prepared.nextBalance, nextTransactions: prepared.nextTransactions })
+    } catch {
+        return { ok: false, code: 'commit-threw' }
+    }
+    if (!committed || typeof committed.then === 'function' || committed.ok !== true) return { ok: false, code: committed?.code || 'commit-rejected' }
+    publish(prepared.nextBalance, prepared.nextTransactions)
+    return { ok: true, code: null }
+}
+
 export function CreditProvider({ children }) {
     const [balance, setBalance] = useState(() => readNumber(CREDIT_STORAGE_KEY, INITIAL_CREDITS))
     const [currency, setCurrency] = useState('GC')
@@ -125,6 +164,22 @@ export function CreditProvider({ children }) {
         })
     }, [recordTransaction])
 
+    const runCreditTransactionsTransactional = useCallback((entries, commit) => {
+        const prepared = prepareCreditTransactions(balance, transactions, entries)
+        return commitPreparedCreditTransactions(prepared, commit, (nextBalance, nextTransactions) => {
+            setBalance(nextBalance)
+            setTransactions(nextTransactions)
+        })
+    }, [balance, transactions])
+
+    const placeBetTransactional = useCallback((amount, label, transactionId, commit) => (
+        runCreditTransactionsTransactional([{ type: 'bet', label, amount, transactionId }], commit)
+    ), [runCreditTransactionsTransactional])
+
+    const addWinningsTransactional = useCallback((amount, label, transactionId, commit) => (
+        runCreditTransactionsTransactional([{ type: 'win', label, amount, transactionId }], commit)
+    ), [runCreditTransactionsTransactional])
+
     const grantPracticeCredits = useCallback((amount) => {
         const amt = Number(amount)
         if (!Number.isFinite(amt) || amt <= 0) return
@@ -164,6 +219,9 @@ export function CreditProvider({ children }) {
         transactions,
         placeBet,
         addWinnings,
+        runCreditTransactionsTransactional,
+        placeBetTransactional,
+        addWinningsTransactional,
         grantPracticeCredits,
         resetBalance,
         updateBalance,

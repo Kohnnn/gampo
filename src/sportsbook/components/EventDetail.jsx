@@ -1,77 +1,45 @@
-import { ArrowLeft, BarChart3, Filter, Monitor, Radio, Tv } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
+import { formatObservedAge } from '../sportsbookPresentation'
 import MarketGroup from './MarketGroup'
-
-function formatEventDate(startsAt) {
-    const date = new Date(startsAt)
-    if (Number.isNaN(date.getTime())) return 'Upcoming'
-    return date.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
 
 function EventDetail({ event, sport, league, selectedIds, onToggleSelection, onBack }) {
     if (!event) return null
-    const isRacing = event.sportId === 'horse-racing'
-    const tabs = isRacing ? ['R1', 'R2', 'R3', 'R4', 'R5'] : ['Live & Upcoming', 'Outrights', `All ${sport?.label || 'Markets'}`]
+    const schedule = event.facts?.scheduleMetadata
+    const scoreStatus = event.facts?.scoreStatus
 
     return (
-        <section className="sb-event-detail">
-            <div className="sb-detail-breadcrumbs">
-                <button type="button" onClick={onBack} aria-label="Back to sportsbook">
-                    <ArrowLeft size={18} />
-                </button>
+        <article className="sb-event-detail">
+            <nav className="sb-detail-breadcrumbs" aria-label="Fixture breadcrumb">
+                <button type="button" onClick={onBack} aria-label="Back to sportsbook"><ArrowLeft size={18} /></button>
                 <span>{sport?.label || event.sportId}</span>
-                <span>{league?.region || event.region}</span>
-                <strong>{league?.label || event.leagueId}</strong>
-            </div>
-
-            <div className="sb-detail-tabs">
-                {tabs.map((tab, index) => (
-                    <button key={tab} type="button" className={index === 0 ? 'is-active' : ''}>{tab}</button>
-                ))}
-            </div>
+                <span>{league?.region || event.region || 'Region unavailable'}</span>
+                <strong>{schedule?.competition || league?.label || 'Competition unavailable'}</strong>
+            </nav>
 
             <header className="sb-detail-header">
                 <div>
-                    <span className="sb-detail-kicker">{league?.label || 'Event'}</span>
-                    <h1>{event.home} - {event.away}</h1>
-                    <div className="sb-detail-meta">
-                        {event.status === 'live' ? <span className="sb-live-pill"><Radio size={12} /> Live</span> : null}
-                        <span>{formatEventDate(event.startsAt)}</span>
-                        {event.clock ? <span>{event.clock} {event.period}</span> : null}
-                        <Tv size={15} />
-                        <BarChart3 size={15} />
-                    </div>
+                    <span className="sb-detail-kicker">Received fixture facts</span>
+                    <h2>{event.home} – {event.away}</h2>
                 </div>
-                {event.score ? (
+                {scoreStatus?.score ? (
                     <div className="sb-detail-score">
-                        <span>{event.home}<b>{event.score.home}</b></span>
-                        <span>{event.away}<b>{event.score.away}</b></span>
+                        <span>{event.home}<b>{scoreStatus.score.home}</b></span>
+                        <span>{event.away}<b>{scoreStatus.score.away}</b></span>
                     </div>
-                ) : null}
+                ) : <strong>Score unavailable from this feed</strong>}
             </header>
 
-            <div className="sb-detail-tools">
-                <button type="button"><Monitor size={16} /> Display <strong>Standard</strong></button>
-                <button type="button"><Filter size={16} /> Market <strong>Winner</strong></button>
-                <button type="button"><BarChart3 size={16} /> Advanced Stats</button>
-            </div>
+            <dl className="sb-fact-grid">
+                <div><dt>Schedule</dt><dd>{schedule?.startsAt ? new Date(schedule.startsAt).toLocaleString() : 'Unavailable from this feed'}</dd><small>{schedule?.provider ? `${schedule.provider} · ${formatObservedAge(schedule.observedAt)}` : 'Source unavailable'}</small></div>
+                <div><dt>Status</dt><dd>{scoreStatus?.status || 'Unavailable from this feed'}</dd><small>{scoreStatus?.provider ? `${scoreStatus.provider} · ${formatObservedAge(scoreStatus.observedAt)}` : 'Source unavailable'}</small></div>
+            </dl>
 
-            <div className="sb-advanced-stats">
-                <span>Tickets {Number(event.popularity || 0).toLocaleString()}</span>
-                <span>Attack {event.liveStats?.attack || 50}</span>
-                <span>Possession {event.liveStats?.possession || 50}%</span>
-            </div>
-
-            <div className="sb-detail-markets">
+            <section className="sb-detail-markets" aria-label="Supported markets">
                 {event.marketGroups.map(group => (
-                    <MarketGroup
-                        key={group.id}
-                        group={group}
-                        selectedIds={selectedIds}
-                        onToggleSelection={onToggleSelection}
-                    />
+                    <MarketGroup key={group.id} group={group} selectedIds={selectedIds} onToggleSelection={onToggleSelection} />
                 ))}
-            </div>
-        </section>
+            </section>
+        </article>
     )
 }
 

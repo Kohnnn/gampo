@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Activity, BadgeDollarSign } from 'lucide-react'
 import { analyzeSettlement } from '../sportsbookEducation'
-import { cashoutOffer } from '../sportsbookMath'
+import { formatObservedAge, presentCashout, presentTicketLifecycle } from '../sportsbookPresentation'
 import OddsCoach from './OddsCoach'
 
 const modeLabels = {
@@ -34,7 +34,7 @@ function eventSnapshot(event) {
     return `${status} · ${score}`
 }
 
-function TicketSection({ title, copy, tickets, eventMap, emptyCopy, onCashOut }) {
+function TicketSection({ title, copy, tickets, eventMap, cashoutValuationsByTicketId, emptyCopy, onCashOut }) {
     return (
         <section className="sb-ticket-section" aria-label={title}>
             <div className="sb-ticket-section-head">
@@ -48,19 +48,22 @@ function TicketSection({ title, copy, tickets, eventMap, emptyCopy, onCashOut })
                 <div className="sb-empty-panel is-compact">{emptyCopy}</div>
             ) : (
                 <div className="sb-ticket-list">
-                    {tickets.map(ticket => <TicketCard key={ticket.id} ticket={ticket} eventMap={eventMap} onCashOut={onCashOut} />)}
+                    {tickets.map(ticket => <TicketCard key={ticket.id} ticket={ticket} eventMap={eventMap} cashoutValuation={cashoutValuationsByTicketId.get(ticket.id)} onCashOut={onCashOut} />)}
                 </div>
             )}
         </section>
     )
 }
 
-function TicketCard({ ticket, eventMap, onCashOut }) {
+function TicketCard({ ticket, eventMap, cashoutValuation, onCashOut }) {
     const legs = ticket.legs?.length ? ticket.legs : ticket.selections || []
     const settled = ticket.status === 'settled' || ticket.status === 'cashed_out'
     const profit = Number(ticket.profit || 0)
     const time = new Date(settled && ticket.settledAt ? ticket.settledAt : ticket.acceptedAt).toLocaleTimeString()
-    const offer = isActiveTicket(ticket) ? cashoutOffer(ticket) : 0
+    const lifecycle = presentTicketLifecycle(ticket)
+    const cashout = presentCashout(cashoutValuation)
+    const offer = isActiveTicket(ticket) && cashout.available ? cashout.amount : null
+    const cashoutReasonId = `my-bets-cashout-reason-${ticket.id}`
 
     return (
         <article className={`sb-ticket-card is-${settled ? 'settled' : 'active'}`}>
@@ -70,7 +73,7 @@ function TicketCard({ ticket, eventMap, onCashOut }) {
                     <strong>{modeLabels[ticket.mode] || ticket.mode} · {legs.length} selections</strong>
                     <span>{settled ? 'Settled' : 'Accepted'} {time}</span>
                 </div>
-                <b className={`sb-life-badge ${settled ? 'is-settled' : 'is-active'}`}>{settled ? ticket.result || 'settled' : `${ticket.pending?.length || legs.filter(leg => legStatus(leg) === 'pending').length || legs.length} pending`}</b>
+                 <b className={`sb-life-badge ${settled ? 'is-settled' : 'is-active'}`}>{lifecycle.label}</b>
             </header>
             <div className="sb-ticket-legs">
                 {legs.map(leg => {
@@ -78,8 +81,9 @@ function TicketCard({ ticket, eventMap, onCashOut }) {
                     const event = eventMap.get(leg.eventId)
                     return (
                         <span key={leg.selectionId} className={`is-${status}`}>
-                            <strong>{leg.label} @ {Number(leg.odds || leg.acceptedOdds || 0).toFixed(2)}</strong>
-                            <small>{eventSnapshot(event)} · {leg.reason || status}</small>
+                             <strong>{leg.label} @ accepted {Number(leg.acceptedOdds || leg.odds || 0).toFixed(2)}</strong>
+                             <small>{leg.bookmaker || 'Bookmaker unavailable'} · {leg.provider || 'Source unavailable'} · {formatObservedAge(leg.observedAt)}</small>
+                             <small>{eventSnapshot(event)} · {leg.reason || status}</small>
                         </span>
                     )
                 })}
@@ -95,9 +99,14 @@ function TicketCard({ ticket, eventMap, onCashOut }) {
                 {settled ? <OddsCoach analysis={analyzeSettlement(ticket)} variant="chip" label="Review" /> : null}
             </footer>
             {onCashOut && offer > 0 ? (
-                <button type="button" className="sb-cashout-btn" onClick={() => onCashOut(ticket.id)} data-ux-primary-action>
-                    Cash out {formatGc(offer)}
+                <button type="button" className="sb-cashout-btn" onClick={() => onCashOut(ticket.id, cashout.valuationFingerprint)} data-ux-primary-action>
+                    {cashout.actionLabel}
                 </button>
+            ) : onCashOut && isActiveTicket(ticket) ? (
+                <>
+                    <button type="button" className="sb-cashout-btn" disabled aria-describedby={cashoutReasonId}>Simulated cash-out unavailable</button>
+                    <p className="sb-cashout-reason" id={cashoutReasonId}>{cashout.message}</p>
+                </>
             ) : null}
         </article>
     )
@@ -114,7 +123,7 @@ function settledSummary(tickets) {
     }, { staked: 0, returned: 0, net: 0, won: 0, lost: 0 })
 }
 
-function MyBetsPanel({ tickets = [], events = [], onCashOut }) {
+function MyBetsPanel({ tickets = [], events = [], cashoutValuationsByTicketId = new Map(), onCashOut }) {
     const eventMap = useMemo(() => new Map(events.map(event => [event.id, event])), [events])
     const activeTickets = tickets.filter(isActiveTicket)
     const settledTickets = tickets.filter(ticket => ticket.status === 'settled' || ticket.status === 'cashed_out')
@@ -143,6 +152,7 @@ function MyBetsPanel({ tickets = [], events = [], onCashOut }) {
                         copy="Pending legs follow the simulator event feed."
                         tickets={activeTickets}
                         eventMap={eventMap}
+                        cashoutValuationsByTicketId={cashoutValuationsByTicketId}
                         emptyCopy="No active practice tickets."
                         onCashOut={onCashOut}
                     />
@@ -151,6 +161,7 @@ function MyBetsPanel({ tickets = [], events = [], onCashOut }) {
                         copy="Final fake-credit returns and review context."
                         tickets={settledTickets}
                         eventMap={eventMap}
+                        cashoutValuationsByTicketId={cashoutValuationsByTicketId}
                         emptyCopy="No settled practice tickets yet."
                     />
                 </div>

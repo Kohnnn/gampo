@@ -1,4 +1,4 @@
-import { buildSyntheticSportsbookData, LEAGUES, SPORTS } from './sportsbookData'
+import { buildSyntheticSportsbookData, SPORTS } from './sportsbookData'
 import { normalizeFreeProviderPayload } from './freeFeedAdapters'
 import { curateTopSportsbookItems, scoreMarqueeItem } from './sportsbookMarquee'
 
@@ -137,6 +137,8 @@ export async function loadSportsbookFeed() {
     let providerQuotas = {}
     let providerSources = {}
     let marquee = null
+    let feedState = { status: 'empty' }
+    let generatedAt = null
 
     try {
         // All providers (including The Odds API) are fetched server-side by the
@@ -147,6 +149,8 @@ export async function loadSportsbookFeed() {
         providerSources = freeFeed.sources || {}
         marquee = freeFeed.marquee || null
         inSeason = freeFeed.inSeason || []
+        feedState = freeFeed.feedState || { status: freeFeed.events?.length ? 'current' : freeFeed.errors?.length ? 'error' : 'empty' }
+        generatedAt = freeFeed.generatedAt || null
         const filtered = curateTopSportsbookItems(uniqueEvents(freeFeed.events || []), { perSport: 12, minimumVisible: 60, maximumVisible: 120 })
         feedEvents = filtered.items.slice(0, 120)
         marquee = marquee || filtered.metrics
@@ -173,5 +177,7 @@ export async function loadSportsbookFeed() {
         quotas: providerQuotas,
         providerSources,
         marquee,
+        feedState,
+        generatedAt,
     }
 }
