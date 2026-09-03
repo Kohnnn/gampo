@@ -1,6 +1,6 @@
 # Fixture — Repository Diagnostic Envelope Negative Cases
 
-All 64 v2 cases require the public production-envelope entrypoint with real isolated topology, canonical bound registry bytes, filesystem checks enabled, no acceptance-path `skipFilesystem`, and exact identity-ledger teardown. Validator stream mutations are exercised by the runner's separate exact 72-case row-semantic matrix plus four lifecycle destinations; registry identity is forbidden from those child expectations.
+All 64 v2 cases require the public production-envelope entrypoint with real isolated topology, canonical bound registry bytes, filesystem checks enabled, no acceptance-path `skipFilesystem`, and exact identity-ledger teardown. Validator stream mutations are exercised by the runner's separate exact 72-case row-semantic matrix plus four lifecycle destinations; registry identity is forbidden from those child expectations. Global cached/index forms are invalid; any real-index observation is limited to the exact twelve-path harness intersection, while complete commit proof uses an operation-owned alternate `GIT_INDEX_FILE`.
 
 ## Validate Contract
 

@@ -91,6 +91,10 @@ Temporary execution uses one initial envelope preflight, then immediate per-targ
 
 **Scope note:** these validators check harness wiring and declared plan contracts. The temporary branch checks current filesystem identity but does not intercept later writes or eliminate TOCTOU races. Node `realpath`/`lstat` cannot prove every Windows reparse tag; a blocked junction probe is `SKIP`, never PASS. A green run of any subset does not mean the whole harness audit is green; report per-validator results, not a blanket pass.
 
+## Scoped-index and production-cleanup rule
+
+For `repository-diagnostic-evidence-set/v2`, derive one closed runtime identity ledger only from operation-created HOME files/directories, archive, stream/temp files/directories, and `runtime_root`; pass it unchanged into children-first lifecycle cleanup. Publish cleanup last and emit final stdout/stderr truth after its publication outcome. Never read the global real index: any real-index observation must end with `--` plus exactly the twelve authorized harness paths; commit construction and complete cached/blob/tree proof must use an operation-owned `GIT_INDEX_FILE` initialized from verified HEAD.
+
 ## Rules
 
 - Treat `.claude/agents/` as canonical for agent definitions; `.codex/agents/` mirrors them.

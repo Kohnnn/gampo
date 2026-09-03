@@ -371,6 +371,10 @@ Under `/goal` this gate auto-proceeds on the recommended option — including a 
 
 ---
 
+## Repository diagnostic runtime and index isolation
+
+For `repository-diagnostic-evidence-set/v2`, production execution owns one actual-creation runtime identity ledger for HOME, archive, streams, temporary objects, and `runtime_root`; pass it unchanged to exact children-first non-recursive cleanup. Publish the cleanup artifact exactly once after cleanup actions, then emit final stdout/stderr truth containing the final primary and ordered secondary errors. Do not read the global real index. A real-index observation, if unavoidable, must be one query ending in `--` plus exactly the twelve authorized harness paths. Build and verify commits only with a fresh operation-owned `GIT_INDEX_FILE` initialized from verified HEAD and exact allowlisted pathspecs.
+
 ## Self-Review Before Reporting DONE
 
 Before reporting any exit code, execute-agent must:

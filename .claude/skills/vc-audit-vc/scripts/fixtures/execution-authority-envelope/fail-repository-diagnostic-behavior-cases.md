@@ -1,5 +1,7 @@
 # Fixture — Repository Diagnostic Behavior Negative Cases
 
+Production behavior rejects discovered/default-empty runtime cleanup authority, stale pre-publication final summaries, and global cached/index reads. Positive controls require actual-creation runtime ledgers, one final cleanup publication attempt, exact twelve-path real-index intersections, or operation-owned alternate-index commands.
+
 ## Validate Contract
 
 ```json repository-diagnostic-behavior-negative-cases/v1
@@ -7,7 +9,7 @@
   { "name": "placeholder-source-production-path", "kind": "source" },
   { "name": "inventory-only-production-path", "kind": "receipt", "value": "inventory-only" },
   { "name": "missing-behavioral-receipt-production-path", "kind": "receipt", "value": "missing" },
-  { "name": "receipt-runner-digest-mutation", "kind": "receipt-field", "from": "\"runnerSha256\": \"77e3417f9819285970d424d4164929da6b53ef340848627030a63d49253ff24d\"", "to": "\"runnerSha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"", "reason": "behavioral execution receipt binding is invalid" },
+  { "name": "receipt-runner-digest-mutation", "kind": "receipt-field", "from": "\"runnerSha256\": \"9e17aeb5a2a4c86b6c2bcfe248321c9a17d2aefceb7ec8ba479e19e540b0044c\"", "to": "\"runnerSha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"", "reason": "behavioral execution receipt binding is invalid" },
   { "name": "receipt-terminal-result-mutation", "kind": "receipt-field", "from": "\"terminalSha256\": \"079380eccb5db41e4852d1634453d77641f375a40976a8e1dd9f00b64e1e8672\"", "to": "\"terminalSha256\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"", "reason": "actual diagnostic execution result does not match" },
   { "name": "receipt-closed-schema", "kind": "receipt-field", "from": "\"status\": \"PASS\"\n}\n```", "to": "\"status\": \"PASS\",\n  \"identity\": null\n}\n```", "reason": "behavioral execution receipt has unknown key" },
   { "name": "cmd-rm-forbidden-argv", "kind": "registry-field", "from": "[\"--diagnostic-op\", \"node-version\"]", "to": "[\"--diagnostic-op\", \"rm\"]", "reason": "diagnostic registry capability rejected" },

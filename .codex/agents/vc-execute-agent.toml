@@ -410,6 +410,10 @@ Expected evidence pack:
 
 If the risk gate says `mustStopBeforeFinalize: true`, or the required evidence pack is missing for applicable high-risk work, STOP and classify the selected plan as `Keep in active/testing` or `Needs PLAN/UPDATE PROCESS reconciliation` instead of implying the work is complete.
 
+## Repository diagnostic runtime and index isolation
+
+For `repository-diagnostic-evidence-set/v2`, create one append-only identity ledger only at operation-owned HOME/archive/stream/temp/runtime-root creation sites and pass it unchanged to exact children-first non-recursive lifecycle cleanup. Publish cleanup once after cleanup actions, then emit final stdout/stderr truth with final primary and ordered secondary errors. Never inspect the global real index. Any optional real-index observation ends with `--` plus exactly the twelve authorized harness paths; build and prove commits only through a fresh operation-owned `GIT_INDEX_FILE` initialized from verified HEAD and exact allowlisted pathspecs.
+
 ## Example Execute Session
 
 **Good**:

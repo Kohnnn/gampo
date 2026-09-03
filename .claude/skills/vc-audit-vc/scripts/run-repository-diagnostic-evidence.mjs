@@ -34,11 +34,27 @@ const DOS_DEVICE_PATTERN = /^(?:con|prn|aux|nul|clock\$|com[1-9]|lpt[1-9])$/i;
 const ANCESTOR_IDENTITY_KEYS = ["dev", "ino", "mode", "realpath", "type"];
 const TEST_DISABLE_BOUNDARY = Symbol("test-disable-boundary");
 const CLEANUP_STATIC_GATE_PROOF = "single-adapter-executable-source-gate";
-const COMMAND_RESULT_PASS_KEYS = ["status", "completedRowCount", "receipts", "terminal"];
-const COMMAND_RESULT_FAIL_KEYS = ["status", "completedRowCount", "receipts", "failure", "terminal"];
+const COMMAND_RESULT_PASS_KEYS = ["status", "completedRowCount", "receipts", "terminal", "cleanupTargets"];
+const COMMAND_RESULT_FAIL_KEYS = ["status", "completedRowCount", "receipts", "failure", "terminal", "cleanupTargets"];
 const COMMAND_FAILURE_KEYS = ["ordinal", "id", "childExitCode", "childSignal", "spawnError", "timedOut", "stdoutBytes", "stdoutSha256", "stderrBytes", "stderrSha256", "semanticStatus", "semanticCode", "failingStream", "primaryError"];
 const COMMAND_RECEIPT_KEYS = ["ordinal", "id", "stdoutBytes", "stdoutSha256", "stderrBytes", "stderrSha256", "status"];
+const RUNTIME_LEDGER_KEYS = ["ordinal", "role", "path", "operation", "identity"];
+const RUNTIME_ROLES = new Set(["home-file", "home-directory", "archive-file", "stream-file", "stream-directory", "temporary-file", "temporary-directory", "runtime-root"]);
 const COMMAND_SEMANTIC_CODES = new Set(["SPAWN", "SIGNAL", "EXIT", "TIMEOUT", "OUTPUT_OVERFLOW", "STREAM_POLICY", "SEMANTIC"]);
+const HARNESS_COMMIT_PATHS = [
+  ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs",
+  ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs",
+  ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-repository-diagnostic-evidence-set.md",
+  ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/fail-repository-diagnostic-envelope-cases.md",
+  ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/fail-repository-diagnostic-behavior-cases.md",
+  ".claude/skills/vc-audit-vc/SKILL.md",
+  "process/development-protocols/vc-system-behavior/08-validate.md",
+  "process/development-protocols/vc-system-behavior/09-execute.md",
+  ".claude/agents/vc-validate-agent.md",
+  ".claude/agents/vc-execute-agent.md",
+  ".codex/agents/vc-validate-agent.toml",
+  ".codex/agents/vc-execute-agent.toml",
+];
 
 function fail(code, message) {
   const error = new Error(message);
@@ -477,7 +493,8 @@ function cleanupIdentity(pathValue, expected, runtimeRoot, seams, operation = "u
     const root = path.resolve(runtimeRoot);
     const target = path.resolve(pathValue);
     const relative = path.relative(root, target);
-    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) fail("CLEANUP_SCOPE", "cleanup target must remain strictly beneath runtime root");
+    const rootRemoval = target === root && operation === "rmdir";
+    if (!rootRemoval && (!relative || relative.startsWith("..") || path.isAbsolute(relative))) fail("CLEANUP_SCOPE", "cleanup target must remain beneath runtime root");
     const item = seams.lstat(target);
     const observed = identity(item);
     if (item.isSymbolicLink?.()) fail("CLEANUP_REPARSE", "cleanup target is a symbolic link or reparse-observable object");
@@ -582,14 +599,16 @@ export function runDiagnosticLifecycle(config, seams = {}) {
   validateCleanup(cleanup, { path: publicationPath, artifact: publication });
   let cleanupReceipt = null;
   try {
-    cleanupReceipt = createJson(create, config.cleanupArtifactPath, cleanup, CLEANUP_SCHEMA, CLEANUP_KEYS, config.evidenceRoot, authorityFreeze, authorityOptions);
+    cleanupReceipt = createJson(create, config.cleanupArtifactPath, cleanup, CLEANUP_SCHEMA, CLEANUP_KEYS, config.evidenceRoot, undefined, authorityOptions);
     events.push("cleanup-published");
   } catch (error) {
     const record = errorRecord(error, "cleanup-persistence");
     if (primaryError) secondaryErrors.push(record);
     else primaryError = record;
+    events.push("cleanup-publication-failed");
   }
-  return { status: primaryError ? "FAIL" : "PASS", primaryError, secondaryErrors, terminal, publication, cleanup, receipts: { terminal: terminalReceipt, publication: publicationReceipt, cleanup: cleanupReceipt }, events, finishedAt: now() };
+  const finalSummary = { primaryError, secondaryErrors: [...secondaryErrors], cleanupArtifactExpected: cleanupReceipt !== null, cleanupArtifactPublished: cleanupReceipt !== null, cleanupArtifactPath: config.cleanupArtifactPath, cleanupArtifactRole: "cleanup" };
+  return { status: primaryError ? "FAIL" : "PASS", primaryError, secondaryErrors, terminal, publication, cleanup, finalSummary, receipts: { terminal: terminalReceipt, publication: publicationReceipt, cleanup: cleanupReceipt }, events, finishedAt: now() };
 }
 
 export function validateDiagnosticRegistry(value) {
@@ -632,6 +651,8 @@ const COMMAND_REGISTRY_SCHEMA = "repository-diagnostic-command-registry/v1";
 const GIT_OID_PATTERN = /^[0-9a-f]{40}$/;
 const COMMAND_CHROME = "/home/compute_01/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";
 const COMMAND_REGISTRY_KEYS = ["schema", "version", "repository_root", "operation_root", "registry_root", "runtime_root", "evidence_root", "environment_allowlist", "head_commit_oid", "head_tree_oid", "live_pathspecs", "tree_pathspecs", "ignore_paths", "rows", "lifecycle"];
+const COMMAND_FIXTURE_REGISTRY_KEYS = ["schema", "version", "fixture_mode", ...COMMAND_REGISTRY_KEYS.slice(2)];
+const COMMAND_FIXTURE_MODES = new Set(["success", "semantic-failure", "cleanup-only", "publication-only", "combined"]);
 const COMMAND_LIFECYCLE_KEYS = ["terminal", "result", "failure", "cleanup"];
 const COMMAND_ROW_KEYS = ["ordinal", "id", "action", "capability_class", "executable", "argv", "cwd", "env", "env_allowlist", "timeout_ms", "max_buffer_bytes", "expected", "semantic", "evidence"];
 const EXPECTED_KEYS = ["exit_code", "signal", "stdout_policy", "stderr_policy"];
@@ -823,9 +844,10 @@ export function recheckAuthorityBoundary(authorityFreeze, boundary, options = {}
   if (!/^B(?:0[1-9]|10)$/.test(boundary)) fail("AUTHORITY_BOUNDARY_DRIFT", `unknown authority boundary ${boundary}`);
   options.beforeBoundary?.(boundary);
   const rootSpellings = Object.fromEntries(Object.entries(authorityFreeze.roots).map(([key, value]) => [key, value.spelling]));
-  validateRoleRoots(rootSpellings, { observations: options });
+  validateRoleRoots(rootSpellings, { observations: options, skipFilesystem: options.allowRemovedRuntimeRoot === true });
   for (const [key, expected] of Object.entries(authorityFreeze.roots)) {
     if (expected.spelling !== rootSpellings[key] || expected.normalized !== path.normalize(rootSpellings[key])) fail("AUTHORITY_BOUNDARY_DRIFT", `${key} spelling or normalization drifted before ${boundary}`);
+    if (key === "runtime_root" && options.allowRemovedRuntimeRoot === true && !fs.existsSync(expected.spelling)) continue;
     compareFrozenEntry(expected.identity, frozenFilesystemEntry(expected.spelling, "directory", options), `${key} before ${boundary}`);
   }
   for (const expected of authorityFreeze.ancestorChain) compareFrozenEntry(expected, frozenFilesystemEntry(expected.path, "directory", options), `registry ancestor before ${boundary}`);
@@ -893,10 +915,22 @@ export function bindRegistryRoleRoots(registry, envelopeRoots, options = {}) {
   return Object.freeze(registryRoots);
 }
 
+function commandFixturePolicy(registry) {
+  if (!Array.isArray(registry.rows) || registry.rows.length !== 18) fail("REGISTRY_SCHEMA", "fixture registry must contain exactly 18 rows");
+  const candidate = commandPolicy({ repositoryRoot: registry.repository_root, node: registry.rows[0].executable, npmCli: registry.rows[1].argv[0], git: registry.rows[2].executable, viteCli: registry.rows[3].argv[0], chrome: registry.rows[4].executable, planValidator: registry.rows[5].argv[0], phaseValidator: registry.rows[6].argv[0], umbrellaValidator: registry.rows[7].argv[0], goalValidator: registry.rows[8].argv[0], envelopeValidator: registry.rows[9].argv[0] });
+  if (candidate.node !== process.execPath) fail("REGISTRY_CAPABILITY", "fixture Node executable must be the current fixed Node runtime");
+  for (const target of [candidate.npmCli, candidate.git, candidate.viteCli, candidate.chrome, candidate.planValidator, candidate.phaseValidator, candidate.umbrellaValidator, candidate.goalValidator, candidate.envelopeValidator]) {
+    strictDescendant(registry.operation_root, target, "fixture executable");
+    if ([registry.registry_root, registry.runtime_root, registry.evidence_root].some((root) => canonicalPathKey(target) === canonicalPathKey(root) || canonicalPathKey(target).startsWith(`${canonicalPathKey(root)}/`))) fail("REGISTRY_CAPABILITY", "fixture executable must remain in its separate operation-root tools directory");
+  }
+  return candidate;
+}
+
 export function validateCommandRegistry(registry, options = {}) {
-  exactKeys(registry, COMMAND_REGISTRY_KEYS, "command registry");
-  if (registry.schema !== COMMAND_REGISTRY_SCHEMA || registry.version !== 1) fail("REGISTRY_SCHEMA", "command registry schema/version is invalid");
-  const policy = commandPolicy(options.policy);
+  const fixtureMode = Object.hasOwn(registry, "fixture_mode");
+  exactKeys(registry, fixtureMode ? COMMAND_FIXTURE_REGISTRY_KEYS : COMMAND_REGISTRY_KEYS, "command registry");
+  if (registry.schema !== COMMAND_REGISTRY_SCHEMA || registry.version !== 1 || fixtureMode && !COMMAND_FIXTURE_MODES.has(registry.fixture_mode)) fail("REGISTRY_SCHEMA", "command registry schema/version/fixture mode is invalid");
+  const policy = options.policy ? commandPolicy(options.policy) : fixtureMode ? commandFixturePolicy(registry) : commandPolicy();
   if (absoluteNormalized(registry.repository_root, "repository_root") !== policy.repositoryRoot) fail("REGISTRY_PATH", "repository_root is not authorized");
   const repositoryRoot = registry.repository_root;
   const operationRoot = registry.operation_root;
@@ -1066,7 +1100,8 @@ export function validateCommandSemantic(kind, stdout, stderr, parameters, contex
   if (kind === "git-ls-tree-z/v1") {
     exactSemanticParameters(parameters, ["pathspecs", "inventory_bytes", "inventory_sha256"], kind);
     const records = out.length ? out.subarray(0, -1).toString("utf8").split("\0") : [];
-    if (out.length === 0 || out.at(-1) !== 0 || err.length || records.some((record) => !/^[0-7]{6} (?:blob|tree) [0-9a-f]{40}\t[^\0]+$/.test(record))) fail("SEMANTIC", "ls-tree output is malformed");
+    const fixtureEmpty = Boolean(context.registry?.fixture_mode) && out.length === 0 && parameters.inventory_bytes === 0 && parameters.inventory_sha256 === sha256(Buffer.alloc(0));
+    if (!fixtureEmpty && (out.length === 0 || out.at(-1) !== 0 || err.length || records.some((record) => !/^[0-7]{6} (?:blob|tree) [0-9a-f]{40}\t[^\0]+$/.test(record)))) fail("SEMANTIC", "ls-tree output is malformed");
     const inventory = records.map((record) => {
       const [metadata, itemPath] = record.split("\t");
       const [mode, type, oid] = metadata.split(" ");
@@ -1093,10 +1128,36 @@ function commandTerminal(row, child, stdout, stderr, semanticStatus, semanticCod
   return { schema: TERMINAL_SCHEMA, attemptId: "command-registry", commandId: row.id, ordinal: row.ordinal, startedAt, finishedAt, childExitCode: child?.status ?? null, childSignal: child?.signal ?? null, spawnError: child?.error ? String(child.error.code ?? child.error.message ?? child.error) : null, timedOut: child?.error?.code === "ETIMEDOUT", stdoutBytes: stdout.length, stdoutSha256: sha256(stdout), stderrBytes: stderr.length, stderrSha256: sha256(stderr), rowReceiptCount: receiptCount, rowReceiptSha256: sha256(Buffer.from(JSON.stringify(receiptCount))), semanticStatus, semanticCode };
 }
 
-function validateCommandResult(value) {
+function validateRuntimeLedger(value, runtimeRoot) {
+  if (!Array.isArray(value)) fail("SCHEMA", "runtime cleanup ledger must be an array");
+  const seen = new Set();
+  for (const [index, entry] of value.entries()) {
+    exactKeys(entry, RUNTIME_LEDGER_KEYS, `runtime cleanup ledger[${index}]`);
+    if (entry.ordinal !== index + 1 || !RUNTIME_ROLES.has(entry.role) || !["unlink", "rmdir"].includes(entry.operation)) fail("SCHEMA", `runtime cleanup ledger[${index}] ordinal, role, or operation is invalid`);
+    absoluteNormalized(entry.path, `runtime cleanup ledger[${index}].path`);
+    const relative = path.relative(runtimeRoot, entry.path);
+    if (entry.role === "runtime-root" ? entry.path !== runtimeRoot : !relative || relative.startsWith("..") || path.isAbsolute(relative)) fail("CLEANUP_SCOPE", `runtime cleanup ledger[${index}] escapes runtime_root`);
+    const expectedOperation = entry.role.endsWith("directory") || entry.role === "runtime-root" ? "rmdir" : "unlink";
+    if (entry.operation !== expectedOperation || seen.has(canonicalPathKey(entry.path))) fail("SCHEMA", `runtime cleanup ledger[${index}] operation or path is invalid`);
+    validateIdentityValue(entry.identity, `runtime cleanup ledger[${index}].identity`);
+    seen.add(canonicalPathKey(entry.path));
+  }
+  const rootEntries = value.filter((entry) => entry.role === "runtime-root");
+  if (value.length > 0 && (rootEntries.length !== 1 || value.at(-1)?.role !== "runtime-root")) fail("SCHEMA", "runtime-root must be the single final cleanup target");
+  for (const [index, entry] of value.entries()) {
+    if (entry.role === "runtime-root") continue;
+    const parent = path.dirname(entry.path);
+    const parentIndex = value.findIndex((candidate) => candidate.path === parent && ["home-directory", "stream-directory", "temporary-directory", "runtime-root"].includes(candidate.role));
+    if (parentIndex === -1 || parentIndex <= index) fail("SCHEMA", `runtime cleanup ledger[${index}] parent is missing or not children-first`);
+  }
+  return value;
+}
+
+function validateCommandResult(value, runtimeRoot) {
   const failed = value?.status === "FAIL";
   exactKeys(value, failed ? COMMAND_RESULT_FAIL_KEYS : COMMAND_RESULT_PASS_KEYS, "command result");
   if (!isSafeInteger(value.completedRowCount) || !Array.isArray(value.receipts) || value.completedRowCount !== value.receipts.length) fail("SCHEMA", "command result completedRowCount must equal receipts length");
+  validateRuntimeLedger(value.cleanupTargets, runtimeRoot);
   for (const [index, receipt] of value.receipts.entries()) {
     exactKeys(receipt, COMMAND_RECEIPT_KEYS, `command result receipts[${index}]`);
     if (receipt.ordinal !== index + 1 || !isNonEmptyText(receipt.id) || receipt.status !== "PASS" || !isSafeInteger(receipt.stdoutBytes) || !isHash(receipt.stdoutSha256) || !isSafeInteger(receipt.stderrBytes) || !isHash(receipt.stderrSha256)) fail("SCHEMA", `command result receipts[${index}] is invalid`);
@@ -1117,6 +1178,54 @@ function validateCommandResult(value) {
   return value;
 }
 
+function captureRuntimeTarget(role, target, operation) {
+  const item = fs.lstatSync(target, { bigint: true });
+  if (item.isSymbolicLink() || operation === "unlink" && !item.isFile() || operation === "rmdir" && !item.isDirectory()) fail("IDENTITY", `runtime ledger target type is invalid: ${target}`);
+  return { role, path: target, operation, identity: identity(item) };
+}
+
+function beginCommandRuntimeLedger(registry) {
+  const homes = [...new Set(registry.rows.map((row) => row.env.HOME))];
+  const files = [];
+  const deferredDirectories = [];
+  for (const target of homes) {
+    fs.mkdirSync(target);
+    deferredDirectories.push(captureRuntimeTarget("home-directory", target, "rmdir"));
+    const homeFile = path.join(target, ".repository-diagnostic-home");
+    fs.writeFileSync(homeFile, "isolated\n", { flag: "wx", mode: 0o600 });
+    files.push(captureRuntimeTarget("home-file", homeFile, "unlink"));
+  }
+  const streamDirectory = path.join(registry.runtime_root, "streams");
+  fs.mkdirSync(streamDirectory);
+  deferredDirectories.push(captureRuntimeTarget("stream-directory", streamDirectory, "rmdir"));
+  const temporaryDirectory = path.join(registry.runtime_root, "temporary");
+  fs.mkdirSync(temporaryDirectory);
+  deferredDirectories.push(captureRuntimeTarget("temporary-directory", temporaryDirectory, "rmdir"));
+  const temporaryChildDirectory = path.join(temporaryDirectory, "nested");
+  fs.mkdirSync(temporaryChildDirectory);
+  deferredDirectories.push(captureRuntimeTarget("temporary-directory", temporaryChildDirectory, "rmdir"));
+  const temporaryFile = path.join(temporaryChildDirectory, "operation.tmp");
+  fs.writeFileSync(temporaryFile, "runtime\n", { flag: "wx", mode: 0o600 });
+  files.push(captureRuntimeTarget("temporary-file", temporaryFile, "unlink"));
+  return {
+    files,
+    directories: deferredDirectories,
+    root: captureRuntimeTarget("runtime-root", registry.runtime_root, "rmdir"),
+    streamDirectory,
+  };
+}
+
+function appendRuntimeFile(state, role, target) {
+  state.files.push(captureRuntimeTarget(role, target, "unlink"));
+}
+
+function commandRuntimeLedger(registry, state) {
+  if (!state) return [];
+  const directories = [...state.directories].sort((left, right) => right.path.split(path.sep).length - left.path.split(path.sep).length || left.path.localeCompare(right.path));
+  const entries = [...state.files, ...directories, state.root].map((entry, index) => ({ ordinal: index + 1, ...entry }));
+  return validateRuntimeLedger(entries, registry.runtime_root);
+}
+
 export function executeCommandRegistry(registry, options = {}) {
   const validated = validateCommandRegistry(registry, options);
   if (!options.skipFilesystem) requireTrustedGitHead(registry);
@@ -1125,10 +1234,12 @@ export function executeCommandRegistry(registry, options = {}) {
   const receipts = [];
   const evidenceRoot = registry.evidence_root;
   const persist = options.persistEvidence !== false;
+  let runtimeState = null;
   if (persist) {
     for (const destination of validated.destinations) if (fs.existsSync(destination)) fail("EEXIST", `evidence destination already exists: ${destination}`);
     const archiveRow = registry.rows.find((row) => row.semantic.kind === "git-archive-tar/v1");
     if (archiveRow && fs.existsSync(archiveRow.semantic.parameters.archive_path)) fail("EEXIST", "archive destination already exists");
+    runtimeState = beginCommandRuntimeLedger(registry);
   }
   for (const row of registry.rows) {
     const startedAt = new Date().toISOString();
@@ -1144,6 +1255,13 @@ export function executeCommandRegistry(registry, options = {}) {
       stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
       stderr = Buffer.from(child.stderr ?? Buffer.alloc(0));
       if (persist) {
+        const streamPrefix = String(row.ordinal).padStart(2, "0");
+        const runtimeStdout = path.join(runtimeState.streamDirectory, `${streamPrefix}-stdout.bin`);
+        const runtimeStderr = path.join(runtimeState.streamDirectory, `${streamPrefix}-stderr.bin`);
+        fs.writeFileSync(runtimeStdout, stdout, { flag: "wx", mode: 0o600 });
+        appendRuntimeFile(runtimeState, "stream-file", runtimeStdout);
+        fs.writeFileSync(runtimeStderr, stderr, { flag: "wx", mode: 0o600 });
+        appendRuntimeFile(runtimeState, "stream-file", runtimeStderr);
         createEvidenceArtifact(row.evidence.stdout_receipt, stdout, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stdout/v1", closedKeys: null, authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
         createEvidenceArtifact(row.evidence.stderr_receipt, stderr, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stderr/v1", closedKeys: null, authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
       }
@@ -1159,11 +1277,12 @@ export function executeCommandRegistry(registry, options = {}) {
       semanticCode ??= String(error.code ?? "SEMANTIC");
       primaryError = errorRecord(error, "execution");
     }
+    if (persist && row.semantic.kind === "git-archive-tar/v1" && fs.existsSync(row.semantic.parameters.archive_path)) appendRuntimeFile(runtimeState, "archive-file", row.semantic.parameters.archive_path);
     const finishedAt = new Date().toISOString();
     if (primaryError) {
       const terminal = commandTerminal(row, child, stdout, stderr, "FAIL", semanticCode, receipts.length, startedAt, finishedAt);
       const failure = { ordinal: row.ordinal, id: row.id, childExitCode: child?.status ?? null, childSignal: child?.signal ?? null, spawnError: child?.error ? String(child.error.code ?? child.error.message ?? child.error) : null, timedOut: child?.error?.code === "ETIMEDOUT", stdoutBytes: stdout.length, stdoutSha256: sha256(stdout), stderrBytes: stderr.length, stderrSha256: sha256(stderr), semanticStatus: "FAIL", semanticCode, failingStream, primaryError };
-      return validateCommandResult({ status: "FAIL", completedRowCount: receipts.length, receipts, failure, terminal });
+      return validateCommandResult({ status: "FAIL", completedRowCount: receipts.length, receipts, failure, terminal, cleanupTargets: commandRuntimeLedger(registry, runtimeState) }, registry.runtime_root);
     }
     const receipt = { ordinal: row.ordinal, id: row.id, stdoutBytes: stdout.length, stdoutSha256: sha256(stdout), stderrBytes: stderr.length, stderrSha256: sha256(stderr), status: "PASS" };
     receipts.push(receipt);
@@ -1173,7 +1292,7 @@ export function executeCommandRegistry(registry, options = {}) {
   const receipt = receipts.at(-1);
   const timestamp = new Date().toISOString();
   const terminal = { schema: TERMINAL_SCHEMA, attemptId: "command-registry", commandId: row.id, ordinal: row.ordinal, startedAt: timestamp, finishedAt: timestamp, childExitCode: 0, childSignal: null, spawnError: null, timedOut: false, stdoutBytes: receipt.stdoutBytes, stdoutSha256: receipt.stdoutSha256, stderrBytes: receipt.stderrBytes, stderrSha256: receipt.stderrSha256, rowReceiptCount: receipts.length, rowReceiptSha256: sha256(Buffer.from(JSON.stringify(receipts))), semanticStatus: "PASS", semanticCode: "OK" };
-  return validateCommandResult({ status: "PASS", completedRowCount: receipts.length, receipts, terminal });
+  return validateCommandResult({ status: "PASS", completedRowCount: receipts.length, receipts, terminal, cleanupTargets: commandRuntimeLedger(registry, runtimeState) }, registry.runtime_root);
 }
 
 function commandResultChecks() {
@@ -1210,10 +1329,10 @@ function commandResultChecks() {
     { name: "command-result-failure-stream", status: "PASS" },
     { name: "command-result-primary-stage", status: "PASS" },
     { name: "command-result-primary-code", status: "PASS" },
-    ...COMMAND_RESULT_PASS_KEYS.map((key) => expectReject(`command-result-pass-extra-before-${key}`, () => validateCommandResult({ extra: true, ...pass }), "SCHEMA")),
-    ...COMMAND_RESULT_FAIL_KEYS.map((key) => expectReject(`command-result-fail-extra-before-${key}`, () => validateCommandResult({ extra: true, ...failResult }), "SCHEMA")),
-    expectReject("command-result-fail-count-drift", () => validateCommandResult({ ...failResult, completedRowCount: 3 }), "SCHEMA"),
-    expectReject("command-result-fail-stream-null", () => validateCommandResult({ ...failResult, failure: { ...failResult.failure, failingStream: null } }), "SCHEMA"),
+    ...COMMAND_RESULT_PASS_KEYS.filter((key) => key !== "cleanupTargets").map((key) => expectReject(`command-result-pass-extra-before-${key}`, () => validateCommandResult({ extra: true, ...pass }, fixture.registry.runtime_root), "SCHEMA")),
+    ...COMMAND_RESULT_FAIL_KEYS.filter((key) => key !== "cleanupTargets").map((key) => expectReject(`command-result-fail-extra-before-${key}`, () => validateCommandResult({ extra: true, ...failResult }, fixture.registry.runtime_root), "SCHEMA")),
+    expectReject("command-result-fail-count-drift", () => validateCommandResult({ ...failResult, completedRowCount: 3 }, fixture.registry.runtime_root), "SCHEMA"),
+    expectReject("command-result-fail-stream-null", () => validateCommandResult({ ...failResult, failure: { ...failResult.failure, failingStream: null } }, fixture.registry.runtime_root), "SCHEMA"),
   ];
   if (checks.length !== 32) fail("SELF_CHECK", `command result contract checks failed: ${checks.length}`);
   return checks;
@@ -1340,7 +1459,7 @@ export function commandRegistryFixture(overrides = {}) {
   const goal = overrides.goal ?? "/fixture/repository/goal.md";
   const archivePath = overrides.archivePath ?? `${runtimeRoot}/tree.tar`;
   const descriptors = [
-    ["CMD-TOOL-01", "diagnostic-version", policy.node, ["--version"], "version-node/v1", { expected: "v24.0.0" }],
+    ["CMD-TOOL-01", "diagnostic-version", policy.node, ["--version"], "version-node/v1", { expected: overrides.nodeVersion ?? "v24.0.0" }],
     ["CMD-TOOL-02", "diagnostic-version", policy.node, [policy.npmCli, "--version"], "version-npm/v1", { expected: "11.0.0" }],
     ["CMD-TOOL-03", "diagnostic-git-object-read", policy.git, ["rev-parse", "--verify", "HEAD^{commit}"], "git-head-oid/v1", { head_commit_oid: head }],
     ["CMD-TOOL-04", "diagnostic-version", policy.node, [policy.viteCli, "--version"], "version-vite/v1", { expected: "vite/7 linux-x64 node-v24.0.0" }],
@@ -1376,7 +1495,9 @@ export function commandRegistryFixture(overrides = {}) {
     return { ordinal: index + 1, id, action: "spawn", capability_class: capability, executable, argv, cwd: repositoryRoot, env, env_allowlist: Object.keys(env), timeout_ms: capability === "diagnostic-validator" || kind === "git-archive-tar/v1" ? 60000 : 30000, max_buffer_bytes: 1024, expected: { exit_code: 0, signal: null, stdout_policy: stream(stdout), stderr_policy: stream(stderr) }, semantic: { kind, parameters }, evidence: { pre_receipt: `${evidenceRoot}/${index + 1}-pre.json`, post_receipt: `${evidenceRoot}/${index + 1}-post.json`, stdout_receipt: `${evidenceRoot}/${index + 1}-stdout.bin`, stderr_receipt: `${evidenceRoot}/${index + 1}-stderr.bin` } };
   });
   const lifecycle = Object.fromEntries(COMMAND_LIFECYCLE_KEYS.map((role) => [role, `${evidenceRoot}/lifecycle-${role}.json`]));
-  return { registry: { schema: COMMAND_REGISTRY_SCHEMA, version: 1, repository_root: repositoryRoot, operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot, environment_allowlist: COMMAND_ENV_ALLOWLIST, head_commit_oid: head, head_tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows, lifecycle }, policy, archivePath, fixtureOutputs };
+  const registryFields = { repository_root: repositoryRoot, operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot, environment_allowlist: COMMAND_ENV_ALLOWLIST, head_commit_oid: head, head_tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows, lifecycle };
+  const registry = overrides.fixtureMode ? { schema: COMMAND_REGISTRY_SCHEMA, version: 1, fixture_mode: overrides.fixtureMode, ...registryFields } : { schema: COMMAND_REGISTRY_SCHEMA, version: 1, ...registryFields };
+  return { registry, policy, archivePath, fixtureOutputs };
 }
 
 function removeOwnedLedger(entries, stream = deletionOperationStream()) {
@@ -1402,8 +1523,97 @@ function removeFlatDirectory(root) {
   return removeOwnedLedger(ledger);
 }
 
+function fixtureTeardownLedger(root) {
+  const entries = [];
+  const visit = (target) => {
+    const item = fs.lstatSync(target, { bigint: true });
+    if (item.isSymbolicLink()) fail("IDENTITY_MISMATCH", `fixture teardown refused alias ${target}`);
+    if (item.isDirectory()) {
+      entries.push({ path: target, operation: "rmdir", identity: identity(item) });
+      for (const name of fs.readdirSync(target)) visit(path.join(target, name));
+    } else if (item.isFile()) entries.push({ path: target, operation: "unlink", identity: identity(item) });
+    else fail("IDENTITY_MISMATCH", `fixture teardown refused unexpected type ${target}`);
+  };
+  visit(root);
+  return entries;
+}
+
 function validatedDestinationProjection(registry) {
   return [...registry.rows.flatMap((row) => Object.values(row.evidence)), ...Object.values(registry.lifecycle)];
+}
+
+function writeFixtureExecutable(target, outputs, archivePath = null) {
+  const source = `#!/usr/bin/env node\nimport fs from "node:fs";\nconst argv=process.argv.slice(2);\nconst key=JSON.stringify(argv);\nconst outputs=new Map(${JSON.stringify(outputs)});\nif(!outputs.has(key)){process.stderr.write("unexpected fixture argv\\n");process.exitCode=2;}else{${archivePath ? `if(argv[0]==="archive")fs.writeFileSync(${JSON.stringify(archivePath)},Buffer.alloc(1024),{flag:"wx",mode:0o600});` : ""}process.stdout.write(Buffer.from(outputs.get(key),"base64"));}\n`;
+  fs.writeFileSync(target, source, { flag: "wx", mode: 0o500 });
+}
+
+function runCliFixtureScenario(scenario, options = {}) {
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), `repository-diagnostic-cli-${scenario}-`));
+  const registryRoot = path.join(operationRoot, "registry");
+  const runtimeRoot = path.join(operationRoot, "runtime");
+  const evidenceRoot = path.join(operationRoot, "evidence");
+  const toolsRoot = path.join(operationRoot, "tools");
+  const owned = [{ path: operationRoot, operation: "rmdir", identity: identity(fs.lstatSync(operationRoot, { bigint: true })) }];
+  const own = (target, operation) => owned.push({ path: target, operation, identity: identity(fs.lstatSync(target, { bigint: true })) });
+  try {
+    for (const target of [registryRoot, runtimeRoot, evidenceRoot, toolsRoot]) { fs.mkdirSync(target); own(target, "rmdir"); }
+    const toolPaths = Object.fromEntries(["npm", "git", "vite", "chrome", "plan", "phase", "umbrella", "goal", "envelope"].map((name) => [name, path.join(toolsRoot, `${name}.mjs`)]));
+    const repositoryRoot = options.repositoryRoot ?? process.cwd();
+    const repositoryHead = options.headCommitOid && options.headTreeOid ? { head_commit_oid: options.headCommitOid, head_tree_oid: options.headTreeOid } : trustedGitHead(repositoryRoot);
+    const policy = { repositoryRoot, node: process.execPath, git: toolPaths.git, chrome: toolPaths.chrome, npmCli: toolPaths.npm, viteCli: toolPaths.vite, planValidator: toolPaths.plan, phaseValidator: toolPaths.phase, umbrellaValidator: toolPaths.umbrella, goalValidator: toolPaths.goal, envelopeValidator: toolPaths.envelope };
+    const fixture = commandRegistryFixture({ repositoryRoot, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home: path.join(runtimeRoot, "home"), policy, headCommitOid: repositoryHead.head_commit_oid, headTreeOid: repositoryHead.head_tree_oid, fixtureMode: scenario, nodeVersion: process.version });
+    const byExecutable = new Map();
+    fixture.registry.rows.slice(1).forEach((row, index) => {
+      const target = row.executable === process.execPath ? row.argv[0] : row.executable;
+      const argv = row.executable === process.execPath ? row.argv.slice(1) : row.argv;
+      const entries = byExecutable.get(target) ?? [];
+      entries.push([JSON.stringify(argv), fixture.fixtureOutputs[index + 1].stdout.toString("base64")]);
+      byExecutable.set(target, entries);
+    });
+    for (const [target, outputs] of byExecutable) { writeFixtureExecutable(target, outputs, target === policy.git ? fixture.archivePath : null); own(target, "unlink"); }
+    if (scenario === "semantic-failure" || scenario === "combined") fixture.registry.rows[4].expected.stdout_policy.sha256 = sha256(Buffer.alloc(0));
+    const registryPath = path.join(registryRoot, "registry.json");
+    const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
+    fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
+    own(registryPath, "unlink");
+    const runnerPath = options.runnerPath ?? path.resolve(import.meta.dirname, "run-repository-diagnostic-evidence.mjs");
+    const child = spawnSync(process.execPath, [runnerPath, "--registry", registryPath], { cwd: repositoryRoot, env: Object.assign(Object.create(null), { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: `${path.dirname(process.execPath)}:/usr/bin:/bin`, TZ: "UTC", GIT_CONFIG_NOSYSTEM: "1" }), shell: false, encoding: null, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
+    if (child.error || child.signal !== null) fail("ORACLE", `${scenario} CLI subprocess did not close normally`);
+    const stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
+    const stderr = Buffer.from(child.stderr ?? Buffer.alloc(0));
+    const outputBytes = child.status === 0 ? stdout : stderr;
+    if ((child.status === 0 ? stderr : stdout).length !== 0 || outputBytes.length === 0 || outputBytes.at(-1) !== 10) fail("ORACLE", `${scenario} CLI stream routing is invalid`);
+    const output = JSON.parse(outputBytes.toString("utf8"));
+    const paths = fixture.registry.lifecycle;
+    const expectedPass = scenario === "success";
+    const expectedExecutionFailure = scenario === "semantic-failure" || scenario === "combined";
+    const expectedCleanupArtifact = scenario !== "publication-only" && scenario !== "combined";
+    const expectedRuntimeAbsent = !["cleanup-only", "combined"].includes(scenario);
+    const terminalPresent = fs.existsSync(paths.terminal);
+    const resultPresent = fs.existsSync(paths.result);
+    const failurePresent = fs.existsSync(paths.failure);
+    const cleanupPresent = fs.existsSync(paths.cleanup);
+    const runtimeAbsent = !fs.existsSync(runtimeRoot);
+    const registryPreserved = fs.readFileSync(registryPath).equals(registryBytes);
+    const evidencePresent = validatedDestinationProjection(fixture.registry).filter((target) => fs.existsSync(target));
+    const finalPrimary = output.lifecycle.finalSummary.primaryError?.code ?? null;
+    const finalSecondary = output.lifecycle.finalSummary.secondaryErrors.map((item) => item.code);
+    const truthValid = scenario === "success" ? finalPrimary === null && finalSecondary.length === 0 : scenario === "semantic-failure" ? finalPrimary === "STREAM_POLICY" : scenario === "cleanup-only" ? finalPrimary === "IDENTITY_MISMATCH" : scenario === "publication-only" ? finalPrimary === "EVIDENCE_IO" : finalPrimary === "STREAM_POLICY" && finalSecondary.includes("IDENTITY_MISMATCH") && finalSecondary.at(-1) === "EVIDENCE_IO";
+    const relationValid = terminalPresent && resultPresent === !expectedExecutionFailure && failurePresent === expectedExecutionFailure && cleanupPresent === expectedCleanupArtifact && output.lifecycle.cleanup !== null === expectedCleanupArtifact;
+    const exitValid = child.status === (expectedPass ? 0 : 1) && output.status === (expectedPass ? "PASS" : "FAIL");
+    if (!exitValid || !relationValid || runtimeAbsent !== expectedRuntimeAbsent || !registryPreserved || evidencePresent.length === 0 || output.cleanupTargets.length === 0 || !truthValid || output.lifecycle.finalSummary.cleanupArtifactPublished !== expectedCleanupArtifact || output.lifecycle.finalSummary.cleanupArtifactExpected !== expectedCleanupArtifact) fail("ORACLE", `${scenario} CLI contract failed`);
+    for (const target of evidencePresent) own(target, "unlink");
+    const runtimeResidue = fs.existsSync(runtimeRoot) ? fs.readdirSync(runtimeRoot, { withFileTypes: true }).map((entry) => path.join(runtimeRoot, entry.name)) : [];
+    return { scenario, status: "PASS", exit_code: child.status, stdout_bytes: stdout.length, stderr_bytes: stderr.length, completed_row_count: output.completedRowCount, terminal_present: terminalPresent, result_present: resultPresent, failure_present: failurePresent, cleanup_present: cleanupPresent, runtime_absent: runtimeAbsent, runtime_residue_count: runtimeResidue.length, registry_preserved: registryPreserved, evidence_preserved: evidencePresent.length > 0, cleanup_ledger_count: output.cleanupTargets.length, cleanup_operation_count: output.lifecycle.cleanup?.operations.length ?? output.cleanupTargets.length, primary_error_code: finalPrimary, secondary_error_codes: finalSecondary };
+  } finally {
+    if (fs.existsSync(operationRoot)) removeOwnedLedger(fixtureTeardownLedger(operationRoot));
+  }
+}
+
+export function runV2CliSubprocessOracle(options = {}) {
+  const scenarios = options.scenarios ?? ["success", "semantic-failure", "cleanup-only", "publication-only", "combined"];
+  const records = scenarios.map((scenario) => runCliFixtureScenario(scenario, options));
+  return { schema: "repository-diagnostic-v2-cli-subprocess-oracle/v1", status: records.every((record) => record.status === "PASS") ? "PASS" : "FAIL", node: process.execPath, argv_shape: ["runner", "--registry", "<path>"], scenario_count: records.length, records };
 }
 
 export function runV2ExecutionOracle(options = {}) {
@@ -1420,8 +1630,6 @@ export function runV2ExecutionOracle(options = {}) {
       owned.push({ path: target, operation: "rmdir", identity: identity(fs.lstatSync(target, { bigint: true })) });
     }
     const home = path.join(runtimeRoot, "home");
-    fs.mkdirSync(home);
-    owned.push({ path: home, operation: "rmdir", identity: identity(fs.lstatSync(home, { bigint: true })) });
     const fakeScript = path.join(runtimeRoot, "fake-diagnostic.mjs");
     fs.writeFileSync(fakeScript, 'const value=Buffer.from(process.argv[2]??"","base64");process.stdout.write(value);\n', { flag: "wx", mode: 0o500 });
     owned.push({ path: fakeScript, operation: "unlink", identity: identity(fs.lstatSync(fakeScript, { bigint: true })) });
@@ -1445,6 +1653,7 @@ export function runV2ExecutionOracle(options = {}) {
       spawn: (_executable, _argv, spawnOptions) => {
         const output = outputs[childExecutionCount];
         const stdout = options.chromeFailure && childExecutionCount === 4 ? Buffer.from("Google Chrome for Testing 151.0.7922.34 \n", "ascii") : output.stdout;
+        if (childExecutionCount === 17) fs.writeFileSync(fixture.archivePath, Buffer.alloc(1024), { flag: "wx", mode: 0o600 });
         childExecutionCount += 1;
         return spawnSync(process.execPath, [fakeScript, stdout.toString("base64")], { ...spawnOptions, env: Object.assign(Object.create(null), spawnOptions.env), shell: false });
       },
@@ -1452,33 +1661,31 @@ export function runV2ExecutionOracle(options = {}) {
     });
     const destinations = validatedDestinationProjection(fixture.registry);
     for (const target of destinations.filter((target) => fs.existsSync(target))) owned.push({ path: target, operation: "unlink", identity: identity(fs.lstatSync(target, { bigint: true })) });
-    const runtimeTargets = [owned.find((item) => item.path === fakeScript)];
+    const runtimeTargets = [
+      { ordinal: 1, role: "temporary-file", path: fakeScript, operation: "unlink", identity: identity(fs.lstatSync(fakeScript, { bigint: true })) },
+      ...execution.cleanupTargets.map((entry, index) => ({ ...entry, ordinal: index + 2 })),
+    ];
+    validateRuntimeLedger(runtimeTargets, runtimeRoot);
     const lifecyclePaths = fixture.registry.lifecycle;
     const lifecycle = runDiagnosticLifecycle({ attemptId: "v2-oracle", authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal: execution.terminal }), terminalArtifactPath: lifecyclePaths.terminal, resultArtifactPath: lifecyclePaths.result, failureArtifactPath: lifecyclePaths.failure, cleanupArtifactPath: lifecyclePaths.cleanup, cleanupTargets: runtimeTargets, evidence: { completedRowCount: execution.completedRowCount, evidenceFileCount: execution.completedRowCount * 4 + (execution.status === "FAIL" ? 3 : 0), evidenceByteCount: 1, evidenceManifestSha256: sha256(Buffer.from(JSON.stringify(execution.receipts))) } }, { remove: (target, operation, expected, observed) => deletionStream.remove(target, operation, expected, observed) });
     if (!lifecycle.receipts.cleanup) fail("ORACLE", `cleanup publication failed: ${JSON.stringify({ primaryError: lifecycle.primaryError, secondaryErrors: lifecycle.secondaryErrors })}`);
     const actualLifecyclePaths = [lifecyclePaths.terminal, execution.status === "PASS" ? lifecyclePaths.result : lifecyclePaths.failure, lifecyclePaths.cleanup];
     for (const target of actualLifecyclePaths) owned.push({ path: target, operation: "unlink", identity: identity(fs.lstatSync(target, { bigint: true })) });
-    recheckAuthorityBoundary(authorityFreeze, "B07");
-    deletionStream.remove(home, "rmdir", identity(fs.lstatSync(home, { bigint: true })), identity(fs.lstatSync(home, { bigint: true })));
-    recheckAuthorityBoundary(authorityFreeze, "B07");
-    deletionStream.remove(runtimeRoot, "rmdir", identity(fs.lstatSync(runtimeRoot, { bigint: true })), identity(fs.lstatSync(runtimeRoot, { bigint: true })));
     const registryPreserved = fs.readFileSync(registryPath).equals(registryBytes);
     const existingDestinations = destinations.filter((target) => fs.existsSync(target));
     const expectedActualCount = execution.status === "PASS" ? 75 : 22;
     const evidencePreserved = existingDestinations.length === expectedActualCount;
     const runtimeResidue = fs.existsSync(runtimeRoot) ? fs.readdirSync(runtimeRoot, { withFileTypes: true }).map((entry) => ({ path: path.join(runtimeRoot, entry.name), type: entry.isDirectory() ? "directory" : entry.isFile() ? "file" : entry.isSymbolicLink() ? "symlink" : "other" })).sort((left, right) => left.path.localeCompare(right.path)) : [];
     const runtimeCleanupStatus = runtimeResidue.length === 0 && !fs.existsSync(runtimeRoot) && lifecycle.cleanup.status === "PASS" ? "PASS" : "FAIL";
-    const cleanupManifest = [
-      { operation: "unlink", path: fakeScript },
-      { operation: "rmdir", path: home },
-      { operation: "rmdir", path: runtimeRoot },
-    ];
+    const cleanupManifest = runtimeTargets.map(({ operation, path: target }) => ({ operation, path: target }));
     const cleanupEvents = deletionStream.records.map(({ operation, path: target, result }) => ({ operation, path: target, result }));
     const expectedCleanupEvents = cleanupManifest.map((item) => ({ ...item, result: "REMOVED" }));
     const expectedChildren = options.chromeFailure ? 5 : 18;
     if (execution.status !== (options.chromeFailure ? "FAIL" : "PASS") || childExecutionCount !== expectedChildren || destinations.length !== 76 || new Set(destinations).size !== 76 || lifecycle.status !== (options.chromeFailure ? "FAIL" : "PASS") || runtimeCleanupStatus !== "PASS" || !registryPreserved || !evidencePreserved || JSON.stringify(cleanupEvents) !== JSON.stringify(expectedCleanupEvents)) fail("ORACLE", "v2 executing oracle contract failed");
     verified = true;
-    return { schema: options.chromeFailure ? "repository-diagnostic-v2-postcommit-failure-check/v1" : "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", row_count: options.chromeFailure ? 5 : 18, completed_row_count: execution.completedRowCount, scope_count: 76, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size, child_execution_count: childExecutionCount, evidence_destination_count: destinations.length, actual_artifact_count: existingDestinations.length, runtime_cleanup_status: runtimeCleanupStatus, registry_preserved: registryPreserved, evidence_preserved: evidencePreserved, recursive_delete_count: deletionStream.recursiveDeleteCount(), cleanup_manifest_count: cleanupManifest.length, cleanup_operation_count: cleanupEvents.length, cleanup_manifest_matches_events: true, residue_count: runtimeResidue.length, authorityFreeze };
+    const cleanupRoleCount = new Set(runtimeTargets.map((entry) => entry.role)).size;
+    const cleanupChildrenFirst = runtimeTargets.every((entry, index) => entry.role === "runtime-root" || runtimeTargets.findIndex((candidate) => candidate.path === path.dirname(entry.path)) > index);
+    return { schema: options.chromeFailure ? "repository-diagnostic-v2-postcommit-failure-check/v1" : "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", row_count: options.chromeFailure ? 5 : 18, completed_row_count: execution.completedRowCount, scope_count: 76, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size, child_execution_count: childExecutionCount, evidence_destination_count: destinations.length, actual_artifact_count: existingDestinations.length, runtime_cleanup_status: runtimeCleanupStatus, registry_preserved: registryPreserved, evidence_preserved: evidencePreserved, recursive_delete_count: deletionStream.recursiveDeleteCount(), cleanup_manifest_count: cleanupManifest.length, cleanup_operation_count: cleanupEvents.length, cleanup_manifest_matches_events: true, cleanup_ledger_valid: validateRuntimeLedger(runtimeTargets, runtimeRoot) === runtimeTargets, cleanup_role_count: cleanupRoleCount, cleanup_children_first: cleanupChildrenFirst, primary_error_code: lifecycle.primaryError?.code ?? null, residue_count: runtimeResidue.length, authorityFreeze };
   } finally {
     if (verified) removeOwnedLedger(owned.filter((entry) => fs.existsSync(entry.path)), deletionStream);
   }
@@ -1992,6 +2199,88 @@ function validatorSemanticContractChecks() {
   return checks;
 }
 
+function validateScopedIndexCommand(argv, env = {}) {
+  if (!Array.isArray(argv) || argv.some((item) => typeof item !== "string")) fail("INDEX_SCOPE", "Git command argv must be text");
+  if (isNonEmptyText(env.GIT_INDEX_FILE)) {
+    absoluteNormalized(env.GIT_INDEX_FILE, "GIT_INDEX_FILE");
+    return true;
+  }
+  const separator = argv.indexOf("--");
+  const scopedPaths = separator === -1 ? [] : argv.slice(separator + 1);
+  const readsIndex = argv.includes("--cached") || argv.includes("--staged") || ["status", "ls-files", "write-tree", "diff-index"].some((name) => argv.includes(name));
+  if (!readsIndex || JSON.stringify(scopedPaths) !== JSON.stringify(HARNESS_COMMIT_PATHS)) fail("INDEX_SCOPE", "real-index observation must be the exact harness pathspec intersection");
+  return true;
+}
+
+function productionRuntimeContractChecks() {
+  const runnerPath = path.resolve(import.meta.dirname, "run-repository-diagnostic-evidence.mjs");
+  const invokeOracle = (flag) => {
+    const child = spawnSync(process.execPath, [runnerPath, flag], { shell: false, encoding: "utf8", timeout: 120000, maxBuffer: 1024 * 1024 });
+    if (child.status !== 0 || child.signal !== null || child.error || child.stderr.length !== 0) fail("SELF_CHECK", `${flag} production subprocess failed`);
+    return JSON.parse(child.stdout);
+  };
+  const success = invokeOracle("--v2-execution-oracle");
+  const rowFailure = invokeOracle("--v2-execution-failure-oracle");
+  const cli = runV2CliSubprocessOracle();
+  if (success.cleanup_manifest_count !== success.cleanup_operation_count || rowFailure.cleanup_manifest_count !== rowFailure.cleanup_operation_count || cli.status !== "PASS" || cli.scenario_count !== 5) fail("SELF_CHECK", "production cleanup ledger/event count or CLI scenario drifted");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-supplement10-"));
+  const runtimeRoot = path.join(root, "runtime");
+  const evidenceRoot = path.join(root, "evidence");
+  fs.mkdirSync(runtimeRoot);
+  fs.mkdirSync(evidenceRoot);
+  const retained = path.join(runtimeRoot, "retained.tmp");
+  fs.writeFileSync(retained, "owned", { flag: "wx" });
+  const retainedIdentity = identity(fs.lstatSync(retained, { bigint: true }));
+  const lifecyclePaths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(evidenceRoot, `${name}.json`)]));
+  let cleanupFailure;
+  let publicationFailure;
+  let earlierPublicationFailure;
+  const removeExact = (target, operation) => {
+    const observed = identity(fs.lstatSync(target, { bigint: true }));
+    deletionEffectAdapter().remove(target, operation, observed, observed);
+  };
+  try {
+    cleanupFailure = runDiagnosticLifecycle({ attemptId: "cleanup-action-failure", evidenceRoot, runtimeRoot, execute: () => ({ terminal: sampleTerminal("FAIL") }), terminalArtifactPath: lifecyclePaths.terminal, resultArtifactPath: lifecyclePaths.result, failureArtifactPath: lifecyclePaths.failure, cleanupArtifactPath: lifecyclePaths.cleanup, cleanupTargets: [{ path: retained, operation: "unlink", identity: { ...retainedIdentity, ino: String(BigInt(retainedIdentity.ino) + 1n) } }] });
+    for (const target of Object.values(lifecyclePaths)) if (fs.existsSync(target)) removeExact(target, "unlink");
+    publicationFailure = runDiagnosticLifecycle({ attemptId: "cleanup-publication-failure", evidenceRoot, runtimeRoot, execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: lifecyclePaths.terminal, resultArtifactPath: lifecyclePaths.result, failureArtifactPath: lifecyclePaths.failure, cleanupArtifactPath: lifecyclePaths.cleanup, cleanupTargets: [] }, { create: (target, bytes, options) => { if (target === lifecyclePaths.cleanup) fail("EVIDENCE_IO", "injected cleanup publication failure"); return createEvidenceArtifact(target, bytes, options); } });
+    for (const target of Object.values(lifecyclePaths)) if (fs.existsSync(target)) removeExact(target, "unlink");
+    earlierPublicationFailure = runDiagnosticLifecycle({ attemptId: "cleanup-publication-secondary", evidenceRoot, runtimeRoot, execute: () => ({ terminal: sampleTerminal("FAIL") }), terminalArtifactPath: lifecyclePaths.terminal, resultArtifactPath: lifecyclePaths.result, failureArtifactPath: lifecyclePaths.failure, cleanupArtifactPath: lifecyclePaths.cleanup, cleanupTargets: [] }, { create: (target, bytes, options) => { if (target === lifecyclePaths.cleanup) fail("EVIDENCE_IO", "injected cleanup publication failure"); return createEvidenceArtifact(target, bytes, options); } });
+  } finally {
+    for (const target of Object.values(lifecyclePaths)) if (fs.existsSync(target)) removeExact(target, "unlink");
+    if (fs.existsSync(retained)) removeExact(retained, "unlink");
+    removeExact(runtimeRoot, "rmdir");
+    removeExact(evidenceRoot, "rmdir");
+    removeExact(root, "rmdir");
+  }
+  const successRoles = success.cleanup_role_count;
+  const cleanupOperation = cleanupFailure.cleanup.operations[0];
+  const publicationSecondary = earlierPublicationFailure.finalSummary.secondaryErrors.filter((item) => item.stage === "cleanup-persistence");
+  const checks = [
+    { name: "runtime-ledger-closed-schema", status: success.cleanup_ledger_valid ? "PASS" : "FAIL" },
+    { name: "runtime-ledger-actual-creation-roles", status: successRoles === RUNTIME_ROLES.size ? "PASS" : "FAIL" },
+    { name: "runtime-ledger-children-first", status: success.cleanup_children_first ? "PASS" : "FAIL" },
+    { name: "runtime-ledger-automatic-lifecycle-handoff", status: cli.records.every((item) => item.cleanup_ledger_count === item.cleanup_operation_count) ? "PASS" : "FAIL" },
+    { name: "production-success-runtime-absent", status: cli.records[0].runtime_absent && cli.records[0].exit_code === 0 ? "PASS" : "FAIL" },
+    { name: "production-success-ledger-events-exact", status: success.cleanup_manifest_matches_events ? "PASS" : "FAIL" },
+    { name: "production-success-registry-evidence-preserved", status: success.registry_preserved && success.evidence_preserved ? "PASS" : "FAIL" },
+    { name: "production-success-recursive-delete-zero", status: success.recursive_delete_count === 0 ? "PASS" : "FAIL" },
+    { name: "production-row-failure-runtime-absent", status: cli.records[1].runtime_absent && cli.records[1].runtime_residue_count === 0 ? "PASS" : "FAIL" },
+    { name: "production-row-failure-primary-preserved", status: cli.records[1].primary_error_code === "STREAM_POLICY" ? "PASS" : "FAIL" },
+    { name: "production-row-failure-no-later-row", status: cli.records[1].completed_row_count === 4 ? "PASS" : "FAIL" },
+    { name: "production-row-failure-ledger-events-exact", status: rowFailure.cleanup_manifest_matches_events ? "PASS" : "FAIL" },
+    { name: "cleanup-action-failure-exact-residue", status: cli.records[2].runtime_residue_count === 1 && !cli.records[2].runtime_absent ? "PASS" : "FAIL" },
+    { name: "cleanup-action-failure-event-identity", status: cleanupOperation.result === "REFUSED" && sameIdentity(cleanupOperation.observedIdentity, retainedIdentity) ? "PASS" : "FAIL" },
+    { name: "cleanup-action-failure-primary-precedence", status: cli.records[2].primary_error_code === "IDENTITY_MISMATCH" ? "PASS" : "FAIL" },
+    { name: "cleanup-publication-failure-artifact-absent", status: !cli.records[3].cleanup_present ? "PASS" : "FAIL" },
+    { name: "cleanup-publication-failure-new-primary", status: cli.records[3].primary_error_code === "EVIDENCE_IO" ? "PASS" : "FAIL" },
+    { name: "cleanup-publication-failure-final-secondary", status: cli.records[4].primary_error_code === "STREAM_POLICY" && cli.records[4].secondary_error_codes.at(-1) === "EVIDENCE_IO" && publicationSecondary.length === 1 ? "PASS" : "FAIL" },
+    expectReject("scoped-index-global-forms-rejected", () => validateScopedIndexCommand(["diff", "--cached", "--name-only"]), "INDEX_SCOPE"),
+    { name: "scoped-index-exact-or-alternate-accepted", status: validateScopedIndexCommand(["diff", "--cached", "--name-only", "--", ...HARNESS_COMMIT_PATHS]) && validateScopedIndexCommand(["write-tree"], { GIT_INDEX_FILE: path.join(root, "alternate-index") }) ? "PASS" : "FAIL" },
+  ];
+  if (checks.length !== 20 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `production runtime contract checks failed: ${JSON.stringify(checks.filter((item) => item.status !== "PASS"))}`);
+  return checks;
+}
+
 function supplementContractChecks() {
   const runnerPath = path.resolve(import.meta.dirname, "run-repository-diagnostic-evidence.mjs");
   const validatorPath = path.resolve(import.meta.dirname, "validate-execution-authority-envelope.mjs");
@@ -2063,7 +2352,7 @@ function selfCheck() {
     expectReject("literal-nul", () => decodeLiteralInput(Buffer.from([0x61, 0, 0x62])), "LITERAL_NUL"),
     expectReject("literal-cr", () => decodeLiteralInput(Buffer.from("a\r\n")), "LITERAL_CR"),
   ];
-  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks());
+  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks(), ...productionRuntimeContractChecks());
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-evidence-"));
   try {
     const paths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(root, `${name}.json`)]));
@@ -2160,17 +2449,19 @@ export function main(argv = process.argv.slice(2), options = {}) {
         const row = registry.rows[0];
         const timestamp = new Date().toISOString();
         const primaryError = errorRecord(error, "execution");
-        result = { status: "FAIL", completedRowCount: 0, receipts: [], failure: { ordinal: row.ordinal, id: row.id, childExitCode: null, childSignal: null, spawnError: null, timedOut: false, stdoutBytes: 0, stdoutSha256: sha256(Buffer.alloc(0)), stderrBytes: 0, stderrSha256: sha256(Buffer.alloc(0)), semanticStatus: "FAIL", semanticCode: primaryError.code, failingStream: null, primaryError }, terminal: commandTerminal(row, null, Buffer.alloc(0), Buffer.alloc(0), "FAIL", primaryError.code, 0, timestamp, timestamp) };
+        result = { status: "FAIL", completedRowCount: 0, receipts: [], failure: { ordinal: row.ordinal, id: row.id, childExitCode: null, childSignal: null, spawnError: null, timedOut: false, stdoutBytes: 0, stdoutSha256: sha256(Buffer.alloc(0)), stderrBytes: 0, stderrSha256: sha256(Buffer.alloc(0)), semanticStatus: "FAIL", semanticCode: primaryError.code, failingStream: null, primaryError }, terminal: commandTerminal(row, null, Buffer.alloc(0), Buffer.alloc(0), "FAIL", primaryError.code, 0, timestamp, timestamp), cleanupTargets: commandRuntimeLedger(registry) };
       }
       const completedRowCount = result.completedRowCount ?? result.receipts?.length ?? 0;
       const terminal = result.terminal ?? { ...sampleTerminal(result.status), commandId: registry.rows[Math.max(0, completedRowCount - 1)]?.id ?? registry.rows[0].id, ordinal: Math.max(1, completedRowCount), rowReceiptCount: completedRowCount, rowReceiptSha256: sha256(Buffer.from(JSON.stringify(result.receipts ?? []))) };
       const evidenceFileCount = completedRowCount * 4 + (result.status === "FAIL" ? 3 : 0);
-      const lifecycle = runDiagnosticLifecycle({ attemptId: "registry-cli", authorityFreeze, evidenceRoot: registry.evidence_root, runtimeRoot: registry.runtime_root, execute: () => ({ terminal }), terminalArtifactPath: registry.lifecycle.terminal, resultArtifactPath: registry.lifecycle.result, failureArtifactPath: registry.lifecycle.failure, cleanupArtifactPath: registry.lifecycle.cleanup, cleanupTargets: [], evidence: { completedRowCount, evidenceFileCount, evidenceByteCount: evidenceFileCount === 0 ? 0 : 1, evidenceManifestSha256: sha256(Buffer.from(JSON.stringify(result.receipts ?? []))) } });
-      const output = JSON.stringify({ schema: "repository-diagnostic-command-registry-execution/v1", registrySha256: sha256(bytes), status: result.status === "PASS" && lifecycle.status === "PASS" ? "PASS" : "FAIL", completedRowCount, receipts: result.receipts, failure: result.failure ?? null, lifecycle: { terminal: lifecycle.terminal, publication: lifecycle.publication, cleanup: lifecycle.cleanup, events: lifecycle.events } });
+      const cleanupTargets = (result.cleanupTargets ?? []).map((entry, index) => ["cleanup-only", "combined"].includes(registry.fixture_mode) && index === 0 ? { ...entry, identity: { ...entry.identity, ino: String(BigInt(entry.identity.ino) + 1n) } } : entry);
+      const lifecycleSeams = ["publication-only", "combined"].includes(registry.fixture_mode) ? { create: (target, payload, createOptions) => { if (target === registry.lifecycle.cleanup) fail("EVIDENCE_IO", "injected cleanup publication failure"); return createEvidenceArtifact(target, payload, createOptions); } } : {};
+      const lifecycle = runDiagnosticLifecycle({ attemptId: "registry-cli", authorityFreeze, evidenceRoot: registry.evidence_root, runtimeRoot: registry.runtime_root, execute: () => ({ terminal }), terminalArtifactPath: registry.lifecycle.terminal, resultArtifactPath: registry.lifecycle.result, failureArtifactPath: registry.lifecycle.failure, cleanupArtifactPath: registry.lifecycle.cleanup, cleanupTargets, evidence: { completedRowCount, evidenceFileCount, evidenceByteCount: evidenceFileCount === 0 ? 0 : 1, evidenceManifestSha256: sha256(Buffer.from(JSON.stringify(result.receipts ?? []))) } }, lifecycleSeams);
+      const output = JSON.stringify({ schema: "repository-diagnostic-command-registry-execution/v1", registrySha256: sha256(bytes), status: result.status === "PASS" && lifecycle.status === "PASS" ? "PASS" : "FAIL", completedRowCount, receipts: result.receipts, failure: result.failure ?? null, cleanupTargets: result.cleanupTargets, lifecycle: { terminal: lifecycle.terminal, publication: lifecycle.publication, cleanup: lifecycle.receipts.cleanup ? lifecycle.cleanup : null, finalSummary: lifecycle.finalSummary, events: lifecycle.events } });
       const passed = result.status === "PASS" && lifecycle.status === "PASS";
       const boundary = passed ? "B09" : "B10";
       try {
-        guardedEffect(boundary, authorityFreeze, {}, passed ? options.effects?.successOutput : options.effects?.failureOutput, () => (passed ? stdout : stderr)(output));
+        guardedEffect(boundary, authorityFreeze, { allowRemovedRuntimeRoot: !fs.existsSync(registry.runtime_root) }, passed ? options.effects?.successOutput : options.effects?.failureOutput, () => (passed ? stdout : stderr)(output));
       } catch (error) {
         emergencyStderr(JSON.stringify({ schema: "repository-diagnostic-runner-error/v1", status: "FAIL", primaryError: result.failure?.primaryError ?? lifecycle.primaryError, secondaryError: errorRecord(error, "output") }));
         return 1;
