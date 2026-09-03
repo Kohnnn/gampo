@@ -48,13 +48,13 @@
 ```
 
 Fixed runner: `.claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs`
-Fixed runner SHA-256: `1233bcff9522159c6abb7792294f744543ae493499b29e0af69f893b118354d2`
+Fixed runner SHA-256: `f73a8b362ddc8be8e1136a457809022e3faf3eb7d84c6045d68d5f3c0f68f32e`
 
 ```json repository-diagnostic-behavioral-execution-receipt/v1
 {
   "schema": "repository-diagnostic-behavioral-execution-receipt/v1",
   "runnerPath": ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs",
-  "runnerSha256": "1233bcff9522159c6abb7792294f744543ae493499b29e0af69f893b118354d2",
+  "runnerSha256": "f73a8b362ddc8be8e1136a457809022e3faf3eb7d84c6045d68d5f3c0f68f32e",
   "registryPath": ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-repository-diagnostic-evidence-set.md",
   "registrySha256": "e72b75409d9e2f63c68400621559049789b74e97bdb84f8fd9861bebeebb0c25",
   "executionStatus": "PASS",
