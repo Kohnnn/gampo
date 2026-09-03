@@ -140,7 +140,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "83fb71083c262b978595cce8d6c0148d45bdd2bd19c0bddf4c858ca4ad82e596";
+const RUNNER_SHA256 = "b2eca7f04cbaf7a23da25050e7082c51050a9d4548c0d827a975c70fc232e682";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
@@ -2881,7 +2881,7 @@ function runMutatedRunnerSelfCheck(name, from, to) {
     const child = spawnSync(process.execPath, [target, "--self-check"], { cwd: ROOT, shell: false, encoding: null, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
     if (child.status === 0 || child.signal !== null || child.error) throw new Error(`${name} unexpectedly passed or failed outside its assertion`);
     const diagnostic = Buffer.concat([Buffer.from(child.stdout ?? Buffer.alloc(0)), Buffer.from(child.stderr ?? Buffer.alloc(0))]).toString("utf8");
-    if (!diagnostic.includes("raw Git framing checks failed") && !diagnostic.includes("porcelain-v1 -z output must be nonempty") && !diagnostic.includes("reading 'sourcePath'")) throw new Error(`${name} failed outside raw Git framing acceptance: ${diagnostic}`);
+    if (!diagnostic.includes("raw Git framing checks failed") && !diagnostic.includes("porcelain-v1 -z output must be nonempty") && !diagnostic.includes("porcelain status is not authorized") && !diagnostic.includes("ls-tree -z output is unterminated") && !diagnostic.includes("reading 'sourcePath'")) throw new Error(`${name} failed outside raw Git framing acceptance: ${diagnostic}`);
   } finally {
     removeFixturePath(target);
     removeFixturePath(root, "rmdir");
@@ -2900,6 +2900,8 @@ function runAntiCheatCases(fixturePath) {
     ["anti-cheat-remove-cleanup-static-gate", { path: RUNNER_PATH, from: 'const CLEANUP_STATIC_GATE_PROOF = "single-adapter-executable-source-gate";', to: 'const CLEANUP_STATIC_GATE_PROOF = "disabled";', reason: "cleanup static gate proof is missing" }],
     ["anti-cheat-git-positive-empty-buffer", { path: RUNNER_PATH, from: 'const porcelainSpace = Buffer.from(" M dir/file name\\0");', to: 'const porcelainSpace = Buffer.alloc(0);', reason: "runner source bytes do not match" }],
     ["anti-cheat-git-parser-bypass", { path: RUNNER_PATH, from: 'if (kind === "git-porcelain-pathset/v1") return { status: "PASS", records: parseGitPorcelainZ(out, err, parameters) };', to: 'if (kind === "git-porcelain-pathset/v1") return { status: "PASS", records: [] };', reason: "runner source bytes do not match" }],
+    ["anti-cheat-git-type-change-status-omission", { path: RUNNER_PATH, from: 'const GIT_PORCELAIN_STATUSES = [" M", " T", " A", " D", " R", " C", "M ", "MM", "MT", "MD", "T ", "TM", "TT", "TD", "A ", "AM", "AT", "AD", "D ", "R ", "RM", "RT", "RD", "C ", "CM", "CT", "CD", "DD", "AU", "UD", "UA", "DU", "AA", "UU", "??", "!!"];', to: 'const GIT_PORCELAIN_STATUSES = [" M", " A", " D", " R", " C", "M ", "MM", "MT", "MD", "T ", "TM", "TT", "TD", "A ", "AM", "AT", "AD", "D ", "R ", "RM", "RT", "RD", "C ", "CM", "CT", "CD", "DD", "AU", "UD", "UA", "DU", "AA", "UU", "??", "!!"];', reason: "runner source bytes do not match" }],
+    ["anti-cheat-git-tree-utf8-terminator-omission", { path: RUNNER_PATH, from: 'const invalidUtf8Tree = Buffer.concat([Buffer.from(`100644 blob ${oid}\\troot/`), Buffer.from([0xc3, 0x28, 0])]);', to: 'const invalidUtf8Tree = Buffer.concat([Buffer.from(`100644 blob ${oid}\\troot/`), Buffer.from([0xc3, 0x28])]);', reason: "runner source bytes do not match" }],
   ]);
   validateDiagnosticIntegrityProofs();
   for (const item of cases) {
@@ -3148,7 +3150,7 @@ async function runConcurrencyStress(argv) {
   try {
     for (let iteration = 0; iteration < repeat; iteration++) {
       const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents, callsiteMarker);
-      if (selfChecks.some((text) => !text.includes('"checkCount":532'))) block("concurrent self-check count drifted");
+      if (selfChecks.some((text) => !text.includes('"checkCount":536'))) block("concurrent self-check count drifted");
       successful += selfChecks.length;
       const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents, callsiteMarker);
       if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
