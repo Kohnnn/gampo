@@ -140,7 +140,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "9e17aeb5a2a4c86b6c2bcfe248321c9a17d2aefceb7ec8ba479e19e540b0044c";
+const RUNNER_SHA256 = "604d21c3ec9da172ca5d065ec0159c89300ccbd84ebac703a2b15f730bc093fc";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
@@ -163,6 +163,9 @@ const STANDING_CONSENT = "EXECUTE CONSENT: standing-granted";
 const EXPLICIT_CONSENT = "ENTER EXECUTE MODE";
 const GOAL_BLOCK_VALIDATOR =
   ".claude/skills/vc-autopilot/scripts/validate-autopilot-goal-block.mjs";
+const AUTHORITY_FIXTURE_MANIFEST = [
+  "fail-artifact-outside-scope.md", "fail-cleanup-basename-encoding-components.md", "fail-cleanup-duplicate-broad-scope.md", "fail-cleanup-fixture-family-companions.md", "fail-cleanup-keys-counts-mixed-lane.md", "fail-cleanup-operation-creation-source-write.md", "fail-cleanup-root-target-identity.md", "fail-cleanup-tracked-normal-nested-file.md", "fail-correction-destination-mismatch.md", "fail-invalid-artifact-path.md", "fail-invalid-authority-proof.md", "fail-missing-correction-destination.md", "fail-missing-selected-plan.md", "fail-missing-stop-conditions.md", "fail-repository-diagnostic-behavior-cases.md", "fail-repository-diagnostic-envelope-cases.md", "fail-temp-ads.md", "fail-temp-device-namespace.md", "fail-temp-dos-device.md", "fail-temp-duplicate-key.md", "fail-temp-duplicate-target.md", "fail-temp-escaped-duplicate-key.md", "fail-temp-glob.md", "fail-temp-missing-receipt-schema.md", "fail-temp-mixed-lane.md", "fail-temp-prefix-collision.md", "fail-temp-reparse-seam.md", "fail-temp-too-many.md", "fail-temp-trailing-dot-space.md", "fail-temp-traversal.md", "fail-temp-wrong-root.md", "fail-temp-wrong-scope-count.md", "fail-temp-wrong-stop-count.md", "fail-unknown-envelope-report-schema.md", "pass-correction-envelope.md", "pass-envelope.md", "pass-fixture-residue-cleanup-set.md", "pass-repository-diagnostic-evidence-set.md", "pass-temporary-artifact-set.md",
+];
 
 class Blocked extends Error {}
 
@@ -979,7 +982,7 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm, t
   const runnerBytes = safeBoundFile(runnerPath, "diagnostic_runner.runner_path");
   if (!Number.isSafeInteger(runner.runner_bytes) || runner.runner_bytes !== runnerBytes.length || !sha256Pattern(runner.runner_sha256) || createHash("sha256").update(runnerBytes).digest("hex") !== runner.runner_sha256) block(`diagnostic runner bytes/SHA drifted`);
   if (!/^[0-9a-f]{40}$/.test(runner.runner_blob_oid) || !/^[0-9a-f]{40}$/.test(runner.runner_commit_oid)) block(`diagnostic runner blob/commit OIDs are invalid`);
-  if (testIsolation === null) {
+  if (!testIsolation?.runnerPath) {
     if (gitObjectText(["cat-file", "-t", runner.runner_commit_oid], "runner commit") !== "commit") block(`diagnostic runner commit OID is not a commit`);
     const relativeRunner = path.relative(ROOT, runnerPath).split(path.sep).join("/");
     if (gitObjectText(["rev-parse", `${runner.runner_commit_oid}:${relativeRunner}`], "runner blob") !== runner.runner_blob_oid || gitObjectText(["cat-file", "-t", runner.runner_blob_oid], "runner blob") !== "blob") block(`diagnostic runner blob binding drifted`);
@@ -1053,6 +1056,9 @@ function removeExactTree(entries) {
 }
 
 function runV2PostcommitCheck(options = {}) {
+  const committedSourceRoot = options.validationOnly && process.env.REPOSITORY_DIAGNOSTIC_PROOF_SOURCE_ROOT
+    ? path.resolve(process.env.REPOSITORY_DIAGNOSTIC_PROOF_SOURCE_ROOT)
+    : ROOT;
   const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-v2-"));
   const registryRoot = path.join(operationRoot, "registry");
   const runtimeRoot = path.join(operationRoot, "runtime");
@@ -1073,12 +1079,15 @@ function runV2PostcommitCheck(options = {}) {
   own(evidenceRoot, "rmdir");
   fs.mkdirSync(home);
   own(home, "rmdir");
-  const runnerPath = path.resolve(ROOT, RUNNER_PATH);
+  const viteCli = path.join(runtimeRoot, "vite-cli.mjs");
+  fs.writeFileSync(viteCli, Buffer.from("#!/usr/bin/env node\n", "utf8"), { flag: "wx", mode: 0o500 });
+  own(viteCli, "unlink");
+  const runnerPath = path.resolve(committedSourceRoot, RUNNER_PATH);
   try {
-    const currentHead = readTrustedHead(ROOT);
+    const currentHead = readTrustedHead(committedSourceRoot);
     const commitOid = currentHead.head_commit_oid;
     const treeOid = currentHead.head_tree_oid;
-    const blobOid = gitObjectText(["rev-parse", `${commitOid}:${RUNNER_PATH}`], "runner blob");
+    const blobOid = gitObjectText(["rev-parse", `${commitOid}:${RUNNER_PATH}`], "runner blob", committedSourceRoot);
     const runnerBytes = safeBoundFile(runnerPath, "diagnostic_runner.runner_path");
     const policy = {
       repositoryRoot: ROOT,
@@ -1086,7 +1095,7 @@ function runV2PostcommitCheck(options = {}) {
       git: "/usr/bin/git",
       chrome: "/home/compute_01/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome",
       npmCli: path.join(path.dirname(path.dirname(process.execPath)), "lib/node_modules/npm/bin/npm-cli.js"),
-      viteCli: path.join(ROOT, "node_modules/vite/bin/vite.js"),
+      viteCli,
       planValidator: path.join(ROOT, ".claude/skills/vc-generate-plan/scripts/validate-plan-artifact.mjs"),
       phaseValidator: path.join(ROOT, ".claude/skills/vc-generate-phase-program/scripts/validate-phase-stub.mjs"),
       umbrellaValidator: path.join(ROOT, ".claude/skills/vc-generate-phase-program/scripts/validate-umbrella-artifact.mjs"),
@@ -1094,7 +1103,10 @@ function runV2PostcommitCheck(options = {}) {
       envelopeValidator: path.join(ROOT, "./.claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"),
     };
     const selectedPlan = options.selectedPlan ?? ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-repository-diagnostic-evidence-set.md";
-    const fixture = commandRegistryFixture({ repositoryRoot: ROOT, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headCommitOid: commitOid, headTreeOid: treeOid, selectedPlan, selectedPlanAbsolute: path.join(ROOT, selectedPlan), umbrella: path.join(ROOT, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/visual-animation-assets-umbrella_PLAN_07-08-26.md"), goal: path.join(ROOT, ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md"), archivePath: path.join(runtimeRoot, "tree.tar") });
+    const syntheticPhase = "process/features/synthetic/active/synthetic-phase_03-09-26/synthetic-phase_PLAN_03-09-26.md";
+    const syntheticUmbrella = "process/features/synthetic/active/synthetic-program_03-09-26/synthetic-program-umbrella_PLAN_03-09-26.md";
+    const committedProof = ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md";
+    const fixture = commandRegistryFixture({ repositoryRoot: ROOT, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headCommitOid: commitOid, headTreeOid: treeOid, selectedPlan, selectedPlanAbsolute: path.join(ROOT, selectedPlan), phasePlan: path.join(ROOT, syntheticPhase), umbrella: path.join(ROOT, syntheticUmbrella), goal: path.join(committedSourceRoot, committedProof), archivePath: path.join(runtimeRoot, "tree.tar") });
     const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
     registryPath = path.join(registryRoot, `variable-registry-${randomUUID()}.json`);
     fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
@@ -1117,7 +1129,7 @@ function runV2PostcommitCheck(options = {}) {
       stop_condition_count: REQUIRED_STOP_CATEGORIES.length,
       artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
     };
-    const validationIsolation = options.validationOnly ? { runnerPath, registryOptions: { policy, headCommitOid: commitOid, headTreeOid: treeOid } } : null;
+    const validationIsolation = { ...(options.validationOnly ? { runnerPath } : {}), registryOptions: { policy, headCommitOid: commitOid, headTreeOid: treeOid } };
     const validation = publicValidationSummary(validateRepositoryDiagnosticV2Envelope(model, selectedPlan, normalizePath(selectedPlan, "selected plan"), validationIsolation));
     if (options.validationOnly) return validation;
     removeExactTree(owned);
@@ -2948,15 +2960,14 @@ function runFixtures(dirRaw) {
     block(`fixture directory "${dirNorm.path}" does not exist on disk`);
   }
 
-  const files = fs
+  const physicalFiles = fs
     .readdirSync(dirAbs, { withFileTypes: true })
-    .filter((e) => e.isFile() && e.name.endsWith(".md"))
-    .map((e) => e.name)
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => entry.name)
     .sort();
-
-  if (files.length === 0) {
-    block(`fixture directory "${dirNorm.path}" contains no .md fixtures`);
-  }
+  const files = [...AUTHORITY_FIXTURE_MANIFEST];
+  const missing = files.filter((name) => !physicalFiles.includes(name));
+  if (missing.length > 0) block(`fixture directory "${dirNorm.path}" is missing committed manifest fixtures: ${missing.join(", ")}`);
 
   const rows = [];
   for (const name of files) {

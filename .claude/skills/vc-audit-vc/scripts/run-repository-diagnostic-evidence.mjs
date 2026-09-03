@@ -41,6 +41,58 @@ const COMMAND_RECEIPT_KEYS = ["ordinal", "id", "stdoutBytes", "stdoutSha256", "s
 const RUNTIME_LEDGER_KEYS = ["ordinal", "role", "path", "operation", "identity"];
 const RUNTIME_ROLES = new Set(["home-file", "home-directory", "archive-file", "stream-file", "stream-directory", "temporary-file", "temporary-directory", "runtime-root"]);
 const COMMAND_SEMANTIC_CODES = new Set(["SPAWN", "SIGNAL", "EXIT", "TIMEOUT", "OUTPUT_OVERFLOW", "STREAM_POLICY", "SEMANTIC"]);
+const AUTHORITY_FIXTURE_ROOT = ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope";
+const AUTHORITY_FIXTURE_MANIFEST = [
+  "fail-artifact-outside-scope.md",
+  "fail-cleanup-basename-encoding-components.md",
+  "fail-cleanup-duplicate-broad-scope.md",
+  "fail-cleanup-fixture-family-companions.md",
+  "fail-cleanup-keys-counts-mixed-lane.md",
+  "fail-cleanup-operation-creation-source-write.md",
+  "fail-cleanup-root-target-identity.md",
+  "fail-cleanup-tracked-normal-nested-file.md",
+  "fail-correction-destination-mismatch.md",
+  "fail-invalid-artifact-path.md",
+  "fail-invalid-authority-proof.md",
+  "fail-missing-correction-destination.md",
+  "fail-missing-selected-plan.md",
+  "fail-missing-stop-conditions.md",
+  "fail-repository-diagnostic-behavior-cases.md",
+  "fail-repository-diagnostic-envelope-cases.md",
+  "fail-temp-ads.md",
+  "fail-temp-device-namespace.md",
+  "fail-temp-dos-device.md",
+  "fail-temp-duplicate-key.md",
+  "fail-temp-duplicate-target.md",
+  "fail-temp-escaped-duplicate-key.md",
+  "fail-temp-glob.md",
+  "fail-temp-missing-receipt-schema.md",
+  "fail-temp-mixed-lane.md",
+  "fail-temp-prefix-collision.md",
+  "fail-temp-reparse-seam.md",
+  "fail-temp-too-many.md",
+  "fail-temp-trailing-dot-space.md",
+  "fail-temp-traversal.md",
+  "fail-temp-wrong-root.md",
+  "fail-temp-wrong-scope-count.md",
+  "fail-temp-wrong-stop-count.md",
+  "fail-unknown-envelope-report-schema.md",
+  "pass-correction-envelope.md",
+  "pass-envelope.md",
+  "pass-fixture-residue-cleanup-set.md",
+  "pass-repository-diagnostic-evidence-set.md",
+  "pass-temporary-artifact-set.md",
+];
+const COMMITTED_VALIDATOR_PATHS = [
+  ".claude/skills/vc-autopilot/scripts/validate-autopilot-goal-block.mjs",
+  ".claude/skills/vc-generate-plan/scripts/validate-plan-artifact.mjs",
+  ".claude/skills/vc-generate-phase-program/scripts/validate-phase-stub.mjs",
+  ".claude/skills/vc-generate-phase-program/scripts/validate-umbrella-artifact.mjs",
+];
+const PROOF_PATHS = [
+  `${AUTHORITY_FIXTURE_ROOT}/proof/standing-goal-block.md`,
+  `${AUTHORITY_FIXTURE_ROOT}/proof/no-consent-goal-block.md`,
+];
 const HARNESS_COMMIT_PATHS = [
   ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs",
   ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs",
@@ -1455,6 +1507,7 @@ export function commandRegistryFixture(overrides = {}) {
   const stopConditionCount = overrides.stopConditionCount ?? 5;
   const selectedPlan = overrides.selectedPlan ?? "/fixture/repository/plan.md";
   const selectedPlanAbsolute = overrides.selectedPlanAbsolute ?? selectedPlan;
+  const phasePlan = overrides.phasePlan ?? selectedPlanAbsolute;
   const umbrella = overrides.umbrella ?? "/fixture/repository/umbrella.md";
   const goal = overrides.goal ?? "/fixture/repository/goal.md";
   const archivePath = overrides.archivePath ?? `${runtimeRoot}/tree.tar`;
@@ -1465,7 +1518,7 @@ export function commandRegistryFixture(overrides = {}) {
     ["CMD-TOOL-04", "diagnostic-version", policy.node, [policy.viteCli, "--version"], "version-vite/v1", { expected: "vite/7 linux-x64 node-v24.0.0" }],
     ["CMD-TOOL-05", "diagnostic-version", policy.chrome, ["--version"], "version-chrome/v1", { expected: "Google Chrome for Testing 151.0.0.0" }],
     ["CMD-VAL-01", "diagnostic-validator", policy.node, [policy.planValidator, "--strict", selectedPlan], "validator-plan-json-clean/v1", { argv_path: selectedPlan, target_path: selectedPlan }],
-    ["CMD-VAL-02", "diagnostic-validator", policy.node, [policy.phaseValidator, "--strict", selectedPlanAbsolute], "validator-phase-json-clean/v1", { argv_path: selectedPlanAbsolute, target_path: path.relative(repositoryRoot, selectedPlanAbsolute).split(path.sep).join("/") }],
+    ["CMD-VAL-02", "diagnostic-validator", policy.node, [policy.phaseValidator, "--strict", phasePlan], "validator-phase-json-clean/v1", { argv_path: phasePlan, target_path: path.relative(repositoryRoot, phasePlan).split(path.sep).join("/") }],
     ["CMD-VAL-03", "diagnostic-validator", policy.node, [policy.umbrellaValidator, "--strict", umbrella], "validator-umbrella-json-clean/v1", { argv_path: umbrella, target_path: path.relative(repositoryRoot, umbrella).split(path.sep).join("/") }],
     ["CMD-VAL-04", "diagnostic-validator", policy.node, [policy.goalValidator, goal], "validator-goal-pass-line/v1", { goal, lane: "absent" }],
     ["CMD-VAL-06", "diagnostic-validator", policy.node, [policy.envelopeValidator, selectedPlan], "validator-envelope-json-clean/v1", { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 76, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 76 }],
@@ -2073,39 +2126,118 @@ function sourceAuthorityEntries(repositoryRoot, overrides = {}) {
   });
 }
 
+const SYNTHETIC_DOCUMENTS = Object.freeze({
+  plan: Object.freeze({
+    path: "process/general-plans/active/synthetic-validator-plan_03-09-26/synthetic-validator-plan_PLAN_03-09-26.md",
+    bytes: Buffer.from("---\nname: plan:synthetic-validator-plan\ndescription: Synthetic validator plan\ndate: 03-09-26\nfeature: synthetic\n---\n# Synthetic Validator Plan\n\n**Date**: 03-09-26\n**Complexity**: SIMPLE\n**Status**: VALIDATE\n\n## Context\n\nUses process/context/all-context.md and process/context/tests/all-tests.md.\n\n## Phase Completion Rules\n\nPass every gate.\n\n## Implementation Checklist\n\n- Validate literals.\n\n## Acceptance Criteria\n\n- Validators pass.\n\n## Touchpoints\n\nSynthetic files only.\n\n## Public Contracts\n\nNone.\n\n## Blast Radius\n\nTemporary root only.\n\n## Verification Evidence\n\nStrict validator output.\n\n## Test Procedure\n\nRun the actual validator.\n\n## Test Infra Improvement Notes\n\nNone.\n\n## Resume and Execution Handoff\n\nRIPER-5 Next Step: EXECUTE.\n\n## Validate Contract\n\nStatus: PASS\n", "utf8"),
+  }),
+  phase: Object.freeze({
+    path: "process/features/synthetic/active/synthetic-phase_03-09-26/synthetic-phase_PLAN_03-09-26.md",
+    bytes: Buffer.from("---\nname: plan:synthetic-phase\ndescription: Synthetic phase\ndate: 03-09-26\nfeature: synthetic\ntype: plan\nphase: \"01\"\n---\n# Synthetic Phase\n\n## Phase Loop Progress\n\n1. RESEARCH\n2. INNOVATE\n3. PLAN\n4. PVL\n5. EXECUTE\n6. EVL\n7. UPDATE PROCESS\n\n**Validate-contract required**\n\n## Objective\n\nValidate the phase literal.\n\n## Exit Gate\n\nPass.\n\n## Blast Radius\n\nTemporary root only.\n\nUmbrella plan: synthetic-program-umbrella_PLAN_03-09-26.md.\n\n## Validate Contract\n\nStatus: PASS\n", "utf8"),
+  }),
+  umbrella: Object.freeze({
+    path: "process/features/synthetic/active/synthetic-program_03-09-26/synthetic-program-umbrella_PLAN_03-09-26.md",
+    bytes: Buffer.from(["---", "name: plan:synthetic-program", "description: Synthetic umbrella", "date: 03-09-26", "feature: synthetic", "type: plan", `phase: ${"umbrella"}`, "---", "# Synthetic Program", "", "Status: VALIDATE", "", "## Context", "", "Synthetic program.", "", "## Implementation Checklist", "", "- Validate literals.", "", "## Verification Evidence", "", "Strict validator output.", "", "## Program Goal Charter", "", "Synthetic charter.", "", "## Stable Program Goal", "", "Validate committed validators against generated operands.", "", "## Current Execution State", "", "VALIDATE.", "", "## Phase Ordering", "", "Phase 01 only; no external path reference.", "", "## Program Status Table", "", "| Phase | Status |", "|---|---|", "| 01 | VALIDATE |", "", "## Per-Phase Loop", "", "Use RIPER-5.", "", "## Global Constraints", "", "Temporary files only.", "", "## Durable Report Destinations", "", "None.", "", "## Validate Contract", "", "Status: PASS", ""].join("\n"), "utf8"),
+  }),
+});
+
+function makeOwnedDirectories(root, targetDirectory) {
+  const relative = path.relative(root, targetDirectory);
+  let current = root;
+  for (const segment of relative.split(path.sep).filter(Boolean)) {
+    current = path.join(current, segment);
+    if (!fs.existsSync(current)) fs.mkdirSync(current);
+  }
+}
+
+function writeExclusiveDocument(root, document) {
+  const target = path.join(root, document.path);
+  makeOwnedDirectories(root, path.dirname(target));
+  fs.writeFileSync(target, document.bytes, { flag: "wx" });
+  return target;
+}
+
+function removeOwnedTemporaryTree(root) {
+  if (!fs.existsSync(root)) return;
+  const entries = [];
+  const visit = (target) => {
+    const item = fs.lstatSync(target, { bigint: true });
+    if (item.isSymbolicLink()) fail("IDENTITY_MISMATCH", `temporary teardown refused alias ${target}`);
+    if (item.isDirectory()) {
+      entries.push({ path: target, operation: "rmdir", identity: identity(item) });
+      for (const name of fs.readdirSync(target)) visit(path.join(target, name));
+      return;
+    }
+    if (!item.isFile()) fail("IDENTITY_MISMATCH", `temporary teardown refused unexpected type ${target}`);
+    entries.push({ path: target, operation: "unlink", identity: identity(item) });
+  };
+  visit(root);
+  removeOwnedLedger(entries);
+}
+
 function validatorSemanticContractChecks() {
   const checks = [];
   const repositoryRoot = process.cwd();
-  const selectedPlan = "process/general-plans/active/repository-diagnostic-command-runner_03-09-26/repository-diagnostic-command-runner_PLAN_03-09-26.md";
-  const phasePlan = path.join(repositoryRoot, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_PLAN_07-08-26.md");
-  const umbrella = path.join(repositoryRoot, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/visual-animation-assets-umbrella_PLAN_07-08-26.md");
-  const goal = path.join(repositoryRoot, ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md");
+  const syntheticRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-synthetic-"));
   const policy = commandPolicy({ repositoryRoot });
-  const definitions = [
-    ["plan", "validator-plan-json-clean/v1", policy.planValidator, ["--strict", selectedPlan], { argv_path: selectedPlan, target_path: selectedPlan }],
-    ["phase", "validator-phase-json-clean/v1", policy.phaseValidator, ["--strict", phasePlan], { argv_path: phasePlan, target_path: path.relative(repositoryRoot, phasePlan).split(path.sep).join("/") }],
-    ["umbrella", "validator-umbrella-json-clean/v1", policy.umbrellaValidator, ["--strict", umbrella], { argv_path: umbrella, target_path: path.relative(repositoryRoot, umbrella).split(path.sep).join("/") }],
-    ["goal", "validator-goal-pass-line/v1", policy.goalValidator, [goal], { goal, lane: "absent" }],
-  ];
   const outputs = new Map();
-  for (const [name, kind, script, argv, parameters] of definitions) {
-    const child = spawnSync(process.execPath, [script, ...argv], { cwd: repositoryRoot, shell: false, encoding: null, timeout: 120000, maxBuffer: 1048576 });
-    if (child.error || child.signal !== null || child.status !== 0) fail("SELF_CHECK", `actual ${name} validator failed`);
-    const stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
-    const stderr = Buffer.from(child.stderr ?? Buffer.alloc(0));
-    validateCommandSemantic(kind, stdout, stderr, parameters);
-    outputs.set(name, { kind, stdout, parameters });
-    checks.push({ name: `validator-actual-${name}-production-output`, status: "PASS" });
-  }
-  const envelopeParameters = { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 76, stop_condition_count: 5, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 76 };
-  const envelopeChild = spawnSync(process.execPath, [policy.envelopeValidator, "--v2-validation-fixture", selectedPlan], { cwd: repositoryRoot, shell: false, encoding: null, timeout: 120000, maxBuffer: 1048576 });
-  if (envelopeChild.error || envelopeChild.signal !== null || envelopeChild.status !== 0) fail("SELF_CHECK", "actual envelope validator failed");
-  const envelopeOutput = Buffer.from(envelopeChild.stdout ?? Buffer.alloc(0));
-  const envelopeStderr = Buffer.from(envelopeChild.stderr ?? Buffer.alloc(0));
-  validateCommandSemantic("validator-envelope-json-clean/v1", envelopeOutput, envelopeStderr, envelopeParameters);
-  const envelopeValue = JSON.parse(envelopeOutput);
-  outputs.set("envelope", { kind: "validator-envelope-json-clean/v1", stdout: envelopeOutput, parameters: envelopeParameters });
-  checks.push({ name: "validator-actual-envelope-production-output", status: "PASS" });
+  let selectedPlan;
+  let phasePlan;
+  let umbrella;
+  let goal;
+  try {
+    spawnSync("/usr/bin/git", ["init", "--quiet"], { cwd: syntheticRoot, shell: false, encoding: null });
+    selectedPlan = SYNTHETIC_DOCUMENTS.plan.path;
+    phasePlan = SYNTHETIC_DOCUMENTS.phase.path;
+    umbrella = SYNTHETIC_DOCUMENTS.umbrella.path;
+    for (const document of Object.values(SYNTHETIC_DOCUMENTS)) writeExclusiveDocument(syntheticRoot, document);
+    const proofBytes = fs.readFileSync(path.join(repositoryRoot, PROOF_PATHS[0]));
+    if (proofBytes.length !== 647 || sha256(proofBytes) !== "08c300a11138312edf254f3e6c5237ed340c6dc95468dd44dba24dff494cbb0f") fail("SELF_CHECK", "committed standing proof bytes drifted");
+    goal = path.join(syntheticRoot, "proof/standing-goal-block.md");
+    makeOwnedDirectories(syntheticRoot, path.dirname(goal));
+    fs.writeFileSync(goal, proofBytes, { flag: "wx" });
+    const envelopeProof = path.join(syntheticRoot, PROOF_PATHS[0]);
+    makeOwnedDirectories(syntheticRoot, path.dirname(envelopeProof));
+    fs.writeFileSync(envelopeProof, proofBytes, { flag: "wx" });
+    const noConsent = path.join(syntheticRoot, "proof/no-consent-goal-block.md");
+    fs.writeFileSync(noConsent, fs.readFileSync(path.join(repositoryRoot, PROOF_PATHS[1])), { flag: "wx" });
+    for (const sourcePath of [...COMMITTED_VALIDATOR_PATHS, ...Object.values(SOURCE_AUTHORITY_PATHS)]) {
+      const target = path.join(syntheticRoot, sourcePath);
+      makeOwnedDirectories(syntheticRoot, path.dirname(target));
+      fs.writeFileSync(target, fs.readFileSync(path.join(repositoryRoot, sourcePath)), { flag: "wx" });
+    }
+    const syntheticVite = path.join(syntheticRoot, "node_modules/vite/bin/vite.js");
+    makeOwnedDirectories(syntheticRoot, path.dirname(syntheticVite));
+    fs.writeFileSync(syntheticVite, Buffer.from("#!/usr/bin/env node\n", "utf8"), { flag: "wx" });
+    spawnSync("/usr/bin/git", ["-c", "user.name=Repository Diagnostic", "-c", "user.email=diagnostic@example.invalid", "add", "-f", "--", "process", ".claude", "node_modules/vite/bin/vite.js"], { cwd: syntheticRoot, shell: false, encoding: null });
+    const syntheticCommit = spawnSync("/usr/bin/git", ["-c", "user.name=Repository Diagnostic", "-c", "user.email=diagnostic@example.invalid", "commit", "--quiet", "-m", "synthetic validator operands"], { cwd: syntheticRoot, shell: false, encoding: null });
+    if (syntheticCommit.status !== 0) fail("SELF_CHECK", "synthetic validator repository commit failed");
+    const noConsentChild = spawnSync(process.execPath, [policy.goalValidator, noConsent], { cwd: syntheticRoot, shell: false, encoding: null, timeout: 120000, maxBuffer: 1048576 });
+    if (noConsentChild.status === 0 || !Buffer.from(noConsentChild.stdout ?? Buffer.alloc(0)).includes(Buffer.from("does not contain \"standing-granted\""))) fail("SELF_CHECK", "actual goal validator accepted no-consent proof");
+    const definitions = [
+      ["plan", "validator-plan-json-clean/v1", policy.planValidator, ["--strict", selectedPlan], { argv_path: selectedPlan, target_path: selectedPlan }],
+      ["phase", "validator-phase-json-clean/v1", policy.phaseValidator, ["--strict", phasePlan], { argv_path: phasePlan, target_path: phasePlan }],
+      ["umbrella", "validator-umbrella-json-clean/v1", policy.umbrellaValidator, ["--strict", umbrella], { argv_path: umbrella, target_path: umbrella }],
+      ["goal", "validator-goal-pass-line/v1", policy.goalValidator, [goal], { goal, lane: "absent" }],
+    ];
+    for (const [name, kind, script, argv, parameters] of definitions) {
+      const child = spawnSync(process.execPath, [script, ...argv], { cwd: syntheticRoot, shell: false, encoding: null, timeout: 120000, maxBuffer: 1048576 });
+      if (child.error || child.signal !== null || child.status !== 0) fail("SELF_CHECK", `actual ${name} validator failed: ${Buffer.from(child.stdout ?? Buffer.alloc(0)).toString("utf8")}`);
+      const stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
+      const stderr = Buffer.from(child.stderr ?? Buffer.alloc(0));
+      validateCommandSemantic(kind, stdout, stderr, parameters);
+      outputs.set(name, { kind, stdout, parameters });
+      checks.push({ name: `validator-actual-${name}-production-output`, status: "PASS" });
+    }
+    const envelopeParameters = { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: PROOF_PATHS[0], scope_count: 76, stop_condition_count: 5, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 76 };
+    const envelopeChild = spawnSync(process.execPath, [path.join(syntheticRoot, SOURCE_AUTHORITY_PATHS.validator), "--v2-validation-fixture", selectedPlan], { cwd: syntheticRoot, shell: false, encoding: null, timeout: 120000, maxBuffer: 1048576 });
+    if (envelopeChild.error || envelopeChild.signal !== null || envelopeChild.status !== 0) fail("SELF_CHECK", `actual envelope validator failed: ${Buffer.from(envelopeChild.stderr ?? Buffer.alloc(0)).toString("utf8")}`);
+    const envelopeOutput = Buffer.from(envelopeChild.stdout ?? Buffer.alloc(0));
+    const envelopeStderr = Buffer.from(envelopeChild.stderr ?? Buffer.alloc(0));
+    validateCommandSemantic("validator-envelope-json-clean/v1", envelopeOutput, envelopeStderr, envelopeParameters);
+    const envelopeValue = JSON.parse(envelopeOutput);
+    outputs.set("envelope", { kind: "validator-envelope-json-clean/v1", stdout: envelopeOutput, parameters: envelopeParameters });
+    checks.push({ name: "validator-actual-envelope-production-output", status: "PASS" });
 
   const reject = (name, kind, stdout, parameters, stderr = Buffer.alloc(0)) => checks.push(expectReject(name, () => validateCommandSemantic(kind, stdout, stderr, parameters)));
   const jsonOutput = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
@@ -2194,8 +2326,11 @@ function validatorSemanticContractChecks() {
   changed.head_commit_oid = "c".repeat(40);
   const changedBytes = Buffer.from(`${JSON.stringify(changed, null, 2)}\n`);
   if (firstBytes.equals(changedBytes) || firstDigest === sha256(changedBytes) || JSON.stringify(childExpectations) !== JSON.stringify(changed.rows.filter((row) => row.capability_class === "diagnostic-validator").map((row) => [row.expected.stdout_policy, row.expected.stderr_policy]))) fail("SELF_CHECK", "registry metadata change altered child expectations");
-  checks.push({ name: "validator-registry-change-child-expectation-invariance", status: "PASS" });
-  if (checks.length !== 72 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `validator semantic contract checks failed: ${checks.length}`);
+    checks.push({ name: "validator-registry-change-child-expectation-invariance", status: "PASS" });
+    if (checks.length !== 72 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `validator semantic contract checks failed: ${checks.length}`);
+  } finally {
+    removeOwnedTemporaryTree(syntheticRoot);
+  }
   return checks;
 }
 
