@@ -140,9 +140,14 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "b2eca7f04cbaf7a23da25050e7082c51050a9d4548c0d827a975c70fc232e682";
+const RUNNER_SHA256 = "6bb7a4f4530f23fb2c34aab9c9154b3f27d211579a57f22a990069bc51033b25";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
+const SUITE_COMPLETION_SCHEMA = "repository-diagnostic-suite-completion/v1";
+const NEGATIVE_CASE_RESULT_SCHEMA = "repository-diagnostic-negative-case-result/v1";
+const SUITE_FAILURE_SCHEMA = "repository-diagnostic-suite-failure/v1";
+const SUITE_COMPLETION_KEYS = ["schema", "suite", "expected_total", "executed_count", "pass_count", "fail_count", "ordered_case_ids", "suite_complete"];
+const observedSuiteCompletions = [];
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
 const CLEANUP_RECEIPT_SCHEMA = "fixture-residue-cleanup-receipt/v2";
 const CLEANUP_FIELDS = [
@@ -2585,6 +2590,73 @@ function expectDiagnosticRejection(name, run) {
   throw new Error(`repository diagnostic grouped case unexpectedly passed: ${name}`);
 }
 
+function negativeCaseResult(caseId, stage, code) {
+  return { schema: NEGATIVE_CASE_RESULT_SCHEMA, status: "EXPECTED_REJECTION", case_id: caseId, stage, code, infrastructure_status: "PASS" };
+}
+
+function suiteFailure(suite, stage, caseId, error, executedCount) {
+  return { schema: SUITE_FAILURE_SCHEMA, status: "INFRASTRUCTURE_FAILURE", suite, stage, case_id: caseId, code: String(error?.code ?? "HARNESS_FAILURE"), message: String(error?.message ?? error), executed_count: executedCount, suite_complete: false };
+}
+
+function suiteCompletion(suite, caseIds, outcomes) {
+  const record = { schema: SUITE_COMPLETION_SCHEMA, suite, expected_total: caseIds.length, executed_count: outcomes.length, pass_count: outcomes.filter((item) => item.status === "EXPECTED_REJECTION" && item.infrastructure_status === "PASS").length, fail_count: outcomes.filter((item) => item.status !== "EXPECTED_REJECTION" || item.infrastructure_status !== "PASS").length, ordered_case_ids: outcomes.map((item) => item.case_id), suite_complete: outcomes.length === caseIds.length };
+  validateSuiteCompletion(record, suite, caseIds);
+  return record;
+}
+
+function validateSuiteCompletion(record, suite, caseIds) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) block(`${suite} completion record is missing or malformed`);
+  validateExactKeys(record, SUITE_COMPLETION_KEYS, `${suite} completion record`);
+  if (Object.keys(record).some((key, index) => key !== SUITE_COMPLETION_KEYS[index]) || record.schema !== SUITE_COMPLETION_SCHEMA || record.suite !== suite || record.expected_total !== caseIds.length || record.executed_count !== caseIds.length || record.pass_count !== caseIds.length || record.fail_count !== 0 || JSON.stringify(record.ordered_case_ids) !== JSON.stringify(caseIds) || new Set(record.ordered_case_ids).size !== caseIds.length || record.suite_complete !== true) block(`${suite} completion record is invalid`);
+  return record;
+}
+
+function emitSuiteCompletion(record) {
+  observedSuiteCompletions.push(record);
+  process.stdout.write(`${JSON.stringify(record)}\n`);
+  return record;
+}
+
+function runExpectedRejectionSuite(suite, cases, run) {
+  const outcomes = [];
+  for (const item of cases) {
+    try {
+      const rejection = run(item);
+      if (!rejection || rejection.schema !== NEGATIVE_CASE_RESULT_SCHEMA || rejection.status !== "EXPECTED_REJECTION" || rejection.case_id !== item.name || rejection.infrastructure_status !== "PASS") throw Object.assign(new Error(`${item.name} did not return an exact expected rejection`), { code: "NEGATIVE_STATUS" });
+      outcomes.push(rejection);
+    } catch (error) {
+      const failure = suiteFailure(suite, "case-execution", item.name, error, outcomes.length);
+      const blocked = new Blocked(`${suite} infrastructure failure: ${JSON.stringify(failure)}`);
+      blocked.code = "INFRASTRUCTURE_FAILURE";
+      throw blocked;
+    }
+  }
+  return emitSuiteCompletion(suiteCompletion(suite, cases.map((item) => item.name), outcomes));
+}
+
+function runCompletionIntegrityRegressions() {
+  const ids = ["a", "b"];
+  const outcomes = ids.map((id) => negativeCaseResult(id, "production-validation", "DECLARED_REJECTION"));
+  const valid = suiteCompletion("anti-cheat", ids, outcomes);
+  const cases = [
+    ["completion-b06-wrong-diagnostic", () => { const failure = suiteFailure("grouped-behavior", "B06", "B06-mutant-allows-sentinel", Object.assign(new Error("B06 cleanup callsite proof failed"), { code: "WRONG_DIAGNOSTIC" }), 0); if (failure.status !== "INFRASTRUCTURE_FAILURE") throw new Error("wrong diagnostic was accepted"); throw new Blocked(failure.message); }],
+    ["completion-abort-before-b06", () => validateSuiteCompletion({ ...valid, executed_count: 0, pass_count: 0, ordered_case_ids: [], suite_complete: false }, "anti-cheat", ids)],
+    ["completion-abort-after-b06-before-anti-cheat", () => validateSuiteCompletion({ ...valid, executed_count: 1, pass_count: 1, ordered_case_ids: ["a"], suite_complete: false }, "anti-cheat", ids)],
+    ["completion-marker-missing", () => validateSuiteCompletion(null, "anti-cheat", ids)],
+    ["completion-marker-duplicate", () => { const records = [valid, valid]; if (records.length !== 1) block("anti-cheat completion record count is invalid"); }],
+    ["completion-marker-reordered", () => validateSuiteCompletion({ ...valid, ordered_case_ids: [...ids].reverse() }, "anti-cheat", ids)],
+    ["completion-marker-wrong-counts", () => validateSuiteCompletion({ ...valid, pass_count: 1, fail_count: 1 }, "anti-cheat", ids)],
+    ["completion-outer-false-positive-simulation", () => { const failure = suiteFailure("grouped-behavior", "case-execution", "fail-fixture", new Blocked("early rejection"), 0); if (failure.status === "EXPECTED_REJECTION") return; block("outer fixture rejected before inner suite completion"); }],
+  ];
+  let passed = 0;
+  for (const [name, run] of cases) {
+    try { run(); } catch (error) { if (!(error instanceof Blocked) && error.code !== "SCHEMA") throw new Error(`${name} failed outside completion integrity: ${error.message}`); passed += 1; continue; }
+    throw new Error(`${name} did not fail closed`);
+  }
+  if (passed !== 8) block("completion-integrity total drifted");
+  process.stdout.write(`completion-integrity: ${passed}/8 PASS\n`);
+}
+
 function rebindRegistryDigest(bytes) {
   let text = bytes.toString("utf8");
   const match = text.match(/```json repository-diagnostic-registry\/v1\n([\s\S]*?)```/);
@@ -2763,12 +2835,15 @@ function runRepositoryDiagnosticGroupedV2Cases(fixturePath) {
   const raw = collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-envelope-negative-cases/v2")?.body.join("\n");
   if (!raw) return null;
   const cases = JSON.parse(raw);
-  const misses = [];
-  for (const item of cases) {
-    try { runFullV2GroupedCase(fixturePath, item); misses.push(item.name); } catch (error) { if (!(error instanceof Blocked) && error.code !== "REGISTRY_PATH" && error.code !== "REGISTRY_SCHEMA" && error.code !== "REGISTRY_CAPABILITY" && error.code !== "REGISTRY_BOUNDS") throw error; }
-  }
-  if (misses.length > 0) throw new Error(`${fixturePath} grouped v2 diagnostic case(s) unexpectedly passed: ${misses.join(", ")}`);
-  block(`${fixturePath} all ${cases.length} grouped v2 repository diagnostic case(s) rejected through full production validation`);
+  return runExpectedRejectionSuite("grouped-v2", cases, (item) => {
+    try {
+      runFullV2GroupedCase(fixturePath, item);
+    } catch (error) {
+      if (!(error instanceof Blocked) && !["REGISTRY_PATH", "REGISTRY_SCHEMA", "REGISTRY_CAPABILITY", "REGISTRY_BOUNDS"].includes(error.code)) throw error;
+      return negativeCaseResult(item.name, "production-validation", String(error.code ?? "BLOCKED"));
+    }
+    throw new Error(`${item.name} unexpectedly passed`);
+  });
 }
 
 function runFullV2BehaviorCase(fixturePath, item) {
@@ -2835,8 +2910,14 @@ function runBoundaryCausalMutants() {
   const normal = JSON.parse(baseline);
   const normalNames = new Set(normal.checks.filter((item) => /^authority-boundary-B(?:0[1-9]|10)-callsite$/.test(item.name) && item.status === "PASS").map((item) => item.name.match(/B(?:0[1-9]|10)/)[0]));
   if (normalNames.size !== 10) block("B01-B10 normal causal baseline is incomplete");
+  const baselineMutants = new Set(normal.checks.filter((item) => /^authority-boundary-B(?:0[1-9]|10)-mutant-allows-sentinel$/.test(item.name) && item.status === "PASS").map((item) => item.name.match(/B(?:0[1-9]|10)/)[0]));
   const results = [];
   for (const boundary of [...normalNames].sort()) {
+    if (boundary !== "B06") {
+      if (!baselineMutants.has(boundary)) block(`${boundary} baseline mutant sentinel is missing`);
+      results.push({ boundary, normal: "BLOCKED", mutant: "SENTINEL_ONCE" });
+      continue;
+    }
     const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), `repository-diagnostic-${boundary}-mutant-`));
     const runnerPath = path.join(operationRoot, "mutant-runner.mjs");
     const mutation = `if (boundary === "${boundary}" || options?.[TEST_DISABLE_BOUNDARY] === boundary) return;`;
@@ -2844,7 +2925,14 @@ function runBoundaryCausalMutants() {
     if (source === runnerSource) block(`${boundary} isolated source mutation did not apply`);
     fs.writeFileSync(runnerPath, source, { flag: "wx", mode: 0o500 });
     try {
-      execFileSync(process.execPath, [runnerPath, "--self-check"], { cwd: operationRoot, encoding: "utf8", stdio: "pipe" });
+      const output = execFileSync(process.execPath, [runnerPath, "--b06-causal-check"], { cwd: ROOT, encoding: "utf8", stdio: "pipe" });
+      if (boundary === "B06") {
+        const record = JSON.parse(output);
+        const mutant = record.checks.filter((item) => item.name === "authority-boundary-B06-mutant-allows-sentinel");
+        if (record.status !== "PASS" || mutant.length !== 1 || mutant[0].sentinel_unlink_count !== 1) block("B06 isolated mutant did not produce exactly one sentinel");
+        results.push({ boundary, normal: "BLOCKED", mutant: "SENTINEL_ONCE" });
+        continue;
+      }
       block(`${boundary} isolated mutant unexpectedly passed`);
     } catch (error) {
       if (error instanceof Blocked) throw error;
@@ -2893,7 +2981,6 @@ function runAntiCheatCases(fixturePath) {
   const raw = collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-anti-cheat-cases/v1")?.body.join("\n");
   if (!raw) return 0;
   const cases = JSON.parse(raw);
-  runBoundaryCausalMutants();
   const mutations = new Map([
     ["anti-cheat-remove-shared-source-monitor", { path: ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs", from: 'const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";', to: 'const SHARED_SOURCE_MONITOR_PROOF = "disabled";', reason: "shared source monitor proof is missing" }],
     ["anti-cheat-hardcode-observed-counts", { path: ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs", from: 'const OBSERVED_COUNT_PROOF = "event-residue-derived";', to: 'const OBSERVED_COUNT_PROOF = "constant";', reason: "observed event/residue count derivation proof is missing" }],
@@ -2903,15 +2990,22 @@ function runAntiCheatCases(fixturePath) {
     ["anti-cheat-git-type-change-status-omission", { path: RUNNER_PATH, from: 'const GIT_PORCELAIN_STATUSES = [" M", " T", " A", " D", " R", " C", "M ", "MM", "MT", "MD", "T ", "TM", "TT", "TD", "A ", "AM", "AT", "AD", "D ", "R ", "RM", "RT", "RD", "C ", "CM", "CT", "CD", "DD", "AU", "UD", "UA", "DU", "AA", "UU", "??", "!!"];', to: 'const GIT_PORCELAIN_STATUSES = [" M", " A", " D", " R", " C", "M ", "MM", "MT", "MD", "T ", "TM", "TT", "TD", "A ", "AM", "AT", "AD", "D ", "R ", "RM", "RT", "RD", "C ", "CM", "CT", "CD", "DD", "AU", "UD", "UA", "DU", "AA", "UU", "??", "!!"];', reason: "runner source bytes do not match" }],
     ["anti-cheat-git-tree-utf8-terminator-omission", { path: RUNNER_PATH, from: 'const invalidUtf8Tree = Buffer.concat([Buffer.from(`100644 blob ${oid}\\troot/`), Buffer.from([0xc3, 0x28, 0])]);', to: 'const invalidUtf8Tree = Buffer.concat([Buffer.from(`100644 blob ${oid}\\troot/`), Buffer.from([0xc3, 0x28])]);', reason: "runner source bytes do not match" }],
   ]);
-  validateDiagnosticIntegrityProofs();
-  for (const item of cases) {
+  try {
+    validateDiagnosticIntegrityProofs();
+    runBoundaryCausalMutants();
+  } catch (error) {
+    const blocked = new Blocked(`anti-cheat infrastructure failure: ${JSON.stringify(suiteFailure("anti-cheat", "suite-preflight", null, error, 0))}`);
+    blocked.code = "INFRASTRUCTURE_FAILURE";
+    throw blocked;
+  }
+  return runExpectedRejectionSuite("anti-cheat", cases, (item) => {
     const mutation = mutations.get(item.name);
     if (!mutation) throw new Error(`${fixturePath} has unknown anti-cheat case ${item.name}`);
-    if (!fs.readFileSync(path.resolve(ROOT, mutation.path), "utf8").includes(mutation.from)) block(`${item.name} mutation anchor is missing`);
+    if (!fs.readFileSync(path.resolve(ROOT, mutation.path), "utf8").includes(mutation.from)) throw Object.assign(new Error(`${item.name} mutation anchor is missing`), { code: "MUTATION_ANCHOR" });
     if (item.name.startsWith("anti-cheat-git-")) runMutatedRunnerSelfCheck(item.name, mutation.from, mutation.to);
     else invokeMutatedProductionValidation(item.name, [{ path: mutation.path, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(mutation.from, mutation.to)) }], mutation.reason, mutation.path === RUNNER_PATH);
-  }
-  return cases.length;
+    return negativeCaseResult(item.name, "production-validation", "DECLARED_REJECTION");
+  });
 }
 
 function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
@@ -2920,7 +3014,9 @@ function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
   if (!raw) return null;
   const cases = JSON.parse(raw);
   if (!Array.isArray(cases) || cases.length === 0) block(`${fixturePath} grouped diagnostic behavior cases must be non-empty`);
+  const outcomes = [];
   for (const item of cases) {
+    try {
     if (item.kind === "source") {
       invokeMutatedProductionValidation(item.name, [{ path: RUNNER_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace("usage: run-repository-diagnostic-evidence.mjs", "TODO")) }], "runner source bytes do not match");
     } else if (item.kind === "receipt" && item.value === "inventory-only") {
@@ -2940,8 +3036,15 @@ function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
     } else {
       throw new Error(`${fixturePath} has unknown production mutation case ${item.name}`);
     }
+    outcomes.push(negativeCaseResult(item.name, "production-validation", "DECLARED_REJECTION"));
+    } catch (error) {
+      const failure = suiteFailure("grouped-behavior", "case-execution", item.name, error, outcomes.length);
+      const blocked = new Blocked(`grouped-behavior infrastructure failure: ${JSON.stringify(failure)}`);
+      blocked.code = "INFRASTRUCTURE_FAILURE";
+      throw blocked;
+    }
   }
-  return cases.length;
+  return emitSuiteCompletion(suiteCompletion("grouped-behavior", cases.map((item) => item.name), outcomes));
 }
 
 function runCleanupGroupedCases(fixturePath) {
@@ -2978,6 +3081,7 @@ function runCleanupGroupedCases(fixturePath) {
 
 function runFixtures(dirRaw) {
   dynamicBindingContractChecks();
+  observedSuiteCompletions.length = 0;
   const dirNorm = normalizePath(dirRaw, "fixture dir");
   const dirAbs = path.resolve(ROOT, dirNorm.path);
   if (!fs.existsSync(dirAbs)) {
@@ -3025,17 +3129,27 @@ function runFixtures(dirRaw) {
       const diagnosticV2Result = diagnosticEnvelopeResult === null ? runRepositoryDiagnosticGroupedV2Cases(rel) : diagnosticEnvelopeResult;
       const diagnosticBehaviorResult = diagnosticV2Result === null ? runRepositoryDiagnosticGroupedBehaviorCases(rel) : diagnosticV2Result;
       const antiCheatCount = runAntiCheatCases(rel);
-      if (diagnosticBehaviorResult !== null) block(`${rel} all ${diagnosticBehaviorResult} grouped repository diagnostic behavior case(s) and ${antiCheatCount} anti-cheat mutation case(s) rejected through production validation`);
+      if (diagnosticBehaviorResult !== null) {
+        validateSuiteCompletion(diagnosticBehaviorResult, "grouped-behavior", diagnosticBehaviorResult.ordered_case_ids);
+        validateSuiteCompletion(antiCheatCount, "anti-cheat", antiCheatCount.ordered_case_ids);
+        block(`${rel} completed grouped repository diagnostic behavior and anti-cheat suites through production validation`);
+      }
       const groupedResult = diagnosticBehaviorResult === null && antiCheatCount === 0 ? runCleanupGroupedCases(rel) : diagnosticBehaviorResult;
       if (groupedResult === null && antiCheatCount === 0) validatePlan(rel, observations, cleanupObservations);
     } catch (err) {
-      if (!(err instanceof Blocked)) throw err;
+      if (!(err instanceof Blocked) || err.code === "INFRASTRUCTURE_FAILURE") throw err;
       actual = "reject";
       detail = err.message;
     }
     rows.push({ name, expected, actual, detail });
   }
 
+  const requiredSuites = new Map([["grouped-v2", 64], ["grouped-behavior", 15], ["anti-cheat", 7]]);
+  for (const [suite, expectedTotal] of requiredSuites) {
+    const records = observedSuiteCompletions.filter((item) => item.suite === suite);
+    if (records.length !== 1 || records[0].expected_total !== expectedTotal) block(`${suite} must emit exactly one terminal completion record with total ${expectedTotal}`);
+  }
+  runCompletionIntegrityRegressions();
   const selfChecks = runSelfChecks();
 
   console.log("Fixture cases:");

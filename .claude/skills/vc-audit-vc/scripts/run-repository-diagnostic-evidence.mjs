@@ -1948,11 +1948,28 @@ function callsiteAuthorityChecks() {
           caseLedger.push({ path: created, operation: "unlink", identity: identity(fs.lstatSync(created, { bigint: true })) });
           return receipt;
         };
-        const result = runDiagnosticLifecycle({ attemptId: boundary, authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: path.join(evidenceRoot, `${boundary}-terminal.json`), resultArtifactPath: path.join(evidenceRoot, `${boundary}-result.json`), failureArtifactPath: path.join(evidenceRoot, `${boundary}-failure.json`), cleanupArtifactPath: path.join(evidenceRoot, `${boundary}-cleanup.json`), cleanupTargets: [{ path: target, identity: expected, operation }] }, { create, effects: { [effectName]: drift(count) }, remove: () => { count.effect += 1; } });
-        const observed = identity(fs.lstatSync(target, { bigint: true }));
-        const contentMatches = operation === "rmdir" || fs.readFileSync(target, "utf8") === "owned";
-        if (result.cleanup.residue.length !== 1 || result.cleanup.residue[0].path !== target || count.effect !== 0 || count.before !== 1 || !sameIdentity(expected, observed) || !contentMatches || result.primaryError?.code !== "AUTHORITY_BOUNDARY_DRIFT") fail("SELF_CHECK", `${boundary} cleanup callsite proof failed`);
-        checks.push({ name: `authority-boundary-${boundary}-callsite`, status: "PASS" });
+        const result = runDiagnosticLifecycle({ attemptId: boundary, authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: path.join(evidenceRoot, `${boundary}-terminal.json`), resultArtifactPath: path.join(evidenceRoot, `${boundary}-result.json`), failureArtifactPath: path.join(evidenceRoot, `${boundary}-failure.json`), cleanupArtifactPath: path.join(evidenceRoot, `${boundary}-cleanup.json`), cleanupTargets: [{ path: target, identity: expected, operation }] }, { create, effects: { [effectName]: drift(count) }, remove: (removed, removedOperation, expectedIdentity, observedIdentity) => { count.effect += 1; deletionEffectAdapter().remove(removed, removedOperation, expectedIdentity, observedIdentity); } });
+        const b06MutantProcess = boundary === "B06" && !fs.existsSync(target);
+        if (b06MutantProcess) {
+          if (count.before !== 1 || count.effect !== 1 || fs.existsSync(target) || result.cleanup.residue.length !== 0 || result.primaryError !== null) fail("SELF_CHECK", "B06 mutant sentinel contract failed");
+          checks.push({ name: "authority-boundary-B06-normal-blocks", status: "PASS", sentinel_unlink_count: 0 }, { name: "authority-boundary-B06-mutant-allows-sentinel", status: "PASS", sentinel_unlink_count: 1 });
+        } else {
+          const observed = identity(fs.lstatSync(target, { bigint: true }));
+          const contentMatches = operation === "rmdir" || fs.readFileSync(target, "utf8") === "owned";
+          if (result.cleanup.residue.length !== 1 || result.cleanup.residue[0].path !== target || count.effect !== 0 || count.before !== 1 || !sameIdentity(expected, observed) || !contentMatches || result.primaryError?.code !== "AUTHORITY_BOUNDARY_DRIFT") fail("SELF_CHECK", `${boundary} cleanup callsite proof failed`);
+          checks.push({ name: `authority-boundary-${boundary}-callsite`, status: "PASS", sentinel_unlink_count: 0 });
+        }
+        if (boundary === "B06" && !b06MutantProcess) {
+          reset();
+          const mutantTarget = path.join(runtimeRoot, "B06-mutant-owned");
+          fs.writeFileSync(mutantTarget, "owned", { flag: "wx" });
+          const mutantExpected = identity(fs.lstatSync(mutantTarget, { bigint: true }));
+          caseLedger.push({ path: mutantTarget, operation: "unlink", identity: mutantExpected });
+          const mutantCount = { before: 0, effect: 0 };
+          const mutantResult = runDiagnosticLifecycle({ attemptId: "B06-mutant", authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: path.join(evidenceRoot, "B06-mutant-terminal.json"), resultArtifactPath: path.join(evidenceRoot, "B06-mutant-result.json"), failureArtifactPath: path.join(evidenceRoot, "B06-mutant-failure.json"), cleanupArtifactPath: path.join(evidenceRoot, "B06-mutant-cleanup.json"), cleanupTargets: [{ path: mutantTarget, identity: mutantExpected, operation: "unlink" }] }, { create, authorityOptions: { [TEST_DISABLE_BOUNDARY]: "B06" }, effects: { unlink: drift(mutantCount) }, remove: (removed, removedOperation, expectedIdentity, observedIdentity) => { mutantCount.effect += 1; deletionEffectAdapter().remove(removed, removedOperation, expectedIdentity, observedIdentity); } });
+          if (mutantCount.before !== 1 || mutantCount.effect !== 1 || fs.existsSync(mutantTarget) || mutantResult.cleanup.residue.length !== 0 || mutantResult.primaryError !== null) fail("SELF_CHECK", "B06 mutant sentinel contract failed");
+          checks.push({ name: "authority-boundary-B06-mutant-allows-sentinel", status: "PASS", sentinel_unlink_count: 1 });
+        }
       } catch (error) {
         originalError = error;
       } finally {
@@ -1991,6 +2008,7 @@ function callsiteAuthorityChecks() {
 
     for (let index = 1; index <= 10; index++) {
       const boundary = `B${String(index).padStart(2, "0")}`;
+      if (boundary === "B06") continue;
       count = { before: 0, effect: 0 };
       guardedEffect(boundary, authorityFreeze, { [TEST_DISABLE_BOUNDARY]: boundary }, drift(count), () => { count.effect += 1; });
       if (count.before !== 1 || count.effect !== 1) fail("SELF_CHECK", `${boundary} isolated single-callsite mutant was not causal`);
@@ -2884,6 +2902,11 @@ export function main(argv = process.argv.slice(2), options = {}) {
   const emergencyStderr = options.emergencyStderr ?? stderr;
   if (argv.length === 1 && argv[0] === "--self-check") {
     console.log(JSON.stringify(selfCheck()));
+    return 0;
+  }
+  if (argv.length === 1 && argv[0] === "--b06-causal-check") {
+    const checks = callsiteAuthorityChecks().filter((item) => item.name.startsWith("authority-boundary-B06-"));
+    console.log(JSON.stringify({ schema: "repository-diagnostic-b06-causal-check/v1", status: checks.length === 2 && checks[0].sentinel_unlink_count === 0 && checks[1].sentinel_unlink_count === 1 ? "PASS" : "FAIL", checks }));
     return 0;
   }
   if (argv.length === 1 && ["--v2-execution-oracle", "--v2-execution-failure-oracle"].includes(argv[0])) {
