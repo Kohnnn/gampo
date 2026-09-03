@@ -140,7 +140,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "00aa57873580cc9545b72a14b1e2cf7a70245fabf2be20db87fa8e606d0a47bc";
+const RUNNER_SHA256 = "83fb71083c262b978595cce8d6c0148d45bdd2bd19c0bddf4c858ca4ad82e596";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
@@ -2870,6 +2870,24 @@ function validateDiagnosticIntegrityProofs() {
   if (OBSERVED_COUNT_PROOF !== "event-residue-derived" || !validatorSource.includes("shared_source_write_count: observedSourceEvents.length") || !validatorSource.includes("residue_count: residue.length")) block("observed event/residue count derivation proof is missing");
 }
 
+function runMutatedRunnerSelfCheck(name, from, to) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-git-mutant-"));
+  const target = path.join(root, "mutant-runner.mjs");
+  const source = fs.readFileSync(path.resolve(ROOT, RUNNER_PATH), "utf8");
+  const mutated = source.replace(from, to);
+  if (mutated === source) block(`${name} mutation anchor is missing`);
+  fs.writeFileSync(target, mutated, { flag: "wx", mode: 0o500 });
+  try {
+    const child = spawnSync(process.execPath, [target, "--self-check"], { cwd: ROOT, shell: false, encoding: null, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
+    if (child.status === 0 || child.signal !== null || child.error) throw new Error(`${name} unexpectedly passed or failed outside its assertion`);
+    const diagnostic = Buffer.concat([Buffer.from(child.stdout ?? Buffer.alloc(0)), Buffer.from(child.stderr ?? Buffer.alloc(0))]).toString("utf8");
+    if (!diagnostic.includes("raw Git framing checks failed") && !diagnostic.includes("porcelain-v1 -z output must be nonempty") && !diagnostic.includes("reading 'sourcePath'")) throw new Error(`${name} failed outside raw Git framing acceptance: ${diagnostic}`);
+  } finally {
+    removeFixturePath(target);
+    removeFixturePath(root, "rmdir");
+  }
+}
+
 function runAntiCheatCases(fixturePath) {
   const text = fs.readFileSync(path.resolve(ROOT, fixturePath), "utf8");
   const raw = collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-anti-cheat-cases/v1")?.body.join("\n");
@@ -2880,12 +2898,16 @@ function runAntiCheatCases(fixturePath) {
     ["anti-cheat-remove-shared-source-monitor", { path: ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs", from: 'const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";', to: 'const SHARED_SOURCE_MONITOR_PROOF = "disabled";', reason: "shared source monitor proof is missing" }],
     ["anti-cheat-hardcode-observed-counts", { path: ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs", from: 'const OBSERVED_COUNT_PROOF = "event-residue-derived";', to: 'const OBSERVED_COUNT_PROOF = "constant";', reason: "observed event/residue count derivation proof is missing" }],
     ["anti-cheat-remove-cleanup-static-gate", { path: RUNNER_PATH, from: 'const CLEANUP_STATIC_GATE_PROOF = "single-adapter-executable-source-gate";', to: 'const CLEANUP_STATIC_GATE_PROOF = "disabled";', reason: "cleanup static gate proof is missing" }],
+    ["anti-cheat-git-positive-empty-buffer", { path: RUNNER_PATH, from: 'const porcelainSpace = Buffer.from(" M dir/file name\\0");', to: 'const porcelainSpace = Buffer.alloc(0);', reason: "runner source bytes do not match" }],
+    ["anti-cheat-git-parser-bypass", { path: RUNNER_PATH, from: 'if (kind === "git-porcelain-pathset/v1") return { status: "PASS", records: parseGitPorcelainZ(out, err, parameters) };', to: 'if (kind === "git-porcelain-pathset/v1") return { status: "PASS", records: [] };', reason: "runner source bytes do not match" }],
   ]);
   validateDiagnosticIntegrityProofs();
   for (const item of cases) {
     const mutation = mutations.get(item.name);
     if (!mutation) throw new Error(`${fixturePath} has unknown anti-cheat case ${item.name}`);
-    invokeMutatedProductionValidation(item.name, [{ path: mutation.path, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(mutation.from, mutation.to)) }], mutation.reason, mutation.path === RUNNER_PATH);
+    if (!fs.readFileSync(path.resolve(ROOT, mutation.path), "utf8").includes(mutation.from)) block(`${item.name} mutation anchor is missing`);
+    if (item.name.startsWith("anti-cheat-git-")) runMutatedRunnerSelfCheck(item.name, mutation.from, mutation.to);
+    else invokeMutatedProductionValidation(item.name, [{ path: mutation.path, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(mutation.from, mutation.to)) }], mutation.reason, mutation.path === RUNNER_PATH);
   }
   return cases.length;
 }
@@ -2908,7 +2930,7 @@ function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
     } else if (item.kind === "registry-field") {
       invokeMutatedProductionValidation(item.name, [{ path: DIAGNOSTIC_FIXTURE_PATH, apply: (bytes) => rebindRegistryDigest(Buffer.from(bytes.toString("utf8").replaceAll(item.from, item.to))) }], item.reason);
     } else if (item.kind === "runner-self-check") {
-      invokeMutatedProductionValidation(item.name, [{ path: RUNNER_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(item.from, item.to)) }], "runner source bytes do not match");
+      runMutatedRunnerSelfCheck(item.name, item.from.replace("\\\\0", "\\0"), item.to);
     } else if (item.kind === "oracle-regression") {
       let rejected = false;
       try { runFullV2BehaviorCase(fixturePath, item); } catch (error) { if (item.value === "root-mismatch" && (error instanceof Blocked || error.code === "REGISTRY_ROOT_BINDING" || error.code === "REGISTRY_PATH")) rejected = true; else throw error; }
@@ -3126,7 +3148,7 @@ async function runConcurrencyStress(argv) {
   try {
     for (let iteration = 0; iteration < repeat; iteration++) {
       const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents, callsiteMarker);
-      if (selfChecks.some((text) => !text.includes('"checkCount":486'))) block("concurrent self-check count drifted");
+      if (selfChecks.some((text) => !text.includes('"checkCount":532'))) block("concurrent self-check count drifted");
       successful += selfChecks.length;
       const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents, callsiteMarker);
       if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
