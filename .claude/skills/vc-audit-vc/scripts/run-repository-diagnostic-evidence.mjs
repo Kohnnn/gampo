@@ -40,7 +40,7 @@ const COMMAND_FAILURE_KEYS = ["ordinal", "id", "childExitCode", "childSignal", "
 const COMMAND_RECEIPT_KEYS = ["ordinal", "id", "stdoutBytes", "stdoutSha256", "stderrBytes", "stderrSha256", "status"];
 const RUNTIME_LEDGER_KEYS = ["ordinal", "role", "path", "operation", "identity"];
 const RUNTIME_ROLES = new Set(["home-file", "home-directory", "archive-file", "stream-file", "stream-directory", "temporary-file", "temporary-directory", "runtime-root"]);
-const COMMAND_SEMANTIC_CODES = new Set(["SPAWN", "SIGNAL", "EXIT", "TIMEOUT", "OUTPUT_OVERFLOW", "STREAM_POLICY", "SEMANTIC"]);
+const COMMAND_SEMANTIC_CODES = new Set(["SPAWN", "SIGNAL", "EXIT", "TIMEOUT", "OUTPUT_OVERFLOW", "STREAM_POLICY", "SEMANTIC", "GIT_INVALID_UTF8"]);
 const AUTHORITY_FIXTURE_ROOT = ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope";
 const AUTHORITY_FIXTURE_MANIFEST = [
   "fail-artifact-outside-scope.md",
@@ -717,7 +717,7 @@ const COMMAND_SEMANTICS = new Set(["version-node/v1", "version-npm/v1", "version
 const COMMAND_LIVE_PATHS = [".gitattributes", "scripts/assetDeliveryManifest.js", "scripts/assetDeliveryAudit.mjs", "scripts/assetDeliveryAudit.test.mjs", "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_PLAN_07-08-26.md"];
 const COMMAND_IGNORE_PATHS = [".agent/phase-02-runtime/phase02-continuation-20260902-17", "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_EVL-CORRECTION_23-08-26.md"];
 const COMMAND_TREE_PATHS = [".claude", ".codex", ".github", ".gitignore", ".vercelignore", "DESIGN.md", "README.md", "api", "components.json", "docs", "eslint.config.js", "index.html", "jsconfig.json", "netlify.toml", "netlify", "package-lock.json", "package.json", "process", "progress.md", "public", "scripts", "server", "skills-lock.json", "src", "tsconfig.core.json", "types", "vercel.json", "vite.config.js"];
-const GIT_PORCELAIN_STATUSES = [" M", "M ", "MM", "A ", "AM", "D ", " D", "R ", "RM", "C ", "CM", "DD", "AU", "UD", "UA", "DU", "AA", "UU", "??", "!!"];
+const GIT_PORCELAIN_STATUSES = [" M", " T", " A", " D", " R", " C", "M ", "MM", "MT", "MD", "T ", "TM", "TT", "TD", "A ", "AM", "AT", "AD", "D ", "R ", "RM", "RT", "RD", "C ", "CM", "CT", "CD", "DD", "AU", "UD", "UA", "DU", "AA", "UU", "??", "!!"];
 const SECRET_NAME_PATTERN = /TOKEN|SECRET|PASSWORD|PASSWD|COOKIE|AUTH|CREDENTIAL|PRIVATE|API_KEY|PROXY|PROVIDER|^VITE_/i;
 
 function commandPolicy(overrides = {}) {
@@ -1107,14 +1107,14 @@ export function validateCommandRegistry(registry, options = {}) {
   return { registry, policy, destinations: [...rowDestinations, ...lifecycleDestinations], rowDestinations, lifecycleDestinations };
 }
 
-function decodeText(bytes, label) {
+function decodeText(bytes, label, failureCode = "SEMANTIC") {
   try {
     const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    if (!Buffer.from(text).equals(bytes)) fail("SEMANTIC", `${label} is not canonical UTF-8`);
+    if (!Buffer.from(text).equals(bytes)) fail(failureCode, `${label} is not canonical UTF-8`);
     return text;
   } catch (error) {
-    if (error.code === "SEMANTIC") throw error;
-    fail("SEMANTIC", `${label} is not UTF-8`);
+    if (error.code === failureCode) throw error;
+    fail(failureCode, `${label} is not UTF-8`);
   }
 }
 
@@ -1181,13 +1181,13 @@ function parseGitPorcelainZ(bytes, stderr, parameters) {
     if (record.length < 4 || record[2] !== 32) fail("SEMANTIC", "porcelain primary record framing is invalid");
     const status = record.subarray(0, 2).toString("ascii");
     if (!parameters.allowed_statuses.includes(status) || status === "??" && !parameters.include_untracked || status === "!!" && !parameters.include_ignored) fail("SEMANTIC", "porcelain status is not authorized");
-    const itemPath = validateRepositoryRelativePath(decodeText(record.subarray(3), "porcelain current path"), "porcelain current path");
+    const itemPath = validateRepositoryRelativePath(decodeText(record.subarray(3), "porcelain current path", "GIT_INVALID_UTF8"), "porcelain current path");
     if (!parameters.allowed_paths.includes(itemPath)) fail("SEMANTIC", "porcelain current path escaped allowed_paths");
     let sourcePath;
     if (/[RC]/.test(status)) {
       const source = records[++index];
       if (!source || source.length >= 3 && source[2] === 32 && parameters.allowed_statuses.includes(source.subarray(0, 2).toString("ascii"))) fail("SEMANTIC", "porcelain rename/copy source is missing or framed as a primary record");
-      sourcePath = validateRepositoryRelativePath(decodeText(source, "porcelain source path"), "porcelain source path");
+      sourcePath = validateRepositoryRelativePath(decodeText(source, "porcelain source path", "GIT_INVALID_UTF8"), "porcelain source path");
       paths.push(itemPath, sourcePath);
     } else {
       paths.push(itemPath);
@@ -1203,7 +1203,7 @@ function parseGitNameListZ(bytes, stderr, parameters) {
   exactSemanticParameters(parameters, ["framing", "allowed_paths", "bytes", "sha256"], "git-name-list/v1");
   if (parameters.framing !== "name-only-z/raw-bytes") fail("SEMANTIC", "name-only framing is invalid");
   const records = rawNulRecords(bytes, "name-only -z output", { allowEmptyStream: parameters.allowed_paths.length === 0 });
-  const paths = records.map((record) => validateRepositoryRelativePath(decodeText(record, "name-only path"), "name-only path"));
+  const paths = records.map((record) => validateRepositoryRelativePath(decodeText(record, "name-only path", "GIT_INVALID_UTF8"), "name-only path"));
   validatePathLedger(paths, parameters.allowed_paths);
   validateRawReceipt(bytes, stderr, parameters);
   return paths;
@@ -1220,7 +1220,7 @@ function parseGitLsTreeZ(bytes, stderr, parameters) {
     if (!metadata.every((byte) => byte < 128)) fail("SEMANTIC", "ls-tree metadata is not ASCII");
     const match = metadata.toString("ascii").match(/^([0-7]{6}) (blob|tree) ([0-9a-f]{40})$/);
     if (!match) fail("SEMANTIC", "ls-tree metadata is malformed");
-    const itemPath = validateRepositoryRelativePath(decodeText(record.subarray(tab + 1), "ls-tree path"), "ls-tree path", { excludeSportsbook: false });
+    const itemPath = validateRepositoryRelativePath(decodeText(record.subarray(tab + 1), "ls-tree path", "GIT_INVALID_UTF8"), "ls-tree path", { excludeSportsbook: false });
     return { mode: match[1], type: match[2], oid: match[3], path: itemPath };
   });
   const paths = inventory.map((entry) => entry.path);
@@ -2156,7 +2156,7 @@ function gitRawFramingChecks() {
     const value = validateCommandSemantic(kind, bytes, Buffer.alloc(0), parameters);
     checks.push({ name, status: value.status === "PASS" && verify(value) ? "PASS" : "FAIL" });
   };
-  const reject = (name, kind, bytes, parameters, stderr = Buffer.alloc(0)) => checks.push(expectReject(name, () => validateCommandSemantic(kind, bytes, stderr, parameters), "SEMANTIC"));
+  const reject = (name, kind, bytes, parameters, stderr = Buffer.alloc(0), code = "SEMANTIC") => checks.push(expectReject(name, () => validateCommandSemantic(kind, bytes, stderr, parameters), code));
   const fixture = commandRegistryFixture();
   const argvExpected = [
     ["-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=normal", "--", ...COMMAND_LIVE_PATHS],
@@ -2181,6 +2181,30 @@ function gitRawFramingChecks() {
   accept("git-porcelain-positive-untracked-gate", "git-porcelain-pathset/v1", untracked, porcelainParameters(untracked, [".gitattributes"], [".gitattributes"], { include_untracked: true }));
   const ignored = Buffer.from("!! ignored/file\0");
   accept("git-porcelain-positive-ignored-gate", "git-porcelain-pathset/v1", ignored, porcelainParameters(ignored, ["ignored/file"], ["ignored/file"], { include_ignored: true }));
+  const frozenPorcelainStatuses = [" M", " T", " A", " D", " R", " C", "M ", "MM", "MT", "MD", "T ", "TM", "TT", "TD", "A ", "AM", "AT", "AD", "D ", "R ", "RM", "RT", "RD", "C ", "CM", "CT", "CD", "DD", "AU", "UD", "UA", "DU", "AA", "UU", "??", "!!"];
+  const matrixRecords = [];
+  const matrixPaths = [];
+  const matrixLedger = [];
+  for (const [index, status] of frozenPorcelainStatuses.entries()) {
+    const itemPath = `matrix/path-${index}`;
+    matrixRecords.push(Buffer.from(`${status} ${itemPath}\0`));
+    matrixPaths.push(itemPath);
+    matrixLedger.push(itemPath);
+    if (/[RC]/.test(status)) {
+      const sourcePath = `matrix/source-${index}`;
+      matrixRecords.push(Buffer.from(`${sourcePath}\0`));
+      matrixLedger.push(sourcePath);
+    }
+  }
+  const matrixBytes = Buffer.concat(matrixRecords);
+  accept("git-porcelain-positive-status-matrix", "git-porcelain-pathset/v1", matrixBytes, porcelainParameters(matrixBytes, matrixPaths, matrixLedger, { include_ignored: true }), (value) => JSON.stringify(GIT_PORCELAIN_STATUSES) === JSON.stringify(frozenPorcelainStatuses) && JSON.stringify(value.records.map(({ status, path }) => [status, path])) === JSON.stringify(frozenPorcelainStatuses.map((status, index) => [status, `matrix/path-${index}`])));
+  const undocumentedStatuses = ["DA", "RR", "UC", "TU"];
+  const matrixDrifts = [GIT_PORCELAIN_STATUSES.slice(1), [...GIT_PORCELAIN_STATUSES, "ZZ"], [...GIT_PORCELAIN_STATUSES.slice(0, 1), GIT_PORCELAIN_STATUSES[0], ...GIT_PORCELAIN_STATUSES.slice(1)], [...GIT_PORCELAIN_STATUSES].reverse()];
+  const matrixRejects = [...undocumentedStatuses.map((status) => () => {
+    const bytes = Buffer.from(`${status} matrix/rejected\0`);
+    validateCommandSemantic("git-porcelain-pathset/v1", bytes, Buffer.alloc(0), porcelainParameters(bytes, ["matrix/rejected"]));
+  }), ...matrixDrifts.map((allowed_statuses) => () => validateCommandSemantic("git-porcelain-pathset/v1", porcelainSpace, Buffer.alloc(0), porcelainParameters(porcelainSpace, ["dir/file name"], ["dir/file name"], { allowed_statuses })))];
+  checks.push({ name: "git-porcelain-negative-undocumented-status-matrix", status: matrixRejects.every((invoke) => { try { invoke(); return false; } catch (error) { return error.code === "SEMANTIC"; } }) ? "PASS" : "FAIL" });
 
   const porcelainNegative = (name, bytes, allowed, ledger = allowed, overrides = {}) => reject(`git-porcelain-negative-${name}`, "git-porcelain-pathset/v1", bytes, porcelainParameters(bytes, allowed, ledger, overrides));
   porcelainNegative("duplicate", Buffer.from(" M a\0 M a\0"), ["a"]);
@@ -2192,7 +2216,8 @@ function gitRawFramingChecks() {
   porcelainNegative("extra-source", Buffer.from(" M current\0source\0"), ["current"], ["current", "source"]);
   porcelainNegative("truncation", Buffer.from(" M truncated"), ["truncated"]);
   porcelainNegative("lf-quoted", Buffer.from(" M \"quoted name\"\n"), ["quoted name"]);
-  porcelainNegative("invalid-utf8", Buffer.from([0x20, 0x4d, 0x20, 0xc3, 0x28, 0]), ["bad"]);
+  const invalidUtf8Porcelain = Buffer.from([0x20, 0x4d, 0x20, 0xc3, 0x28, 0]);
+  reject("git-porcelain-negative-invalid-utf8", "git-porcelain-pathset/v1", invalidUtf8Porcelain, porcelainParameters(invalidUtf8Porcelain, ["bad"]), Buffer.alloc(0), "GIT_INVALID_UTF8");
   porcelainNegative("outside-destination", Buffer.from(" M outside\0"), ["inside"], ["inside", "outside"]);
   porcelainNegative("outside-source", Buffer.from("R  new\0outside\0"), ["new"], ["new", "old"]);
   porcelainNegative("unsafe-absolute-traversal", Buffer.from(" M ../escape\0"), ["../escape"]);
@@ -2204,7 +2229,8 @@ function gitRawFramingChecks() {
   accept("git-name-positive-empty-bound", "git-name-list/v1", Buffer.alloc(0), namesParameters(Buffer.alloc(0), []));
   const nameNegative = (name, bytes, allowed) => reject(`git-name-negative-${name}`, "git-name-list/v1", bytes, namesParameters(bytes, allowed));
   nameNegative("duplicate", Buffer.from("a\0a\0"), ["a"]);
-  nameNegative("framing-utf8", Buffer.from([0xc3, 0x28, 0]), ["bad"]);
+  const invalidUtf8Name = Buffer.from([0xc3, 0x28, 0]);
+  reject("git-name-negative-framing-utf8", "git-name-list/v1", invalidUtf8Name, namesParameters(invalidUtf8Name, ["bad"]), Buffer.alloc(0), "GIT_INVALID_UTF8");
   nameNegative("unsafe-outside", Buffer.from("../escape\0"), ["../escape"]);
   nameNegative("lf-quoted", Buffer.from("\"name\"\n"), ["name"]);
 
@@ -2214,7 +2240,11 @@ function gitRawFramingChecks() {
   accept("git-tree-positive-special-bytes", "git-ls-tree-z/v1", treeSpecial, treeParameters(treeSpecial), (value) => value.inventory[0].path === "root/ file");
   const treeNegative = (name, bytes, pathspecs = ["root"]) => reject(`git-tree-negative-${name}`, "git-ls-tree-z/v1", bytes, treeParameters(bytes, pathspecs));
   treeNegative("malformed-multiple-tab", Buffer.from(`100644 blob ${oid}\troot/a\textra\0`));
-  treeNegative("invalid-utf8", Buffer.concat([Buffer.from(`100644 blob ${oid}\troot/`), Buffer.from([0xc3, 0x28, 0])]));
+  const invalidUtf8Tree = Buffer.concat([Buffer.from(`100644 blob ${oid}\troot/`), Buffer.from([0xc3, 0x28, 0])]);
+  reject("git-tree-negative-invalid-utf8", "git-ls-tree-z/v1", invalidUtf8Tree, treeParameters(invalidUtf8Tree), Buffer.alloc(0), "GIT_INVALID_UTF8");
+  reject("git-tree-negative-invalid-utf8-framed", "git-ls-tree-z/v1", invalidUtf8Tree, treeParameters(invalidUtf8Tree), Buffer.alloc(0), "GIT_INVALID_UTF8");
+  const truncatedTree = Buffer.from(`100644 blob ${oid}\troot/truncated`);
+  checks.push({ name: "git-tree-negative-truncation-distinct", status: (() => { try { validateCommandSemantic("git-ls-tree-z/v1", truncatedTree, Buffer.alloc(0), treeParameters(truncatedTree)); return false; } catch (error) { return error.code === "SEMANTIC" && error.code !== "GIT_INVALID_UTF8"; } })() ? "PASS" : "FAIL" });
   treeNegative("duplicate-unsafe", Buffer.from(`100644 blob ${oid}\troot/a\0${`100644 blob ${oid}\troot/a\0`}`));
   treeNegative("empty-bypass", Buffer.alloc(0));
 
@@ -2226,7 +2256,7 @@ function gitRawFramingChecks() {
   checks.push({ name: "anti-cheat-git-positive-empty-buffer", status: porcelainSpace.length > 0 ? "PASS" : "FAIL" });
   const semanticSource = validateCommandSemantic.toString();
   checks.push({ name: "anti-cheat-git-parser-bypass", status: semanticSource.includes("parseGitPorcelainZ(out, err, parameters)") && semanticSource.includes("parseGitNameListZ(out, err, parameters)") && semanticSource.includes("parseGitLsTreeZ(out, err, parameters)") ? "PASS" : "FAIL" });
-  if (checks.length !== 46 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `raw Git framing checks failed: ${JSON.stringify(checks.filter((item) => item.status !== "PASS"))}`);
+  if (checks.length !== 50 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `raw Git framing checks failed: ${JSON.stringify(checks.filter((item) => item.status !== "PASS"))}`);
   return checks;
 }
 
