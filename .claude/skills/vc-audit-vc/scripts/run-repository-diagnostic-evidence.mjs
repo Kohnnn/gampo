@@ -1579,6 +1579,167 @@ function commandRegistryChecks() {
   return checks;
 }
 
+const SOURCE_AUTHORITY_PATHS = {
+  runner: ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs",
+  validator: ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs",
+};
+
+function tokenizeJavaScriptSource(bytes, label) {
+  const source = decodeLiteralInput(bytes);
+  const tokens = [];
+  const delimiters = [];
+  const matching = { "(": ")", "[": "]", "{": "}" };
+  const expressionPrefix = new Set(["(", "[", "{", ",", ";", ":", "=", "==", "===", "!=", "!==", "!", "&&", "||", "?", "=>", "return", "case", "throw"]);
+  let index = 0;
+  let previous = null;
+  const push = (type, value) => {
+    tokens.push({ type, value });
+    previous = value;
+  };
+  while (index < source.length) {
+    const character = source[index];
+    if (/\s/.test(character)) {
+      index += 1;
+      continue;
+    }
+    if (source.startsWith("//", index)) {
+      const end = source.indexOf("\n", index + 2);
+      index = end === -1 ? source.length : end + 1;
+      continue;
+    }
+    if (source.startsWith("/*", index)) {
+      const end = source.indexOf("*/", index + 2);
+      if (end === -1) fail("SOURCE_AUDIT", `${label} has an unterminated block comment`);
+      index = end + 2;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "`") {
+      const quote = character;
+      let value = "";
+      let closed = false;
+      index += 1;
+      while (index < source.length) {
+        const item = source[index];
+        if (item === "\\") {
+          if (index + 1 >= source.length) fail("SOURCE_AUDIT", `${label} has an unterminated escape`);
+          value += source.slice(index, index + 2);
+          index += 2;
+          continue;
+        }
+        if (item === quote) {
+          index += 1;
+          closed = true;
+          break;
+        }
+        value += item;
+        index += 1;
+      }
+      if (!closed) fail("SOURCE_AUDIT", `${label} has an unterminated string or template literal`);
+      push(quote === "`" ? "template" : "string", value);
+      continue;
+    }
+    if (character === "/" && source[index + 1] !== "=" && (previous === null || expressionPrefix.has(previous))) {
+      let value = "/";
+      let escaped = false;
+      let characterClass = false;
+      let closed = false;
+      index += 1;
+      while (index < source.length) {
+        const item = source[index++];
+        value += item;
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (item === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (item === "[") characterClass = true;
+        if (item === "]") characterClass = false;
+        if (item === "/" && !characterClass) {
+          while (/[A-Za-z]/.test(source[index] ?? "")) value += source[index++];
+          closed = true;
+          break;
+        }
+        if (item === "\n") break;
+      }
+      if (!closed) fail("SOURCE_AUDIT", `${label} has an unterminated regular expression`);
+      push("regex", value);
+      continue;
+    }
+    const identifier = source.slice(index).match(/^[A-Za-z_$][A-Za-z0-9_$]*/)?.[0];
+    if (identifier) {
+      push("identifier", identifier);
+      index += identifier.length;
+      continue;
+    }
+    const number = source.slice(index).match(/^(?:0[xob][0-9a-f]+|\d+(?:\.\d+)?)/i)?.[0];
+    if (number) {
+      push("number", number);
+      index += number.length;
+      continue;
+    }
+    const operator = ["===", "!==", "=>", "==", "!=", "<=", ">=", "&&", "||", "??", "?.", "++", "--", "**", "..."].find((item) => source.startsWith(item, index)) ?? character;
+    if (Object.hasOwn(matching, operator)) delimiters.push(operator);
+    else if ([")", "]", "}"].includes(operator)) {
+      const opening = delimiters.pop();
+      if (!opening || matching[opening] !== operator) fail("SOURCE_AUDIT", `${label} has unbalanced delimiters`);
+    }
+    push("operator", operator);
+    index += operator.length;
+  }
+  if (delimiters.length !== 0) fail("SOURCE_AUDIT", `${label} has unbalanced delimiters`);
+  return tokens;
+}
+
+function auditProductionSourceBindings(entries, validatorRows = []) {
+  if (!Array.isArray(entries) || entries.length !== 2) fail("SOURCE_AUDIT", "source authority list must contain exactly two entries");
+  const roles = new Set();
+  for (const entry of entries) {
+    if (!entry || !Object.hasOwn(SOURCE_AUTHORITY_PATHS, entry.role) || roles.has(entry.role)) fail("SOURCE_AUDIT", "source authority roles must be unique runner and validator entries");
+    roles.add(entry.role);
+    if (entry.canonicalPath !== SOURCE_AUTHORITY_PATHS[entry.role]) fail("SOURCE_AUDIT", `${entry.role} canonical path was substituted`);
+    if (!Buffer.isBuffer(entry.bytes)) fail("SOURCE_AUDIT", `${entry.role} bytes must be a Buffer`);
+    const digest = sha256(entry.bytes);
+    if (entry.sha256 !== undefined && entry.sha256 !== digest) fail("SOURCE_AUDIT", `${entry.role} byte/SHA binding drifted`);
+    const tokens = tokenizeJavaScriptSource(entry.bytes, entry.role);
+    const ownRoles = new Set(entry.role === "runner" ? ["self", "runner"] : ["self", "validator", "envelopeValidator"]);
+    const ownPlaceholders = new Set(["SELF_" + "SHA256", "__SELF_" + "SHA256__", "<SELF_" + "SHA256>", entry.role.toUpperCase() + "_SELF_" + "SHA256"]);
+    for (const token of tokens) {
+      if (!["string", "template"].includes(token.type)) continue;
+      if (token.value === digest || token.value === digest.toUpperCase() || ownPlaceholders.has(token.value)) fail("SOURCE_SELF_BINDING", `${entry.role} source binds its own digest`);
+    }
+    for (let roleIndex = 0; roleIndex < tokens.length - 3; roleIndex += 1) {
+      if (!ownRoles.has(tokens[roleIndex].value) || tokens[roleIndex + 1].value !== ":" || tokens[roleIndex + 2].value !== "{") continue;
+      let depth = 1;
+      let end = roleIndex + 3;
+      for (; end < tokens.length && depth > 0; end += 1) {
+        if (tokens[end].value === "{") depth += 1;
+        if (tokens[end].value === "}") depth -= 1;
+      }
+      if (depth !== 0) fail("SOURCE_AUDIT", `${entry.role} authority object is unbalanced`);
+      const objectTokens = tokens.slice(roleIndex + 3, end - 1);
+      const hasDigestProperty = objectTokens.some((token, tokenIndex) => ["sha", "sha256", "digest", "hash"].includes(token.value) && objectTokens[tokenIndex + 1]?.value === ":");
+      const hasOwnInput = objectTokens.some((token) => [entry.canonicalPath, path.basename(entry.canonicalPath), "import.meta.filename", "process.argv[1]"].includes(token.value)) || objectTokens.some((token, tokenIndex) => token.value === "import" && objectTokens.slice(tokenIndex, tokenIndex + 5).map((item) => item.value).join(".").includes("import...meta.filename"));
+      const computesDigest = objectTokens.some((token) => ["sha256", "createHash", "readFileSync", "bytes"].includes(token.value));
+      if (hasDigestProperty && hasOwnInput && computesDigest) fail("SOURCE_SELF_BINDING", `${entry.role} authority object computes its own digest`);
+    }
+  }
+  if (roles.size !== 2) fail("SOURCE_AUDIT", "source authority roles are incomplete");
+  const forbiddenRegistryBinding = /registry(?:_|)(?:path|bytes|sha256)|digest(?:_|-)(?:placeholder|derived)|registrySha256/;
+  if (validatorRows.some((row) => forbiddenRegistryBinding.test(JSON.stringify({ expected: row.expected, semantic: row.semantic })))) fail("SOURCE_SELF_BINDING", "validator registry self-reference remained");
+  return true;
+}
+
+function sourceAuthorityEntries(repositoryRoot, overrides = {}) {
+  return Object.entries(SOURCE_AUTHORITY_PATHS).map(([role, canonicalPath]) => {
+    const physicalPath = overrides[role] ?? path.join(repositoryRoot, canonicalPath);
+    const bytes = fs.readFileSync(physicalPath);
+    return { role, canonicalPath, basename: path.basename(canonicalPath), physicalPath, bytes, sha256: sha256(bytes) };
+  });
+}
+
 function validatorSemanticContractChecks() {
   const checks = [];
   const repositoryRoot = process.cwd();
@@ -1662,8 +1823,33 @@ function validatorSemanticContractChecks() {
   }
   const fixture = commandRegistryFixture({ repositoryRoot });
   const validatorRows = fixture.registry.rows.filter((row) => row.capability_class === "diagnostic-validator");
-  const forbidden = /registry(?:_|)(?:path|bytes|sha256)|digest(?:_|-)(?:placeholder|derived)|registrySha256/;
-  if (validatorRows.some((row) => forbidden.test(JSON.stringify({ expected: row.expected, semantic: row.semantic })))) fail("SELF_CHECK", "validator registry self-reference remained");
+  auditProductionSourceBindings(sourceAuthorityEntries(repositoryRoot), validatorRows);
+  const mutationRoots = [];
+  try {
+    for (const role of ["runner", "validator"]) {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), `repository-diagnostic-source-${role}-`));
+      mutationRoots.push(root);
+      const isolatedPath = path.join(root, path.basename(SOURCE_AUTHORITY_PATHS[role]));
+      const original = fs.readFileSync(path.join(repositoryRoot, SOURCE_AUTHORITY_PATHS[role]));
+      const placeholder = role === "runner" ? "RUNNER_SELF_" + "SHA256" : "VALIDATOR_SELF_" + "SHA256";
+      const authorityRole = role === "runner" ? "runner" : "envelopeValidator";
+      const mutation = Buffer.concat([original, Buffer.from(`\nconst isolatedSelfAuthority = { ${authorityRole}: { sha256: "${placeholder}", source: import.meta.filename } };\nvoid isolatedSelfAuthority;\n`)]);
+      fs.writeFileSync(isolatedPath, mutation, { flag: "wx" });
+      const overrides = { [role]: isolatedPath };
+      const entries = sourceAuthorityEntries(repositoryRoot, overrides);
+      checks.push(expectReject(`validator-${role}-isolated-own-digest-binding`, () => auditProductionSourceBindings(entries, validatorRows), "SOURCE_SELF_BINDING"));
+    }
+    const controls = {
+      runner: Buffer.from('const HASH_PATTERN = /^[0-9a-f]{64}$/;\nconst algorithm = "sha256";\nconst digest = createHash(algorithm).update(externalInputBytes).digest("hex");\n'),
+      validator: Buffer.from('const runnerAuthority = { runner: { sha256: runnerDigest, source: runnerPath } };\n'),
+    };
+    const controlEntries = Object.entries(SOURCE_AUTHORITY_PATHS).map(([role, canonicalPath]) => ({ role, canonicalPath, basename: path.basename(canonicalPath), physicalPath: canonicalPath, bytes: controls[role], sha256: sha256(controls[role]) }));
+    auditProductionSourceBindings(controlEntries, validatorRows);
+  } finally {
+    for (const root of mutationRoots.reverse()) if (fs.existsSync(root)) removeFlatDirectory(root);
+  }
+  if (mutationRoots.some((root) => fs.existsSync(root))) fail("SELF_CHECK", "isolated source mutation residue remained");
+  checks.splice(-2, 2);
   checks.push({ name: "validator-registry-self-reference-static-rejection", status: "PASS" });
   const firstBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
   const firstDigest = sha256(firstBytes);
