@@ -194,6 +194,7 @@ function safeRelativePath(raw) {
 function parseTarNumber(bytes) {
   if (bytes.length === 0) fail("TAR_SIZE", "empty TAR size field");
   if ((bytes[0] & 0x80) !== 0) {
+    if ((bytes[0] & 0x40) !== 0) fail("TAR_SIZE", "negative TAR base-256 size is unsupported");
     const copy = Buffer.from(bytes);
     copy[0] &= 0x7f;
     let value = 0n;
@@ -210,6 +211,29 @@ function parseTarNumber(bytes) {
   const value = BigInt(`0o${text}`);
   if (value > BigInt(Number.MAX_SAFE_INTEGER)) fail("TAR_SIZE", "TAR octal size exceeds safe range");
   return Number(value);
+}
+
+function decodeTarField(bytes, label, allowEmpty) {
+  const nul = bytes.indexOf(0);
+  const occupied = nul === -1 ? bytes : bytes.subarray(0, nul);
+  if (nul !== -1 && bytes.subarray(nul + 1).some((byte) => byte !== 0)) fail("TAR_PATH", `${label} has nonzero bytes after its terminator`);
+  if (!allowEmpty && occupied.length === 0) fail("TAR_PATH", `${label} must not be empty`);
+  let text;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(occupied);
+  } catch {
+    fail("TAR_PATH", `${label} is not valid UTF-8`);
+  }
+  if (!Buffer.from(text, "utf8").equals(occupied)) fail("TAR_PATH", `${label} failed canonical UTF-8 round-trip`);
+  return text;
+}
+
+function parseTarChecksum(bytes) {
+  if (bytes.length !== 8) fail("TAR_CHECKSUM", "TAR checksum field width is invalid");
+  const text = bytes.toString("ascii");
+  const match = /^(?:([0-7]{6})(?:\0 | \0)|([0-7]{7})\0)$/.exec(text);
+  if (!match) fail("TAR_CHECKSUM", `TAR checksum terminator is malformed: ${bytes.toString("hex")}`);
+  return Number.parseInt(match[1] ?? match[2], 8);
 }
 
 export function decodeLiteralInput(input) {
@@ -238,24 +262,33 @@ export function parseTarEntries(input) {
       zeroBlocks += 1;
       offset += 512;
       if (zeroBlocks === 2) {
-        if (archive.subarray(offset).some((byte) => byte !== 0)) fail("TAR_TRAILING", "TAR contains data after terminal zero blocks");
+        const trailing = archive.subarray(offset);
+        if (trailing.length % 512 !== 0) fail("TAR_TRAILING", "TAR has a partial trailing block");
+        if (trailing.some((byte) => byte !== 0)) fail("TAR_TRAILING", "TAR contains data after terminal zero blocks");
         return entries;
       }
       continue;
     }
     if (zeroBlocks !== 0) fail("TAR_TERMINATION", "TAR has only one zero block before another entry");
-    const nameField = header.subarray(0, 100);
-    const nul = nameField.indexOf(0);
-    if (nul === -1 || nameField.subarray(nul).some((byte) => byte !== 0)) fail("TAR_PATH", "TAR member name is not NUL-terminated unambiguously");
-    const name = safeRelativePath(decodeLiteralInput(nameField.subarray(0, nul)));
+    if (!header.subarray(257, 263).equals(Buffer.from("ustar\0")) || !header.subarray(263, 265).equals(Buffer.from("00"))) fail("TAR_HEADER", "TAR USTAR magic or version is invalid");
+    const expectedChecksum = parseTarChecksum(header.subarray(148, 156));
+    let actualChecksum = 0;
+    for (let index = 0; index < header.length; index++) actualChecksum += index >= 148 && index < 156 ? 32 : header[index];
+    if (actualChecksum !== expectedChecksum) fail("TAR_CHECKSUM", "TAR header checksum mismatch");
     const type = header[156];
     if (![0, 48, 53].includes(type)) fail("TAR_TYPE", `unsupported TAR entry type ${type}`);
     const size = parseTarNumber(header.subarray(124, 136));
+    const namePart = decodeTarField(header.subarray(0, 100), "TAR member name", false);
+    const prefix = decodeTarField(header.subarray(345, 500), "TAR member prefix", true);
+    const name = safeRelativePath(prefix ? `${prefix}/${namePart}` : namePart);
     if (type === 53 && (size !== 0 || !name.endsWith("/"))) fail("TAR_TYPE", `invalid TAR directory ${name}`);
+    const bodyStart = offset + 512;
+    const bodyEnd = bodyStart + size;
     const paddedSize = Math.ceil(size / 512) * 512;
-    const nextOffset = offset + 512 + paddedSize;
-    if (!Number.isSafeInteger(nextOffset) || nextOffset > archive.length) fail("TAR_TRUNCATED", `TAR member ${name} body is truncated`);
-    entries.push({ name, size, data: Buffer.from(archive.subarray(offset + 512, offset + 512 + size)) });
+    const nextOffset = bodyStart + paddedSize;
+    if (![bodyStart, bodyEnd, paddedSize, nextOffset].every(Number.isSafeInteger) || bodyEnd > archive.length || nextOffset > archive.length) fail("TAR_TRUNCATED", `TAR member ${name} body is truncated`);
+    if (archive.subarray(bodyEnd, nextOffset).some((byte) => byte !== 0)) fail("TAR_PADDING", `TAR member ${name} padding is nonzero`);
+    entries.push({ name, size, data: Buffer.from(archive.subarray(bodyStart, bodyEnd)) });
     offset = nextOffset;
   }
   fail("TAR_TERMINATION", "TAR requires two consecutive terminal zero blocks");
@@ -1506,23 +1539,174 @@ function commandResultChecks() {
   return checks;
 }
 
+function splitTarPath(name) {
+  const bytes = Buffer.from(name, "utf8");
+  if (bytes.length <= 100) return { name: bytes, prefix: Buffer.alloc(0) };
+  for (let index = bytes.length - 1; index >= 0; index--) {
+    if (bytes[index] !== 47) continue;
+    const prefix = bytes.subarray(0, index);
+    const basename = bytes.subarray(index + 1);
+    if (prefix.length <= 155 && basename.length > 0 && basename.length <= 100) return { name: basename, prefix };
+  }
+  fail("TAR_PATH", "TAR path cannot be represented by USTAR name and prefix fields");
+}
+
 function tarHeader(name, size, type = "0", rawSize = null) {
   const header = Buffer.alloc(512);
-  header.write(name, 0, 100, "utf8");
+  const fields = splitTarPath(name);
+  fields.name.copy(header, 0);
+  header.write("0000644\0", 100, 8, "ascii");
+  header.write("0000000\0", 108, 8, "ascii");
+  header.write("0000000\0", 116, 8, "ascii");
   if (rawSize) rawSize.copy(header, 124, 0, Math.min(rawSize.length, 12));
   else header.write(size.toString(8).padStart(11, "0") + "\0", 124, 12, "ascii");
-  header.write(type, 156, 1, "ascii");
+  header.write("00000000000\0", 136, 12, "ascii");
+  header.fill(32, 148, 156);
+  if (type !== null) header.write(type, 156, 1, "ascii");
+  header.write("ustar\0", 257, 6, "ascii");
+  header.write("00", 263, 2, "ascii");
+  fields.prefix.copy(header, 345);
+  const checksum = header.reduce((sum, byte) => sum + byte, 0);
+  header.write(checksum.toString(8).padStart(6, "0") + "\0 ", 148, 8, "ascii");
   return header;
 }
 
 function tarArchive(entries, zeroBlocks = 2) {
   const chunks = [];
   for (const entry of entries) {
-    chunks.push(tarHeader(entry.name, entry.data.length, entry.type));
+    chunks.push(tarHeader(entry.name, entry.data.length, entry.type ?? "0", entry.rawSize ?? null));
     chunks.push(entry.data, Buffer.alloc(Math.ceil(entry.data.length / 512) * 512 - entry.data.length));
   }
   chunks.push(Buffer.alloc(zeroBlocks * 512));
   return Buffer.concat(chunks);
+}
+
+function ustarContractChecks() {
+  const triggerPath = ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/pass-correction-envelope.md";
+  const fullName = "n".repeat(100);
+  const splitName = `${"p".repeat(100)}/x`;
+  const fullPrefixName = `${"q".repeat(155)}/x`;
+  const reconstructionHeader = tarHeader(triggerPath, 0);
+  const reconstructionSha256 = sha256(reconstructionHeader);
+  const checksumValue = (header) => {
+    const copy = Buffer.from(header);
+    copy.fill(32, 148, 156);
+    return copy.reduce((sum, byte) => sum + byte, 0);
+  };
+  const archiveForHeader = (header, body = Buffer.alloc(0)) => Buffer.concat([header, body, Buffer.alloc(Math.ceil(body.length / 512) * 512 - body.length), Buffer.alloc(1024)]);
+  const rewriteChecksum = (header) => {
+    const copy = Buffer.from(header);
+    copy.fill(32, 148, 156);
+    copy.write(checksumValue(copy).toString(8).padStart(6, "0") + "\0 ", 148, 8, "ascii");
+    return copy;
+  };
+  const valid = tarHeader("valid.txt", 0);
+  const occupiedName = parseTarEntries(tarArchive([{ name: fullName, data: Buffer.alloc(0) }]))[0]?.name;
+  const splitEntry = parseTarEntries(tarArchive([{ name: splitName, data: Buffer.alloc(0) }]))[0]?.name;
+  const fullPrefixEntry = parseTarEntries(tarArchive([{ name: fullPrefixName, data: Buffer.alloc(0) }]))[0]?.name;
+  const ninetyNine = "a".repeat(99);
+  const ninetyNineHeader = tarHeader(ninetyNine, 0);
+  const emptyName = rewriteChecksum(Buffer.from(valid));
+  emptyName.fill(0, 0, 100);
+  const emptyNameFixed = rewriteChecksum(emptyName);
+  const tailDrift = Buffer.from(valid);
+  tailDrift[1] = 0;
+  tailDrift[2] = 65;
+  const tailDriftFixed = rewriteChecksum(tailDrift);
+  const badMagic = Buffer.from(valid);
+  badMagic[257] = 85;
+  const badVersion = Buffer.from(valid);
+  badVersion[263] = 49;
+  const badChecksum = Buffer.from(valid);
+  badChecksum[100] ^= 1;
+  const malformedChecksum = Buffer.from(valid);
+  malformedChecksum.write("zzzzzz\0 ", 148, 8, "ascii");
+  const base256Positive = Buffer.alloc(12);
+  base256Positive[0] = 0x80;
+  base256Positive[11] = 1;
+  const base256Negative = Buffer.alloc(12);
+  base256Negative[0] = 0xc0;
+  const base256Unsafe = Buffer.alloc(12);
+  base256Unsafe[0] = 0x80;
+  base256Unsafe[5] = 0x20;
+  const regularNul = tarHeader("regular-null.txt", 0, null);
+  const paddedArchive = tarArchive([{ name: "padding.bin", data: Buffer.from("x") }]);
+  const nonzeroPadding = Buffer.from(paddedArchive);
+  nonzeroPadding[513] = 1;
+  const oneZeroThenEntry = Buffer.concat([Buffer.alloc(512), tarArchive([{ name: "late", data: Buffer.alloc(0) }])]);
+  const unsafeCombined = tarHeader("../escape", 0);
+  const invalidNameUtf8 = Buffer.from(valid);
+  invalidNameUtf8[0] = 0xc3;
+  invalidNameUtf8[1] = 0x28;
+  const invalidPrefixUtf8 = tarHeader("x", 0);
+  invalidPrefixUtf8[345] = 0xc3;
+  invalidPrefixUtf8[346] = 0x28;
+  const checks = [
+    { name: "ustar-field-99-plus-nul", status: ninetyNineHeader[99] === 0 && parseTarEntries(archiveForHeader(ninetyNineHeader))[0]?.name === ninetyNine ? "PASS" : "FAIL" },
+    { name: "ustar-field-full-name-100", status: occupiedName === fullName ? "PASS" : "FAIL" },
+    { name: "ustar-field-101-slash-split", status: splitEntry === splitName ? "PASS" : "FAIL" },
+    { name: "ustar-field-full-prefix-155", status: fullPrefixEntry === fullPrefixName ? "PASS" : "FAIL" },
+    expectReject("ustar-field-empty-name", () => parseTarEntries(archiveForHeader(emptyNameFixed)), "TAR_PATH"),
+    expectReject("ustar-field-nonzero-zero-tail", () => parseTarEntries(archiveForHeader(tailDriftFixed)), "TAR_PATH"),
+    { name: "ustar-reconstruction-label", status: "PASS", evidence: "reconstruction evidence", headerSha256: reconstructionSha256 },
+    { name: "ustar-reconstruction-trigger-bytes", status: reconstructionHeader.subarray(0, 100).equals(Buffer.from(triggerPath)) ? "PASS" : "FAIL" },
+    { name: "ustar-reconstruction-full-name-no-nul", status: !reconstructionHeader.subarray(0, 100).includes(0) && parseTarEntries(archiveForHeader(reconstructionHeader))[0]?.name === triggerPath ? "PASS" : "FAIL" },
+    { name: "ustar-reconstruction-header-sha", status: reconstructionHeader.length === 512 && isHash(reconstructionSha256) ? "PASS" : "FAIL", evidence: "reconstruction evidence", headerBytes: reconstructionHeader.length, headerSha256: reconstructionSha256 },
+    { name: "ustar-header-valid-magic-version-checksum", status: valid.subarray(257, 263).equals(Buffer.from("ustar\0")) && valid.subarray(263, 265).equals(Buffer.from("00")) && parseTarChecksum(valid.subarray(148, 156)) === checksumValue(valid) ? "PASS" : "FAIL" },
+    expectReject("ustar-header-bad-magic", () => parseTarEntries(archiveForHeader(badMagic)), "TAR_HEADER"),
+    expectReject("ustar-header-bad-version", () => parseTarEntries(archiveForHeader(badVersion)), "TAR_HEADER"),
+    expectReject("ustar-header-checksum-mismatch", () => parseTarEntries(archiveForHeader(badChecksum)), "TAR_CHECKSUM"),
+    expectReject("ustar-header-malformed-checksum", () => parseTarEntries(archiveForHeader(malformedChecksum)), "TAR_CHECKSUM"),
+    { name: "ustar-size-octal-zero-nonzero", status: parseTarEntries(tarArchive([{ name: "zero", data: Buffer.alloc(0) }, { name: "one", data: Buffer.from("x") }])).map((entry) => entry.size).join(",") === "0,1" ? "PASS" : "FAIL" },
+    { name: "ustar-size-positive-base256", status: parseTarEntries(tarArchive([{ name: "base256", data: Buffer.from("x"), rawSize: base256Positive }]))[0]?.size === 1 ? "PASS" : "FAIL" },
+    expectReject("ustar-size-negative-base256", () => parseTarEntries(tarArchive([{ name: "negative", data: Buffer.alloc(0), rawSize: base256Negative }])), "TAR_SIZE"),
+    expectReject("ustar-size-unsafe-base256", () => parseTarEntries(tarArchive([{ name: "unsafe", data: Buffer.alloc(0), rawSize: base256Unsafe }])), "TAR_SIZE"),
+    { name: "ustar-type-regular-nul", status: parseTarEntries(archiveForHeader(regularNul))[0]?.name === "regular-null.txt" ? "PASS" : "FAIL" },
+    { name: "ustar-type-regular-zero", status: parseTarEntries(tarArchive([{ name: "zero.txt", data: Buffer.alloc(0), type: "0" }]))[0]?.name === "zero.txt" ? "PASS" : "FAIL" },
+    { name: "ustar-type-directory-five", status: parseTarEntries(tarArchive([{ name: "dir/", data: Buffer.alloc(0), type: "5" }]))[0]?.name === "dir/" ? "PASS" : "FAIL" },
+    expectReject("ustar-type-unsupported", () => parseTarEntries(tarArchive([{ name: "link", data: Buffer.alloc(0), type: "2" }])), "TAR_TYPE"),
+    { name: "ustar-traversal-900-byte-next-header", status: parseTarEntries(tarArchive([{ name: "large", data: Buffer.alloc(900) }, { name: "next", data: Buffer.alloc(0) }]))[1]?.name === "next" ? "PASS" : "FAIL" },
+    { name: "ustar-traversal-zero-padding", status: parseTarEntries(paddedArchive)[0]?.size === 1 ? "PASS" : "FAIL" },
+    expectReject("ustar-traversal-nonzero-padding", () => parseTarEntries(nonzeroPadding), "TAR_PADDING"),
+    expectReject("ustar-traversal-truncation", () => parseTarEntries(tarArchive([{ name: "cut", data: Buffer.alloc(900) }]).subarray(0, 1024)), "TAR_TRUNCATED"),
+    { name: "ustar-traversal-one-zero-termination", status: [tarArchive([{ name: "one", data: Buffer.alloc(0) }], 1), oneZeroThenEntry].every((bytes) => { try { parseTarEntries(bytes); return false; } catch (error) { return error.code === "TAR_TERMINATION"; } }) ? "PASS" : "FAIL" },
+    expectReject("ustar-traversal-trailing-nonzero", () => parseTarEntries(Buffer.concat([tarArchive([]), Buffer.alloc(512, 1)])), "TAR_TRAILING"),
+    expectReject("ustar-traversal-partial-trailing-block", () => parseTarEntries(Buffer.concat([tarArchive([]), Buffer.alloc(1)])), "TAR_TRAILING"),
+    expectReject("ustar-combined-path-unsafe", () => parseTarEntries(archiveForHeader(unsafeCombined)), "TAR_PATH"),
+    expectReject("ustar-name-invalid-utf8", () => parseTarEntries(archiveForHeader(rewriteChecksum(invalidNameUtf8))), "TAR_PATH"),
+    expectReject("ustar-prefix-invalid-utf8", () => parseTarEntries(archiveForHeader(rewriteChecksum(invalidPrefixUtf8))), "TAR_PATH"),
+    expectReject("ustar-generator-unsplittable", () => tarHeader("z".repeat(101), 0), "TAR_PATH"),
+  ];
+  const gitRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-ustar-git-"));
+  try {
+    const repository = path.join(gitRoot, "repository");
+    fs.mkdirSync(repository);
+    const fixturePath = path.join(repository, triggerPath);
+    let fixtureParent = repository;
+    for (const segment of path.dirname(triggerPath).split("/")) {
+      fixtureParent = path.join(fixtureParent, segment);
+      fs.mkdirSync(fixtureParent);
+    }
+    fs.writeFileSync(fixturePath, "fixture\n", { flag: "wx", mode: 0o600 });
+    const runGit = (argv) => spawnSync("/usr/bin/git", argv, { cwd: repository, env: Object.assign(Object.create(null), { HOME: gitRoot, LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: "/usr/bin:/bin", TZ: "UTC" }), shell: false, encoding: null, timeout: 30000, maxBuffer: 1024 * 1024 });
+    const init = runGit(["init", "--quiet"]);
+    const add = runGit(["add", "--", triggerPath]);
+    const commit = runGit(["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture"]);
+    const tree = runGit(["rev-parse", "--verify", "HEAD^{tree}"]);
+    const treeOid = Buffer.from(tree.stdout ?? Buffer.alloc(0)).toString("ascii").trim();
+    const archivePath = path.join(gitRoot, "fixture.tar");
+    const archived = runGit(["archive", "--format=tar", `--output=${archivePath}`, treeOid, "--", triggerPath]);
+    checks.push({ name: "ustar-real-git-repository-commit", status: init.status === 0 && add.status === 0 && commit.status === 0 ? "PASS" : "FAIL" });
+    checks.push({ name: "ustar-real-git-archive-exit", status: archived.status === 0 && archived.signal === null && !archived.error ? "PASS" : "FAIL" });
+    const parsed = parseTarEntries(fs.readFileSync(archivePath));
+    checks.push({ name: "ustar-real-git-production-parser", status: parsed.filter((entry) => !entry.name.endsWith("/")).map((entry) => entry.name).join(",") === triggerPath ? "PASS" : "FAIL" });
+    const semantic = validateCommandSemantic("git-archive-tar/v1", Buffer.alloc(0), Buffer.alloc(0), { archive_path: archivePath, inventory: [{ path: triggerPath, size: 8 }] });
+    checks.push({ name: "ustar-real-git-git08-inventory", status: semantic.status });
+  } finally {
+    removeOwnedLedger(fixtureTeardownLedger(gitRoot));
+  }
+  if (checks.length !== 38 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `USTAR contract checks failed (${checks.length}/38): ${JSON.stringify(checks.filter((item) => item.status !== "PASS"))}`);
+  return checks;
 }
 
 function sampleTerminal(status = "PASS") {
@@ -2841,7 +3025,7 @@ function selfCheck() {
     expectReject("literal-nul", () => decodeLiteralInput(Buffer.from([0x61, 0, 0x62])), "LITERAL_NUL"),
     expectReject("literal-cr", () => decodeLiteralInput(Buffer.from("a\r\n")), "LITERAL_CR"),
   ];
-  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...gitRawFramingChecks(), ...semanticStreamConsistencyChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks(), ...productionRuntimeContractChecks());
+  checks.push(...ustarContractChecks(), ...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...gitRawFramingChecks(), ...semanticStreamConsistencyChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks(), ...productionRuntimeContractChecks());
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-evidence-"));
   try {
     const paths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(root, `${name}.json`)]));
