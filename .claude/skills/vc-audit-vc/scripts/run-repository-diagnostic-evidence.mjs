@@ -624,10 +624,9 @@ export function executeDiagnosticRegistry(registry, options = {}) {
 }
 
 const COMMAND_REGISTRY_SCHEMA = "repository-diagnostic-command-registry/v1";
-const COMMAND_HEAD_OID = "2e19490896ced8eb1d10f809283b160ca40d15d0";
-const COMMAND_TREE_OID = "fe836928c9ce6c154cd080d4280505800b163ad5";
+const GIT_OID_PATTERN = /^[0-9a-f]{40}$/;
 const COMMAND_CHROME = "/home/compute_01/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";
-const COMMAND_REGISTRY_KEYS = ["schema", "version", "repository_root", "operation_root", "registry_root", "runtime_root", "evidence_root", "environment_allowlist", "head_oid", "tree_oid", "live_pathspecs", "tree_pathspecs", "ignore_paths", "rows"];
+const COMMAND_REGISTRY_KEYS = ["schema", "version", "repository_root", "operation_root", "registry_root", "runtime_root", "evidence_root", "environment_allowlist", "head_commit_oid", "head_tree_oid", "live_pathspecs", "tree_pathspecs", "ignore_paths", "rows"];
 const COMMAND_ROW_KEYS = ["ordinal", "id", "action", "capability_class", "executable", "argv", "cwd", "env", "env_allowlist", "timeout_ms", "max_buffer_bytes", "expected", "semantic", "evidence"];
 const EXPECTED_KEYS = ["exit_code", "signal", "stdout_policy", "stderr_policy"];
 const STREAM_POLICY_KEYS = ["schema", "bytes", "sha256", "semantic_kind"];
@@ -660,6 +659,23 @@ function commandPolicy(overrides = {}) {
 
 function exactArray(value, expected, label) {
   if (JSON.stringify(value) !== JSON.stringify(expected)) fail("REGISTRY_SCHEMA", `${label} must equal the frozen ordered ledger`);
+}
+
+function trustedGitHead(repositoryRoot) {
+  const env = Object.assign(Object.create(null), { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: "/usr/bin:/bin", TZ: "UTC", GIT_CONFIG_NOSYSTEM: "1" });
+  const read = (revision) => {
+    const child = spawnSync("/usr/bin/git", ["rev-parse", "--verify", revision], { cwd: repositoryRoot, env, shell: false, encoding: null, timeout: 30000, maxBuffer: 4096 });
+    const stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
+    if (child.error || child.signal !== null || child.status !== 0 || Buffer.from(child.stderr ?? Buffer.alloc(0)).length !== 0 || stdout.length !== 41 || !/^[0-9a-f]{40}\n$/.test(stdout.toString("ascii"))) fail("REPOSITORY_AUTHORITY", `trusted Git failed for ${revision}`);
+    return stdout.subarray(0, 40).toString("ascii");
+  };
+  return { head_commit_oid: read("HEAD^{commit}"), head_tree_oid: read("HEAD^{tree}") };
+}
+
+function requireTrustedGitHead(registry) {
+  const first = trustedGitHead(registry.repository_root);
+  const second = trustedGitHead(registry.repository_root);
+  if (JSON.stringify(first) !== JSON.stringify(second) || first.head_commit_oid !== registry.head_commit_oid || first.head_tree_oid !== registry.head_tree_oid) fail("REPOSITORY_AUTHORITY", "declared repository objects do not match stable trusted Git HEAD");
 }
 
 function absoluteNormalized(value, label) {
@@ -854,8 +870,8 @@ function commandShape(row, registry, policy) {
     [policy.git, ["diff", "--check", "--", ...live], "diagnostic-git-path-read", "git-diff-check-clean/v1"],
     [policy.git, ["check-ignore", "-v", "--", ignore[0]], "diagnostic-git-path-read", "git-check-ignore-exact/v1"],
     [policy.git, ["check-ignore", "-v", "--", ignore[1]], "diagnostic-git-path-read", "git-check-ignore-exact/v1"],
-    [policy.git, ["ls-tree", "-r", "-z", "--full-tree", registry.tree_oid, "--", ...tree], "diagnostic-git-object-read", "git-ls-tree-z/v1"],
-    [policy.git, ["archive", "--format=tar", `--output=${row.semantic.parameters.archive_path}`, registry.tree_oid, "--", ...tree], "diagnostic-git-archive-write", "git-archive-tar/v1"],
+    [policy.git, ["ls-tree", "-r", "-z", "--full-tree", registry.head_tree_oid, "--", ...tree], "diagnostic-git-object-read", "git-ls-tree-z/v1"],
+    [policy.git, ["archive", "--format=tar", `--output=${row.semantic.parameters.archive_path}`, registry.head_tree_oid, "--", ...tree], "diagnostic-git-archive-write", "git-archive-tar/v1"],
   ];
   return shapes.find(([executable, argv, capability, semantic]) => row.executable === executable && JSON.stringify(row.argv) === JSON.stringify(argv) && row.capability_class === capability && row.semantic.kind === semantic);
 }
@@ -883,7 +899,8 @@ export function validateCommandRegistry(registry, options = {}) {
   const evidenceRoot = registry.evidence_root;
   validateRoleRoots({ operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot }, options);
   exactArray(registry.environment_allowlist, COMMAND_ENV_ALLOWLIST, "environment_allowlist");
-  if (registry.head_oid !== (options.headOid ?? COMMAND_HEAD_OID) || registry.tree_oid !== (options.treeOid ?? COMMAND_TREE_OID)) fail("REGISTRY_SCHEMA", "head_oid/tree_oid do not equal the frozen objects");
+  if (!GIT_OID_PATTERN.test(registry.head_commit_oid) || !GIT_OID_PATTERN.test(registry.head_tree_oid)) fail("REGISTRY_SCHEMA", "head_commit_oid/head_tree_oid must be canonical lowercase Git OIDs");
+  if ((options.headCommitOid !== undefined && registry.head_commit_oid !== options.headCommitOid) || (options.headTreeOid !== undefined && registry.head_tree_oid !== options.headTreeOid)) fail("REGISTRY_SCHEMA", "head_commit_oid/head_tree_oid do not equal the declared objects");
   exactArray(registry.live_pathspecs, options.livePathspecs ?? COMMAND_LIVE_PATHS, "live_pathspecs");
   exactArray(registry.tree_pathspecs, options.treePathspecs ?? COMMAND_TREE_PATHS, "tree_pathspecs");
   exactArray(registry.ignore_paths, options.ignorePaths ?? COMMAND_IGNORE_PATHS, "ignore_paths");
@@ -974,9 +991,9 @@ export function validateCommandSemantic(kind, stdout, stderr, parameters, contex
     return { status: "PASS", value: parameters.expected };
   }
   if (kind === "git-head-oid/v1") {
-    exactSemanticParameters(parameters, ["head_oid"], kind);
-    if (decodeText(out, "HEAD stdout") !== `${parameters.head_oid}\n` || err.length !== 0) fail("SEMANTIC", "HEAD output mismatch");
-    return { status: "PASS", value: parameters.head_oid };
+    exactSemanticParameters(parameters, ["head_commit_oid"], kind);
+    if (decodeText(out, "HEAD stdout") !== `${parameters.head_commit_oid}\n` || err.length !== 0) fail("SEMANTIC", "HEAD output mismatch");
+    return { status: "PASS", value: parameters.head_commit_oid };
   }
   if (kind.startsWith("validator-") && kind !== "validator-goal-clean/v1" && kind !== "validator-envelope-clean/v1") {
     exactSemanticParameters(parameters, [kind === "validator-umbrella-clean/v1" ? "umbrella" : "selected_plan", "expected_line"], kind);
@@ -1038,6 +1055,7 @@ export function validateCommandSemantic(kind, stdout, stderr, parameters, contex
 
 export function executeCommandRegistry(registry, options = {}) {
   const validated = validateCommandRegistry(registry, options);
+  if (!options.skipFilesystem) requireTrustedGitHead(registry);
   const spawn = options.spawn ?? spawnSync;
   const semantic = options.semantic ?? validateCommandSemantic;
   const receipts = [];
@@ -1181,8 +1199,9 @@ export function commandRegistryFixture(overrides = {}) {
   const evidenceRoot = overrides.evidenceRoot ?? `${operationRoot}/evidence`;
   const home = overrides.home ?? `${runtimeRoot}/home`;
   const policy = commandPolicy(overrides.policy ?? { repositoryRoot, node: "/fixture/bin/node", git: "/usr/bin/git", chrome: "/fixture/bin/chrome", npmCli: "/fixture/npm-cli.js", viteCli: "/fixture/vite.js", planValidator: "/fixture/validate-plan.mjs", phaseValidator: "/fixture/validate-phase.mjs", umbrellaValidator: "/fixture/validate-umbrella.mjs", goalValidator: "/fixture/validate-goal.mjs", envelopeValidator: "/fixture/validate-envelope.mjs" });
-  const head = overrides.headOid ?? "a".repeat(40);
-  const tree = overrides.treeOid ?? "b".repeat(40);
+  const head = overrides.headCommitOid ?? "a".repeat(40);
+  const tree = overrides.headTreeOid ?? "b".repeat(40);
+  const stopConditionCount = overrides.stopConditionCount ?? 5;
   const selectedPlan = overrides.selectedPlan ?? "/fixture/repository/plan.md";
   const selectedPlanAbsolute = overrides.selectedPlanAbsolute ?? selectedPlan;
   const umbrella = overrides.umbrella ?? "/fixture/repository/umbrella.md";
@@ -1191,14 +1210,14 @@ export function commandRegistryFixture(overrides = {}) {
   const descriptors = [
     ["CMD-TOOL-01", "diagnostic-version", policy.node, ["--version"], "version-node/v1", { expected: "v24.0.0" }],
     ["CMD-TOOL-02", "diagnostic-version", policy.node, [policy.npmCli, "--version"], "version-npm/v1", { expected: "11.0.0" }],
-    ["CMD-TOOL-03", "diagnostic-git-object-read", policy.git, ["rev-parse", "--verify", "HEAD^{commit}"], "git-head-oid/v1", { head_oid: head }],
+    ["CMD-TOOL-03", "diagnostic-git-object-read", policy.git, ["rev-parse", "--verify", "HEAD^{commit}"], "git-head-oid/v1", { head_commit_oid: head }],
     ["CMD-TOOL-04", "diagnostic-version", policy.node, [policy.viteCli, "--version"], "version-vite/v1", { expected: "vite/7 linux-x64 node-v24.0.0" }],
     ["CMD-TOOL-05", "diagnostic-version", policy.chrome, ["--version"], "version-chrome/v1", { expected: "Google Chrome for Testing 151.0.0.0" }],
     ["CMD-VAL-01", "diagnostic-validator", policy.node, [policy.planValidator, "--strict", selectedPlan], "validator-plan-clean/v1", { selected_plan: selectedPlan, expected_line: `PASS: ${selectedPlan} strict checked=1 failures=0 warnings=0` }],
     ["CMD-VAL-02", "diagnostic-validator", policy.node, [policy.phaseValidator, "--strict", selectedPlanAbsolute], "validator-phase-clean/v1", { selected_plan: selectedPlanAbsolute, expected_line: `PASS: ${selectedPlanAbsolute} strict failures=0 warnings=0` }],
     ["CMD-VAL-03", "diagnostic-validator", policy.node, [policy.umbrellaValidator, "--strict", umbrella], "validator-umbrella-clean/v1", { umbrella, expected_line: `PASS: ${umbrella} strict failures=0 warnings=0` }],
     ["CMD-VAL-04", "diagnostic-validator", policy.node, [policy.goalValidator, goal], "validator-goal-clean/v1", { goal, expected_line: `PASS: ${goal} 9 fields standing-granted` }],
-    ["CMD-VAL-06", "diagnostic-validator", policy.node, [policy.envelopeValidator, selectedPlan], "validator-envelope-clean/v1", { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", scope_count: 72, stop_condition_count: 4, artifact_receipt_schema_version: RECEIPT_SCHEMA }],
+    ["CMD-VAL-06", "diagnostic-validator", policy.node, [policy.envelopeValidator, selectedPlan], "validator-envelope-clean/v1", { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", scope_count: 72, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA }],
     ["CMD-GIT-01", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=normal", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
     ["CMD-GIT-02", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=all", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
     ["CMD-GIT-03", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "--", ...COMMAND_LIVE_PATHS], "git-name-list/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
@@ -1214,7 +1233,7 @@ export function commandRegistryFixture(overrides = {}) {
     if (kind.startsWith("version-")) stdout = Buffer.from(`${parameters.expected}\n`);
     else if (kind === "git-head-oid/v1") stdout = Buffer.from(`${head}\n`);
     else if (kind.startsWith("validator-") && kind !== "validator-envelope-clean/v1") stdout = Buffer.from(`${parameters.expected_line}\n`);
-    else if (kind === "validator-envelope-clean/v1") stdout = Buffer.from(`${JSON.stringify({ status: "PASS", authorityClass: parameters.authority_class, selected_plan: selectedPlan, scope_count: 72, stop_condition_count: 4, artifact_receipt_schema_version: RECEIPT_SCHEMA })}\n`);
+    else if (kind === "validator-envelope-clean/v1") stdout = Buffer.from(`${JSON.stringify({ status: "PASS", authorityClass: parameters.authority_class, selected_plan: selectedPlan, scope_count: 72, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA })}\n`);
     else if (kind === "git-check-ignore-exact/v1") stdout = Buffer.from(`${parameters.expected_line}\n`);
     const stderr = Buffer.alloc(0);
     const gitLike = executable === policy.git || executable === policy.chrome;
@@ -1223,7 +1242,7 @@ export function commandRegistryFixture(overrides = {}) {
     fixtureOutputs.push({ stdout, stderr });
     return { ordinal: index + 1, id, action: "spawn", capability_class: capability, executable, argv, cwd: repositoryRoot, env, env_allowlist: Object.keys(env), timeout_ms: capability === "diagnostic-validator" || kind === "git-archive-tar/v1" ? 60000 : 30000, max_buffer_bytes: 1024, expected: { exit_code: 0, signal: null, stdout_policy: stream(stdout), stderr_policy: stream(stderr) }, semantic: { kind, parameters }, evidence: { pre_receipt: `${evidenceRoot}/${index + 1}-pre.json`, post_receipt: `${evidenceRoot}/${index + 1}-post.json`, stdout_receipt: `${evidenceRoot}/${index + 1}-stdout.bin`, stderr_receipt: `${evidenceRoot}/${index + 1}-stderr.bin` } };
   });
-  return { registry: { schema: COMMAND_REGISTRY_SCHEMA, version: 1, repository_root: repositoryRoot, operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot, environment_allowlist: COMMAND_ENV_ALLOWLIST, head_oid: head, tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows }, policy, archivePath, fixtureOutputs };
+  return { registry: { schema: COMMAND_REGISTRY_SCHEMA, version: 1, repository_root: repositoryRoot, operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot, environment_allowlist: COMMAND_ENV_ALLOWLIST, head_commit_oid: head, head_tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows }, policy, archivePath, fixtureOutputs };
 }
 
 function removeOwnedLedger(entries, stream = deletionOperationStream()) {
@@ -1269,8 +1288,9 @@ export function runV2ExecutionOracle(options = {}) {
     fs.writeFileSync(fakeScript, 'const value=Buffer.from(process.argv[2]??"","base64");process.stdout.write(value);\n', { flag: "wx", mode: 0o500 });
     owned.push({ path: fakeScript, operation: "unlink", identity: identity(fs.lstatSync(fakeScript, { bigint: true })) });
     const repositoryRoot = options.repositoryRoot ?? process.cwd();
+    const repositoryHead = options.headCommitOid && options.headTreeOid ? { head_commit_oid: options.headCommitOid, head_tree_oid: options.headTreeOid } : trustedGitHead(repositoryRoot);
     const policy = { repositoryRoot, node: process.execPath, git: "/usr/bin/git", chrome: process.execPath, npmCli: fakeScript, viteCli: fakeScript, planValidator: fakeScript, phaseValidator: fakeScript, umbrellaValidator: fakeScript, goalValidator: fakeScript, envelopeValidator: fakeScript };
-    const fixture = commandRegistryFixture({ repositoryRoot, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headOid: options.headOid, treeOid: options.treeOid });
+    const fixture = commandRegistryFixture({ repositoryRoot, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headCommitOid: repositoryHead.head_commit_oid, headTreeOid: repositoryHead.head_tree_oid });
     const registryPath = path.join(registryRoot, "registry.json");
     const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
     fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
@@ -1281,8 +1301,8 @@ export function runV2ExecutionOracle(options = {}) {
     let childExecutionCount = 0;
     const execution = executeCommandRegistry(fixture.registry, {
       policy,
-      headOid: fixture.registry.head_oid,
-      treeOid: fixture.registry.tree_oid,
+      headCommitOid: fixture.registry.head_commit_oid,
+      headTreeOid: fixture.registry.head_tree_oid,
       authorityFreeze,
       spawn: (_executable, _argv, spawnOptions) => {
         const output = outputs[childExecutionCount++];
@@ -1353,7 +1373,7 @@ function callsiteAuthorityChecks() {
 
     count = { before: 0, effect: 0 };
     const commandFixture = commandRegistryFixture();
-    expectCallsite("authority-boundary-B02-callsite", count, () => executeCommandRegistry(commandFixture.registry, { policy: commandFixture.policy, skipFilesystem: true, headOid: commandFixture.registry.head_oid, treeOid: commandFixture.registry.tree_oid, persistEvidence: false, authorityFreeze, effects: { spawn: drift(count) }, spawn: () => { count.effect += 1; return { status: 0 }; } }));
+    expectCallsite("authority-boundary-B02-callsite", count, () => executeCommandRegistry(commandFixture.registry, { policy: commandFixture.policy, skipFilesystem: true, headCommitOid: commandFixture.registry.head_commit_oid, headTreeOid: commandFixture.registry.head_tree_oid, persistEvidence: false, authorityFreeze, effects: { spawn: drift(count) }, spawn: () => { count.effect += 1; return { status: 0 }; } }));
 
     const lifecycleCase = (boundary, name, terminalStatus, effectName) => {
       const local = { before: 0, effect: 0 };
@@ -1502,7 +1522,7 @@ function roleRootChecks() {
 
 function commandRegistryChecks() {
   const { registry, policy, fixtureOutputs } = commandRegistryFixture();
-  const options = { policy, skipFilesystem: true, headOid: registry.head_oid, treeOid: registry.tree_oid };
+  const options = { policy, skipFilesystem: true, headCommitOid: registry.head_commit_oid, headTreeOid: registry.head_tree_oid };
   validateCommandRegistry(registry, options);
   const checks = [{ name: "v2-registry-18-row-closure", status: "PASS" }];
   let spawnIndex = 0;
@@ -1555,6 +1575,14 @@ function supplementContractChecks() {
     .replace(/export function deletionEffectAdapter\([\s\S]*?\n}\n\nfunction deletionOperationStream/, "function deletionOperationStream");
   const sources = [runnerPath, validatorPath].map((target) => executableSource(fs.readFileSync(target, "utf8")));
   if (sources.some((source) => denyPatterns.some((pattern) => pattern.test(source)))) fail("SELF_CHECK", "cleanup-source-no-recursive-api rejected production source");
+  const authoritySources = sources.map((source) => source.replace(/  const authorityLiteralPatterns = \[[\s\S]*?\n  \];/, "  const authorityLiteralPatterns = [];"));
+  const authorityLiteralPatterns = [
+    /(?:head|tree)[A-Za-z_]*\s*(?:===?|!==?)\s*["'][0-9a-f]{40}["']/,
+    /["'][0-9a-f]{40}["']\s*(?:===?|!==?)\s*(?:head|tree)/,
+    /stop_condition_count\s*(?:===?|!==?)\s*[45]\b/,
+    /\b(?:COMMAND_HEAD_OID|COMMAND_TREE_OID|head_oid|tree_oid)\b/,
+  ];
+  if (authoritySources.some((source) => authorityLiteralPatterns.some((pattern) => pattern.test(source)))) fail("SELF_CHECK", "dynamic-repository-binding-source-scan rejected production source");
   const sharedPaths = new Set([runnerPath, validatorPath]);
   const opens = [];
   for (const target of sharedPaths) {
