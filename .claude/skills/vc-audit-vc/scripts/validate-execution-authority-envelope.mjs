@@ -140,7 +140,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "604d21c3ec9da172ca5d065ec0159c89300ccbd84ebac703a2b15f730bc093fc";
+const RUNNER_SHA256 = "24d044f28eb9d7ca99a5697ff264131210bdd799f7ebd841c7f8678c11977154";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
@@ -3122,7 +3122,7 @@ async function runConcurrencyStress(argv) {
   try {
     for (let iteration = 0; iteration < repeat; iteration++) {
       const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
-      if (selfChecks.some((text) => !text.includes('"checkCount":469'))) block("concurrent self-check count drifted");
+      if (selfChecks.some((text) => !text.includes('"checkCount":486'))) block("concurrent self-check count drifted");
       successful += selfChecks.length;
       const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
       if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
