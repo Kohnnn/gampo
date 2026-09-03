@@ -68,10 +68,40 @@ describe('fetchFreeProviderFeed', () => {
 
         expect(feed.feedSource).toBe('fallback')
         expect(shellSource).toContain('data-sportsbook-feed-source')
-        expect(shellSource).toContain('synthetic practice fallback')
+        expect(shellSource).toContain('presentFeedCondition')
         expect(netlifyToml).toContain('from = "/api/sportsbook/free-feed"')
         expect(netlifyFunction).toContain('loadProviderFeed(process.env)')
         expect(netlifyFunction).toContain("console.error('sportsbook upstream failure', sanitizeUpstreamFailure(error, process.env))")
+    })
+
+    it('reports deterministic current, stale, empty, partial, and error feed truth', async () => {
+        const payloads = [
+            {
+                generatedAt: '2026-05-26T20:00:00.000Z',
+                errors: [],
+                oddsApiIo: {
+                    events: [{ id: 'current', sport: 'basketball', league: 'NBA', home: 'Alpha', away: 'Beta', startTime: '2026-05-27T20:00:00.000Z' }],
+                    odds: [{ eventId: 'current', bookmakers: [{ name: 'Book A', updatedAt: '2026-05-26T19:58:00.000Z', markets: [{ name: 'Moneyline', outcomes: [{ name: 'Alpha', price: 1.9 }, { name: 'Beta', price: 2.1 }] }] }] }],
+                },
+            },
+            {
+                generatedAt: '2026-05-26T20:00:00.000Z',
+                errors: ['one provider failed'],
+                oddsApiIo: {
+                    events: [{ id: 'partial', sport: 'basketball', league: 'NBA', home: 'Gamma', away: 'Delta', startTime: '2026-05-27T20:00:00.000Z' }],
+                    odds: [{ eventId: 'partial', bookmakers: [{ name: 'Book B', updatedAt: '2026-05-26T19:58:00.000Z', markets: [{ name: 'Moneyline', outcomes: [{ name: 'Gamma', price: 1.8 }, { name: 'Delta', price: 2.2 }] }] }] }],
+                },
+            },
+            { generatedAt: '2026-05-26T20:00:00.000Z', errors: [], oddsApiIo: { events: [], odds: [] } },
+            { generatedAt: '2026-05-26T20:00:00.000Z', errors: ['all providers failed'], oddsApiIo: { events: [], odds: [] } },
+        ]
+        globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => payloads.shift() }))
+
+        expect((await loadSportsbookFeed()).feedState.status).toBe('current')
+        expect((await loadSportsbookFeed()).feedState.status).toBe('partial')
+        expect((await loadSportsbookFeed()).feedState.status).toBe('empty')
+        expect((await loadSportsbookFeed()).feedState.status).toBe('error')
+        expect(globalThis.fetch).toHaveBeenCalledTimes(4)
     })
 
     it('uses blended real-event feed events with estimated odds when a feed is available', async () => {
@@ -135,6 +165,6 @@ describe('fetchFreeProviderFeed', () => {
         expect(sportsbookFeedSource).toContain('perSport: 12, minimumVisible: 60, maximumVisible: 120')
         expect(sportsbookFeedSource).toContain('feedEvents = filtered.items.slice(0, 120)')
         expect(sportsHomeSource).toContain('Real-event feed guard active')
-        expect(sportsHomeSource).toContain('Big Match Only')
+        expect(sportsHomeSource).not.toMatch(/MatchdaySpotlight|Big Match Only/)
     })
 })

@@ -1,51 +1,42 @@
-import { BarChart3, ChevronRight, Radio, Tv } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import OddsButton from './OddsButton'
 import TeamLogo from './TeamLogo'
 
 function formatEventTime(startsAt) {
     const date = new Date(startsAt)
-    if (Number.isNaN(date.getTime())) return ''
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    if (Number.isNaN(date.getTime())) return 'Schedule unavailable'
+    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function EventRow({ event, league, selectedIds, onToggleSelection, onOpenEvent }) {
     const mainMarket = event.marketGroups?.[0]
-    const extraMarkets = Math.max(0, (event.marketGroups?.length || 1) - 1)
-    const live = event.status === 'live'
+    const additionalMarkets = Math.max(0, (event.marketGroups?.length || 0) - 1)
+    const schedule = event.facts?.scheduleMetadata
+    const scoreStatus = event.facts?.scoreStatus
+    const offers = mainMarket?.selections || []
 
     return (
-        <article className={`sb-event-row ${live ? 'is-live' : ''}`}>
+        <article className={`sb-event-row ${scoreStatus?.status === 'live' ? 'is-live' : ''}`}>
             <button type="button" className="sb-event-main" onClick={() => onOpenEvent(event.id)}>
                 <div className="sb-event-time">
-                    {live ? <span className="sb-live-pill">Live</span> : <span>{formatEventTime(event.startsAt)}</span>}
-                    {live ? <small>{event.clock} {event.period}</small> : <small>{league?.region || event.region}</small>}
+                    <span>{schedule?.startsAt ? formatEventTime(schedule.startsAt) : 'Unavailable from this feed'}</span>
+                    <small>{schedule?.provider ? `Schedule · ${schedule.provider}` : 'Schedule source unavailable'}</small>
                 </div>
                 <div className="sb-event-teams">
                     <span><TeamLogo src={event.homeLogo} label={event.home} />{event.home}</span>
                     <span><TeamLogo src={event.awayLogo} label={event.away} />{event.away}</span>
-                    <small>{league?.label || event.leagueId}</small>
+                    <small>{schedule?.competition || league?.label || 'Competition unavailable'}</small>
                 </div>
-                <div className="sb-event-score" aria-label="Score">
-                    {event.score ? (
-                        <>
-                            <span>{event.score.home}</span>
-                            <span>{event.score.away}</span>
-                        </>
-                    ) : (
-                        <>
-                            <Tv size={14} />
-                            <BarChart3 size={14} />
-                        </>
-                    )}
+                <div className="sb-event-score" aria-label="Received score and status">
+                    {scoreStatus?.score ? <><span>{scoreStatus.score.home}</span><span>{scoreStatus.score.away}</span></> : <span>Score unavailable</span>}
+                    <small>{scoreStatus?.status || 'Status unavailable'}</small>
                 </div>
             </button>
 
             <div className="sb-event-market">
-                <div className="sb-market-caption">
-                    <span>{mainMarket?.label || 'Winner'}</span>
-                </div>
+                <div className="sb-market-caption"><span>{mainMarket?.label || 'Market unavailable'}</span></div>
                 <div className="sb-row-odds">
-                    {(mainMarket?.selections || []).slice(0, 3).map(selection => (
+                    {offers.slice(0, 3).map(selection => (
                         <OddsButton
                             key={selection.id}
                             selection={selection}
@@ -58,10 +49,11 @@ function EventRow({ event, league, selectedIds, onToggleSelection, onOpenEvent }
                 </div>
             </div>
 
-            <button type="button" className="sb-more-markets" onClick={() => onOpenEvent(event.id)}>
-                {extraMarkets ? `+${extraMarkets * 12}` : '+0'}
-                <ChevronRight size={15} />
-            </button>
+            {additionalMarkets > 0 ? (
+                <button type="button" className="sb-more-markets" onClick={() => onOpenEvent(event.id)} aria-label={`Open ${additionalMarkets} additional supported markets`}>
+                    +{additionalMarkets}<ChevronRight size={15} />
+                </button>
+            ) : null}
         </article>
     )
 }

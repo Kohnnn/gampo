@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Info, X } from 'lucide-react'
 import { EDUCATION_SECTIONS } from '../sportsbookEducation'
 
@@ -8,6 +8,19 @@ function toneClass(tone) {
 
 function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
     const [open, setOpen] = useState(false)
+    const dialogRef = useRef(null)
+    const openerRef = useRef(null)
+    const closeRef = useRef(null)
+
+    useEffect(() => {
+        const dialog = dialogRef.current
+        if (!dialog) return
+        if (open && !dialog.open) {
+            dialog.showModal()
+            closeRef.current?.focus()
+        }
+        if (!open && dialog.open) dialog.close()
+    }, [open])
 
     if (!analysis) return null
 
@@ -19,13 +32,14 @@ function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
     const openCoach = (event) => {
         event.preventDefault()
         event.stopPropagation()
+        openerRef.current = event.currentTarget
         setOpen(true)
     }
 
     const closeCoach = (event) => {
         event?.preventDefault()
         event?.stopPropagation()
-        setOpen(false)
+        dialogRef.current?.close()
     }
 
     return (
@@ -39,15 +53,24 @@ function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
                 {variant === 'icon' ? <Info size={14} /> : <><Info size={14} /> {label}</>}
             </button>
 
-            {open ? (
-                <div className="sb-coach-backdrop" role="presentation" onClick={closeCoach}>
-                    <section className="sb-coach-panel" role="dialog" aria-modal="true" aria-label={analysis.title} onClick={event => event.stopPropagation()}>
+            <dialog
+                ref={dialogRef}
+                className="sb-coach-backdrop"
+                aria-labelledby={`odds-coach-${analysis.id || 'heading'}`}
+                onCancel={() => setOpen(false)}
+                onClose={() => {
+                    setOpen(false)
+                    openerRef.current?.isConnected && openerRef.current.focus()
+                }}
+                onClick={event => { if (event.target === dialogRef.current) closeCoach(event) }}
+            >
+                    <section className="sb-coach-panel">
                         <header className="sb-coach-head">
                             <div>
                                 <span>Odds Coach</span>
-                                <strong>{analysis.title}</strong>
+                                <strong id={`odds-coach-${analysis.id || 'heading'}`}>{analysis.title}</strong>
                             </div>
-                            <button type="button" aria-label="Close odds coach" onClick={closeCoach}>
+                            <button ref={closeRef} type="button" aria-label="Close odds coach" onClick={closeCoach}>
                                 <X size={18} />
                             </button>
                         </header>
@@ -129,8 +152,7 @@ function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
                             </div>
                         ) : null}
                     </section>
-                </div>
-            ) : null}
+            </dialog>
         </>
     )
 }

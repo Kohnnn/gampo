@@ -53,44 +53,6 @@ export const LEAGUES = [
     { id: 'lol-league', sportId: 'league-of-legends', region: 'Esports', country: 'Global', label: 'LoL World Championship' },
 ]
 
-export const PROMO_CARDS = [
-    {
-        id: 'practice-shield',
-        label: 'New Feature',
-        title: 'Practice Shield',
-        copy: 'Add 3+ legs and compare the protected return.',
-        action: 'View Info',
-        icon: ShieldCheck,
-    },
-    {
-        id: 'clay-slate',
-        label: 'Promotion',
-        title: 'Clay Court Slate',
-        copy: 'Follow live tennis markets and compare tiebreak swings.',
-        action: 'Practice Slate',
-        icon: Trophy,
-    },
-    {
-        id: 'race-day',
-        label: 'Boost',
-        title: 'Race Day Boost',
-        copy: 'Track racing prices with suspended-runner states.',
-        action: 'Practice Race',
-        icon: Flame,
-    },
-]
-
-export const OUTRIGHTS = [
-    ['Spain', 5.75],
-    ['France', 6.1],
-    ['England', 7],
-    ['Brazil', 9],
-    ['Argentina', 9.4],
-    ['Portugal', 11],
-    ['Germany', 14],
-    ['Netherlands', 21],
-]
-
 const EVENT_BLUEPRINTS = [
     ['soccer', 'soccer-england', 'Manchester City', 'Liverpool', 'prematch', ['top', 'popular']],
     ['soccer', 'soccer-england', 'Arsenal', 'Chelsea', 'live', ['live', 'top']],
@@ -318,33 +280,29 @@ export function buildSyntheticSportsbookData(seed = modelBoardWindow()) {
 
 export function driftSyntheticEvents(events, tick = 1) {
     const random = createSeededRandom(`gampo-sportsbook-drift-${tick}`)
-    return events.map(event => ({
-        ...event,
-        clock: event.status === 'live' && event.clock
-            ? `${Math.min(90, Number.parseInt(event.clock, 10) + 1 || 8)}'`
-            : event.clock,
-        score: event.status === 'live' && event.score && tick % 4 === 0 && random() > 0.72
-            ? { ...event.score, [random() > 0.5 ? 'home' : 'away']: event.score[random() > 0.5 ? 'home' : 'away'] + 1 }
-            : event.score,
-        marketGroups: event.marketGroups.map(group => ({
-            ...group,
-            selections: group.selections.map(selection => {
-                if (selection.source !== 'synthetic') return selection
-                const direction = random() > 0.52 ? 1 : -1
-                const change = direction * (0.01 + random() * 0.05)
-                const decimalOdds = roundCurrency(Math.max(1.05, selection.decimalOdds + change))
-                const suspended = random() > 0.965 || selection.status === 'locked'
-                return {
-                    ...selection,
-                    previousOdds: selection.decimalOdds,
-                    decimalOdds,
-                    suspended,
-                    status: suspended ? 'suspended' : decimalOdds > selection.decimalOdds ? 'odds-up' : decimalOdds < selection.decimalOdds ? 'odds-down' : 'available',
-                    pulseKey: tick,
-                }
-            }),
-        })),
-    }))
+    return events.map(event => {
+        if (event.source !== 'synthetic') return event
+        return {
+            ...event,
+            marketGroups: event.marketGroups.map(group => ({
+                ...group,
+                selections: group.selections.map(selection => {
+                    const direction = random() > 0.52 ? 1 : -1
+                    const change = direction * (0.01 + random() * 0.05)
+                    const decimalOdds = roundCurrency(Math.max(1.05, selection.decimalOdds + change))
+                    const suspended = random() > 0.965 || selection.status === 'locked'
+                    return {
+                        ...selection,
+                        previousOdds: selection.decimalOdds,
+                        decimalOdds,
+                        suspended,
+                        status: suspended ? 'suspended' : decimalOdds > selection.decimalOdds ? 'odds-up' : decimalOdds < selection.decimalOdds ? 'odds-down' : 'available',
+                        pulseKey: tick,
+                    }
+                }),
+            })),
+        }
+    })
 }
 
 export const SHELF_ICONS = {

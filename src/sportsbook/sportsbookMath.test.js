@@ -9,9 +9,12 @@ import {
     resolveSelectionFromScore,
     settleTicketByEventResults,
     formatOdds,
-    cashoutOffer,
+    SIMULATED_CASHOUT_HAIRCUT,
+    valueSimulatedCashout,
 } from './sportsbookMath'
 import { buildSyntheticSportsbookData } from './sportsbookData'
+import { normalizeSportsGameOddsEvent } from './freeFeedAdapters'
+import { cashOutTicket, createPracticeTicket, makeBetSlipSelection } from './sportsbookState'
 
 const selections = [
     { selectionId: 'a', currentOdds: 2, acceptedOdds: 2, trueProbability: 0.52, oddsChanged: false, label: 'Home' },
@@ -26,18 +29,83 @@ describe('sportsbookMath', () => {
         expect(probabilities[0]).toBeGreaterThan(probabilities[2])
     })
 
-    it('quotes singles, multi, and 2-of-N system tickets', () => {
+    it('quotes singles, multi, and system-2 from deterministic shared combinations', () => {
         const singles = quoteTicket({ selections: selections.slice(0, 2), stake: 20, mode: BET_MODES.SINGLES })
         expect(singles.estimatedPayout).toBe(38)
         expect(singles.combinations).toBe(2)
+        expect(singles.combinationDetails.map(({ id, selectionIds }) => ({ id, selectionIds }))).toEqual([
+            { id: 'singles:a', selectionIds: ['a'] },
+            { id: 'singles:b', selectionIds: ['b'] },
+        ])
 
         const multi = quoteTicket({ selections: selections.slice(0, 2), stake: 20, mode: BET_MODES.MULTI })
         expect(multi.totalOdds).toBe(3.6)
         expect(multi.estimatedPayout).toBe(72)
+        expect(multi.combinations).toBe(1)
+        expect(multi.combinationDetails[0]).toMatchObject({
+            id: 'multi:a+b',
+            selectionIds: ['a', 'b'],
+            rawStake: 20,
+            rawOddsProduct: 3.6,
+            rawEstimatedReturn: 72,
+        })
 
         const system = quoteTicket({ selections, stake: 30, mode: BET_MODES.SYSTEM_2 })
         expect(system.combinations).toBe(3)
-        expect(system.estimatedPayout).toBeGreaterThan(100)
+        expect(system.combinations).toBe(system.combinationDetails.length)
+        expect(system.combinationDetails.map(detail => detail.id)).toEqual([
+            'system-2:a+b',
+            'system-2:a+c',
+            'system-2:b+c',
+        ])
+        expect(system.estimatedPayout).toBe(127.2)
+    })
+
+    it('proves the literal four-leg system-2 oracle and lexical detail order', () => {
+        const fourLegs = [
+            { selectionId: 'a', acceptedOdds: 2, status: 'won' },
+            { selectionId: 'b', acceptedOdds: 3, status: 'won' },
+            { selectionId: 'c', acceptedOdds: 4, status: 'won' },
+            { selectionId: 'd', acceptedOdds: 5, status: 'won' },
+        ]
+        const quote = quoteTicket({ selections: fourLegs, stake: 60, mode: BET_MODES.SYSTEM_2 })
+        const settlement = settleTicketByEventResults({ selections: fourLegs, stake: 60, mode: BET_MODES.SYSTEM_2 })
+        const expectedIds = [
+            'system-2:a+b',
+            'system-2:a+c',
+            'system-2:a+d',
+            'system-2:b+c',
+            'system-2:b+d',
+            'system-2:c+d',
+        ]
+        expect(quote.combinations).toBe(6)
+        expect(quote.combinationDetails.map(detail => detail.id)).toEqual(expectedIds)
+        expect(quote.combinationDetails.map(detail => detail.selectionIds)).toEqual([
+            ['a', 'b'], ['a', 'c'], ['a', 'd'], ['b', 'c'], ['b', 'd'], ['c', 'd'],
+        ])
+        expect(quote.combinationDetails.map(detail => detail.rawStake)).toEqual([10, 10, 10, 10, 10, 10])
+        expect(quote.combinationDetails.map(detail => detail.rawEstimatedReturn)).toEqual([60, 80, 100, 120, 150, 200])
+        expect(quote.estimatedPayout).toBe(710)
+        expect(settlement.combinations).toBe(6)
+        expect(settlement.combinationDetails.map(detail => detail.id)).toEqual(expectedIds)
+        expect(settlement.combinationDetails.map(detail => detail.rawSettledReturn)).toEqual([60, 80, 100, 120, 150, 200])
+        expect(settlement).toMatchObject({ payout: 710, profit: 650, result: 'win', status: 'settled' })
+    })
+
+    it('sums raw returns before final currency rounding and uses accepted odds after acceptance', () => {
+        const roundingSelections = [
+            { selectionId: 'a', acceptedOdds: 1.005, currentOdds: 9, status: 'won' },
+            { selectionId: 'b', acceptedOdds: 1.005, currentOdds: 9, status: 'won' },
+            { selectionId: 'c', acceptedOdds: 1.005, currentOdds: 9, status: 'won' },
+        ]
+        const quote = quoteTicket({ selections: roundingSelections, stake: 1, mode: BET_MODES.SINGLES })
+        const settlement = settleTicketByEventResults({ selections: roundingSelections, stake: 1, mode: BET_MODES.SINGLES })
+        expect(quote.combinationDetails.map(detail => detail.estimatedReturn)).toEqual([0.34, 0.34, 0.34])
+        expect(quote.estimatedPayout).toBe(1.01)
+        expect(quote.combinationDetails.reduce((sum, detail) => sum + detail.rawEstimatedReturn, 0)).toBeCloseTo(1.005)
+        expect(settlement.combinationDetails.map(detail => detail.settledReturn)).toEqual([0.34, 0.34, 0.34])
+        expect(settlement.combinationDetails.reduce((sum, detail) => sum + detail.rawSettledReturn, 0)).toBeCloseTo(1.005)
+        expect(settlement).toMatchObject({ payout: 1.01, profit: 0.01, result: 'win' })
     })
 
     it('enforces the default accept-only-higher odds policy', () => {
@@ -662,7 +730,7 @@ describe('sportsbookMath', () => {
                 })
                 expect(result.payout).toBe(20)
                 expect(result.profit).toBe(0)
-                expect(result.result).toBe('partial')
+                expect(result.result).toBe('push')
             })
 
             it('pays singles with two winners at full stake-per-leg rate', () => {
@@ -707,19 +775,30 @@ describe('sportsbookMath', () => {
                 expect(result.result).toBe('loss')
             })
 
-            it('pays system-2 combos only where both legs are non-lost', () => {
+            it('pays system-2 combos only where both legs are non-lost without a winner divisor', () => {
                 const result = settleTicketByEventResults({
                     selections: [
-                        { selectionId: 'a', odds: 2, status: 'won' },
-                        { selectionId: 'b', odds: 3, status: 'lost' },
-                        { selectionId: 'c', odds: 4, status: 'won' },
+                        { selectionId: 'a', acceptedOdds: 2, currentOdds: 20, status: 'won' },
+                        { selectionId: 'b', acceptedOdds: 3, currentOdds: 30, status: 'lost' },
+                        { selectionId: 'c', acceptedOdds: 4, currentOdds: 40, status: 'won' },
                     ],
                     stake: 30,
                     mode: BET_MODES.SYSTEM_2,
                 })
-                expect(result.payout).toBe(40)
-                expect(result.profit).toBe(10)
+                expect(result.payout).toBe(80)
+                expect(result.profit).toBe(50)
                 expect(result.result).toBe('win')
+                expect(result.combinationDetails.map(detail => detail.id)).toEqual([
+                    'system-2:a+b',
+                    'system-2:a+c',
+                    'system-2:b+c',
+                ])
+                expect(result.combinationDetails[1]).toMatchObject({
+                    rawStake: 10,
+                    rawSettledReturn: 80,
+                    settledReturn: 80,
+                    status: 'settled',
+                })
             })
 
             it('returns loss when no system-2 combo has two non-lost legs', () => {
@@ -735,6 +814,69 @@ describe('sportsbookMath', () => {
                 expect(result.payout).toBe(0)
                 expect(result.profit).toBe(-30)
                 expect(result.result).toBe('loss')
+            })
+
+            it('applies pending, full-void, push, win, and partial precedence', () => {
+                const pending = settleTicketByEventResults({
+                    selections: [
+                        { selectionId: 'a', acceptedOdds: 2, status: 'pending' },
+                        { selectionId: 'b', acceptedOdds: 3, status: 'won' },
+                        { selectionId: 'c', acceptedOdds: 4, status: 'lost' },
+                    ],
+                    stake: 30,
+                    mode: BET_MODES.SYSTEM_2,
+                })
+                expect(pending.result).toBe('pending')
+
+                const fullVoid = settleTicketByEventResults({
+                    selections: [
+                        { selectionId: 'a', acceptedOdds: 2, status: 'void' },
+                        { selectionId: 'b', acceptedOdds: 3, status: 'void' },
+                    ],
+                    stake: 10,
+                    mode: BET_MODES.MULTI,
+                })
+                expect(fullVoid).toMatchObject({ payout: 10, result: 'full-void' })
+
+                const push = settleTicketByEventResults({
+                    selections: [
+                        { selectionId: 'a', acceptedOdds: 2, status: 'won' },
+                        { selectionId: 'b', acceptedOdds: 3, status: 'lost' },
+                    ],
+                    stake: 20,
+                    mode: BET_MODES.SINGLES,
+                })
+                expect(push.result).toBe('push')
+
+                const partial = settleTicketByEventResults({
+                    selections: [
+                        { selectionId: 'a', acceptedOdds: 1.5, status: 'won' },
+                        { selectionId: 'b', acceptedOdds: 3, status: 'lost' },
+                    ],
+                    stake: 20,
+                    mode: BET_MODES.SINGLES,
+                })
+                expect(partial).toMatchObject({ payout: 15, result: 'partial' })
+            })
+
+            it('keeps unsupported markets and canonical lookup misses pending', () => {
+                const unsupported = settleTicketByEventResults({
+                    selections: [{
+                        selectionId: 'a',
+                        canonicalEventId: 'canonical-a',
+                        eventId: 'legacy-a',
+                        marketId: 'correct-score',
+                        label: '1-0',
+                        acceptedOdds: 4,
+                    }],
+                    stake: 10,
+                    mode: BET_MODES.SINGLES,
+                    eventResults: {
+                        'legacy-a': { eventId: 'legacy-a', status: 'settled', homeScore: 1, awayScore: 0 },
+                    },
+                })
+                expect(unsupported).toMatchObject({ status: 'pending', result: 'pending' })
+                expect(unsupported.legs[0].reason).toBe('unsupported-market')
             })
         })
     })
@@ -769,41 +911,269 @@ describe('sportsbookMath', () => {
         })
     })
 
-    describe('cashoutOffer', () => {
-        const baseTicket = {
-            status: 'active',
-            stake: 10,
-            quote: { estimatedPayout: 100 },
-            acceptedAt: 1_000,
-            legs: [{ selectionId: 'a', status: 'pending' }],
+    describe('valueSimulatedCashout', () => {
+        it('cashes out a real adapter ticket with canonical identity invariant to provider event IDs', () => {
+            const adapterFixture = providerEventId => normalizeSportsGameOddsEvent({
+                eventID: providerEventId,
+                sportID: 'BASKETBALL',
+                leagueID: 'Journey League',
+                teams: { home: { names: { long: 'Home' } }, away: { names: { long: 'Away' } } },
+                status: { startsAt: '2026-09-04T17:00:00.000Z', started: false, ended: false },
+                odds: {
+                    'points-home-game-ml-home': { byBookmaker: { 'Journey Book': { odds: '2', available: true, lastUpdated: '2026-09-03T12:00:00.000Z' } } },
+                    'points-away-game-ml-away': { byBookmaker: { 'Journey Book': { odds: '2', available: true, lastUpdated: '2026-09-03T12:00:00.000Z' } } },
+                },
+            }, { generatedAt: '2026-09-03T12:01:00.000Z' })
+            const event = adapterFixture('adapter-original')
+            const offer = event.offers.find(candidate => candidate.outcome === 'home')
+            const selection = makeBetSlipSelection({ event, selection: offer })
+            const ticket = createPracticeTicket({ selections: [selection], stake: 10, seed: 7 })
+            const valuation = valueSimulatedCashout({ ticket, events: [event] })
+            const cashed = cashOutTicket(ticket, valuation, 8)
+
+            expect(event.canonicalEventId).toBe(event.id)
+            expect(offer.canonicalEventId).toBe(event.id)
+            expect(selection.canonicalEventId).toBe(event.id)
+            expect(valuation).toMatchObject({ available: true, amount: 7.8 })
+            expect(valuation.observationFingerprint).toContain('cashout-observation-v1')
+            expect(valuation.valuationFingerprint).toContain('cashout-valuation-v1')
+            expect(cashed).toMatchObject({ status: 'cashed_out', result: 'cashed_out' })
+            expect(cashed.settlementKey).toContain(valuation.valuationFingerprint)
+
+            const refreshed = adapterFixture('refreshed-id')
+            const refreshedValuation = valueSimulatedCashout({ ticket, events: [refreshed] })
+            expect(refreshed.canonicalEventId).toBe(event.id)
+            expect(refreshed.sourceRefs).toEqual([{ provider: 'sportsgameodds', eventId: 'refreshed-id' }])
+            expect(refreshedValuation.amount).toBe(valuation.amount)
+            expect(refreshedValuation.observationFingerprint).toBe(valuation.observationFingerprint)
+            expect(refreshedValuation.valuationFingerprint).toBe(valuation.valuationFingerprint)
+            expect(cashOutTicket(ticket, refreshedValuation, 8)).toMatchObject({ status: 'cashed_out', result: 'cashed_out' })
+        })
+
+        function cashoutFixture(overrides = {}) {
+            const selection = {
+                id: 'home', selectionId: 'home', canonicalEventId: 'event', eventId: 'provider-event', marketId: 'winner',
+                outcome: 'home', side: 'home', acceptedOdds: 2, bookmaker: 'Book', provider: 'Provider',
+                providerEventId: 'provider-event', sourceContext: { group: 'odds', nested: { b: 2, a: 1 } },
+            }
+            const combination = { id: 'singles:home', mode: 'singles', selectionIds: ['home'], rawStake: 10 }
+            const ticket = {
+                id: 'ticket', status: 'active', mode: 'singles', stake: 10, acceptedAt: 1,
+                selections: [selection], legs: [{ selectionId: 'home', canonicalEventId: 'event', marketId: 'winner', status: 'pending', reason: 'pending' }],
+                combinationDetails: [combination], quote: { combinationDetails: [structuredClone(combination)] },
+                ...overrides,
+            }
+            const offer = (outcome, decimalOdds, extra = {}) => ({
+                id: outcome, canonicalEventId: 'event', marketId: 'winner', outcome, decimalOdds,
+                bookmaker: 'Book', provider: 'Provider', providerEventId: 'provider-event',
+                sourceContext: { nested: { a: 1, b: 2 }, group: 'odds' }, observedAt: '2026-09-03T12:00:00.000Z',
+                freshness: 'current', submittable: true, ineligibilityReason: null, suspended: false, ...extra,
+            })
+            return { ticket, events: [{ canonicalEventId: 'event', clock: '10:00', offers: [offer('home', 2), offer('away', 2)] }], offer }
         }
 
-        it('offers a haircut value for active tickets with no settled-loss legs', () => {
-            const offer = cashoutOffer(baseTicket, 1_000)
-            expect(offer).toBeGreaterThan(0)
-            expect(offer).toBeLessThan(baseTicket.quote.estimatedPayout)
+        it('uses complete same-bookmaker de-vig probability and the literal haircut once', () => {
+            const { ticket, events } = cashoutFixture()
+            const result = valueSimulatedCashout({ ticket, events })
+            expect(SIMULATED_CASHOUT_HAIRCUT).toBe(0.78)
+            expect(result).toMatchObject({ available: true, fairCurrentValue: 10, amount: 7.8, currency: 'GC', label: 'Simulated cash-out', reason: null })
+            expect(result.legProbabilities).toEqual([{ selectionId: 'home', probability: 0.5, bookmaker: 'Book', provider: 'Provider', observedAt: '2026-09-03T12:00:00.000Z' }])
+            expect(result.combinationValues).toEqual([{ id: 'singles:home', rawStake: 10, rawCurrentValue: 10 }])
+            expect(result.observationFingerprint).toContain('cashout-observation-v1')
+            expect(result.valuationFingerprint).toContain('cashout-valuation-v1')
         })
 
-        it('also offers cash-out for accepted tickets', () => {
-            const offer = cashoutOffer({ ...baseTicket, status: 'accepted' }, 1_000)
-            expect(offer).toBeGreaterThan(0)
+        it('responds monotonically to current probability and ignores age, clocks, key order, and unmatched offers', () => {
+            const base = cashoutFixture()
+            const first = valueSimulatedCashout(base)
+            const changed = cashoutFixture({ acceptedAt: 999999 })
+            changed.events[0].clock = '89:59'
+            changed.events[0].offers.push(changed.offer('home', 9, { bookmaker: 'Other' }))
+            expect(valueSimulatedCashout(changed)).toEqual(first)
+            const rising = cashoutFixture()
+            rising.events[0].offers[0].decimalOdds = 1.5
+            rising.events[0].offers[1].decimalOdds = 3
+            expect(valueSimulatedCashout(rising)).toMatchObject({ fairCurrentValue: 13.333333333333332, amount: 10.4 })
         })
 
-        it('returns zero when any leg has already lost', () => {
-            const ticket = { ...baseTicket, legs: [{ selectionId: 'a', status: 'lost' }, { selectionId: 'b', status: 'pending' }] }
-            expect(cashoutOffer(ticket, 1_000)).toBe(0)
+        it('ignores provider event ID drift in cohort matching and fingerprints', () => {
+            const base = cashoutFixture()
+            const expected = valueSimulatedCashout(base)
+            base.events[0].offers.forEach(offer => { offer.providerEventId = `changed-${offer.providerEventId}` })
+            base.ticket.selections[0].providerEventId = 'changed-selection-provider-event'
+            expect(valueSimulatedCashout(base)).toEqual(expected)
         })
 
-        it('returns zero for settled or non-live tickets', () => {
-            expect(cashoutOffer({ ...baseTicket, status: 'settled' }, 1_000)).toBe(0)
-            expect(cashoutOffer({ ...baseTicket, status: 'cashed_out' }, 1_000)).toBe(0)
-            expect(cashoutOffer(null, 1_000)).toBe(0)
+        it('canonicalizes only pending leg reasons in valuation fingerprints', () => {
+            const base = cashoutFixture()
+            const pendingFingerprint = valueSimulatedCashout(base).valuationFingerprint
+            base.ticket.legs[0].reason = 'event-not-settled'
+            expect(valueSimulatedCashout(base).valuationFingerprint).toBe(pendingFingerprint)
+
+            const changedStatus = cashoutFixture()
+            changedStatus.ticket.legs[0] = { ...changedStatus.ticket.legs[0], status: 'won', reason: 'winner' }
+            const wonFingerprint = valueSimulatedCashout(changedStatus).valuationFingerprint
+            expect(wonFingerprint).not.toBe(pendingFingerprint)
+            changedStatus.ticket.legs[0].reason = 'total'
+            expect(valueSimulatedCashout(changedStatus).valuationFingerprint).not.toBe(wonFingerprint)
+
+            for (const mutate of [
+                value => { value.ticket.selections[0].acceptedOdds = 3 },
+                value => {
+                    value.ticket.selections[0].canonicalEventId = 'changed-event'
+                    value.ticket.legs[0].canonicalEventId = 'changed-event'
+                    value.events[0].canonicalEventId = 'changed-event'
+                    value.events[0].offers.forEach(offer => { offer.canonicalEventId = 'changed-event' })
+                },
+                value => {
+                    value.ticket.combinationDetails[0].id = 'changed-combination'
+                    value.ticket.quote.combinationDetails[0].id = 'changed-combination'
+                },
+                value => { value.ticket.selections[0].sourceContext = { group: 'changed' }; value.events[0].offers.forEach(offer => { offer.sourceContext = { group: 'changed' } }) },
+                value => { value.events[0].offers[0].decimalOdds = 1.5; value.events[0].offers[1].decimalOdds = 3 },
+            ]) {
+                const changed = cashoutFixture()
+                mutate(changed)
+                const valuation = valueSimulatedCashout(changed)
+                expect(valuation.valuationFingerprint).not.toBe(pendingFingerprint)
+            }
+
+            const valueChange = cashoutFixture()
+            valueChange.events[0].offers[0].decimalOdds = 1.5
+            valueChange.events[0].offers[1].decimalOdds = 3
+            const changedValue = valueSimulatedCashout(valueChange)
+            expect(changedValue.observationFingerprint).not.toBe(valueSimulatedCashout(cashoutFixture()).observationFingerprint)
+            expect(changedValue.fairCurrentValue).not.toBe(10)
+            expect(changedValue.amount).not.toBe(7.8)
         })
 
-        it('reduces the offer as the ticket ages toward settlement', () => {
-            const fresh = cashoutOffer(baseTicket, 1_000)
-            const older = cashoutOffer(baseTicket, 1_000 + 60_000)
-            expect(older).toBeGreaterThan(fresh)
+        it('values multi settled factors and authoritative system combinations without intermediate rounding', () => {
+            const first = cashoutFixture()
+            const second = cashoutFixture()
+            second.ticket.selections[0] = { ...second.ticket.selections[0], id: 'away-2', selectionId: 'away-2', canonicalEventId: 'event-2', eventId: 'provider-event-2', providerEventId: 'provider-event-2', acceptedOdds: 3, outcome: 'home', side: 'home' }
+            second.ticket.legs[0] = { selectionId: 'away-2', canonicalEventId: 'event-2', marketId: 'winner', status: 'pending', reason: 'pending' }
+            second.events[0] = { canonicalEventId: 'event-2', offers: [second.offer('home', 2.5, { canonicalEventId: 'event-2', providerEventId: 'provider-event-2' }), second.offer('away', 1.6666666666666667, { canonicalEventId: 'event-2', providerEventId: 'provider-event-2' })] }
+            const ticket = { ...first.ticket, mode: 'multi', selections: [...first.ticket.selections, ...second.ticket.selections], legs: [...first.ticket.legs, ...second.ticket.legs] }
+            ticket.combinationDetails = [{ id: 'multi:home+away-2', mode: 'multi', selectionIds: ['home', 'away-2'], rawStake: 10 }]
+            ticket.quote = { combinationDetails: structuredClone(ticket.combinationDetails) }
+            const pending = valueSimulatedCashout({ ticket, events: [...first.events, ...second.events] })
+            expect(pending.fairCurrentValue).toBeCloseTo(12)
+            expect(pending.amount).toBe(9.36)
+            ticket.legs[0] = { ...ticket.legs[0], status: 'won', reason: 'winner' }
+            const won = valueSimulatedCashout({ ticket, events: second.events })
+            expect(won.fairCurrentValue).toBeCloseTo(24)
+            expect(won.amount).toBe(18.72)
+            ticket.legs[0] = { ...ticket.legs[0], status: 'void', reason: 'push' }
+            const voided = valueSimulatedCashout({ ticket, events: second.events })
+            expect(voided.fairCurrentValue).toBeCloseTo(12)
+            expect(voided.amount).toBe(9.36)
+        })
+
+        it.each([
+            [null, 'ticket-ineligible'],
+            [{ status: 'settled' }, 'ticket-terminal'],
+            [{ legs: [{ selectionId: 'home', canonicalEventId: 'event', marketId: 'winner', status: 'lost', reason: 'winner' }] }, 'leg-lost'],
+            [{ legs: [{ selectionId: 'home', canonicalEventId: 'event', marketId: 'winner', status: 'banana', reason: 'banana' }] }, 'unsupported-leg'],
+        ])('returns exact unavailable reason precedence for ticket mutation %#', (mutation, reason) => {
+            const { ticket, events } = cashoutFixture()
+            const target = mutation === null ? null : { ...ticket, ...mutation }
+            expect(valueSimulatedCashout({ ticket: target, events })).toMatchObject({ available: false, amount: null, reason, fairCurrentValue: null, legProbabilities: [], combinationValues: [], observationFingerprint: null, valuationFingerprint: null })
+        })
+
+        it('values the literal three-pending system-2 worked vector', () => {
+            const first = cashoutFixture()
+            const second = cashoutFixture()
+            const third = cashoutFixture()
+            const selections = [
+                { ...first.ticket.selections[0], selectionId: 'a', id: 'a', acceptedOdds: 2 },
+                { ...second.ticket.selections[0], selectionId: 'b', id: 'b', canonicalEventId: 'event-b', eventId: 'event-b', acceptedOdds: 2 },
+                { ...third.ticket.selections[0], selectionId: 'c', id: 'c', canonicalEventId: 'event-c', eventId: 'event-c', acceptedOdds: 2 },
+            ]
+            const legs = [
+                { selectionId: 'a', canonicalEventId: 'event', marketId: 'winner', status: 'pending', reason: 'pending' },
+                { selectionId: 'b', canonicalEventId: 'event-b', marketId: 'winner', status: 'pending', reason: 'pending' },
+                { selectionId: 'c', canonicalEventId: 'event-c', marketId: 'winner', status: 'pending', reason: 'pending' },
+            ]
+            const combinationDetails = [
+                { id: 'system-2:a+b', mode: 'system-2', selectionIds: ['a', 'b'], rawStake: 10 },
+                { id: 'system-2:a+c', mode: 'system-2', selectionIds: ['a', 'c'], rawStake: 10 },
+                { id: 'system-2:b+c', mode: 'system-2', selectionIds: ['b', 'c'], rawStake: 10 },
+            ]
+            const ticket = { ...first.ticket, mode: 'system-2', stake: 30, selections, legs, combinationDetails, quote: { combinationDetails: structuredClone(combinationDetails) } }
+            const events = [
+                first.events[0],
+                { canonicalEventId: 'event-b', offers: [second.offer('home', 2, { canonicalEventId: 'event-b' }), second.offer('away', 4 / 3, { canonicalEventId: 'event-b' })] },
+                { canonicalEventId: 'event-c', offers: [third.offer('home', 4, { canonicalEventId: 'event-c' }), third.offer('away', 4 / 3, { canonicalEventId: 'event-c' })] },
+            ]
+            const result = valueSimulatedCashout({ ticket, events })
+            expect(result.legProbabilities.map(({ probability }) => probability)).toEqual([0.5, 0.4, 0.25])
+            expect(result.combinationValues.map(({ rawCurrentValue }) => rawCurrentValue)).toEqual([8, 5, 4])
+            expect(result.fairCurrentValue).toBe(17)
+            expect(SIMULATED_CASHOUT_HAIRCUT).toBe(0.78)
+            expect(result.amount).toBe(13.26)
+        })
+
+        it('values the independent system-2 worked vector with won, void, and pending legs', () => {
+            const first = cashoutFixture()
+            const second = cashoutFixture()
+            const third = cashoutFixture()
+            const selections = [
+                { ...first.ticket.selections[0], selectionId: 'a', id: 'a', acceptedOdds: 2 },
+                { ...second.ticket.selections[0], selectionId: 'b', id: 'b', canonicalEventId: 'event-b', eventId: 'event-b', acceptedOdds: 2 },
+                { ...third.ticket.selections[0], selectionId: 'c', id: 'c', canonicalEventId: 'event-c', eventId: 'event-c', acceptedOdds: 2 },
+            ]
+            const legs = [
+                { selectionId: 'a', status: 'won', reason: 'winner' },
+                { selectionId: 'b', status: 'void', reason: 'push' },
+                { selectionId: 'c', status: 'pending', reason: 'pending' },
+            ]
+            const combinationDetails = [
+                { id: 'system-2:a+b', mode: 'system-2', selectionIds: ['a', 'b'], rawStake: 10 },
+                { id: 'system-2:a+c', mode: 'system-2', selectionIds: ['a', 'c'], rawStake: 10 },
+                { id: 'system-2:b+c', mode: 'system-2', selectionIds: ['b', 'c'], rawStake: 10 },
+            ]
+            const ticket = { ...first.ticket, mode: 'system-2', stake: 30, selections, legs, combinationDetails, quote: { combinationDetails: structuredClone(combinationDetails) } }
+            const events = [{ canonicalEventId: 'event-c', offers: [third.offer('home', 3, { canonicalEventId: 'event-c' }), third.offer('away', 1.5, { canonicalEventId: 'event-c' })] }]
+            const result = valueSimulatedCashout({ ticket, events })
+            expect(result.fairCurrentValue).toBeCloseTo(40)
+            expect(result.amount).toBe(31.2)
+            expect(result.combinationValues[0]).toEqual({ id: 'system-2:a+b', rawStake: 10, rawCurrentValue: 20 })
+            expect(result.combinationValues[1].rawCurrentValue).toBeCloseTo(40 / 3)
+            expect(result.combinationValues[2].rawCurrentValue).toBeCloseTo(20 / 3)
+            ticket.legs[1] = { ...ticket.legs[1], status: 'lost', reason: 'winner' }
+            expect(valueSimulatedCashout({ ticket, events })).toMatchObject({ available: false, amount: null, reason: 'leg-lost' })
+        })
+
+        it('applies full unavailable precedence for conflicting probability defects', () => {
+            const { ticket, events, offer } = cashoutFixture()
+            events[0].offers.push(offer('home', 1, { freshness: 'stale', suspended: true }))
+            expect(valueSimulatedCashout({ ticket, events }).reason).toBe('probability-conflict')
+            ticket.legs[0] = { ...ticket.legs[0], status: 'lost', reason: 'winner' }
+            expect(valueSimulatedCashout({ ticket, events }).reason).toBe('leg-lost')
+        })
+
+        it('returns non-positive-value when coherent arithmetic underflows the currency boundary', () => {
+            const { ticket, events } = cashoutFixture()
+            ticket.stake = Number.MIN_VALUE
+            ticket.combinationDetails[0].rawStake = Number.MIN_VALUE
+            ticket.quote.combinationDetails[0].rawStake = Number.MIN_VALUE
+            expect(valueSimulatedCashout({ ticket, events })).toMatchObject({ available: false, amount: null, reason: 'non-positive-value' })
+        })
+
+        it.each([
+            ['probability-unmatched', events => { events[0].offers.forEach(item => { item.bookmaker = 'Other' }) }],
+            ['probability-conflict', (events, offer) => { events[0].offers.push(offer('home', 2)) }],
+            ['probability-stale', events => { events[0].offers[0].freshness = 'stale' }],
+            ['probability-stale', events => { events[0].offers[0].freshness = 'unknown' }],
+            ['probability-malformed', events => { events[0].offers[0].decimalOdds = 1 }],
+            ['probability-malformed', events => { events[0].offers[0].suspended = true }],
+            ['probability-malformed', events => { events[0].offers[0].bookmaker = null; events[0].offers[0].ineligibilityReason = 'model-estimate' }],
+            ['probability-malformed', events => { Object.defineProperty(events[0].offers[0].sourceContext, 'group', { get: () => 'odds', configurable: true }) }],
+            ['probability-incomplete', events => { events[0].offers.pop() }],
+        ])('fails closed with %s', (reason, mutate) => {
+            const { ticket, events, offer } = cashoutFixture()
+            mutate(events, offer)
+            expect(valueSimulatedCashout({ ticket, events }).reason).toBe(reason)
         })
     })
 

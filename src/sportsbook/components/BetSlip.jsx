@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown, Settings, Ticket, Trash2, X } from 'lucide-react'
+import { Settings, Ticket, Trash2, X } from 'lucide-react'
 import { analyzeTicket } from '../sportsbookEducation'
-import { BET_MODES, ODDS_POLICIES, cashoutOffer, formatOdds, quoteTicket } from '../sportsbookMath'
+import { BET_MODES, ODDS_POLICIES, formatOdds, quoteTicket } from '../sportsbookMath'
 import { validateTicket } from '../sportsbookState'
+import { formatObservedAge, presentCashout, presentTicketLifecycle } from '../sportsbookPresentation'
 import OddsCoach from './OddsCoach'
 
 const modeLabels = {
@@ -41,7 +42,7 @@ function formatEventSnapshot(event) {
     return `${status}${score}`
 }
 
-function TicketSnapshot({ ticket, eventMap, onCashOut }) {
+function TicketSnapshot({ ticket, eventMap, cashoutValuation, onCashOut }) {
     const legs = ticket.legs?.length ? ticket.legs : ticket.selections || []
     const pending = legs.filter(leg => legStatus(leg) === 'pending')
     const focusLeg = pending[0] || legs[0] || {}
@@ -49,8 +50,11 @@ function TicketSnapshot({ ticket, eventMap, onCashOut }) {
     const settled = ticket.status === 'settled' || ticket.status === 'cashed_out'
     const profit = Number(ticket.profit || 0)
     const statusClass = settled ? 'is-settled' : 'is-active'
-    const resultLabel = settled ? ticket.result || 'settled' : `${pending.length || legs.length} pending`
-    const offer = isActiveTicket(ticket) ? cashoutOffer(ticket) : 0
+    const lifecycle = presentTicketLifecycle(ticket)
+    const cashout = presentCashout(cashoutValuation)
+    const resultLabel = lifecycle.label
+    const offer = isActiveTicket(ticket) && cashout.available ? cashout.amount : null
+    const cashoutReasonId = `cashout-reason-${ticket.id}`
 
     return (
         <article className={`sb-slip-ticket ${statusClass}`}>
@@ -60,21 +64,27 @@ function TicketSnapshot({ ticket, eventMap, onCashOut }) {
             </header>
             <p>{focusLeg.eventLabel || 'Practice ticket'}</p>
             <small>{formatEventSnapshot(event)}{focusLeg.reason && focusLeg.reason !== 'pending' ? ` · ${focusLeg.reason}` : ''}</small>
+            <small>{focusLeg.bookmaker || 'Bookmaker unavailable'} · {focusLeg.provider || 'Source unavailable'} · accepted {formatOdds(focusLeg.acceptedOdds || focusLeg.odds || 0, 'decimal')} · {formatObservedAge(focusLeg.observedAt)}</small>
             <footer>
                 <span>Stake {formatGc(ticket.stake)}</span>
                 <span>{settled ? `Returned ${formatGc(ticket.payout)}` : `Est. ${formatGc(ticket.estimatedPayout)}`}</span>
                 {settled ? <strong className={profit >= 0 ? 'is-positive' : 'is-negative'}>{profit >= 0 ? '+' : ''}{formatGc(profit)}</strong> : null}
             </footer>
             {onCashOut && offer > 0 ? (
-                <button type="button" className="sb-cashout-btn" onClick={() => onCashOut(ticket.id)} data-ux-primary-action>
-                    Cash out {formatGc(offer)}
+                <button type="button" className="sb-cashout-btn" onClick={() => onCashOut(ticket.id, cashout.valuationFingerprint)} data-ux-primary-action>
+                    {cashout.actionLabel}
                 </button>
+            ) : onCashOut && isActiveTicket(ticket) ? (
+                <>
+                    <button type="button" className="sb-cashout-btn" disabled aria-describedby={cashoutReasonId}>Simulated cash-out unavailable</button>
+                    <p className="sb-cashout-reason" id={cashoutReasonId}>{cashout.message}</p>
+                </>
             ) : null}
         </article>
     )
 }
 
-function TicketList({ tickets, events, emptyTitle, emptyCopy, onCashOut }) {
+function TicketList({ tickets, events, cashoutValuationsByTicketId, emptyTitle, emptyCopy, onCashOut }) {
     const eventMap = useMemo(() => new Map(events.map(event => [event.id, event])), [events])
 
     if (tickets.length === 0) {
@@ -89,7 +99,7 @@ function TicketList({ tickets, events, emptyTitle, emptyCopy, onCashOut }) {
 
     return (
         <div className="sb-slip-ticket-list">
-            {tickets.map(ticket => <TicketSnapshot key={ticket.id} ticket={ticket} eventMap={eventMap} onCashOut={onCashOut} />)}
+            {tickets.map(ticket => <TicketSnapshot key={ticket.id} ticket={ticket} eventMap={eventMap} cashoutValuation={cashoutValuationsByTicketId.get(ticket.id)} onCashOut={onCashOut} />)}
         </div>
     )
 }
@@ -128,14 +138,13 @@ function BetSlipSettings({ settings, onChange, onClose }) {
     )
 }
 
-function BetSlip({ selections = [], tickets = [], events = [], stake, mode, settings, balance, placing, onStakeChange, onModeChange, onSettingsChange, onRemove, onClear, onAcceptOdds, onPlace, onCashOut, onClose }) {
+function BetSlip({ selections = [], tickets = [], events = [], cashoutValuationsByTicketId = new Map(), stake, mode, settings, balance, placing, onStakeChange, onModeChange, onSettingsChange, onRemove, onClear, onAcceptOdds, onPlace, onCashOut, onClose, headingId }) {
     const [showSettings, setShowSettings] = useState(false)
     const [activeTab, setActiveTab] = useState('slip')
     const quote = quoteTicket({ selections, stake, mode })
     const analysis = analyzeTicket({ selections, stake, mode, quote })
     const validation = validateTicket({ selections, stake, balance, settings, mode })
     const status = placing ? 'placing' : selections.length === 0 ? 'empty' : validation.valid ? 'ready' : validation.needsManualAccept ? 'odds-changed' : 'selected'
-    const hasSameGame = selections.some((selection, index) => selections.findIndex(other => other.eventId === selection.eventId) !== index)
     const activeTickets = tickets.filter(isActiveTicket)
     const settledTickets = tickets.filter(ticket => ticket.status === 'settled' || ticket.status === 'cashed_out')
     const tabCounts = { slip: selections.length, active: activeTickets.length, settled: settledTickets.length }
@@ -145,11 +154,10 @@ function BetSlip({ selections = [], tickets = [], events = [], stake, mode, sett
             <header className="sb-slip-header">
                 <div>
                     <Ticket size={18} />
-                    <strong>Bet Slip</strong>
+                     <strong id={headingId}>Practice ticket</strong>
                     <span>{selections.length}</span>
                 </div>
                 <div>
-                    <button type="button" aria-label="Collapse bet slip"><ChevronDown size={17} /></button>
                     <button type="button" aria-label="Bet slip settings" onClick={() => { setActiveTab('slip'); setShowSettings(value => !value) }}><Settings size={17} /></button>
                     {onClose ? <button type="button" aria-label="Close bet slip" onClick={onClose}><X size={17} /></button> : null}
                 </div>
@@ -187,7 +195,7 @@ function BetSlip({ selections = [], tickets = [], events = [], stake, mode, sett
                     </div>
 
                     {selections.length === 0 ? (
-                        <div className="sb-slip-empty">
+                        <div className="sb-slip-empty" id="slip-empty-reason">
                             <Ticket size={28} />
                             <strong>Your practice slip is empty</strong>
                             <p>Select a price to build a fake-credit ticket.</p>
@@ -213,7 +221,8 @@ function BetSlip({ selections = [], tickets = [], events = [], stake, mode, sett
                                         </button>
                                         <small>{selection.eventLabel}</small>
                                         <span>{selection.marketLabel}</span>
-                                        <strong>{selection.label}<b>{formatOdds(selection.currentOdds, settings.oddsFormat)}</b></strong>
+                                        <strong>{selection.label}<b>{formatOdds(selection.acceptedOdds, settings.oddsFormat)}</b></strong>
+                                        <small>{selection.bookmaker} · {selection.provider} · {formatObservedAge(selection.observedAt)}</small>
                                         {selection.oddsChanged ? (
                                             <div className="sb-odds-change">
                                                 Was {formatOdds(selection.acceptedOdds, settings.oddsFormat)}
@@ -226,10 +235,6 @@ function BetSlip({ selections = [], tickets = [], events = [], stake, mode, sett
                             </section>
                         </div>
                     )}
-
-                    {hasSameGame && mode !== BET_MODES.SINGLES ? (
-                        <div className="sb-slip-warning">Same-game multi: correlation can distort the displayed price.</div>
-                    ) : null}
 
                     <label className="sb-slip-stake">
                         <span>Total Practice Stake</span>
@@ -261,18 +266,18 @@ function BetSlip({ selections = [], tickets = [], events = [], stake, mode, sett
 
                     <div className="sb-slip-metrics">
                         <div><span>Status</span><strong>{status}</strong></div>
-                        <div><span>EV Hint</span><strong className={quote.expectedValue >= 0 ? 'is-positive' : 'is-negative'}>{formatGc(quote.expectedValue)}</strong></div>
+
                         <div><span>Balance</span><strong>{formatGc(balance)}</strong></div>
                     </div>
 
-                    {!validation.valid && selections.length > 0 ? <p className="sb-slip-reason">{validation.reason}</p> : null}
+                    {!validation.valid && selections.length > 0 ? <p className="sb-slip-reason" id="slip-validation-reason">{validation.reason}</p> : null}
 
                     <div className="sb-slip-actions">
-                        <button type="button" className="sb-clear-btn" onClick={onClear} disabled={selections.length === 0}>
+                        <button type="button" className="sb-clear-btn" onClick={onClear} disabled={selections.length === 0} aria-describedby={selections.length === 0 ? 'slip-empty-reason' : undefined}>
                             <Trash2 size={15} />
                             Clear
                         </button>
-                        <button type="button" className="sb-place-btn" onClick={onPlace} disabled={!validation.valid || placing} data-ux-primary-action>
+                        <button type="button" className="sb-place-btn" onClick={onPlace} disabled={!validation.valid || placing} aria-describedby={!validation.valid ? (selections.length === 0 ? 'slip-empty-reason' : 'slip-validation-reason') : undefined} data-ux-primary-action>
                             {placing ? 'Placing...' : (
                                 <>
                                     <span>Place Practice Bet</span>
@@ -292,6 +297,7 @@ function BetSlip({ selections = [], tickets = [], events = [], stake, mode, sett
                     <TicketList
                         tickets={activeTab === 'active' ? activeTickets : settledTickets}
                         events={events}
+                        cashoutValuationsByTicketId={cashoutValuationsByTicketId}
                         emptyTitle={activeTab === 'active' ? 'No active tickets' : 'No settled tickets'}
                         emptyCopy={activeTab === 'active' ? 'Place a practice ticket to track pending legs here.' : 'Completed local practice results will appear here.'}
                         onCashOut={activeTab === 'active' ? onCashOut : undefined}

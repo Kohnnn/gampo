@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BET_MODES, ODDS_POLICIES, cashoutOffer } from './sportsbookMath'
+import { BET_MODES, ODDS_POLICIES, valueSimulatedCashout } from './sportsbookMath'
 import { buildSyntheticSportsbookData, modelBoardWindow } from './sportsbookData'
 import {
     DEFAULT_BETSLIP_SETTINGS,
@@ -8,45 +8,71 @@ import {
     createPracticeTicket,
     deriveBetSlipStatus,
     makeBetSlipSelection,
+    settleActiveTicketsWithEvents,
     settlePracticeTicket,
     syncSelectionsWithEvents,
-    toggleSelection,
+    toggleSelection as toggleCanonicalSelection,
     validateTicket,
 } from './sportsbookState'
 
-const event = {
-    id: 'event-1',
-    sportId: 'soccer',
-    leagueId: 'league-1',
-    home: 'Home FC',
-    away: 'Away FC',
-    marketGroups: [{
-        id: 'winner',
-        label: '1x2',
-        selections: [
-            {
-                id: 'sel-home',
-                eventId: 'event-1',
-                marketId: 'winner',
-                label: 'Home FC',
-                decimalOdds: 2,
-                trueProbability: 0.52,
-                suspended: false,
-                boosted: false,
-            },
-            {
-                id: 'sel-away',
-                eventId: 'event-1',
-                marketId: 'winner',
-                label: 'Away FC',
-                decimalOdds: 3,
-                trueProbability: 0.33,
-                suspended: true,
-                boosted: false,
-            },
-        ],
-    }],
+function offer(overrides = {}) {
+    return {
+        id: 'sel-home',
+        canonicalEventId: 'canonical-1',
+        marketId: 'winner',
+        outcome: 'home',
+        decimalOdds: 2,
+        bookmaker: 'Book A',
+        provider: 'provider-a',
+        providerEventId: 'provider-event-1',
+        sourceContext: { source: 'fixture' },
+        observedAt: '2026-09-02T12:00:00.000Z',
+        freshness: 'current',
+        submittable: true,
+        ineligibilityReason: null,
+        suspended: false,
+        ...overrides,
+    }
 }
+
+function toggleSelection(betslipSelections, events, selectionId) {
+    const canonicalEvents = events.map(item => item.offers ? item : {
+        ...item,
+        canonicalEventId: item.id,
+        offers: item.marketGroups.flatMap(group => group.selections.map(selection => offer({
+            ...selection,
+            canonicalEventId: item.id,
+            marketId: group.id,
+            marketLabel: group.label,
+            outcome: selection.side,
+        }))),
+    })
+    return toggleCanonicalSelection(betslipSelections, canonicalEvents, selectionId)
+}
+
+function canonicalEvent(overrides = {}) {
+    return {
+        id: 'event-1',
+        canonicalEventId: 'canonical-1',
+        sportId: 'soccer',
+        leagueId: 'league-1',
+        status: 'prematch',
+        home: 'Home FC',
+        away: 'Away FC',
+        offers: [offer()],
+        modelEstimates: [offer({
+            id: 'model-home',
+            bookmaker: null,
+            provider: 'model',
+            providerEventId: 'model-event-1',
+            submittable: false,
+            ineligibilityReason: 'model-estimate',
+        })],
+        ...overrides,
+    }
+}
+
+const event = canonicalEvent()
 
 describe('model board generation', () => {
     it('builds reproducible real-world practice fixtures with valid selections', () => {
@@ -65,441 +91,339 @@ describe('model board generation', () => {
 })
 
 describe('sportsbookState', () => {
-    it('selects and removes available prices while ignoring suspended prices', () => {
+    it('selects only Phase 01 offers and snapshots provenance', () => {
         const selected = toggleSelection([], [event], 'sel-home')
         expect(selected).toHaveLength(1)
-        expect(selected[0].acceptedOdds).toBe(2)
-
+        expect(selected[0]).toMatchObject({
+            selectionId: 'sel-home',
+            canonicalEventId: 'canonical-1',
+            acceptedOdds: 2,
+            bookmaker: 'Book A',
+            provider: 'provider-a',
+            providerEventId: 'provider-event-1',
+            freshness: 'current',
+            submittable: true,
+        })
+        expect(toggleSelection([], [event], 'model-home')).toHaveLength(0)
         expect(toggleSelection(selected, [event], 'sel-home')).toHaveLength(0)
-        expect(toggleSelection([], [event], 'sel-away')).toHaveLength(0)
     })
 
-    it('syncs selected prices when odds move and supports manual acceptance', () => {
-        const selected = toggleSelection([], [event], 'sel-home')
-        const movedEvent = {
-            ...event,
-            marketGroups: [{
-                ...event.marketGroups[0],
-                selections: [{ ...event.marketGroups[0].selections[0], decimalOdds: 1.9 }],
-            }],
-        }
-        const synced = syncSelectionsWithEvents(selected, [movedEvent])
-        expect(synced[0].oddsChanged).toBe(true)
-        expect(synced[0].status).toBe('odds-down')
+    it('projects adapter-shaped offers to the exact accepted selection contract', () => {
+        const selected = makeBetSlipSelection({
+            event,
+            selection: offer({
+                source: 'sportsgameodds',
+                previousOdds: 1.95,
+                boosted: true,
+                unrelatedExtra: 'drop',
+            }),
+            stake: 7,
+        })
+        expect(Object.keys(selected)).toEqual([
+            'id', 'selectionId', 'canonicalEventId', 'eventId', 'marketId', 'marketType', 'outcome', 'side', 'line', 'decimalOdds', 'acceptedOdds', 'currentOdds', 'bookmaker', 'provider', 'providerEventId', 'sourceContext', 'observedAt', 'freshness', 'submittable', 'ineligibilityReason', 'suspended', 'stake', 'status', 'oddsChanged', 'label', 'eventLabel', 'marketLabel', 'eventStatus', 'eventHome', 'eventAway', 'home', 'away', 'leagueId', 'sportId', 'supportedMarket',
+        ])
+        expect(selected).toMatchObject({
+            id: 'sel-home', selectionId: 'sel-home', canonicalEventId: 'canonical-1', eventId: 'event-1', marketId: 'winner', marketType: 'winner', outcome: 'home', side: 'home', decimalOdds: 2, acceptedOdds: 2, currentOdds: 2, bookmaker: 'Book A', provider: 'provider-a', providerEventId: 'provider-event-1', sourceContext: { source: 'fixture' }, observedAt: '2026-09-02T12:00:00.000Z', freshness: 'current', submittable: true, ineligibilityReason: null, suspended: false, stake: 7, status: 'selected', oddsChanged: false, label: 'home', eventLabel: 'Home FC - Away FC', marketLabel: 'winner', eventStatus: 'prematch', eventHome: 'Home FC', eventAway: 'Away FC', home: 'Home FC', away: 'Away FC', leagueId: 'league-1', sportId: 'soccer', supportedMarket: true,
+        })
+        expect(selected).not.toHaveProperty('source')
+        expect(selected).not.toHaveProperty('previousOdds')
+        expect(selected).not.toHaveProperty('boosted')
+        expect(selected).not.toHaveProperty('unrelatedExtra')
+    })
 
+    it('syncs mutable offer metadata without overwriting accepted odds', () => {
+        const selected = toggleSelection([], [event], 'sel-home')
+        const synced = syncSelectionsWithEvents(selected, [canonicalEvent({
+            offers: [offer({ decimalOdds: 1.9, observedAt: '2026-09-02T12:01:00.000Z' })],
+        })])
+        expect(synced[0]).toMatchObject({ acceptedOdds: 2, currentOdds: 1.9, oddsChanged: true, status: 'odds-down' })
+        expect(synced[0].observedAt).toBe('2026-09-02T12:01:00.000Z')
         const accepted = acceptSelectionOdds(synced)
-        expect(accepted[0].acceptedOdds).toBe(1.9)
-        expect(accepted[0].oddsChanged).toBe(false)
+        expect(accepted[0]).toMatchObject({ acceptedOdds: 1.9, oddsChanged: false })
     })
 
-    it('validates stake, balance, suspended selections, and odds policy', () => {
+    it('returns stable validation codes for every preflight boundary', () => {
         const selected = toggleSelection([], [event], 'sel-home')
-        expect(validateTicket({ selections: [], stake: 10, balance: 100 }).valid).toBe(false)
-        expect(validateTicket({ selections: selected, stake: 0, balance: 100 }).valid).toBe(false)
-        expect(validateTicket({ selections: selected, stake: 101, balance: 100 }).valid).toBe(false)
-        expect(validateTicket({ selections: selected, stake: 10, balance: 100, settings: DEFAULT_BETSLIP_SETTINGS }).valid).toBe(true)
-
-        const worseOdds = [{ ...selected[0], currentOdds: 1.8, oddsChanged: true }]
+        expect(validateTicket({ selections: [], stake: 10, balance: 100 }).code).toBe('empty')
+        expect(validateTicket({ selections: selected, stake: 0, balance: 100 }).code).toBe('stake-invalid')
+        expect(validateTicket({ selections: selected, stake: 101, balance: 100 }).code).toBe('balance-insufficient')
+        expect(validateTicket({ selections: selected, stake: 10, balance: 100 })).toEqual({ valid: true, code: null, reason: null })
         expect(validateTicket({
-            selections: worseOdds,
+            selections: [{ ...selected[0], currentOdds: 1.8, oddsChanged: true }],
             stake: 10,
             balance: 100,
-            settings: { order: 'singles-first', oddsPolicy: ODDS_POLICIES.ACCEPT_HIGHER },
-        }).needsManualAccept).toBe(true)
+            settings: { ...DEFAULT_BETSLIP_SETTINGS, oddsPolicy: ODDS_POLICIES.ACCEPT_HIGHER },
+        })).toMatchObject({ valid: false, code: 'odds-acceptance-required', needsManualAccept: true })
     })
 
-    it('derives betslip statuses and creates deterministic settled tickets', () => {
+    it('rejects model, stale, unknown, malformed, unsupported, suspended, and locked selections', () => {
+        const valid = toggleSelection([], [event], 'sel-home')[0]
+        const cases = [
+            [{ ...valid, bookmaker: null, ineligibilityReason: 'model-estimate' }, 'model-estimate'],
+            [{ ...valid, freshness: 'stale', submittable: false, ineligibilityReason: 'stale-offer' }, 'stale-offer'],
+            [{ ...valid, freshness: 'unknown', submittable: false, ineligibilityReason: 'unknown-freshness' }, 'unknown-freshness'],
+            [{ ...valid, bookmaker: '' }, 'malformed-selection'],
+            [{ ...valid, marketId: 'correct-score', marketType: 'correct-score', marketLabel: 'Correct Score' }, 'unsupported-market'],
+            [{ ...valid, suspended: true, status: 'suspended' }, 'suspended'],
+            [{ ...valid, status: 'locked' }, 'locked'],
+        ]
+        for (const [selection, code] of cases) {
+            expect(validateTicket({ selections: [selection], stake: 10, balance: 100 }).code).toBe(code)
+        }
+    })
+
+    it('accepts exactly winner, total, and spread and rejects every resolver-only market', () => {
+        const accepted = [
+            offer({ id: 'winner', marketId: 'winner', outcome: 'draw' }),
+            offer({ id: 'total', marketId: 'total', outcome: 'over', line: 2.5 }),
+            offer({ id: 'spread', marketId: 'spread', outcome: 'away', line: 1.5 }),
+        ]
+        for (const candidate of accepted) {
+            const selection = makeBetSlipSelection({ event, selection: candidate })
+            expect(validateTicket({ selections: [selection], stake: 10, balance: 100 })).toEqual({ valid: true, code: null, reason: null })
+        }
+
+        const resolverOnlyMarkets = [
+            'both-teams-to-score',
+            'correct-score',
+            'double-chance',
+            'draw-no-bet',
+            'odd-even',
+            'clean-sheet',
+            'win-to-nil',
+            'home-total-goals',
+            'away-total-goals',
+            'team-total',
+            'result-both-teams-to-score',
+        ]
+        for (const marketId of resolverOnlyMarkets) {
+            const candidate = makeBetSlipSelection({
+                event,
+                selection: offer({ id: `resolver-${marketId}`, marketId, outcome: 'home', line: 1.5 }),
+            })
+            expect(validateTicket({ selections: [candidate], stake: 10, balance: 100 }).code, marketId).toBe('unsupported-market')
+            expect(() => createPracticeTicket({ selections: [candidate], stake: 10 })).toThrowError(expect.objectContaining({
+                code: 'unsupported-market',
+                message: 'This practice market cannot be settled safely.',
+            }))
+        }
+    })
+
+    it('rejects invalid outcome domains and requires an explicit finite numeric line', () => {
+        const cases = [
+            offer({ id: 'winner-invalid', marketId: 'winner', outcome: 'over' }),
+            offer({ id: 'total-invalid', marketId: 'total', outcome: 'draw', line: 2.5 }),
+            offer({ id: 'spread-invalid', marketId: 'spread', outcome: 'draw', line: -1.5 }),
+            offer({ id: 'total-line-missing', marketId: 'total', outcome: 'over', line: undefined, label: 'Over 2.5' }),
+            offer({ id: 'total-line-string', marketId: 'total', outcome: 'over', line: '2.5' }),
+            offer({ id: 'spread-line-mixed-string', marketId: 'spread', outcome: 'home', line: '-1.5junk' }),
+            offer({ id: 'total-line-nan', marketId: 'total', outcome: 'under', line: NaN }),
+            offer({ id: 'spread-line-infinity', marketId: 'spread', outcome: 'away', line: Infinity }),
+        ]
+        for (const candidate of cases) {
+            const selection = makeBetSlipSelection({ event, selection: candidate })
+            const validation = validateTicket({ selections: [selection], stake: 10, balance: 100 })
+            expect(validation).toEqual({
+                valid: false,
+                code: 'malformed-selection',
+                reason: 'This bookmaker price is missing required acceptance facts.',
+            })
+            expect(() => createPracticeTicket({ selections: [selection], stake: 10 })).toThrowError(expect.objectContaining({
+                code: validation.code,
+                message: validation.reason,
+            }))
+        }
+
+        const validLines = [
+            offer({ id: 'total-line-zero', marketId: 'total', outcome: 'over', line: 0 }),
+            offer({ id: 'total-line-nonzero', marketId: 'total', outcome: 'under', line: 2.5 }),
+            offer({ id: 'spread-line-zero', marketId: 'spread', outcome: 'home', line: 0 }),
+            offer({ id: 'spread-line-nonzero', marketId: 'spread', outcome: 'away', line: -1.5 }),
+        ]
+        for (const candidate of validLines) {
+            const selection = makeBetSlipSelection({ event, selection: candidate })
+            expect(validateTicket({ selections: [selection], stake: 10, balance: 100 })).toEqual({ valid: true, code: null, reason: null })
+            expect(createPracticeTicket({ selections: [selection], stake: 10 }).status).toBe('active')
+        }
+    })
+
+    it('enforces duplicate, contradiction, and repeated exact-fixture policy across every mode', () => {
+        const first = toggleSelection([], [event], 'sel-home')[0]
+        const away = makeBetSlipSelection({ event, selection: offer({ id: 'sel-away', outcome: 'away', decimalOdds: 3 }) })
+        const total = makeBetSlipSelection({ event, selection: offer({ id: 'sel-total', marketId: 'total', outcome: 'over', line: 2.5 }) })
+        for (const mode of Object.values(BET_MODES)) {
+            expect(validateTicket({ selections: [first, { ...first }], stake: 10, balance: 100, mode }).code, mode).toBe('duplicate-selection')
+            expect(validateTicket({ selections: [first, away], stake: 10, balance: 100, mode }).code, mode).toBe('contradictory-market')
+        }
+        expect(validateTicket({ selections: [first, total], stake: 10, balance: 100, mode: BET_MODES.SINGLES }).valid).toBe(true)
+        for (const mode of [BET_MODES.MULTI, BET_MODES.SYSTEM_2]) {
+            expect(validateTicket({ selections: [first, total], stake: 10, balance: 100, mode }).code, mode).toBe('duplicate-fixture')
+        }
+        const isolated = { ...total, selectionId: 'sel-isolated', canonicalEventId: 'canonical-2', eventId: first.eventId }
+        for (const mode of Object.values(BET_MODES)) {
+            expect(validateTicket({ selections: [first, isolated], stake: 10, balance: 100, mode }).valid, mode).toBe(true)
+        }
+    })
+
+    it('creates a valid ticket or throws stable coded Errors for every intrinsic failure', () => {
         const selected = toggleSelection([], [event], 'sel-home')
-        expect(deriveBetSlipStatus({ selections: [], stake: 10 })).toBe('empty')
-        expect(deriveBetSlipStatus({ selections: selected, stake: 0 })).toBe('needs-stake')
-        expect(deriveBetSlipStatus({ selections: selected, stake: 10, settings: DEFAULT_BETSLIP_SETTINGS })).toBe('ready')
+        const ticket = createPracticeTicket({ selections: selected, stake: 10, mode: BET_MODES.SINGLES, seed: 'state-test' })
+        expect(ticket).toMatchObject({ status: 'active', combinations: 1, payoutProcessed: false, settlementKey: null })
+        expect(ticket.combinationDetails).toEqual(ticket.quote.combinationDetails)
+        expect(ticket.legs[0]).toMatchObject({ selectionId: 'sel-home', canonicalEventId: 'canonical-1', status: 'pending' })
 
-        const ticket = createPracticeTicket({
-            selections: selected,
-            stake: 10,
-            mode: BET_MODES.SINGLES,
-            settings: DEFAULT_BETSLIP_SETTINGS,
-            seed: 'state-test',
-        })
-        const settled = settlePracticeTicket(ticket, 'state-test')
-        expect(settled.status).toBe('settled')
-        expect(settled.legs).toHaveLength(1)
-        expect(Number.isFinite(settled.profit)).toBe(true)
+        const total = makeBetSlipSelection({ event, selection: offer({ id: 'factory-total', marketId: 'total', outcome: 'over', line: 2.5 }) })
+        const away = makeBetSlipSelection({ event, selection: offer({ id: 'factory-away', outcome: 'away' }) })
+        const cases = [
+            [{ selections: [], stake: 10 }, 'empty', 'Pick at least one practice price.'],
+            [{ selections: selected, stake: 10, mode: 'unsupported' }, 'unsupported-mode', 'This practice ticket type is unsupported.'],
+            [{ selections: selected, stake: 10, mode: BET_MODES.MULTI }, 'insufficient-legs', 'Add at least two selections for this practice ticket type.'],
+            [{ selections: [selected[0], { ...selected[0] }], stake: 10 }, 'duplicate-selection', 'The same practice price cannot be selected twice.'],
+            [{ selections: [{ ...selected[0], bookmaker: null, ineligibilityReason: 'model-estimate' }], stake: 10 }, 'model-estimate', 'Model estimates cannot be submitted as bookmaker prices.'],
+            [{ selections: [{ ...selected[0], freshness: 'stale', ineligibilityReason: 'stale-offer' }], stake: 10 }, 'stale-offer', 'This bookmaker price is stale.'],
+            [{ selections: [{ ...selected[0], freshness: 'unknown' }], stake: 10 }, 'unknown-freshness', 'This bookmaker price has unknown freshness.'],
+            [{ selections: [{ ...selected[0], provider: '' }], stake: 10 }, 'malformed-selection', 'This bookmaker price is missing required acceptance facts.'],
+            [{ selections: [{ ...selected[0], marketId: 'correct-score', marketType: 'correct-score' }], stake: 10 }, 'unsupported-market', 'This practice market cannot be settled safely.'],
+            [{ selections: [{ ...selected[0], suspended: true, status: 'suspended' }], stake: 10 }, 'suspended', 'A selected practice market is suspended.'],
+            [{ selections: [{ ...selected[0], status: 'locked' }], stake: 10 }, 'locked', 'A selected practice market is locked.'],
+            [{ selections: [selected[0], away], stake: 10 }, 'contradictory-market', 'Contradictory outcomes from the same fixture market cannot be combined.'],
+            [{ selections: [selected[0], total], stake: 10, mode: BET_MODES.MULTI }, 'duplicate-fixture', 'This practice ticket type permits only one selection per fixture.'],
+            [{ selections: selected, stake: 0 }, 'stake-invalid', 'Enter a valid practice stake.'],
+        ]
+        for (const [input, code, message] of cases) {
+            expect(() => createPracticeTicket(input)).toThrowError(expect.objectContaining({ code, message }))
+        }
     })
 
-    it('uses the same selection identity for sportsbook home top matches', () => {
-        const { events } = buildSyntheticSportsbookData('qa-v2-top-match')
-        const topEvent = events.find(item => item.tags?.includes('top'))
-        const selection = topEvent.marketGroups[0].selections.find(item => !item.suspended)
-        const selected = toggleSelection([], events, selection.id)
+    it('settles by canonical identity without legacy fallback and preserves legacy-only compatibility', () => {
+        const ticket = createPracticeTicket({ selections: toggleSelection([], [event], 'sel-home'), stake: 10, seed: 'canonical-settle' })
+        const mismatches = [
+            { id: 'canonical-1', status: 'settled', homeScore: 2, awayScore: 0 },
+            { eventId: 'event-1', status: 'settled', homeScore: 2, awayScore: 0 },
+            { id: 'event-1', canonicalEventId: 'canonical-other', status: 'settled', homeScore: 2, awayScore: 0 },
+        ]
+        for (const result of mismatches) {
+            const pending = settlePracticeTicket(ticket, [result], 100)
+            expect(pending).toMatchObject({ status: 'active', result: null, payout: 0, payoutProcessed: false })
+            expect(pending.legs[0]).toMatchObject({ status: 'pending', reason: 'event-not-settled' })
+        }
+        const settled = settlePracticeTicket(ticket, [{ canonicalEventId: 'canonical-1', status: 'settled', homeScore: 2, awayScore: 0 }], 200)
+        expect(settled).toMatchObject({ status: 'settled', settledAt: 200, result: 'win', payout: 20, profit: 10, payoutProcessed: true })
+        expect(settled.pending).toEqual([])
+        expect(settled.settlementKey).toContain('sel-home:won')
+        expect(settled.combinationDetails[0].id).toBe(ticket.combinationDetails[0].id)
 
-        expect(selected).toHaveLength(1)
-        expect(selected[0].selectionId).toBe(selection.id)
-        expect(selected[0].eventId).toBe(topEvent.id)
-        expect(toggleSelection(selected, events, selection.id)).toHaveLength(0)
+        const legacyTicket = {
+            ...ticket,
+            selections: ticket.selections.map(selection => ({ ...selection, canonicalEventId: '' })),
+        }
+        const legacySettled = settlePracticeTicket(legacyTicket, [{ id: 'event-1', status: 'settled', homeScore: 2, awayScore: 0 }], 300)
+        expect(legacySettled).toMatchObject({ status: 'settled', result: 'win', payout: 20, payoutProcessed: true })
     })
 
-    describe('ticket lifecycle — RED (expected contract)', () => {
-        const homeSelection = {
-            id: 'sel-home',
-            eventId: 'event-1',
-            marketId: 'winner',
-            label: 'Home FC',
-            side: 'home',
-            decimalOdds: 2,
-            trueProbability: 0.52,
-            suspended: false,
-            boosted: false,
-        }
-        const awaySelection = {
-            id: 'sel-away',
-            eventId: 'event-1',
-            marketId: 'winner',
-            label: 'Away FC',
-            side: 'away',
-            decimalOdds: 3,
-            trueProbability: 0.33,
-            suspended: false,
-            boosted: false,
-        }
-        const baseEvent = {
-            id: 'event-1',
-            sportId: 'soccer',
-            leagueId: 'league-1',
-            status: 'prematch',
-            home: 'Home FC',
-            away: 'Away FC',
-            marketGroups: [{
-                id: 'winner',
-                label: '1x2',
-                selections: [homeSelection, awaySelection],
-            }],
-        }
-
-        it('makeBetSlipSelection snapshots side, parsed line, event labels, accepted/current odds, eventStatus, and supportedMarket', () => {
-            const sel = makeBetSlipSelection({
-                event: baseEvent,
-                marketGroup: baseEvent.marketGroups[0],
-                selection: homeSelection,
-            })
-
-            expect(sel.label).toBe('Home FC')
-            expect(sel.eventLabel).toBe('Home FC - Away FC')
-            expect(sel.acceptedOdds).toBe(2)
-            expect(sel.currentOdds).toBe(2)
-            expect(sel.marketLabel).toBe('1x2')
-
-            expect(sel.side).toBe('home')
-            expect(sel.eventStatus).toBe('prematch')
-            expect(sel.supportedMarket).toBe(true)
+    it('marks zero-payout terminal tickets processed without creating payout entries', () => {
+        const ticket = createPracticeTicket({ selections: toggleCanonicalSelection([], [event], 'sel-home'), stake: 10, seed: 'zero-payout' })
+        const result = settleActiveTicketsWithEvents({
+            tickets: [ticket],
+            events: [{ canonicalEventId: 'canonical-1', status: 'settled', homeScore: 0, awayScore: 2 }],
+            now: 400,
         })
-
-        it('makeBetSlipSelection parses line from handicap and total labels', () => {
-            const spreadSelection = {
-                id: 'sel-spread',
-                eventId: 'event-1',
-                marketId: 'spread',
-                label: 'Home -0.5',
-                side: 'home',
-                decimalOdds: 1.9,
-                trueProbability: 0.5,
-                suspended: false,
-                boosted: false,
-            }
-            const spreadEvent = {
-                ...baseEvent,
-                marketGroups: [{
-                    id: 'spread',
-                    label: 'Spread',
-                    selections: [spreadSelection],
-                }],
-            }
-            const sel = makeBetSlipSelection({
-                event: spreadEvent,
-                marketGroup: spreadEvent.marketGroups[0],
-                selection: spreadSelection,
-            })
-            expect(sel.line).toBe(-0.5)
-        })
-
-        it('validateTicket rejects unsupported props/correct-score/racing-style markets', () => {
-            const propsSel = {
-                selectionId: 'sel-prop',
-                eventId: 'event-1',
-                marketId: 'props',
-                acceptedOdds: 2.5,
-                currentOdds: 2.5,
-                label: 'Home guard 20+',
-                eventLabel: 'Home FC - Away FC',
-                marketLabel: 'Player Props',
-                status: 'selected',
-                oddsChanged: false,
-                suspended: false,
-            }
-            const correctScoreSel = {
-                selectionId: 'sel-cs',
-                eventId: 'event-1',
-                marketId: 'correct-score',
-                acceptedOdds: 5,
-                currentOdds: 5,
-                label: '1-0',
-                eventLabel: 'Home FC - Away FC',
-                marketLabel: 'Correct Score',
-                status: 'selected',
-                oddsChanged: false,
-                suspended: false,
-            }
-            const racingSel = {
-                selectionId: 'sel-racing',
-                eventId: 'event-2',
-                marketId: 'fixed-win',
-                acceptedOdds: 3,
-                currentOdds: 3,
-                label: 'Runner A',
-                eventLabel: 'Race 1',
-                marketLabel: 'Fixed Win',
-                status: 'selected',
-                sportId: 'horse-racing',
-                oddsChanged: false,
-                suspended: false,
-            }
-
-            expect(validateTicket({
-                selections: [propsSel], stake: 10, balance: 100,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-            }).valid).toBe(false)
-
-            expect(validateTicket({
-                selections: [correctScoreSel], stake: 10, balance: 100,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-            }).valid).toBe(false)
-
-            expect(validateTicket({
-                selections: [racingSel], stake: 10, balance: 100,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-            }).valid).toBe(false)
-        })
-
-        it('validateTicket rejects settled/cancelled/stale event selections before placement', () => {
-            const settledEventSel = {
-                selectionId: 'sel-settled',
-                eventId: 'event-settled',
-                marketId: 'winner',
-                acceptedOdds: 2,
-                currentOdds: 2,
-                label: 'Home FC',
-                eventLabel: 'Home FC - Away FC',
-                status: 'selected',
-                oddsChanged: false,
-                suspended: false,
-                eventStatus: 'settled',
-            }
-            const cancelledEventSel = {
-                selectionId: 'sel-cancelled',
-                eventId: 'event-cancelled',
-                marketId: 'winner',
-                acceptedOdds: 2,
-                currentOdds: 2,
-                label: 'Home FC',
-                eventLabel: 'Home FC - Away FC',
-                status: 'selected',
-                oddsChanged: false,
-                suspended: false,
-                eventStatus: 'cancelled',
-            }
-
-            expect(validateTicket({
-                selections: [settledEventSel], stake: 10, balance: 100,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-            }).valid).toBe(false)
-
-            expect(validateTicket({
-                selections: [cancelledEventSel], stake: 10, balance: 100,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-            }).valid).toBe(false)
-        })
-
-        it('existing insufficient balance and suspended market checks remain in effect', () => {
-            const selected = toggleSelection([], [baseEvent], 'sel-home')
-            expect(validateTicket({ selections: [], stake: 10, balance: 100 }).valid).toBe(false)
-            expect(validateTicket({ selections: selected, stake: 0, balance: 100 }).valid).toBe(false)
-            expect(validateTicket({ selections: selected, stake: 101, balance: 100 }).valid).toBe(false)
-            expect(validateTicket({ selections: selected, stake: 10, balance: 100, settings: DEFAULT_BETSLIP_SETTINGS }).valid).toBe(true)
-
-            const suspended = toggleSelection([], [{
-                ...baseEvent,
-                marketGroups: [{
-                    ...baseEvent.marketGroups[0],
-                    selections: [{ ...homeSelection, suspended: true }],
-                }],
-            }], 'sel-home')
-            expect(suspended).toHaveLength(0)
-        })
-
-        it('createPracticeTicket returns status active with full lifecycle fields', () => {
-            const selected = toggleSelection([], [baseEvent], 'sel-home')
-            const ticket = createPracticeTicket({
-                selections: selected,
-                stake: 10,
-                mode: BET_MODES.SINGLES,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-                seed: 'lifecycle-test',
-            })
-
-            expect(ticket.status).toBe('active')
-            expect(ticket.acceptedAt).toBeGreaterThan(0)
-            expect(ticket.settledAt).toBeNull()
-            expect(ticket.result).toBeNull()
-            expect(ticket.payout).toBe(0)
-            expect(ticket.profit).toBe(0)
-            expect(ticket.payoutProcessed).toBe(false)
-            expect(ticket.settlementKey).toBeNull()
-            expect(ticket.legs).toBeDefined()
-            expect(ticket.legs.length).toBeGreaterThan(0)
-            ticket.legs.forEach(leg => {
-                expect(leg.status).toBe('pending')
-            })
-        })
-
-        it('live score updates do not settle active tickets while event status is live', () => {
-            const selected = toggleSelection([], [baseEvent], 'sel-home')
-            const ticket = createPracticeTicket({
-                selections: selected,
-                stake: 10,
-                mode: BET_MODES.SINGLES,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-                seed: 'live-event-test',
-            })
-            expect(ticket.status).toBe('active')
-
-            const settled = settlePracticeTicket(ticket, 'live-seed')
-            expect(settled.status).not.toBe('settled')
-            expect(settled.result).toBeNull()
-        })
-
-        it('settled score updates settle the ticket with lifecycle fields', () => {
-            const selected = toggleSelection([], [baseEvent], 'sel-home')
-            const ticket = createPracticeTicket({
-                selections: selected,
-                stake: 10,
-                mode: BET_MODES.SINGLES,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-                seed: 'settled-event-test',
-            })
-            expect(ticket.status).toBe('active')
-
-            const settled = settlePracticeTicket(ticket, 'settled-seed')
-            expect(settled.status).toBe('settled')
-            expect(settled.payoutProcessed).toBe(true)
-            expect(settled.settlementKey).toBeTruthy()
-            expect(settled.pending).toBeDefined()
-            expect(settled.pending).toHaveLength(0)
-        })
-
-        it('rerunning settlement on the same ticket does not emit a second payout action', () => {
-            const selected = toggleSelection([], [baseEvent], 'sel-home')
-            const ticket = createPracticeTicket({
-                selections: selected,
-                stake: 10,
-                mode: BET_MODES.SINGLES,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-                seed: 'idempotent-test',
-            })
-
-            const settled1 = settlePracticeTicket(ticket, 'idem-seed')
-            expect(settled1.payoutProcessed).toBe(true)
-
-            const settled2 = settlePracticeTicket(settled1, 'idem-seed')
-            expect(settled2.payout).toBe(settled1.payout)
-            expect(settled2.payoutProcessed).toBe(true)
-            expect(settled2.settlementKey).toBeTruthy()
-        })
+        expect(result.payouts).toEqual([])
+        expect(result.tickets[0]).toMatchObject({ status: 'settled', result: 'loss', payout: 0, payoutProcessed: true, settledAt: 400 })
     })
 
-    describe('cashOutTicket — RED (expected contract)', () => {
-        const homeSelection = {
-            id: 'sel-home',
-            eventId: 'event-1',
-            marketId: 'winner',
-            label: 'Home FC',
-            side: 'home',
-            decimalOdds: 2,
-            trueProbability: 0.52,
-            suspended: false,
-            boosted: false,
-        }
-        const baseEvent = {
-            id: 'event-1',
-            sportId: 'soccer',
-            leagueId: 'league-1',
-            status: 'live',
-            home: 'Home FC',
-            away: 'Away FC',
-            marketGroups: [{
-                id: 'winner',
-                label: '1x2',
-                selections: [homeSelection],
-            }],
+    it.each([
+        [BET_MODES.SINGLES, [
+            offer({ id: 'align-single-a', canonicalEventId: 'canonical-a', providerEventId: 'provider-a', outcome: 'home', decimalOdds: 2 }),
+            offer({ id: 'align-single-b', canonicalEventId: 'canonical-b', providerEventId: 'provider-b', outcome: 'away', decimalOdds: 3 }),
+        ]],
+        [BET_MODES.MULTI, [
+            offer({ id: 'align-multi-a', canonicalEventId: 'canonical-a', providerEventId: 'provider-a', outcome: 'home', decimalOdds: 2 }),
+            offer({ id: 'align-multi-b', canonicalEventId: 'canonical-b', providerEventId: 'provider-b', outcome: 'away', decimalOdds: 3 }),
+        ]],
+        [BET_MODES.SYSTEM_2, [
+            offer({ id: 'align-system-a', canonicalEventId: 'canonical-a', providerEventId: 'provider-a', outcome: 'home', decimalOdds: 2 }),
+            offer({ id: 'align-system-b', canonicalEventId: 'canonical-b', providerEventId: 'provider-b', outcome: 'away', decimalOdds: 3 }),
+            offer({ id: 'align-system-c', canonicalEventId: 'canonical-c', providerEventId: 'provider-c', outcome: 'draw', decimalOdds: 4 }),
+        ]],
+    ])('keeps quote, creation, settlement details and metadata aligned for %s', (mode, offers) => {
+        const modeSelections = offers.map((candidate, index) => makeBetSlipSelection({
+            event: canonicalEvent({ id: `event-${index}`, canonicalEventId: candidate.canonicalEventId, home: `Home ${index}`, away: `Away ${index}` }),
+            selection: candidate,
+        }))
+        const ticket = createPracticeTicket({ selections: modeSelections, stake: 30, mode, seed: `align-${mode}` })
+        const results = modeSelections.map(selection => ({
+            canonicalEventId: selection.canonicalEventId,
+            status: 'settled',
+            homeScore: selection.outcome === 'away' ? 0 : 2,
+            awayScore: selection.outcome === 'away' ? 2 : selection.outcome === 'draw' ? 2 : 0,
+        }))
+        const settled = settlePracticeTicket(ticket, results, 500)
+        const quoteShape = ticket.quote.combinationDetails.map(({ id, selectionIds }) => ({ id, selectionIds }))
+        expect(ticket.combinationDetails.map(({ id, selectionIds }) => ({ id, selectionIds }))).toEqual(quoteShape)
+        expect(settled.combinationDetails.map(({ id, selectionIds }) => ({ id, selectionIds }))).toEqual(quoteShape)
+        expect(settled.combinations).toBe(quoteShape.length)
+        expect(settled).toMatchObject({ status: 'settled', settledAt: 500, result: 'win', payoutProcessed: true, pending: [] })
+        expect(settled.legs.map(leg => leg.status)).toEqual(modeSelections.map(() => 'won'))
+    })
+
+    describe('cashOutTicket', () => {
+        function fixture(seed = 'cashout-test') {
+            const events = [canonicalEvent({ offers: [offer(), offer({ id: 'sel-away', outcome: 'away', side: 'away', decimalOdds: 2 })] })]
+            const ticket = createPracticeTicket({ selections: [makeBetSlipSelection({ event: events[0], selection: events[0].offers[0] })], stake: 10, seed })
+            return { ticket, valuation: valueSimulatedCashout({ ticket, events }) }
         }
 
-        function makeActiveTicket(seed = 'cashout-test') {
-            const selected = toggleSelection([], [baseEvent], 'sel-home')
-            return createPracticeTicket({
-                selections: selected,
-                stake: 10,
-                mode: BET_MODES.SINGLES,
-                settings: DEFAULT_BETSLIP_SETTINGS,
-                seed,
-            })
-        }
-
-        it('cashes out an active ticket into status cashed_out with payout equal to the offer', () => {
-            const ticket = makeActiveTicket('cashout-active')
-            const now = ticket.acceptedAt + 10000
-            const offer = cashoutOffer(ticket, now)
-            expect(offer).toBeGreaterThan(0)
-
-            const cashed = cashOutTicket(ticket, now)
-            expect(cashed.status).toBe('cashed_out')
-            expect(cashed.payout).toBe(offer)
-            expect(cashed.profit).toBe(offer - ticket.stake)
-            expect(cashed.settledAt).toBe(now)
-            expect(cashed.payoutProcessed).toBe(true)
-            expect(cashed.pending).toHaveLength(0)
+        it('accepts a precomputed bound valuation into the exact terminal lifecycle', () => {
+            const { ticket, valuation } = fixture('cashout-active')
+            const cashed = cashOutTicket(ticket, valuation, 1234)
+            expect(cashed).toMatchObject({ status: 'cashed_out', result: 'cashed_out', settledAt: 1234, payout: 7.8, profit: -2.2, payoutProcessed: true, pending: [] })
+            expect(cashed.settlementKey).toBe(`${ticket.id}:cashout:${valuation.valuationFingerprint}`)
+            expect(cashed.cashOut).toEqual({ schemaVersion: 1, status: 'accepted', acceptedAt: 1234, transactionId: `${cashed.settlementKey}:credit`, valuation })
+            expect(cashed.legs).toEqual([{ ...ticket.legs[0], status: 'cashed_out', reason: 'cashed-out' }])
         })
 
-        it('is idempotent — cashing out an already cashed_out ticket is a no-op', () => {
-            const ticket = makeActiveTicket('cashout-idem')
-            const now = ticket.acceptedAt + 10000
-            const cashed1 = cashOutTicket(ticket, now)
-            const cashed2 = cashOutTicket(cashed1, now + 50000)
-            expect(cashed2.status).toBe('cashed_out')
-            expect(cashed2.payout).toBe(cashed1.payout)
-            expect(cashed2.settledAt).toBe(cashed1.settledAt)
+        it('returns original identity for terminal, unavailable, malformed, mismatched, and repeat inputs', () => {
+            const { ticket, valuation } = fixture('cashout-noop')
+            expect(cashOutTicket({ ...ticket, status: 'settled' }, valuation, 2).status).toBe('settled')
+            expect(cashOutTicket(ticket, { ...valuation, available: false }, 2)).toBe(ticket)
+            expect(cashOutTicket(ticket, { ...valuation, amount: 99 }, 2)).toBe(ticket)
+            expect(cashOutTicket(ticket, { ...valuation, valuationFingerprint: 'drift' }, 2)).toBe(ticket)
+            const cashed = cashOutTicket(ticket, valuation, 2)
+            expect(cashOutTicket(cashed, valuation, 3)).toBe(cashed)
         })
 
-        it('refuses to cash out a settled ticket and leaves it unchanged', () => {
-            const ticket = makeActiveTicket('cashout-settled')
-            const settled = settlePracticeTicket(ticket, 'settled-seed')
-            expect(settled.status).toBe('settled')
-
-            const result = cashOutTicket(settled, settled.settledAt + 10000)
-            expect(result.status).toBe('settled')
-            expect(result.payout).toBe(settled.payout)
+        it.each([
+            ['amount', valuation => { valuation.amount += 1 }],
+            ['fairCurrentValue', valuation => { valuation.fairCurrentValue += 1 }],
+            ['haircut', valuation => { valuation.haircut = 0.5 }],
+            ['sources', valuation => { valuation.sources[0] = 'Forged:Source' }],
+            ['probability', valuation => { valuation.legProbabilities[0].probability = 0.9 }],
+            ['probability bookmaker', valuation => { valuation.legProbabilities[0].bookmaker = 'Forged' }],
+            ['combination value', valuation => { valuation.combinationValues[0].rawCurrentValue += 1 }],
+            ['observation fingerprint', valuation => { valuation.observationFingerprint = 'forged' }],
+            ['valuation fingerprint', valuation => { valuation.valuationFingerprint = 'forged' }],
+        ])('rejects a precomputed valuation with tampered %s', (_, mutate) => {
+            const { ticket, valuation } = fixture('cashout-tamper')
+            const forged = structuredClone(valuation)
+            mutate(forged)
+            expect(cashOutTicket(ticket, forged, 2)).toBe(ticket)
         })
 
-        it('refuses to cash out when the offer is zero (losing leg)', () => {
-            const ticket = makeActiveTicket('cashout-zero')
-            const losing = {
-                ...ticket,
-                legs: ticket.legs.map(leg => ({ ...leg, status: 'lost' })),
-            }
-            const now = ticket.acceptedAt + 10000
-            expect(cashoutOffer(losing, now)).toBe(0)
-
-            const result = cashOutTicket(losing, now)
-            expect(result.status).toBe('active')
-            expect(result.payout).toBe(0)
+        it('retains won and void legs while converting only pending legs', () => {
+            const { ticket, valuation } = fixture('cashout-statuses')
+            const extra = structuredClone(ticket.selections[0])
+            extra.id = 'extra'; extra.selectionId = 'extra'; extra.canonicalEventId = 'event-extra'; extra.eventId = 'event-extra'
+            const mixed = { ...ticket, selections: [...ticket.selections, extra], legs: [{ ...ticket.legs[0], status: 'won', reason: 'winner' }, { ...ticket.legs[0], selectionId: 'extra', canonicalEventId: 'event-extra', eventId: 'event-extra', status: 'void', reason: 'push' }] }
+            mixed.combinationDetails = [{ id: 'singles:sel-home', mode: 'singles', selectionIds: ['sel-home'], rawStake: 5 }, { id: 'singles:extra', mode: 'singles', selectionIds: ['extra'], rawStake: 5 }]
+            mixed.quote = { ...mixed.quote, combinationDetails: structuredClone(mixed.combinationDetails) }
+            const settledValuation = { ...valuation, fairCurrentValue: 15, amount: 11.7, legProbabilities: [], combinationValues: [{ id: 'singles:sel-home', rawStake: 5, rawCurrentValue: 10 }, { id: 'singles:extra', rawStake: 5, rawCurrentValue: 5 }] }
+            settledValuation.observationFingerprint = JSON.stringify(['cashout-observation-v1'])
+            settledValuation.sources = ['Book:Provider']
+            settledValuation.inputObservedAt = '2026-09-03T12:00:00.000Z'
+            const rebound = valueSimulatedCashout({ ticket: mixed, events: [] })
+            const cashed = cashOutTicket(mixed, rebound, 2)
+            expect(cashed.legs.map(leg => leg.status)).toEqual(['won', 'void'])
         })
     })
 })
