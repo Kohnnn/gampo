@@ -1580,12 +1580,23 @@ export function commandRegistryFixture(overrides = {}) {
 }
 
 function removeOwnedLedger(entries, stream = deletionOperationStream()) {
+  const failures = [];
   for (const entry of [...entries].reverse()) {
-    if (!fs.existsSync(entry.path)) continue;
-    const item = fs.lstatSync(entry.path, { bigint: true });
-    const observed = identity(item);
-    if (!sameIdentity(entry.identity, observed) || item.isSymbolicLink()) fail("IDENTITY_MISMATCH", `fixture teardown identity drifted at ${entry.path}`);
-    stream.remove(entry.path, entry.operation, entry.identity, observed);
+    try {
+      if (!fs.existsSync(entry.path)) continue;
+      const item = fs.lstatSync(entry.path, { bigint: true });
+      const observed = identity(item);
+      if (!sameIdentity(entry.identity, observed) || item.isSymbolicLink()) fail("IDENTITY_MISMATCH", `fixture teardown identity drifted at ${entry.path}`);
+      stream.remove(entry.path, entry.operation, entry.identity, observed);
+    } catch (error) {
+      failures.push(errorRecord(error, "fixture-teardown"));
+    }
+  }
+  if (failures.length > 0) {
+    const error = new Error(`fixture teardown failed: ${JSON.stringify(failures)}`);
+    error.code = "FIXTURE_TEARDOWN";
+    error.failures = failures;
+    throw error;
   }
   return stream;
 }
@@ -1771,7 +1782,9 @@ export function runV2ExecutionOracle(options = {}) {
 }
 
 function callsiteAuthorityChecks() {
-  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-callsites-"));
+  const ownedMarker = process.env.REPOSITORY_DIAGNOSTIC_CALLSITE_MARKER ?? "repository-diagnostic-callsites-";
+  if (!/^repository-diagnostic-callsites-(?:[1-9][0-9]*-[0-9a-f]{32}-)?$/.test(ownedMarker)) fail("SELF_CHECK", "callsite marker is invalid");
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), ownedMarker));
   const registryRoot = path.join(operationRoot, "registry");
   const runtimeRoot = path.join(operationRoot, "runtime");
   const evidenceRoot = path.join(operationRoot, "evidence");
@@ -1826,14 +1839,36 @@ function callsiteAuthorityChecks() {
       target = path.join(runtimeRoot, `${boundary}-owned`);
       if (operation === "rmdir") fs.mkdirSync(target); else fs.writeFileSync(target, "owned", { flag: "wx" });
       const expected = identity(fs.lstatSync(target, { bigint: true }));
-      count = { before: 0, effect: 0 };
-      const create = (created, bytes, options) => createEvidenceArtifact(created, bytes, options);
-      const result = runDiagnosticLifecycle({ attemptId: boundary, authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: path.join(evidenceRoot, `${boundary}-terminal.json`), resultArtifactPath: path.join(evidenceRoot, `${boundary}-result.json`), failureArtifactPath: path.join(evidenceRoot, `${boundary}-failure.json`), cleanupArtifactPath: path.join(evidenceRoot, `${boundary}-cleanup.json`), cleanupTargets: [{ path: target, identity: expected, operation }] }, { create, effects: { [effectName]: drift(count) }, remove: () => { count.effect += 1; } });
-      if (result.cleanup.residue.length !== 1 || count.effect !== 0 || count.before !== 1 || !fs.existsSync(target)) fail("SELF_CHECK", `${boundary} cleanup callsite proof failed`);
-      checks.push({ name: `authority-boundary-${boundary}-callsite`, status: "PASS" });
-      reset();
-      ledger.push({ path: target, operation, identity: expected });
-      for (const created of [result.receipts.terminal, result.receipts.publication, result.receipts.cleanup].filter(Boolean)) ledger.push({ path: created.artifactPath, operation: "unlink", identity: identity(fs.lstatSync(created.artifactPath, { bigint: true })) });
+      const caseLedger = [{ path: target, operation, identity: expected }];
+      let originalError = null;
+      let teardownError = null;
+      try {
+        count = { before: 0, effect: 0 };
+        const create = (created, bytes, options) => {
+          const receipt = createEvidenceArtifact(created, bytes, options);
+          caseLedger.push({ path: created, operation: "unlink", identity: identity(fs.lstatSync(created, { bigint: true })) });
+          return receipt;
+        };
+        const result = runDiagnosticLifecycle({ attemptId: boundary, authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: path.join(evidenceRoot, `${boundary}-terminal.json`), resultArtifactPath: path.join(evidenceRoot, `${boundary}-result.json`), failureArtifactPath: path.join(evidenceRoot, `${boundary}-failure.json`), cleanupArtifactPath: path.join(evidenceRoot, `${boundary}-cleanup.json`), cleanupTargets: [{ path: target, identity: expected, operation }] }, { create, effects: { [effectName]: drift(count) }, remove: () => { count.effect += 1; } });
+        const observed = identity(fs.lstatSync(target, { bigint: true }));
+        const contentMatches = operation === "rmdir" || fs.readFileSync(target, "utf8") === "owned";
+        if (result.cleanup.residue.length !== 1 || result.cleanup.residue[0].path !== target || count.effect !== 0 || count.before !== 1 || !sameIdentity(expected, observed) || !contentMatches || result.primaryError?.code !== "AUTHORITY_BOUNDARY_DRIFT") fail("SELF_CHECK", `${boundary} cleanup callsite proof failed`);
+        checks.push({ name: `authority-boundary-${boundary}-callsite`, status: "PASS" });
+      } catch (error) {
+        originalError = error;
+      } finally {
+        reset();
+        try {
+          removeOwnedLedger(caseLedger);
+        } catch (error) {
+          teardownError = error;
+        }
+      }
+      if (originalError) {
+        if (teardownError) originalError.fixtureTeardownError = errorRecord(teardownError, "fixture-teardown");
+        throw originalError;
+      }
+      if (teardownError) throw teardownError;
     }
 
     target = path.join(evidenceRoot, "b08.json");

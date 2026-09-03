@@ -140,7 +140,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "24d044f28eb9d7ca99a5697ff264131210bdd799f7ebd841c7f8678c11977154";
+const RUNNER_SHA256 = "00aa57873580cc9545b72a14b1e2cf7a70245fabf2be20db87fa8e606d0a47bc";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
@@ -3087,14 +3087,14 @@ function removeConcurrentOwner(root, files) {
   adapter.remove(root, "rmdir", observed, observed);
 }
 
-function runConcurrentChildren(args, parallel, fixtureParents, sourcePaths, observedSourceEvents) {
+function runConcurrentChildren(args, parallel, fixtureParents, sourcePaths, observedSourceEvents, callsiteMarker) {
   return Promise.all(Array.from({ length: parallel }, (_, index) => new Promise((resolve, reject) => {
     const fixtureParent = fs.mkdtempSync(path.join(os.tmpdir(), `repository-diagnostic-concurrent-${index}-`));
     const preloadPath = path.join(fixtureParent, "deny-source-writes.mjs");
     const eventPath = path.join(fixtureParent, "source-events.jsonl");
     fs.writeFileSync(preloadPath, sourceWriteDenyPreload(sourcePaths, eventPath), { flag: "wx", mode: 0o400 });
     fixtureParents.push(fixtureParent);
-    const child = spawn(process.execPath, ["--import", preloadPath, path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), ...args], { cwd: ROOT, env: Object.assign(Object.create(null), { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: process.env.PATH ?? "/usr/bin:/bin", TZ: "UTC", REPOSITORY_DIAGNOSTIC_FIXTURE_PARENT: fixtureParent }), shell: false, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, ["--import", preloadPath, path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), ...args], { cwd: ROOT, env: Object.assign(Object.create(null), { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: process.env.PATH ?? "/usr/bin:/bin", TZ: "UTC", REPOSITORY_DIAGNOSTIC_FIXTURE_PARENT: fixtureParent, REPOSITORY_DIAGNOSTIC_CALLSITE_MARKER: callsiteMarker }), shell: false, stdio: ["ignore", "pipe", "pipe"] });
     const stdout = [];
     const stderr = [];
     child.stdout.on("data", (bytes) => stdout.push(bytes));
@@ -3118,13 +3118,17 @@ async function runConcurrencyStress(argv) {
   const observedSourceEvents = [];
   const watchers = sourcePaths.map((target) => fs.watch(target, (eventType) => observedSourceEvents.push({ target, eventType })));
   const fixtureParents = [];
+  const callsiteMarker = `repository-diagnostic-callsites-${process.pid}-${randomUUID().replaceAll("-", "")}-`;
+  const callsiteEntries = () => fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith(callsiteMarker)).sort();
+  const genericBefore = new Set(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith("repository-diagnostic-callsites-")));
+  if (callsiteEntries().length !== 0) block("owned callsite marker collided before concurrency stress");
   let successful = 0;
   try {
     for (let iteration = 0; iteration < repeat; iteration++) {
-      const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
+      const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents, callsiteMarker);
       if (selfChecks.some((text) => !text.includes('"checkCount":486'))) block("concurrent self-check count drifted");
       successful += selfChecks.length;
-      const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
+      const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents, callsiteMarker);
       if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
       successful += fixtures.length;
     }
@@ -3134,9 +3138,12 @@ async function runConcurrencyStress(argv) {
   const after = sourcePaths.map(sourceSnapshot);
   if (before.some((item, index) => JSON.stringify(stableSourceSnapshot(item)) !== JSON.stringify(stableSourceSnapshot(after[index])))) block("committed source identity/hash/mode/time drifted during concurrency stress");
   const residue = deterministicResidueWalk(fixtureParents);
+  const ownedCallsiteRoots = callsiteEntries();
+  const unattributedCallsiteRoots = fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith("repository-diagnostic-callsites-") && !genericBefore.has(name) && !name.startsWith(callsiteMarker)).sort();
   if (residue.length !== 0) block(`concurrency fixture residue remained: ${JSON.stringify(residue)}`);
+  if (ownedCallsiteRoots.length !== 0 || unattributedCallsiteRoots.length !== 0) block(`callsite fixture residue remained: ${JSON.stringify({ ownedCallsiteRoots, unattributedCallsiteRoots })}`);
   if (observedSourceEvents.length !== 0) block(`shared source writable event observed: ${JSON.stringify(observedSourceEvents)}`);
-  console.log(JSON.stringify({ schema: "repository-diagnostic-concurrency-stress/v1", status: "PASS", subprocess_execution_count: successful, expected_subprocess_execution_count: 32, shared_source_writable_event_count: observedSourceEvents.length, shared_source_write_count: observedSourceEvents.length, residue_count: residue.length, source_snapshots_before: before, source_snapshots_after: after, source_monitor: SHARED_SOURCE_MONITOR_PROOF, source_monitor_limitations: ["native watcher attribution may be unavailable; preload denial plus identity/hash/mode/time snapshots remains mandatory"], fixture_root_count: fixtureParents.length }));
+  console.log(JSON.stringify({ schema: "repository-diagnostic-concurrency-stress/v1", status: "PASS", subprocess_execution_count: successful, expected_subprocess_execution_count: 32, shared_source_writable_event_count: observedSourceEvents.length, shared_source_write_count: observedSourceEvents.length, residue_count: residue.length, owned_callsite_root_count: ownedCallsiteRoots.length, unattributed_callsite_root_count: unattributedCallsiteRoots.length, source_snapshots_before: before, source_snapshots_after: after, source_monitor: SHARED_SOURCE_MONITOR_PROOF, source_monitor_limitations: ["native watcher attribution may be unavailable; preload denial plus identity/hash/mode/time snapshots remains mandatory"], fixture_root_count: fixtureParents.length }));
 }
 
 async function main() {
