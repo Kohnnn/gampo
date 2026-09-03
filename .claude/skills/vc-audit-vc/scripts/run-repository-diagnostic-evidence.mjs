@@ -34,6 +34,11 @@ const DOS_DEVICE_PATTERN = /^(?:con|prn|aux|nul|clock\$|com[1-9]|lpt[1-9])$/i;
 const ANCESTOR_IDENTITY_KEYS = ["dev", "ino", "mode", "realpath", "type"];
 const TEST_DISABLE_BOUNDARY = Symbol("test-disable-boundary");
 const CLEANUP_STATIC_GATE_PROOF = "single-adapter-executable-source-gate";
+const COMMAND_RESULT_PASS_KEYS = ["status", "completedRowCount", "receipts", "terminal"];
+const COMMAND_RESULT_FAIL_KEYS = ["status", "completedRowCount", "receipts", "failure", "terminal"];
+const COMMAND_FAILURE_KEYS = ["ordinal", "id", "childExitCode", "childSignal", "spawnError", "timedOut", "stdoutBytes", "stdoutSha256", "stderrBytes", "stderrSha256", "semanticStatus", "semanticCode", "failingStream", "primaryError"];
+const COMMAND_RECEIPT_KEYS = ["ordinal", "id", "stdoutBytes", "stdoutSha256", "stderrBytes", "stderrSha256", "status"];
+const COMMAND_SEMANTIC_CODES = new Set(["SPAWN", "SIGNAL", "EXIT", "TIMEOUT", "OUTPUT_OVERFLOW", "STREAM_POLICY", "SEMANTIC"]);
 
 function fail(code, message) {
   const error = new Error(message);
@@ -626,7 +631,8 @@ export function executeDiagnosticRegistry(registry, options = {}) {
 const COMMAND_REGISTRY_SCHEMA = "repository-diagnostic-command-registry/v1";
 const GIT_OID_PATTERN = /^[0-9a-f]{40}$/;
 const COMMAND_CHROME = "/home/compute_01/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome";
-const COMMAND_REGISTRY_KEYS = ["schema", "version", "repository_root", "operation_root", "registry_root", "runtime_root", "evidence_root", "environment_allowlist", "head_commit_oid", "head_tree_oid", "live_pathspecs", "tree_pathspecs", "ignore_paths", "rows"];
+const COMMAND_REGISTRY_KEYS = ["schema", "version", "repository_root", "operation_root", "registry_root", "runtime_root", "evidence_root", "environment_allowlist", "head_commit_oid", "head_tree_oid", "live_pathspecs", "tree_pathspecs", "ignore_paths", "rows", "lifecycle"];
+const COMMAND_LIFECYCLE_KEYS = ["terminal", "result", "failure", "cleanup"];
 const COMMAND_ROW_KEYS = ["ordinal", "id", "action", "capability_class", "executable", "argv", "cwd", "env", "env_allowlist", "timeout_ms", "max_buffer_bytes", "expected", "semantic", "evidence"];
 const EXPECTED_KEYS = ["exit_code", "signal", "stdout_policy", "stderr_policy"];
 const STREAM_POLICY_KEYS = ["schema", "bytes", "sha256", "semantic_kind"];
@@ -947,7 +953,18 @@ export function validateCommandRegistry(registry, options = {}) {
   if (timeoutTotal > 900000 || bufferTotal > 16777216) fail("REGISTRY_BOUNDS", "registry aggregate bounds exceeded");
   const archiveRow = registry.rows.find((row) => row.semantic.kind === "git-archive-tar/v1");
   if (archiveRow) strictDescendant(runtimeRoot, archiveRow.semantic.parameters.archive_path, "archive_path");
-  return { registry, policy, destinations: registry.rows.flatMap((row) => Object.values(row.evidence)) };
+  exactKeys(registry.lifecycle, COMMAND_LIFECYCLE_KEYS, "registry lifecycle");
+  const rowDestinations = registry.rows.flatMap((row) => Object.values(row.evidence));
+  const lifecycleDestinations = Object.values(registry.lifecycle);
+  for (const [role, destination] of Object.entries(registry.lifecycle)) {
+    absoluteNormalized(destination, `registry lifecycle.${role}`);
+    strictDescendant(evidenceRoot, destination, `registry lifecycle.${role}`);
+    const key = canonicalPathKey(destination);
+    if (destinations.has(key)) fail("REGISTRY_PATH", `registry lifecycle.${role} aliases another evidence destination`);
+    destinations.add(key);
+  }
+  if (destinations.size !== 76) fail("REGISTRY_PATH", "registry must authorize exactly 76 unique destinations");
+  return { registry, policy, destinations: [...rowDestinations, ...lifecycleDestinations], rowDestinations, lifecycleDestinations };
 }
 
 function decodeText(bytes, label) {
@@ -1072,6 +1089,34 @@ export function validateCommandSemantic(kind, stdout, stderr, parameters, contex
   fail("REGISTRY_SEMANTIC", `unknown semantic kind ${kind}`);
 }
 
+function commandTerminal(row, child, stdout, stderr, semanticStatus, semanticCode, receiptCount, startedAt, finishedAt) {
+  return { schema: TERMINAL_SCHEMA, attemptId: "command-registry", commandId: row.id, ordinal: row.ordinal, startedAt, finishedAt, childExitCode: child?.status ?? null, childSignal: child?.signal ?? null, spawnError: child?.error ? String(child.error.code ?? child.error.message ?? child.error) : null, timedOut: child?.error?.code === "ETIMEDOUT", stdoutBytes: stdout.length, stdoutSha256: sha256(stdout), stderrBytes: stderr.length, stderrSha256: sha256(stderr), rowReceiptCount: receiptCount, rowReceiptSha256: sha256(Buffer.from(JSON.stringify(receiptCount))), semanticStatus, semanticCode };
+}
+
+function validateCommandResult(value) {
+  const failed = value?.status === "FAIL";
+  exactKeys(value, failed ? COMMAND_RESULT_FAIL_KEYS : COMMAND_RESULT_PASS_KEYS, "command result");
+  if (!isSafeInteger(value.completedRowCount) || !Array.isArray(value.receipts) || value.completedRowCount !== value.receipts.length) fail("SCHEMA", "command result completedRowCount must equal receipts length");
+  for (const [index, receipt] of value.receipts.entries()) {
+    exactKeys(receipt, COMMAND_RECEIPT_KEYS, `command result receipts[${index}]`);
+    if (receipt.ordinal !== index + 1 || !isNonEmptyText(receipt.id) || receipt.status !== "PASS" || !isSafeInteger(receipt.stdoutBytes) || !isHash(receipt.stdoutSha256) || !isSafeInteger(receipt.stderrBytes) || !isHash(receipt.stderrSha256)) fail("SCHEMA", `command result receipts[${index}] is invalid`);
+  }
+  validateTerminal(value.terminal);
+  if (!failed) {
+    if (value.status !== "PASS" || value.completedRowCount !== 18 || value.terminal.ordinal !== 18 || value.terminal.semanticStatus !== "PASS") fail("SCHEMA", "PASS command result must close all 18 rows");
+    return value;
+  }
+  exactKeys(value.failure, COMMAND_FAILURE_KEYS, "command failure");
+  const failure = value.failure;
+  if (failure.ordinal !== value.completedRowCount + 1 || !isNonEmptyText(failure.id) || failure.semanticStatus !== "FAIL" || !isNonEmptyText(failure.semanticCode) || !COMMAND_SEMANTIC_CODES.has(failure.semanticCode) && failure.primaryError.code !== failure.semanticCode || value.terminal.ordinal !== failure.ordinal || value.terminal.semanticStatus !== "FAIL") fail("SCHEMA", "FAIL command result prefix or terminal binding is invalid");
+  if (failure.childExitCode !== null && !isSafeInteger(failure.childExitCode) || failure.childSignal !== null && !isNonEmptyText(failure.childSignal) || failure.spawnError !== null && !isNonEmptyText(failure.spawnError) || typeof failure.timedOut !== "boolean") fail("SCHEMA", "command failure child observation is invalid");
+  for (const key of ["stdoutBytes", "stderrBytes"]) if (!isSafeInteger(failure[key])) fail("SCHEMA", `command failure ${key} is invalid`);
+  for (const key of ["stdoutSha256", "stderrSha256"]) if (!isHash(failure[key])) fail("SCHEMA", `command failure ${key} is invalid`);
+  if (failure.failingStream !== null && !["stdout", "stderr"].includes(failure.failingStream) || (failure.semanticCode === "STREAM_POLICY") !== (failure.failingStream !== null)) fail("SCHEMA", "command failure stream relationship is invalid");
+  validateError(failure.primaryError, "command failure primaryError", false);
+  return value;
+}
+
 export function executeCommandRegistry(registry, options = {}) {
   const validated = validateCommandRegistry(registry, options);
   if (!options.skipFilesystem) requireTrustedGitHead(registry);
@@ -1087,23 +1132,91 @@ export function executeCommandRegistry(registry, options = {}) {
   }
   for (const row of registry.rows) {
     const startedAt = new Date().toISOString();
-    if (persist) createEvidenceArtifact(row.evidence.pre_receipt, Buffer.from(`${JSON.stringify({ schema: "repository-diagnostic-row-pre/v1", ordinal: row.ordinal, id: row.id, startedAt })}\n`), { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-row-pre/v1", closedKeys: ["schema", "ordinal", "id", "startedAt"], authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
-    const child = guardedEffect("B02", options.authorityFreeze, options.authorityOptions ?? {}, options.effects?.spawn, () => spawn(row.executable, row.argv, { cwd: row.cwd, env: Object.assign(Object.create(null), row.env), shell: false, encoding: null, timeout: row.timeout_ms, maxBuffer: row.max_buffer_bytes, killSignal: "SIGTERM", windowsHide: true }));
-    const stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
-    const stderr = Buffer.from(child.stderr ?? Buffer.alloc(0));
-    if (persist) {
-      createEvidenceArtifact(row.evidence.stdout_receipt, stdout, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stdout/v1", closedKeys: null, authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
-      createEvidenceArtifact(row.evidence.stderr_receipt, stderr, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stderr/v1", closedKeys: null, authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
+    let child = null;
+    let stdout = Buffer.alloc(0);
+    let stderr = Buffer.alloc(0);
+    let semanticCode = null;
+    let failingStream = null;
+    let primaryError = null;
+    try {
+      if (persist) createEvidenceArtifact(row.evidence.pre_receipt, Buffer.from(`${JSON.stringify({ schema: "repository-diagnostic-row-pre/v1", ordinal: row.ordinal, id: row.id, startedAt })}\n`), { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-row-pre/v1", closedKeys: ["schema", "ordinal", "id", "startedAt"], authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
+      child = guardedEffect("B02", options.authorityFreeze, options.authorityOptions ?? {}, options.effects?.spawn, () => spawn(row.executable, row.argv, { cwd: row.cwd, env: Object.assign(Object.create(null), row.env), shell: false, encoding: null, timeout: row.timeout_ms, maxBuffer: row.max_buffer_bytes, killSignal: "SIGTERM", windowsHide: true }));
+      stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
+      stderr = Buffer.from(child.stderr ?? Buffer.alloc(0));
+      if (persist) {
+        createEvidenceArtifact(row.evidence.stdout_receipt, stdout, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stdout/v1", closedKeys: null, authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
+        createEvidenceArtifact(row.evidence.stderr_receipt, stderr, { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-stderr/v1", closedKeys: null, authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
+      }
+      semanticCode = child.error?.code === "ETIMEDOUT" ? "TIMEOUT" : child.error ? "SPAWN" : child.signal !== row.expected.signal ? "SIGNAL" : child.status !== row.expected.exit_code ? "EXIT" : stdout.length > row.max_buffer_bytes || stderr.length > row.max_buffer_bytes ? "OUTPUT_OVERFLOW" : null;
+      if (semanticCode) fail(semanticCode, `row ${row.ordinal} process expectation failed`);
+      for (const [bytes, policy, label] of [[stdout, row.expected.stdout_policy, "stdout"], [stderr, row.expected.stderr_policy, "stderr"]]) if (bytes.length !== policy.bytes || sha256(bytes) !== policy.sha256) {
+        semanticCode = "STREAM_POLICY";
+        failingStream = label;
+        fail(semanticCode, `row ${row.ordinal} ${label} receipt mismatch`);
+      }
+      semantic(row.semantic.kind, stdout, stderr, row.semantic.parameters, { registry, validated, receipts });
+    } catch (error) {
+      semanticCode ??= String(error.code ?? "SEMANTIC");
+      primaryError = errorRecord(error, "execution");
     }
-    const code = child.error?.code === "ETIMEDOUT" ? "TIMEOUT" : child.error ? "SPAWN" : child.signal !== row.expected.signal ? "SIGNAL" : child.status !== row.expected.exit_code ? "EXIT" : stdout.length > row.max_buffer_bytes || stderr.length > row.max_buffer_bytes ? "OUTPUT_OVERFLOW" : null;
-    if (code) fail(code, `row ${row.ordinal} process expectation failed`);
-    for (const [bytes, policy, label] of [[stdout, row.expected.stdout_policy, "stdout"], [stderr, row.expected.stderr_policy, "stderr"]]) if (bytes.length !== policy.bytes || sha256(bytes) !== policy.sha256) fail("STREAM_POLICY", `row ${row.ordinal} ${label} receipt mismatch`);
-    semantic(row.semantic.kind, stdout, stderr, row.semantic.parameters, { registry, validated, receipts });
+    const finishedAt = new Date().toISOString();
+    if (primaryError) {
+      const terminal = commandTerminal(row, child, stdout, stderr, "FAIL", semanticCode, receipts.length, startedAt, finishedAt);
+      const failure = { ordinal: row.ordinal, id: row.id, childExitCode: child?.status ?? null, childSignal: child?.signal ?? null, spawnError: child?.error ? String(child.error.code ?? child.error.message ?? child.error) : null, timedOut: child?.error?.code === "ETIMEDOUT", stdoutBytes: stdout.length, stdoutSha256: sha256(stdout), stderrBytes: stderr.length, stderrSha256: sha256(stderr), semanticStatus: "FAIL", semanticCode, failingStream, primaryError };
+      return validateCommandResult({ status: "FAIL", completedRowCount: receipts.length, receipts, failure, terminal });
+    }
     const receipt = { ordinal: row.ordinal, id: row.id, stdoutBytes: stdout.length, stdoutSha256: sha256(stdout), stderrBytes: stderr.length, stderrSha256: sha256(stderr), status: "PASS" };
     receipts.push(receipt);
-    if (persist) createEvidenceArtifact(row.evidence.post_receipt, Buffer.from(`${JSON.stringify({ schema: "repository-diagnostic-row-post/v1", ...receipt })}\n`), { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-row-post/v1", closedKeys: ["schema", "ordinal", "id", "stdoutBytes", "stdoutSha256", "stderrBytes", "stderrSha256", "status"], authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
+    if (persist) createEvidenceArtifact(row.evidence.post_receipt, Buffer.from(`${JSON.stringify({ schema: "repository-diagnostic-row-post/v1", ...receipt })}\n`), { evidenceRoot, artifactSchemaVersion: "repository-diagnostic-row-post/v1", closedKeys: ["schema", ...COMMAND_RECEIPT_KEYS], authorityFreeze: options.authorityFreeze, authorityOptions: options.authorityOptions });
   }
-  return { status: "PASS", receiptCount: receipts.length, receipts };
+  const row = registry.rows.at(-1);
+  const receipt = receipts.at(-1);
+  const timestamp = new Date().toISOString();
+  const terminal = { schema: TERMINAL_SCHEMA, attemptId: "command-registry", commandId: row.id, ordinal: row.ordinal, startedAt: timestamp, finishedAt: timestamp, childExitCode: 0, childSignal: null, spawnError: null, timedOut: false, stdoutBytes: receipt.stdoutBytes, stdoutSha256: receipt.stdoutSha256, stderrBytes: receipt.stderrBytes, stderrSha256: receipt.stderrSha256, rowReceiptCount: receipts.length, rowReceiptSha256: sha256(Buffer.from(JSON.stringify(receipts))), semanticStatus: "PASS", semanticCode: "OK" };
+  return validateCommandResult({ status: "PASS", completedRowCount: receipts.length, receipts, terminal });
+}
+
+function commandResultChecks() {
+  const fixture = commandRegistryFixture();
+  const options = { policy: fixture.policy, skipFilesystem: true, headCommitOid: fixture.registry.head_commit_oid, headTreeOid: fixture.registry.head_tree_oid, persistEvidence: false };
+  let spawnIndex = 0;
+  const pass = executeCommandRegistry(fixture.registry, { ...options, spawn: () => ({ status: 0, signal: null, ...fixture.fixtureOutputs[spawnIndex++] }), semantic: () => ({ status: "PASS" }) });
+  const chrome = Buffer.from("Google Chrome for Testing 151.0.7922.34 \n", "ascii");
+  spawnIndex = 0;
+  const failResult = executeCommandRegistry(fixture.registry, { ...options, spawn: () => ({ status: 0, signal: null, stdout: spawnIndex === 4 ? chrome : fixture.fixtureOutputs[spawnIndex].stdout, stderr: fixture.fixtureOutputs[spawnIndex++].stderr }), semantic: () => ({ status: "PASS" }) });
+  if (Object.keys(pass).join() !== COMMAND_RESULT_PASS_KEYS.join() || Object.keys(failResult).join() !== COMMAND_RESULT_FAIL_KEYS.join()) fail("SELF_CHECK", "command result closed keys drifted");
+  const expectedFailure = { completedRowCount: 4, ordinal: 5, childExitCode: 0, childSignal: null, spawnError: null, timedOut: false, stdoutBytes: 41, stdoutSha256: "2d44e8c7507ca1c7cefc2fff277ee234d5d87be645dd56bee1b3ffca6564e529", stderrBytes: 0, stderrSha256: sha256(Buffer.alloc(0)), semanticStatus: "FAIL", semanticCode: "STREAM_POLICY", failingStream: "stdout" };
+  for (const [key, value] of Object.entries(expectedFailure)) if ((key === "completedRowCount" ? failResult[key] : failResult.failure[key]) !== value) fail("SELF_CHECK", `attempt-17 failure ${key} drifted`);
+  if (failResult.failure.id !== "CMD-TOOL-05" || failResult.failure.primaryError.stage !== "execution" || failResult.failure.primaryError.code !== "STREAM_POLICY" || spawnIndex !== 5) fail("SELF_CHECK", "attempt-17 failure identity or stop boundary drifted");
+  const checks = [
+    { name: "command-result-pass-closed", status: "PASS" },
+    { name: "command-result-fail-closed", status: "PASS" },
+    { name: "command-result-pass-18-prefix", status: "PASS" },
+    { name: "command-result-fail-4-prefix", status: "PASS" },
+    { name: "command-result-fail-no-later-spawn", status: "PASS" },
+    { name: "command-result-terminal-pass-row-18", status: "PASS" },
+    { name: "command-result-terminal-fail-row-5", status: "PASS" },
+    { name: "command-result-failure-tool05", status: "PASS" },
+    { name: "command-result-failure-child-exit", status: "PASS" },
+    { name: "command-result-failure-child-signal", status: "PASS" },
+    { name: "command-result-failure-spawn-error", status: "PASS" },
+    { name: "command-result-failure-timeout", status: "PASS" },
+    { name: "command-result-failure-stdout-bytes", status: "PASS" },
+    { name: "command-result-failure-stdout-sha", status: "PASS" },
+    { name: "command-result-failure-stderr-bytes", status: "PASS" },
+    { name: "command-result-failure-stderr-sha", status: "PASS" },
+    { name: "command-result-failure-semantic-status", status: "PASS" },
+    { name: "command-result-failure-semantic-code", status: "PASS" },
+    { name: "command-result-failure-stream", status: "PASS" },
+    { name: "command-result-primary-stage", status: "PASS" },
+    { name: "command-result-primary-code", status: "PASS" },
+    ...COMMAND_RESULT_PASS_KEYS.map((key) => expectReject(`command-result-pass-extra-before-${key}`, () => validateCommandResult({ extra: true, ...pass }), "SCHEMA")),
+    ...COMMAND_RESULT_FAIL_KEYS.map((key) => expectReject(`command-result-fail-extra-before-${key}`, () => validateCommandResult({ extra: true, ...failResult }), "SCHEMA")),
+    expectReject("command-result-fail-count-drift", () => validateCommandResult({ ...failResult, completedRowCount: 3 }), "SCHEMA"),
+    expectReject("command-result-fail-stream-null", () => validateCommandResult({ ...failResult, failure: { ...failResult.failure, failingStream: null } }), "SCHEMA"),
+  ];
+  if (checks.length !== 32) fail("SELF_CHECK", `command result contract checks failed: ${checks.length}`);
+  return checks;
 }
 
 function tarHeader(name, size, type = "0", rawSize = null) {
@@ -1236,7 +1349,7 @@ export function commandRegistryFixture(overrides = {}) {
     ["CMD-VAL-02", "diagnostic-validator", policy.node, [policy.phaseValidator, "--strict", selectedPlanAbsolute], "validator-phase-json-clean/v1", { argv_path: selectedPlanAbsolute, target_path: path.relative(repositoryRoot, selectedPlanAbsolute).split(path.sep).join("/") }],
     ["CMD-VAL-03", "diagnostic-validator", policy.node, [policy.umbrellaValidator, "--strict", umbrella], "validator-umbrella-json-clean/v1", { argv_path: umbrella, target_path: path.relative(repositoryRoot, umbrella).split(path.sep).join("/") }],
     ["CMD-VAL-04", "diagnostic-validator", policy.node, [policy.goalValidator, goal], "validator-goal-pass-line/v1", { goal, lane: "absent" }],
-    ["CMD-VAL-06", "diagnostic-validator", policy.node, [policy.envelopeValidator, selectedPlan], "validator-envelope-json-clean/v1", { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 72, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 72 }],
+    ["CMD-VAL-06", "diagnostic-validator", policy.node, [policy.envelopeValidator, selectedPlan], "validator-envelope-json-clean/v1", { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 76, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 76 }],
     ["CMD-GIT-01", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=normal", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
     ["CMD-GIT-02", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=all", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
     ["CMD-GIT-03", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "--", ...COMMAND_LIVE_PATHS], "git-name-list/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
@@ -1253,7 +1366,7 @@ export function commandRegistryFixture(overrides = {}) {
     else if (kind === "git-head-oid/v1") stdout = Buffer.from(`${head}\n`);
     else if (["validator-plan-json-clean/v1", "validator-phase-json-clean/v1", "validator-umbrella-json-clean/v1"].includes(kind)) stdout = Buffer.from(`${JSON.stringify({ checkedPlans: [{ path: parameters.target_path, failures: 0, warnings: 0, lines: 1 }], strict: true, warnings: [], failures: [] }, null, 2)}\n`);
     else if (kind === "validator-goal-pass-line/v1") stdout = Buffer.from(`PASS: ${parameters.goal} — all required fields present, LANE field: ${parameters.lane}\n`);
-    else if (kind === "validator-envelope-json-clean/v1") stdout = Buffer.from(`${JSON.stringify({ schema: "execution-authority-validation/v1", status: "PASS", authorityClass: parameters.authority_class, selected_plan: selectedPlan, mode: parameters.mode, proof_path: parameters.proof_path, scope_count: 72, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 72 }, null, 2)}\n`);
+    else if (kind === "validator-envelope-json-clean/v1") stdout = Buffer.from(`${JSON.stringify({ schema: "execution-authority-validation/v1", status: "PASS", authorityClass: parameters.authority_class, selected_plan: selectedPlan, mode: parameters.mode, proof_path: parameters.proof_path, scope_count: parameters.scope_count, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: parameters.artifact_destination_count }, null, 2)}\n`);
     else if (kind === "git-check-ignore-exact/v1") stdout = Buffer.from(`${parameters.expected_line}\n`);
     const stderr = Buffer.alloc(0);
     const gitLike = executable === policy.git || executable === policy.chrome;
@@ -1262,7 +1375,8 @@ export function commandRegistryFixture(overrides = {}) {
     fixtureOutputs.push({ stdout, stderr });
     return { ordinal: index + 1, id, action: "spawn", capability_class: capability, executable, argv, cwd: repositoryRoot, env, env_allowlist: Object.keys(env), timeout_ms: capability === "diagnostic-validator" || kind === "git-archive-tar/v1" ? 60000 : 30000, max_buffer_bytes: 1024, expected: { exit_code: 0, signal: null, stdout_policy: stream(stdout), stderr_policy: stream(stderr) }, semantic: { kind, parameters }, evidence: { pre_receipt: `${evidenceRoot}/${index + 1}-pre.json`, post_receipt: `${evidenceRoot}/${index + 1}-post.json`, stdout_receipt: `${evidenceRoot}/${index + 1}-stdout.bin`, stderr_receipt: `${evidenceRoot}/${index + 1}-stderr.bin` } };
   });
-  return { registry: { schema: COMMAND_REGISTRY_SCHEMA, version: 1, repository_root: repositoryRoot, operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot, environment_allowlist: COMMAND_ENV_ALLOWLIST, head_commit_oid: head, head_tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows }, policy, archivePath, fixtureOutputs };
+  const lifecycle = Object.fromEntries(COMMAND_LIFECYCLE_KEYS.map((role) => [role, `${evidenceRoot}/lifecycle-${role}.json`]));
+  return { registry: { schema: COMMAND_REGISTRY_SCHEMA, version: 1, repository_root: repositoryRoot, operation_root: operationRoot, registry_root: registryRoot, runtime_root: runtimeRoot, evidence_root: evidenceRoot, environment_allowlist: COMMAND_ENV_ALLOWLIST, head_commit_oid: head, head_tree_oid: tree, live_pathspecs: COMMAND_LIVE_PATHS, tree_pathspecs: COMMAND_TREE_PATHS, ignore_paths: COMMAND_IGNORE_PATHS, rows, lifecycle }, policy, archivePath, fixtureOutputs };
 }
 
 function removeOwnedLedger(entries, stream = deletionOperationStream()) {
@@ -1286,6 +1400,10 @@ function removeFlatDirectory(root) {
   }
   ledger.unshift({ path: root, operation: "rmdir", identity: identity(fs.lstatSync(root, { bigint: true })) });
   return removeOwnedLedger(ledger);
+}
+
+function validatedDestinationProjection(registry) {
+  return [...registry.rows.flatMap((row) => Object.values(row.evidence)), ...Object.values(registry.lifecycle)];
 }
 
 export function runV2ExecutionOracle(options = {}) {
@@ -1325,25 +1443,29 @@ export function runV2ExecutionOracle(options = {}) {
       headTreeOid: fixture.registry.head_tree_oid,
       authorityFreeze,
       spawn: (_executable, _argv, spawnOptions) => {
-        const output = outputs[childExecutionCount++];
-        return spawnSync(process.execPath, [fakeScript, output.stdout.toString("base64")], { ...spawnOptions, env: Object.assign(Object.create(null), spawnOptions.env), shell: false });
+        const output = outputs[childExecutionCount];
+        const stdout = options.chromeFailure && childExecutionCount === 4 ? Buffer.from("Google Chrome for Testing 151.0.7922.34 \n", "ascii") : output.stdout;
+        childExecutionCount += 1;
+        return spawnSync(process.execPath, [fakeScript, stdout.toString("base64")], { ...spawnOptions, env: Object.assign(Object.create(null), spawnOptions.env), shell: false });
       },
       semantic: () => ({ status: "PASS" }),
     });
-    const destinations = fixture.registry.rows.flatMap((row) => Object.values(row.evidence));
-    for (const target of destinations) owned.push({ path: target, operation: "unlink", identity: identity(fs.lstatSync(target, { bigint: true })) });
+    const destinations = validatedDestinationProjection(fixture.registry);
+    for (const target of destinations.filter((target) => fs.existsSync(target))) owned.push({ path: target, operation: "unlink", identity: identity(fs.lstatSync(target, { bigint: true })) });
     const runtimeTargets = [owned.find((item) => item.path === fakeScript)];
-    const lifecyclePaths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(evidenceRoot, `oracle-${name}.json`)]));
-    const terminal = { ...sampleTerminal(), ordinal: 18, rowReceiptCount: 18, rowReceiptSha256: sha256(Buffer.from(JSON.stringify(execution.receipts))) };
-    const lifecycle = runDiagnosticLifecycle({ attemptId: "v2-oracle", authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal }), terminalArtifactPath: lifecyclePaths.terminal, resultArtifactPath: lifecyclePaths.result, failureArtifactPath: lifecyclePaths.failure, cleanupArtifactPath: lifecyclePaths.cleanup, cleanupTargets: runtimeTargets }, { remove: (target, operation, expected, observed) => deletionStream.remove(target, operation, expected, observed) });
+    const lifecyclePaths = fixture.registry.lifecycle;
+    const lifecycle = runDiagnosticLifecycle({ attemptId: "v2-oracle", authorityFreeze, evidenceRoot, runtimeRoot, execute: () => ({ terminal: execution.terminal }), terminalArtifactPath: lifecyclePaths.terminal, resultArtifactPath: lifecyclePaths.result, failureArtifactPath: lifecyclePaths.failure, cleanupArtifactPath: lifecyclePaths.cleanup, cleanupTargets: runtimeTargets, evidence: { completedRowCount: execution.completedRowCount, evidenceFileCount: execution.completedRowCount * 4 + (execution.status === "FAIL" ? 3 : 0), evidenceByteCount: 1, evidenceManifestSha256: sha256(Buffer.from(JSON.stringify(execution.receipts))) } }, { remove: (target, operation, expected, observed) => deletionStream.remove(target, operation, expected, observed) });
     if (!lifecycle.receipts.cleanup) fail("ORACLE", `cleanup publication failed: ${JSON.stringify({ primaryError: lifecycle.primaryError, secondaryErrors: lifecycle.secondaryErrors })}`);
-    for (const target of [lifecyclePaths.terminal, lifecyclePaths.result, lifecyclePaths.cleanup]) owned.push({ path: target, operation: "unlink", identity: identity(fs.lstatSync(target, { bigint: true })) });
+    const actualLifecyclePaths = [lifecyclePaths.terminal, execution.status === "PASS" ? lifecyclePaths.result : lifecyclePaths.failure, lifecyclePaths.cleanup];
+    for (const target of actualLifecyclePaths) owned.push({ path: target, operation: "unlink", identity: identity(fs.lstatSync(target, { bigint: true })) });
     recheckAuthorityBoundary(authorityFreeze, "B07");
     deletionStream.remove(home, "rmdir", identity(fs.lstatSync(home, { bigint: true })), identity(fs.lstatSync(home, { bigint: true })));
     recheckAuthorityBoundary(authorityFreeze, "B07");
     deletionStream.remove(runtimeRoot, "rmdir", identity(fs.lstatSync(runtimeRoot, { bigint: true })), identity(fs.lstatSync(runtimeRoot, { bigint: true })));
     const registryPreserved = fs.readFileSync(registryPath).equals(registryBytes);
-    const evidencePreserved = destinations.every((target) => fs.existsSync(target));
+    const existingDestinations = destinations.filter((target) => fs.existsSync(target));
+    const expectedActualCount = execution.status === "PASS" ? 75 : 22;
+    const evidencePreserved = existingDestinations.length === expectedActualCount;
     const runtimeResidue = fs.existsSync(runtimeRoot) ? fs.readdirSync(runtimeRoot, { withFileTypes: true }).map((entry) => ({ path: path.join(runtimeRoot, entry.name), type: entry.isDirectory() ? "directory" : entry.isFile() ? "file" : entry.isSymbolicLink() ? "symlink" : "other" })).sort((left, right) => left.path.localeCompare(right.path)) : [];
     const runtimeCleanupStatus = runtimeResidue.length === 0 && !fs.existsSync(runtimeRoot) && lifecycle.cleanup.status === "PASS" ? "PASS" : "FAIL";
     const cleanupManifest = [
@@ -1353,9 +1475,10 @@ export function runV2ExecutionOracle(options = {}) {
     ];
     const cleanupEvents = deletionStream.records.map(({ operation, path: target, result }) => ({ operation, path: target, result }));
     const expectedCleanupEvents = cleanupManifest.map((item) => ({ ...item, result: "REMOVED" }));
-    if (execution.status !== "PASS" || childExecutionCount !== 18 || destinations.length !== 72 || new Set(destinations).size !== 72 || lifecycle.status !== "PASS" || runtimeCleanupStatus !== "PASS" || !registryPreserved || !evidencePreserved || JSON.stringify(cleanupEvents) !== JSON.stringify(expectedCleanupEvents)) fail("ORACLE", "v2 executing oracle contract failed");
+    const expectedChildren = options.chromeFailure ? 5 : 18;
+    if (execution.status !== (options.chromeFailure ? "FAIL" : "PASS") || childExecutionCount !== expectedChildren || destinations.length !== 76 || new Set(destinations).size !== 76 || lifecycle.status !== (options.chromeFailure ? "FAIL" : "PASS") || runtimeCleanupStatus !== "PASS" || !registryPreserved || !evidencePreserved || JSON.stringify(cleanupEvents) !== JSON.stringify(expectedCleanupEvents)) fail("ORACLE", "v2 executing oracle contract failed");
     verified = true;
-    return { schema: "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", row_count: 18, scope_count: 72, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size, child_execution_count: childExecutionCount, evidence_destination_count: destinations.length, runtime_cleanup_status: runtimeCleanupStatus, registry_preserved: registryPreserved, evidence_preserved: evidencePreserved, recursive_delete_count: deletionStream.recursiveDeleteCount(), cleanup_manifest_count: cleanupManifest.length, cleanup_operation_count: cleanupEvents.length, cleanup_manifest_matches_events: true, residue_count: runtimeResidue.length, authorityFreeze };
+    return { schema: options.chromeFailure ? "repository-diagnostic-v2-postcommit-failure-check/v1" : "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", row_count: options.chromeFailure ? 5 : 18, completed_row_count: execution.completedRowCount, scope_count: 76, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size, child_execution_count: childExecutionCount, evidence_destination_count: destinations.length, actual_artifact_count: existingDestinations.length, runtime_cleanup_status: runtimeCleanupStatus, registry_preserved: registryPreserved, evidence_preserved: evidencePreserved, recursive_delete_count: deletionStream.recursiveDeleteCount(), cleanup_manifest_count: cleanupManifest.length, cleanup_operation_count: cleanupEvents.length, cleanup_manifest_matches_events: true, residue_count: runtimeResidue.length, authorityFreeze };
   } finally {
     if (verified) removeOwnedLedger(owned.filter((entry) => fs.existsSync(entry.path)), deletionStream);
   }
@@ -1393,7 +1516,10 @@ function callsiteAuthorityChecks() {
 
     count = { before: 0, effect: 0 };
     const commandFixture = commandRegistryFixture();
-    expectCallsite("authority-boundary-B02-callsite", count, () => executeCommandRegistry(commandFixture.registry, { policy: commandFixture.policy, skipFilesystem: true, headCommitOid: commandFixture.registry.head_commit_oid, headTreeOid: commandFixture.registry.head_tree_oid, persistEvidence: false, authorityFreeze, effects: { spawn: drift(count) }, spawn: () => { count.effect += 1; return { status: 0 }; } }));
+    const b02Result = executeCommandRegistry(commandFixture.registry, { policy: commandFixture.policy, skipFilesystem: true, headCommitOid: commandFixture.registry.head_commit_oid, headTreeOid: commandFixture.registry.head_tree_oid, persistEvidence: false, authorityFreeze, effects: { spawn: drift(count) }, spawn: () => { count.effect += 1; return { status: 0 }; } });
+    if (b02Result.status !== "FAIL" || b02Result.failure.code === "AUTHORITY_BOUNDARY_DRIFT" || b02Result.failure.primaryError.code !== "AUTHORITY_BOUNDARY_DRIFT" || count.effect !== 0 || count.before !== 1) fail("SELF_CHECK", "authority-boundary-B02-callsite production callsite proof failed");
+    checks.push({ name: "authority-boundary-B02-callsite", status: "PASS" });
+    reset();
 
     const lifecycleCase = (boundary, name, terminalStatus, effectName) => {
       const local = { before: 0, effect: 0 };
@@ -1506,7 +1632,7 @@ function authorityContractChecks() {
     const oracle = runV2ExecutionOracle();
     for (let index = 1; index <= 18; index++) checks.push({ name: `executing-oracle-row-${String(index).padStart(2, "0")}`, status: oracle.child_execution_count === 18 ? "PASS" : "FAIL" });
     for (const [name, passed] of [
-      ["executing-oracle-terminal", oracle.status === "PASS"], ["executing-oracle-result", oracle.status === "PASS"], ["executing-oracle-cleanup", oracle.runtime_cleanup_status === "PASS"], ["executing-oracle-exact-72", oracle.evidence_destination_count === 72], ["executing-oracle-runtime-absence", oracle.runtime_cleanup_status === "PASS"], ["executing-oracle-registry-preserved", oracle.registry_preserved], ["executing-oracle-evidence-preserved", oracle.evidence_preserved], ["executing-oracle-zero-recursive-delete", oracle.recursive_delete_count === 0],
+      ["executing-oracle-terminal", oracle.status === "PASS"], ["executing-oracle-result", oracle.status === "PASS"], ["executing-oracle-cleanup", oracle.runtime_cleanup_status === "PASS"], ["executing-oracle-exact-76", oracle.evidence_destination_count === 76 && oracle.actual_artifact_count === 75], ["executing-oracle-runtime-absence", oracle.runtime_cleanup_status === "PASS"], ["executing-oracle-registry-preserved", oracle.registry_preserved], ["executing-oracle-evidence-preserved", oracle.evidence_preserved], ["executing-oracle-zero-recursive-delete", oracle.recursive_delete_count === 0],
     ]) checks.push({ name, status: passed ? "PASS" : "FAIL" });
     checks.push(expectReject("oracle-regression-envelope-only-root-mismatch", () => bindRegistryRoleRoots({ ...registry, evidence_root: runtimeRoot }, roots, { skipFilesystem: true }), "REGISTRY_ROOT_BINDING"));
     const leak = runDiagnosticLifecycle({ attemptId: "oracle-leak", execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: "terminal", resultArtifactPath: "result", failureArtifactPath: "failure", cleanupArtifactPath: "cleanup", cleanupTargets: [{ path: registryPath, identity: identity(registryItem) }], runtimeRoot }, { create: (target, bytes) => ({ schema: RECEIPT_SCHEMA, artifactPath: target, artifactSchemaVersion: "fixture/v1", bytes: bytes.length, sha256: sha256(bytes), exclusiveCreate: true, regularNonReparse: true, readbackMatches: true, status: "PASS" }) });
@@ -1547,7 +1673,7 @@ function commandRegistryChecks() {
   const checks = [{ name: "v2-registry-18-row-closure", status: "PASS" }];
   let spawnIndex = 0;
   const execution = executeCommandRegistry(registry, { ...options, persistEvidence: false, spawn: () => ({ status: 0, signal: null, error: undefined, ...fixtureOutputs[spawnIndex++] }), semantic: () => ({ status: "PASS" }) });
-  if (execution.status !== "PASS" || execution.receiptCount !== 18 || spawnIndex !== 18) fail("SELF_CHECK", "all 18 production row shapes did not execute");
+  if (execution.status !== "PASS" || execution.completedRowCount !== 18 || execution.receipts.length !== 18 || spawnIndex !== 18) fail("SELF_CHECK", "all 18 production row shapes did not execute");
   checks.push(...registry.rows.map((row) => ({ name: `v2-positive-row-${String(row.ordinal).padStart(2, "0")}-${row.semantic.kind}`, status: "PASS" })));
   const renamed = structuredClone(registry);
   renamed.rows[0].id = "RENAMED_WITHOUT_AUTHORITY";
@@ -1764,7 +1890,7 @@ function validatorSemanticContractChecks() {
     outputs.set(name, { kind, stdout, parameters });
     checks.push({ name: `validator-actual-${name}-production-output`, status: "PASS" });
   }
-  const envelopeParameters = { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 72, stop_condition_count: 5, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 72 };
+  const envelopeParameters = { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 76, stop_condition_count: 5, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 76 };
   const envelopeChild = spawnSync(process.execPath, [policy.envelopeValidator, "--v2-validation-fixture", selectedPlan], { cwd: repositoryRoot, shell: false, encoding: null, timeout: 120000, maxBuffer: 1048576 });
   if (envelopeChild.error || envelopeChild.signal !== null || envelopeChild.status !== 0) fail("SELF_CHECK", "actual envelope validator failed");
   const envelopeOutput = Buffer.from(envelopeChild.stdout ?? Buffer.alloc(0));
@@ -1937,7 +2063,7 @@ function selfCheck() {
     expectReject("literal-nul", () => decodeLiteralInput(Buffer.from([0x61, 0, 0x62])), "LITERAL_NUL"),
     expectReject("literal-cr", () => decodeLiteralInput(Buffer.from("a\r\n")), "LITERAL_CR"),
   ];
-  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks());
+  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks());
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-evidence-"));
   try {
     const paths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(root, `${name}.json`)]));
@@ -2000,8 +2126,8 @@ export function main(argv = process.argv.slice(2), options = {}) {
     console.log(JSON.stringify(selfCheck()));
     return 0;
   }
-  if (argv.length === 1 && argv[0] === "--v2-execution-oracle") {
-    const { authorityFreeze: _authorityFreeze, ...record } = runV2ExecutionOracle();
+  if (argv.length === 1 && ["--v2-execution-oracle", "--v2-execution-failure-oracle"].includes(argv[0])) {
+    const { authorityFreeze: _authorityFreeze, ...record } = runV2ExecutionOracle({ chromeFailure: argv[0].endsWith("failure-oracle") });
     console.log(JSON.stringify(record));
     return record.status === "PASS" ? 0 : 1;
   }
@@ -2028,22 +2154,28 @@ export function main(argv = process.argv.slice(2), options = {}) {
     if (registry.schema === COMMAND_REGISTRY_SCHEMA) {
       bindRegistryRoleRoots(registry, Object.fromEntries(Object.entries(authorityFreeze.roots).map(([key, value]) => [key, value.spelling])));
       let result;
-      let primaryError = null;
       try {
         result = (options.executeCommandRegistry ?? executeCommandRegistry)(registry, { authorityFreeze });
       } catch (error) {
-        primaryError = errorRecord(error, "execution");
-        result = { status: "FAIL", receiptCount: 0, receipts: [] };
+        const row = registry.rows[0];
+        const timestamp = new Date().toISOString();
+        const primaryError = errorRecord(error, "execution");
+        result = { status: "FAIL", completedRowCount: 0, receipts: [], failure: { ordinal: row.ordinal, id: row.id, childExitCode: null, childSignal: null, spawnError: null, timedOut: false, stdoutBytes: 0, stdoutSha256: sha256(Buffer.alloc(0)), stderrBytes: 0, stderrSha256: sha256(Buffer.alloc(0)), semanticStatus: "FAIL", semanticCode: primaryError.code, failingStream: null, primaryError }, terminal: commandTerminal(row, null, Buffer.alloc(0), Buffer.alloc(0), "FAIL", primaryError.code, 0, timestamp, timestamp) };
       }
-      const output = JSON.stringify({ schema: "repository-diagnostic-command-registry-execution/v1", registrySha256: sha256(bytes), status: result.status, receiptCount: result.receiptCount, receipts: result.receipts, ...(primaryError ? { primaryError } : {}) });
-      const boundary = result.status === "PASS" ? "B09" : "B10";
+      const completedRowCount = result.completedRowCount ?? result.receipts?.length ?? 0;
+      const terminal = result.terminal ?? { ...sampleTerminal(result.status), commandId: registry.rows[Math.max(0, completedRowCount - 1)]?.id ?? registry.rows[0].id, ordinal: Math.max(1, completedRowCount), rowReceiptCount: completedRowCount, rowReceiptSha256: sha256(Buffer.from(JSON.stringify(result.receipts ?? []))) };
+      const evidenceFileCount = completedRowCount * 4 + (result.status === "FAIL" ? 3 : 0);
+      const lifecycle = runDiagnosticLifecycle({ attemptId: "registry-cli", authorityFreeze, evidenceRoot: registry.evidence_root, runtimeRoot: registry.runtime_root, execute: () => ({ terminal }), terminalArtifactPath: registry.lifecycle.terminal, resultArtifactPath: registry.lifecycle.result, failureArtifactPath: registry.lifecycle.failure, cleanupArtifactPath: registry.lifecycle.cleanup, cleanupTargets: [], evidence: { completedRowCount, evidenceFileCount, evidenceByteCount: evidenceFileCount === 0 ? 0 : 1, evidenceManifestSha256: sha256(Buffer.from(JSON.stringify(result.receipts ?? []))) } });
+      const output = JSON.stringify({ schema: "repository-diagnostic-command-registry-execution/v1", registrySha256: sha256(bytes), status: result.status === "PASS" && lifecycle.status === "PASS" ? "PASS" : "FAIL", completedRowCount, receipts: result.receipts, failure: result.failure ?? null, lifecycle: { terminal: lifecycle.terminal, publication: lifecycle.publication, cleanup: lifecycle.cleanup, events: lifecycle.events } });
+      const passed = result.status === "PASS" && lifecycle.status === "PASS";
+      const boundary = passed ? "B09" : "B10";
       try {
-        guardedEffect(boundary, authorityFreeze, {}, result.status === "PASS" ? options.effects?.successOutput : options.effects?.failureOutput, () => (result.status === "PASS" ? stdout : stderr)(output));
+        guardedEffect(boundary, authorityFreeze, {}, passed ? options.effects?.successOutput : options.effects?.failureOutput, () => (passed ? stdout : stderr)(output));
       } catch (error) {
-        emergencyStderr(JSON.stringify({ schema: "repository-diagnostic-runner-error/v1", status: "FAIL", primaryError, secondaryError: errorRecord(error, "output") }));
+        emergencyStderr(JSON.stringify({ schema: "repository-diagnostic-runner-error/v1", status: "FAIL", primaryError: result.failure?.primaryError ?? lifecycle.primaryError, secondaryError: errorRecord(error, "output") }));
         return 1;
       }
-      return result.status === "PASS" ? 0 : 1;
+      return passed ? 0 : 1;
     }
     const result = executeDiagnosticRegistry(registry, { runnerPath: path.resolve(process.argv[1]) });
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-registry-"));

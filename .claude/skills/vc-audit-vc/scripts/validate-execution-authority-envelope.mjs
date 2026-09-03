@@ -139,7 +139,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "5ed28701a175e47ad5d9b2cb358079c6b9fbbb8b23a7a73de8062ea323080eae";
+const RUNNER_SHA256 = "77e3417f9819285970d424d4164929da6b53ef340848627030a63d49253ff24d";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
@@ -1008,9 +1008,9 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm, t
   try { bindRegistryRoleRoots(registry, envelopeRoots); } catch (error) { block(`diagnostic registry root binding rejected: ${error.message}`); }
   try { validateCommandRegistry(registry, { ...testIsolation?.registryOptions, headCommitOid: envelope.head_commit_oid, headTreeOid: envelope.head_tree_oid }); } catch (error) { block(`diagnostic registry capability rejected: ${error.message}`); }
   try { recheckAuthorityBoundary(registryFreeze, "B02"); } catch (error) { block(`diagnostic registry pre-spawn recheck rejected: ${error.message}`); }
-  if (!Array.isArray(envelope.allowed_scope) || envelope.scope_count !== envelope.allowed_scope.length || envelope.allowed_scope.length !== 72) block(`v2 allowed_scope must contain exactly 72 row evidence destinations`);
-  const destinations = registry.rows.flatMap((row) => Object.values(row.evidence));
-  if (JSON.stringify(envelope.allowed_scope) !== JSON.stringify(destinations)) block(`v2 allowed_scope must equal registry evidence destinations`);
+  if (!Array.isArray(envelope.allowed_scope) || envelope.scope_count !== envelope.allowed_scope.length || envelope.allowed_scope.length !== 76) block(`v2 allowed_scope must contain exactly 76 row and lifecycle evidence destinations`);
+  const destinations = [...registry.rows.flatMap((row) => Object.values(row.evidence)), ...Object.values(registry.lifecycle)];
+  if (JSON.stringify(envelope.allowed_scope) !== JSON.stringify(destinations)) block(`v2 allowed_scope must equal registry row and lifecycle evidence destinations`);
   validateDiagnosticStopConditions(envelope.stop_conditions, envelope.stop_condition_count, planLabel);
   if (envelope.artifact_receipt_schema_version !== DIAGNOSTIC_RECEIPT_SCHEMA) block(`v2 receipt schema drifted`);
   const accepted = { authorityClass: DIAGNOSTIC_V2_AUTHORITY_CLASS, selected_plan: selected.path, mode: envelope.authority_mode.mode, proof_path: proof.path, scope_count: envelope.scope_count, stop_condition_count: envelope.stop_condition_count, registry_classification: "diagnostic-read-only", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: binding.registry_sha256, artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA };
@@ -1110,8 +1110,8 @@ function runV2PostcommitCheck(options = {}) {
       head_tree_oid: treeOid,
       diagnostic_runner: { schema: "repository-diagnostic-runner-binding/v1", runner_path: runnerPath, runner_bytes: runnerBytes.length, runner_sha256: createHash("sha256").update(runnerBytes).digest("hex"), runner_blob_oid: blobOid, runner_commit_oid: commitOid },
       diagnostic_registry: { schema: "repository-diagnostic-command-registry/v1", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: createHash("sha256").update(registryBytes).digest("hex"), row_count: 18, rows: fixture.registry.rows },
-      allowed_scope: fixture.registry.rows.flatMap((row) => Object.values(row.evidence)),
-      scope_count: 72,
+      allowed_scope: [...fixture.registry.rows.flatMap((row) => Object.values(row.evidence)), ...Object.values(fixture.registry.lifecycle)],
+      scope_count: 76,
       stop_conditions: REQUIRED_STOP_CATEGORIES.map((category) => `${category}: stop immediately`),
       stop_condition_count: REQUIRED_STOP_CATEGORIES.length,
       artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
@@ -1125,7 +1125,7 @@ function runV2PostcommitCheck(options = {}) {
     const observedSourceEvents = [];
     const watchers = sourcePaths.map((target) => fs.watch(target, (eventType) => observedSourceEvents.push({ target, eventType })));
     let oracle;
-    try { oracle = runV2ExecutionOracle({ repositoryRoot: ROOT, headCommitOid: commitOid, headTreeOid: treeOid }); } finally { for (const watcher of watchers) watcher.close(); }
+    try { oracle = runV2ExecutionOracle({ repositoryRoot: ROOT, headCommitOid: commitOid, headTreeOid: treeOid, chromeFailure: options.failureOnly === true }); } finally { for (const watcher of watchers) watcher.close(); }
     const sourceSnapshotsAfter = sourcePaths.map(sourceSnapshot);
     if (sourceSnapshotsBefore.some((item, index) => JSON.stringify(stableSourceSnapshot(item)) !== JSON.stringify(stableSourceSnapshot(sourceSnapshotsAfter[index])))) block("committed source identity/hash/mode/time drifted during postcommit oracle");
     if (observedSourceEvents.length !== 0) block(`shared source writable event observed during postcommit oracle: ${JSON.stringify(observedSourceEvents)}`);
@@ -2719,7 +2719,7 @@ function runFullV2GroupedCase(fixturePath, item) {
       diagnostic_runner: { schema: "repository-diagnostic-runner-binding/v1", runner_path: runnerPath, runner_bytes: runnerBytes.length, runner_sha256: createHash("sha256").update(runnerBytes).digest("hex"), runner_blob_oid: "a".repeat(40), runner_commit_oid: "b".repeat(40) },
       diagnostic_registry: { schema: "repository-diagnostic-command-registry/v1", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: createHash("sha256").update(registryBytes).digest("hex"), row_count: candidate.rows?.length ?? 0, rows: candidate.rows ?? [] },
       allowed_scope: candidate.rows?.flatMap((row) => Object.values(row.evidence)) ?? [],
-      scope_count: candidate.rows?.length === 18 ? 72 : (candidate.rows?.length ?? 0) * 4,
+      scope_count: candidate.rows?.length === 18 ? 76 : (candidate.rows?.length ?? 0) * 4 + 4,
       stop_conditions: REQUIRED_STOP_CATEGORIES.map((category) => `${category}: stop immediately`),
       stop_condition_count: REQUIRED_STOP_CATEGORIES.length,
       artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
@@ -2794,8 +2794,8 @@ function runFullV2BehaviorCase(fixturePath, item) {
       head_tree_oid: currentHead.head_tree_oid,
       diagnostic_runner: { schema: "repository-diagnostic-runner-binding/v1", runner_path: runnerPath, runner_bytes: runnerBytes.length, runner_sha256: createHash("sha256").update(runnerBytes).digest("hex"), runner_blob_oid: "a".repeat(40), runner_commit_oid: "b".repeat(40) },
       diagnostic_registry: { schema: "repository-diagnostic-command-registry/v1", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: createHash("sha256").update(registryBytes).digest("hex"), row_count: 18, rows: registry.rows },
-      allowed_scope: registry.rows.flatMap((row) => Object.values(row.evidence)),
-      scope_count: 72,
+      allowed_scope: [...registry.rows.flatMap((row) => Object.values(row.evidence)), ...Object.values(registry.lifecycle)],
+      scope_count: 76,
       stop_conditions: REQUIRED_STOP_CATEGORIES.map((category) => `${category}: stop immediately`),
       stop_condition_count: REQUIRED_STOP_CATEGORIES.length,
       artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
@@ -3105,7 +3105,7 @@ async function runConcurrencyStress(argv) {
   try {
     for (let iteration = 0; iteration < repeat; iteration++) {
       const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
-      if (selfChecks.some((text) => !text.includes('"checkCount":417'))) block("concurrent self-check count drifted");
+      if (selfChecks.some((text) => !text.includes('"checkCount":449'))) block("concurrent self-check count drifted");
       successful += selfChecks.length;
       const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
       if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
@@ -3157,8 +3157,8 @@ async function main() {
       console.log(JSON.stringify(runV2PostcommitCheck({ validationOnly: true, selectedPlan: argv[1] }), null, 2));
       return;
     }
-    if (argv.length === 1 && argv[0] === "--v2-postcommit-check") {
-      console.log(JSON.stringify(runV2PostcommitCheck(), null, 2));
+    if (argv.length === 1 && ["--v2-postcommit-check", "--v2-postcommit-failure-check"].includes(argv[0])) {
+      console.log(JSON.stringify(runV2PostcommitCheck({ failureOnly: argv[0] === "--v2-postcommit-failure-check" }), null, 2));
       return;
     }
     if (argv.includes("--creation-probe")) {
