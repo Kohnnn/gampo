@@ -634,7 +634,7 @@ const SEMANTIC_KEYS = ["kind", "parameters"];
 const EVIDENCE_KEYS = ["pre_receipt", "post_receipt", "stdout_receipt", "stderr_receipt"];
 const COMMAND_ENV_ALLOWLIST = ["HOME", "LANG", "LC_ALL", "PATH", "TZ", "GIT_CONFIG_NOSYSTEM"];
 const COMMAND_CAPABILITIES = new Set(["diagnostic-version", "diagnostic-validator", "diagnostic-git-path-read", "diagnostic-git-object-read", "diagnostic-git-archive-write"]);
-const COMMAND_SEMANTICS = new Set(["version-node/v1", "version-npm/v1", "version-vite/v1", "version-chrome/v1", "git-head-oid/v1", "validator-plan-clean/v1", "validator-phase-clean/v1", "validator-umbrella-clean/v1", "validator-goal-clean/v1", "validator-envelope-clean/v1", "git-porcelain-pathset/v1", "git-name-list/v1", "git-diff-check-clean/v1", "git-check-ignore-exact/v1", "git-ls-tree-z/v1", "git-archive-tar/v1"]);
+const COMMAND_SEMANTICS = new Set(["version-node/v1", "version-npm/v1", "version-vite/v1", "version-chrome/v1", "git-head-oid/v1", "validator-plan-json-clean/v1", "validator-phase-json-clean/v1", "validator-umbrella-json-clean/v1", "validator-goal-pass-line/v1", "validator-envelope-json-clean/v1", "git-porcelain-pathset/v1", "git-name-list/v1", "git-diff-check-clean/v1", "git-check-ignore-exact/v1", "git-ls-tree-z/v1", "git-archive-tar/v1"]);
 const COMMAND_LIVE_PATHS = [".gitattributes", "scripts/assetDeliveryManifest.js", "scripts/assetDeliveryAudit.mjs", "scripts/assetDeliveryAudit.test.mjs", "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_PLAN_07-08-26.md"];
 const COMMAND_IGNORE_PATHS = [".agent/phase-02-runtime/phase02-continuation-20260902-17", "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_EVL-CORRECTION_23-08-26.md"];
 const COMMAND_TREE_PATHS = [".claude", ".codex", ".github", ".gitignore", ".vercelignore", "DESIGN.md", "README.md", "api", "components.json", "docs", "eslint.config.js", "index.html", "jsconfig.json", "netlify.toml", "netlify", "package-lock.json", "package.json", "process", "progress.md", "public", "scripts", "server", "skills-lock.json", "src", "tsconfig.core.json", "types", "vercel.json", "vite.config.js"];
@@ -852,18 +852,18 @@ function commandShape(row, registry, policy) {
   const live = registry.live_pathspecs;
   const tree = registry.tree_pathspecs;
   const ignore = registry.ignore_paths;
-  const selectedPlan = row.semantic.parameters.selected_plan;
+  const selectedPlan = row.semantic.parameters.selected_plan ?? row.semantic.parameters.argv_path;
   const shapes = [
     [policy.node, ["--version"], "diagnostic-version", "version-node/v1"],
     [policy.node, [policy.npmCli, "--version"], "diagnostic-version", "version-npm/v1"],
     [policy.git, ["rev-parse", "--verify", "HEAD^{commit}"], "diagnostic-git-object-read", "git-head-oid/v1"],
     [policy.node, [policy.viteCli, "--version"], "diagnostic-version", "version-vite/v1"],
     [policy.chrome, ["--version"], "diagnostic-version", "version-chrome/v1"],
-    [policy.node, [policy.planValidator, "--strict", selectedPlan], "diagnostic-validator", "validator-plan-clean/v1"],
-    [policy.node, [policy.phaseValidator, "--strict", selectedPlan], "diagnostic-validator", "validator-phase-clean/v1"],
-    [policy.node, [policy.umbrellaValidator, "--strict", row.semantic.parameters.umbrella], "diagnostic-validator", "validator-umbrella-clean/v1"],
-    [policy.node, [policy.goalValidator, row.semantic.parameters.goal], "diagnostic-validator", "validator-goal-clean/v1"],
-    [policy.node, [policy.envelopeValidator, selectedPlan], "diagnostic-validator", "validator-envelope-clean/v1"],
+    [policy.node, [policy.planValidator, "--strict", selectedPlan], "diagnostic-validator", "validator-plan-json-clean/v1"],
+    [policy.node, [policy.phaseValidator, "--strict", selectedPlan], "diagnostic-validator", "validator-phase-json-clean/v1"],
+    [policy.node, [policy.umbrellaValidator, "--strict", row.semantic.parameters.argv_path], "diagnostic-validator", "validator-umbrella-json-clean/v1"],
+    [policy.node, [policy.goalValidator, row.semantic.parameters.goal], "diagnostic-validator", "validator-goal-pass-line/v1"],
+    [policy.node, [policy.envelopeValidator, selectedPlan], "diagnostic-validator", "validator-envelope-json-clean/v1"],
     [policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=normal", "--", ...live], "diagnostic-git-path-read", "git-porcelain-pathset/v1"],
     [policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=all", "--", ...live], "diagnostic-git-path-read", "git-porcelain-pathset/v1"],
     [policy.git, ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "--", ...live], "diagnostic-git-path-read", "git-name-list/v1"],
@@ -966,6 +966,19 @@ function exactSemanticParameters(value, keys, label) {
   return value;
 }
 
+function decodeFramedText(stdout, stderr, label) {
+  if (stderr.length !== 0 || stdout.length === 0 || stdout.at(-1) !== 10 || stdout.includes(13) || stdout.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))) fail("SEMANTIC", `${label} stream framing mismatch`);
+  return decodeText(stdout, `${label} stdout`);
+}
+
+function parseCanonicalPrettyJson(stdout, stderr, label) {
+  const text = decodeFramedText(stdout, stderr, label);
+  let value;
+  try { value = JSON.parse(text); } catch { fail("SEMANTIC", `${label} is not one JSON document`); }
+  if (`${JSON.stringify(value, null, 2)}\n` !== text) fail("SEMANTIC", `${label} is not canonical pretty JSON`);
+  return value;
+}
+
 function parseGitPaths(bytes, parameters, nul) {
   const separator = nul ? 0 : 10;
   const records = [];
@@ -995,23 +1008,29 @@ export function validateCommandSemantic(kind, stdout, stderr, parameters, contex
     if (decodeText(out, "HEAD stdout") !== `${parameters.head_commit_oid}\n` || err.length !== 0) fail("SEMANTIC", "HEAD output mismatch");
     return { status: "PASS", value: parameters.head_commit_oid };
   }
-  if (kind.startsWith("validator-") && kind !== "validator-goal-clean/v1" && kind !== "validator-envelope-clean/v1") {
-    exactSemanticParameters(parameters, [kind === "validator-umbrella-clean/v1" ? "umbrella" : "selected_plan", "expected_line"], kind);
-    if (decodeText(out, "validator stdout") !== `${parameters.expected_line}\n` || err.length !== 0 || /(?:FAIL|WARN)/.test(parameters.expected_line)) fail("SEMANTIC", `${kind} output mismatch`);
-    return { status: "PASS" };
+  if (["validator-plan-json-clean/v1", "validator-phase-json-clean/v1", "validator-umbrella-json-clean/v1"].includes(kind)) {
+    exactSemanticParameters(parameters, ["argv_path", "target_path"], kind);
+    const value = parseCanonicalPrettyJson(out, err, kind);
+    exactKeys(value, ["checkedPlans", "strict", "warnings", "failures"], kind);
+    if (!Array.isArray(value.checkedPlans) || value.checkedPlans.length !== 1 || value.strict !== true || !Array.isArray(value.warnings) || value.warnings.length !== 0 || !Array.isArray(value.failures) || value.failures.length !== 0) fail("SEMANTIC", `${kind} summary is not clean`);
+    const checked = value.checkedPlans[0];
+    exactKeys(checked, ["path", "failures", "warnings", "lines"], `${kind} checked plan`);
+    if (checked.path !== parameters.target_path || checked.failures !== 0 || checked.warnings !== 0 || !Number.isSafeInteger(checked.lines) || checked.lines <= 0) fail("SEMANTIC", `${kind} checked plan mismatch`);
+    return { status: "PASS", value };
   }
-  if (kind === "validator-goal-clean/v1") {
-    exactSemanticParameters(parameters, ["goal", "expected_line"], kind);
-    if (decodeText(out, "goal stdout") !== `${parameters.expected_line}\n` || err.length !== 0 || !parameters.expected_line.includes("PASS") || !parameters.expected_line.includes("standing-granted")) fail("SEMANTIC", "goal validator output mismatch");
-    return { status: "PASS" };
+  if (kind === "validator-goal-pass-line/v1") {
+    exactSemanticParameters(parameters, ["goal", "lane"], kind);
+    const text = decodeFramedText(out, err, "goal validator");
+    if (!["quick", "fast", "full", "absent"].includes(parameters.lane) || text !== `PASS: ${parameters.goal} — all required fields present, LANE field: ${parameters.lane}\n`) fail("SEMANTIC", "goal validator output mismatch");
+    return { status: "PASS", value: parameters.lane };
   }
-  if (kind === "validator-envelope-clean/v1") {
-    exactSemanticParameters(parameters, ["selected_plan", "authority_class", "scope_count", "stop_condition_count", "artifact_receipt_schema_version"], kind);
-    let value;
-    try { value = JSON.parse(decodeText(out, "envelope stdout")); } catch { fail("SEMANTIC", "envelope validator output is not one JSON record"); }
-    exactKeys(value, ["status", "authorityClass", "selected_plan", "scope_count", "stop_condition_count", "artifact_receipt_schema_version"], kind);
-    if (err.length !== 0 || value.status !== "PASS" || value.authorityClass !== parameters.authority_class || value.selected_plan !== parameters.selected_plan || value.scope_count !== parameters.scope_count || value.stop_condition_count !== parameters.stop_condition_count || value.artifact_receipt_schema_version !== parameters.artifact_receipt_schema_version) fail("SEMANTIC", "envelope validator output mismatch");
-    return { status: "PASS" };
+  if (kind === "validator-envelope-json-clean/v1") {
+    exactSemanticParameters(parameters, ["selected_plan", "authority_class", "mode", "proof_path", "scope_count", "stop_condition_count", "artifact_receipt_schema_version", "artifact_destination_count"], kind);
+    const value = parseCanonicalPrettyJson(out, err, kind);
+    exactKeys(value, ["schema", "status", "authorityClass", "selected_plan", "mode", "proof_path", "scope_count", "stop_condition_count", "artifact_receipt_schema_version", "artifact_destination_count"], kind);
+    const expected = { schema: "execution-authority-validation/v1", status: "PASS", authorityClass: parameters.authority_class, selected_plan: parameters.selected_plan, mode: parameters.mode, proof_path: parameters.proof_path, scope_count: parameters.scope_count, stop_condition_count: parameters.stop_condition_count, artifact_receipt_schema_version: parameters.artifact_receipt_schema_version, artifact_destination_count: parameters.artifact_destination_count };
+    if (JSON.stringify(value) !== JSON.stringify(expected) || value.artifact_destination_count !== value.scope_count) fail("SEMANTIC", "envelope validator output mismatch");
+    return { status: "PASS", value };
   }
   if (kind === "git-porcelain-pathset/v1" || kind === "git-name-list/v1") {
     exactSemanticParameters(parameters, ["allowed_paths", "bytes", "sha256"], kind);
@@ -1213,11 +1232,11 @@ export function commandRegistryFixture(overrides = {}) {
     ["CMD-TOOL-03", "diagnostic-git-object-read", policy.git, ["rev-parse", "--verify", "HEAD^{commit}"], "git-head-oid/v1", { head_commit_oid: head }],
     ["CMD-TOOL-04", "diagnostic-version", policy.node, [policy.viteCli, "--version"], "version-vite/v1", { expected: "vite/7 linux-x64 node-v24.0.0" }],
     ["CMD-TOOL-05", "diagnostic-version", policy.chrome, ["--version"], "version-chrome/v1", { expected: "Google Chrome for Testing 151.0.0.0" }],
-    ["CMD-VAL-01", "diagnostic-validator", policy.node, [policy.planValidator, "--strict", selectedPlan], "validator-plan-clean/v1", { selected_plan: selectedPlan, expected_line: `PASS: ${selectedPlan} strict checked=1 failures=0 warnings=0` }],
-    ["CMD-VAL-02", "diagnostic-validator", policy.node, [policy.phaseValidator, "--strict", selectedPlanAbsolute], "validator-phase-clean/v1", { selected_plan: selectedPlanAbsolute, expected_line: `PASS: ${selectedPlanAbsolute} strict failures=0 warnings=0` }],
-    ["CMD-VAL-03", "diagnostic-validator", policy.node, [policy.umbrellaValidator, "--strict", umbrella], "validator-umbrella-clean/v1", { umbrella, expected_line: `PASS: ${umbrella} strict failures=0 warnings=0` }],
-    ["CMD-VAL-04", "diagnostic-validator", policy.node, [policy.goalValidator, goal], "validator-goal-clean/v1", { goal, expected_line: `PASS: ${goal} 9 fields standing-granted` }],
-    ["CMD-VAL-06", "diagnostic-validator", policy.node, [policy.envelopeValidator, selectedPlan], "validator-envelope-clean/v1", { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", scope_count: 72, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA }],
+    ["CMD-VAL-01", "diagnostic-validator", policy.node, [policy.planValidator, "--strict", selectedPlan], "validator-plan-json-clean/v1", { argv_path: selectedPlan, target_path: selectedPlan }],
+    ["CMD-VAL-02", "diagnostic-validator", policy.node, [policy.phaseValidator, "--strict", selectedPlanAbsolute], "validator-phase-json-clean/v1", { argv_path: selectedPlanAbsolute, target_path: path.relative(repositoryRoot, selectedPlanAbsolute).split(path.sep).join("/") }],
+    ["CMD-VAL-03", "diagnostic-validator", policy.node, [policy.umbrellaValidator, "--strict", umbrella], "validator-umbrella-json-clean/v1", { argv_path: umbrella, target_path: path.relative(repositoryRoot, umbrella).split(path.sep).join("/") }],
+    ["CMD-VAL-04", "diagnostic-validator", policy.node, [policy.goalValidator, goal], "validator-goal-pass-line/v1", { goal, lane: "absent" }],
+    ["CMD-VAL-06", "diagnostic-validator", policy.node, [policy.envelopeValidator, selectedPlan], "validator-envelope-json-clean/v1", { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 72, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 72 }],
     ["CMD-GIT-01", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=normal", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
     ["CMD-GIT-02", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=all", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
     ["CMD-GIT-03", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "--", ...COMMAND_LIVE_PATHS], "git-name-list/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
@@ -1232,8 +1251,9 @@ export function commandRegistryFixture(overrides = {}) {
     let stdout = Buffer.alloc(0);
     if (kind.startsWith("version-")) stdout = Buffer.from(`${parameters.expected}\n`);
     else if (kind === "git-head-oid/v1") stdout = Buffer.from(`${head}\n`);
-    else if (kind.startsWith("validator-") && kind !== "validator-envelope-clean/v1") stdout = Buffer.from(`${parameters.expected_line}\n`);
-    else if (kind === "validator-envelope-clean/v1") stdout = Buffer.from(`${JSON.stringify({ status: "PASS", authorityClass: parameters.authority_class, selected_plan: selectedPlan, scope_count: 72, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA })}\n`);
+    else if (["validator-plan-json-clean/v1", "validator-phase-json-clean/v1", "validator-umbrella-json-clean/v1"].includes(kind)) stdout = Buffer.from(`${JSON.stringify({ checkedPlans: [{ path: parameters.target_path, failures: 0, warnings: 0, lines: 1 }], strict: true, warnings: [], failures: [] }, null, 2)}\n`);
+    else if (kind === "validator-goal-pass-line/v1") stdout = Buffer.from(`PASS: ${parameters.goal} — all required fields present, LANE field: ${parameters.lane}\n`);
+    else if (kind === "validator-envelope-json-clean/v1") stdout = Buffer.from(`${JSON.stringify({ schema: "execution-authority-validation/v1", status: "PASS", authorityClass: parameters.authority_class, selected_plan: selectedPlan, mode: parameters.mode, proof_path: parameters.proof_path, scope_count: 72, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 72 }, null, 2)}\n`);
     else if (kind === "git-check-ignore-exact/v1") stdout = Buffer.from(`${parameters.expected_line}\n`);
     const stderr = Buffer.alloc(0);
     const gitLike = executable === policy.git || executable === policy.chrome;
@@ -1559,6 +1579,107 @@ function commandRegistryChecks() {
   return checks;
 }
 
+function validatorSemanticContractChecks() {
+  const checks = [];
+  const repositoryRoot = process.cwd();
+  const selectedPlan = "process/general-plans/active/repository-diagnostic-command-runner_03-09-26/repository-diagnostic-command-runner_PLAN_03-09-26.md";
+  const phasePlan = path.join(repositoryRoot, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_PLAN_07-08-26.md");
+  const umbrella = path.join(repositoryRoot, "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/visual-animation-assets-umbrella_PLAN_07-08-26.md");
+  const goal = path.join(repositoryRoot, ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md");
+  const policy = commandPolicy({ repositoryRoot });
+  const definitions = [
+    ["plan", "validator-plan-json-clean/v1", policy.planValidator, ["--strict", selectedPlan], { argv_path: selectedPlan, target_path: selectedPlan }],
+    ["phase", "validator-phase-json-clean/v1", policy.phaseValidator, ["--strict", phasePlan], { argv_path: phasePlan, target_path: path.relative(repositoryRoot, phasePlan).split(path.sep).join("/") }],
+    ["umbrella", "validator-umbrella-json-clean/v1", policy.umbrellaValidator, ["--strict", umbrella], { argv_path: umbrella, target_path: path.relative(repositoryRoot, umbrella).split(path.sep).join("/") }],
+    ["goal", "validator-goal-pass-line/v1", policy.goalValidator, [goal], { goal, lane: "absent" }],
+  ];
+  const outputs = new Map();
+  for (const [name, kind, script, argv, parameters] of definitions) {
+    const child = spawnSync(process.execPath, [script, ...argv], { cwd: repositoryRoot, shell: false, encoding: null, timeout: 120000, maxBuffer: 1048576 });
+    if (child.error || child.signal !== null || child.status !== 0) fail("SELF_CHECK", `actual ${name} validator failed`);
+    const stdout = Buffer.from(child.stdout ?? Buffer.alloc(0));
+    const stderr = Buffer.from(child.stderr ?? Buffer.alloc(0));
+    validateCommandSemantic(kind, stdout, stderr, parameters);
+    outputs.set(name, { kind, stdout, parameters });
+    checks.push({ name: `validator-actual-${name}-production-output`, status: "PASS" });
+  }
+  const envelopeParameters = { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 72, stop_condition_count: 5, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 72 };
+  const envelopeChild = spawnSync(process.execPath, [policy.envelopeValidator, "--v2-validation-fixture", selectedPlan], { cwd: repositoryRoot, shell: false, encoding: null, timeout: 120000, maxBuffer: 1048576 });
+  if (envelopeChild.error || envelopeChild.signal !== null || envelopeChild.status !== 0) fail("SELF_CHECK", "actual envelope validator failed");
+  const envelopeOutput = Buffer.from(envelopeChild.stdout ?? Buffer.alloc(0));
+  const envelopeStderr = Buffer.from(envelopeChild.stderr ?? Buffer.alloc(0));
+  validateCommandSemantic("validator-envelope-json-clean/v1", envelopeOutput, envelopeStderr, envelopeParameters);
+  const envelopeValue = JSON.parse(envelopeOutput);
+  outputs.set("envelope", { kind: "validator-envelope-json-clean/v1", stdout: envelopeOutput, parameters: envelopeParameters });
+  checks.push({ name: "validator-actual-envelope-production-output", status: "PASS" });
+
+  const reject = (name, kind, stdout, parameters, stderr = Buffer.alloc(0)) => checks.push(expectReject(name, () => validateCommandSemantic(kind, stdout, stderr, parameters)));
+  const jsonOutput = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+  for (const name of ["plan", "phase", "umbrella"]) {
+    const { kind, stdout, parameters } = outputs.get(name);
+    const baseline = JSON.parse(stdout);
+    const mutations = [
+      ["checkedPlans", (value) => { value.checkedPlans = []; }],
+      ["strict", (value) => { value.strict = false; }],
+      ["warnings", (value) => { value.warnings = ["warning"]; }],
+      ["failures", (value) => { value.failures = ["failure"]; }],
+      ["entry-path", (value) => { value.checkedPlans[0].path = "wrong.md"; }],
+      ["entry-failures", (value) => { value.checkedPlans[0].failures = 1; }],
+      ["entry-warnings", (value) => { value.checkedPlans[0].warnings = 1; }],
+      ["entry-lines", (value) => { value.checkedPlans[0].lines = 0; }],
+    ];
+    for (const [field, mutate] of mutations) {
+      const value = structuredClone(baseline);
+      mutate(value);
+      reject(`validator-${name}-wrong-${field}`, kind, jsonOutput(value), parameters);
+    }
+  }
+  for (const [field, value] of [["target", "wrong.md"], ["lane", "quick"]]) {
+    const goalRecord = outputs.get("goal");
+    const text = field === "target" ? `PASS: ${value} — all required fields present, LANE field: absent\n` : `PASS: ${goal} — all required fields present, LANE field: ${value}\n`;
+    reject(`validator-goal-wrong-${field}`, goalRecord.kind, Buffer.from(text), goalRecord.parameters);
+  }
+  for (const key of Object.keys(envelopeValue)) {
+    const value = structuredClone(envelopeValue);
+    value[key] = typeof value[key] === "number" ? value[key] + 1 : `${value[key]}-wrong`;
+    reject(`validator-envelope-wrong-${key}`, "validator-envelope-json-clean/v1", jsonOutput(value), envelopeParameters);
+  }
+  for (const name of ["plan", "phase", "umbrella", "envelope"]) {
+    const { kind, stdout, parameters } = outputs.get(name);
+    const missing = JSON.parse(stdout);
+    delete missing[Object.keys(missing)[0]];
+    reject(`validator-${name}-missing-field`, kind, jsonOutput(missing), parameters);
+    const extra = { ...JSON.parse(stdout), extra: true };
+    reject(`validator-${name}-extra-field`, kind, jsonOutput(extra), parameters);
+  }
+  for (const name of ["plan", "phase", "umbrella", "goal", "envelope"]) {
+    const { kind, stdout, parameters } = outputs.get(name);
+    const mismatched = { ...parameters, [name === "goal" ? "goal" : name === "envelope" ? "selected_plan" : "target_path"]: "argv-path-mismatch.md" };
+    reject(`validator-${name}-argv-path-mismatch`, kind, stdout, mismatched);
+    reject(`validator-${name}-crlf`, kind, Buffer.from(stdout.toString("utf8").replaceAll("\n", "\r\n")), parameters);
+    reject(`validator-${name}-extra-record`, kind, Buffer.concat([stdout, stdout]), parameters);
+    reject(`validator-${name}-non-empty-stderr`, kind, stdout, parameters, Buffer.from("unexpected\n"));
+  }
+  const fixture = commandRegistryFixture({ repositoryRoot });
+  const validatorRows = fixture.registry.rows.filter((row) => row.capability_class === "diagnostic-validator");
+  const forbidden = /registry(?:_|)(?:path|bytes|sha256)|digest(?:_|-)(?:placeholder|derived)|registrySha256/;
+  if (validatorRows.some((row) => forbidden.test(JSON.stringify({ expected: row.expected, semantic: row.semantic })))) fail("SELF_CHECK", "validator registry self-reference remained");
+  checks.push({ name: "validator-registry-self-reference-static-rejection", status: "PASS" });
+  const firstBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
+  const firstDigest = sha256(firstBytes);
+  const secondBytes = Buffer.from(`${JSON.stringify(JSON.parse(firstBytes), null, 2)}\n`);
+  if (!firstBytes.equals(secondBytes) || firstDigest !== sha256(secondBytes)) fail("SELF_CHECK", "registry two-pass canonical identity drifted");
+  checks.push({ name: "validator-registry-two-pass-byte-digest-equality", status: "PASS" });
+  const childExpectations = validatorRows.map((row) => [row.expected.stdout_policy, row.expected.stderr_policy]);
+  const changed = structuredClone(fixture.registry);
+  changed.head_commit_oid = "c".repeat(40);
+  const changedBytes = Buffer.from(`${JSON.stringify(changed, null, 2)}\n`);
+  if (firstBytes.equals(changedBytes) || firstDigest === sha256(changedBytes) || JSON.stringify(childExpectations) !== JSON.stringify(changed.rows.filter((row) => row.capability_class === "diagnostic-validator").map((row) => [row.expected.stdout_policy, row.expected.stderr_policy]))) fail("SELF_CHECK", "registry metadata change altered child expectations");
+  checks.push({ name: "validator-registry-change-child-expectation-invariance", status: "PASS" });
+  if (checks.length !== 72 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `validator semantic contract checks failed: ${checks.length}`);
+  return checks;
+}
+
 function supplementContractChecks() {
   const runnerPath = path.resolve(import.meta.dirname, "run-repository-diagnostic-evidence.mjs");
   const validatorPath = path.resolve(import.meta.dirname, "validate-execution-authority-envelope.mjs");
@@ -1630,7 +1751,7 @@ function selfCheck() {
     expectReject("literal-nul", () => decodeLiteralInput(Buffer.from([0x61, 0, 0x62])), "LITERAL_NUL"),
     expectReject("literal-cr", () => decodeLiteralInput(Buffer.from("a\r\n")), "LITERAL_CR"),
   ];
-  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...authorityContractChecks(), ...supplementContractChecks());
+  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks());
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-evidence-"));
   try {
     const paths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(root, `${name}.json`)]));
