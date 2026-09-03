@@ -64,6 +64,7 @@ import {
   freezeBoundedRegistryAuthority,
   recheckAuthorityBoundary,
   runV2ExecutionOracle,
+  runV2CliSubprocessOracle,
   commandRegistryFixture,
   deletionEffectAdapter,
 } from "./run-repository-diagnostic-evidence.mjs";
@@ -139,7 +140,7 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "77e3417f9819285970d424d4164929da6b53ef340848627030a63d49253ff24d";
+const RUNNER_SHA256 = "9e17aeb5a2a4c86b6c2bcfe248321c9a17d2aefceb7ec8ba479e19e540b0044c";
 const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
 const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
@@ -1125,12 +1126,17 @@ function runV2PostcommitCheck(options = {}) {
     const observedSourceEvents = [];
     const watchers = sourcePaths.map((target) => fs.watch(target, (eventType) => observedSourceEvents.push({ target, eventType })));
     let oracle;
-    try { oracle = runV2ExecutionOracle({ repositoryRoot: ROOT, headCommitOid: commitOid, headTreeOid: treeOid, chromeFailure: options.failureOnly === true }); } finally { for (const watcher of watchers) watcher.close(); }
+    let cliOracle;
+    try {
+      oracle = runV2ExecutionOracle({ repositoryRoot: ROOT, headCommitOid: commitOid, headTreeOid: treeOid, chromeFailure: options.failureOnly === true });
+      cliOracle = runV2CliSubprocessOracle({ repositoryRoot: ROOT, headCommitOid: commitOid, headTreeOid: treeOid, runnerPath, scenarios: options.failureOnly === true ? ["semantic-failure", "cleanup-only", "publication-only", "combined"] : ["success"] });
+    } finally { for (const watcher of watchers) watcher.close(); }
+    if (cliOracle.status !== "PASS") block("postcommit CLI subprocess oracle failed");
     const sourceSnapshotsAfter = sourcePaths.map(sourceSnapshot);
     if (sourceSnapshotsBefore.some((item, index) => JSON.stringify(stableSourceSnapshot(item)) !== JSON.stringify(stableSourceSnapshot(sourceSnapshotsAfter[index])))) block("committed source identity/hash/mode/time drifted during postcommit oracle");
     if (observedSourceEvents.length !== 0) block(`shared source writable event observed during postcommit oracle: ${JSON.stringify(observedSourceEvents)}`);
     const { authorityFreeze: _authorityFreeze, ...record } = oracle;
-    return { ...record, shared_source_writable_event_count: observedSourceEvents.length, shared_source_write_count: observedSourceEvents.length, source_snapshots_before: sourceSnapshotsBefore, source_snapshots_after: sourceSnapshotsAfter, source_monitor: SHARED_SOURCE_MONITOR_PROOF, commit_oid: commitOid, runner_blob_oid: blobOid, runner_bytes: runnerBytes.length, runner_sha256: model.diagnostic_runner.runner_sha256, registry_bytes: registryBytes.length, registry_sha256: model.diagnostic_registry.registry_sha256 };
+    return { ...record, cli_subprocess_status: cliOracle.status, cli_subprocess_scenario_count: cliOracle.scenario_count, cli_subprocess_records: cliOracle.records, shared_source_writable_event_count: observedSourceEvents.length, shared_source_write_count: observedSourceEvents.length, source_snapshots_before: sourceSnapshotsBefore, source_snapshots_after: sourceSnapshotsAfter, source_monitor: SHARED_SOURCE_MONITOR_PROOF, commit_oid: commitOid, runner_blob_oid: blobOid, runner_bytes: runnerBytes.length, runner_sha256: model.diagnostic_runner.runner_sha256, registry_bytes: registryBytes.length, registry_sha256: model.diagnostic_registry.registry_sha256 };
   } finally {
     removeExactTree(owned);
   }
@@ -3105,7 +3111,7 @@ async function runConcurrencyStress(argv) {
   try {
     for (let iteration = 0; iteration < repeat; iteration++) {
       const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
-      if (selfChecks.some((text) => !text.includes('"checkCount":449'))) block("concurrent self-check count drifted");
+      if (selfChecks.some((text) => !text.includes('"checkCount":469'))) block("concurrent self-check count drifted");
       successful += selfChecks.length;
       const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
       if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
