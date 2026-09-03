@@ -717,6 +717,7 @@ const COMMAND_SEMANTICS = new Set(["version-node/v1", "version-npm/v1", "version
 const COMMAND_LIVE_PATHS = [".gitattributes", "scripts/assetDeliveryManifest.js", "scripts/assetDeliveryAudit.mjs", "scripts/assetDeliveryAudit.test.mjs", "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_PLAN_07-08-26.md"];
 const COMMAND_IGNORE_PATHS = [".agent/phase-02-runtime/phase02-continuation-20260902-17", "process/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_EVL-CORRECTION_23-08-26.md"];
 const COMMAND_TREE_PATHS = [".claude", ".codex", ".github", ".gitignore", ".vercelignore", "DESIGN.md", "README.md", "api", "components.json", "docs", "eslint.config.js", "index.html", "jsconfig.json", "netlify.toml", "netlify", "package-lock.json", "package.json", "process", "progress.md", "public", "scripts", "server", "skills-lock.json", "src", "tsconfig.core.json", "types", "vercel.json", "vite.config.js"];
+const GIT_PORCELAIN_STATUSES = [" M", "M ", "MM", "A ", "AM", "D ", " D", "R ", "RM", "C ", "CM", "DD", "AU", "UD", "UA", "DU", "AA", "UU", "??", "!!"];
 const SECRET_NAME_PATTERN = /TOKEN|SECRET|PASSWORD|PASSWD|COOKIE|AUTH|CREDENTIAL|PRIVATE|API_KEY|PROXY|PROVIDER|^VITE_/i;
 
 function commandPolicy(overrides = {}) {
@@ -953,6 +954,32 @@ function requireDerivedSemanticPolicy(row) {
   }
 }
 
+function validateGitSemanticParameters(kind, parameters) {
+  if (kind === "git-porcelain-pathset/v1") {
+    exactSemanticParameters(parameters, ["framing", "allowed_statuses", "include_untracked", "include_ignored", "allowed_paths", "ledger_paths", "bytes", "sha256"], kind);
+    if (parameters.framing !== "porcelain-v1-z/raw-bytes" || JSON.stringify(parameters.allowed_statuses) !== JSON.stringify(GIT_PORCELAIN_STATUSES) || typeof parameters.include_untracked !== "boolean" || typeof parameters.include_ignored !== "boolean") fail("REGISTRY_SEMANTIC", `${kind} framing/status flags are invalid`);
+    for (const [label, values] of [["allowed_paths", parameters.allowed_paths], ["ledger_paths", parameters.ledger_paths]]) {
+      validateStringArray(values, `${kind}.${label}`);
+      if (new Set(values).size !== values.length) fail("REGISTRY_SEMANTIC", `${kind}.${label} must be unique`);
+      values.forEach((value) => validateRepositoryRelativePath(value, `${kind}.${label}`));
+    }
+    if (parameters.allowed_paths.some((value) => !parameters.ledger_paths.includes(value))) fail("REGISTRY_SEMANTIC", `${kind} allowed_paths must be included in ledger_paths`);
+  } else if (kind === "git-name-list/v1") {
+    exactSemanticParameters(parameters, ["framing", "allowed_paths", "bytes", "sha256"], kind);
+    if (parameters.framing !== "name-only-z/raw-bytes") fail("REGISTRY_SEMANTIC", `${kind} framing is invalid`);
+    validateStringArray(parameters.allowed_paths, `${kind}.allowed_paths`);
+    if (new Set(parameters.allowed_paths).size !== parameters.allowed_paths.length) fail("REGISTRY_SEMANTIC", `${kind}.allowed_paths must be unique`);
+    parameters.allowed_paths.forEach((value) => validateRepositoryRelativePath(value, `${kind}.allowed_paths`));
+  } else if (kind === "git-ls-tree-z/v1") {
+    exactSemanticParameters(parameters, ["framing", "pathspecs", "inventory_bytes", "inventory_sha256"], kind);
+    if (parameters.framing !== "ls-tree-z/raw-bytes") fail("REGISTRY_SEMANTIC", `${kind} framing is invalid`);
+    validateStringArray(parameters.pathspecs, `${kind}.pathspecs`);
+  } else return;
+  const bytes = kind === "git-ls-tree-z/v1" ? parameters.inventory_bytes : parameters.bytes;
+  const digest = kind === "git-ls-tree-z/v1" ? parameters.inventory_sha256 : parameters.sha256;
+  if (!isSafeInteger(bytes) || !isHash(digest)) fail("REGISTRY_SEMANTIC", `${kind} raw receipt is invalid`);
+}
+
 function commandShape(row, registry, policy) {
   const live = registry.live_pathspecs;
   const tree = registry.tree_pathspecs;
@@ -969,9 +996,9 @@ function commandShape(row, registry, policy) {
     [policy.node, [policy.umbrellaValidator, "--strict", row.semantic.parameters.argv_path], "diagnostic-validator", "validator-umbrella-json-clean/v1"],
     [policy.node, [policy.goalValidator, row.semantic.parameters.goal], "diagnostic-validator", "validator-goal-pass-line/v1"],
     [policy.node, [policy.envelopeValidator, selectedPlan], "diagnostic-validator", "validator-envelope-json-clean/v1"],
-    [policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=normal", "--", ...live], "diagnostic-git-path-read", "git-porcelain-pathset/v1"],
-    [policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=all", "--", ...live], "diagnostic-git-path-read", "git-porcelain-pathset/v1"],
-    [policy.git, ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "--", ...live], "diagnostic-git-path-read", "git-name-list/v1"],
+    [policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=normal", "--", ...live], "diagnostic-git-path-read", "git-porcelain-pathset/v1"],
+    [policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ...live], "diagnostic-git-path-read", "git-porcelain-pathset/v1"],
+    [policy.git, ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "-z", "--", ...live], "diagnostic-git-path-read", "git-name-list/v1"],
     [policy.git, ["diff", "--check", "--", ...live], "diagnostic-git-path-read", "git-diff-check-clean/v1"],
     [policy.git, ["check-ignore", "-v", "--", ignore[0]], "diagnostic-git-path-read", "git-check-ignore-exact/v1"],
     [policy.git, ["check-ignore", "-v", "--", ignore[1]], "diagnostic-git-path-read", "git-check-ignore-exact/v1"],
@@ -1052,6 +1079,7 @@ export function validateCommandRegistry(registry, options = {}) {
     validateStreamPolicy(row.expected.stdout_policy, row.semantic.kind, `row ${row.ordinal} stdout_policy`);
     validateStreamPolicy(row.expected.stderr_policy, row.semantic.kind, `row ${row.ordinal} stderr_policy`);
     requireDerivedSemanticPolicy(row);
+    validateGitSemanticParameters(row.semantic.kind, row.semantic.parameters);
     exactKeys(row.evidence, EVIDENCE_KEYS, `row ${row.ordinal} evidence`);
     for (const [role, destination] of Object.entries(row.evidence)) {
       absoluteNormalized(destination, `row ${row.ordinal} evidence.${role}`);
@@ -1108,20 +1136,97 @@ function parseCanonicalPrettyJson(stdout, stderr, label) {
   return value;
 }
 
-function parseGitPaths(bytes, parameters, nul) {
-  const separator = nul ? 0 : 10;
+function validateRepositoryRelativePath(value, label, { excludeSportsbook = true } = {}) {
+  if (typeof value !== "string" || value.length === 0 || /[\0\r\n\\]/.test(value) || value.startsWith("/") || value.startsWith("//") || /^[A-Za-z]:/.test(value) || /^[/\\]{2}[?.]/.test(value) || value.endsWith("/")) fail("SEMANTIC", `${label} is not a safe repository-relative path`);
+  const segments = value.split("/");
+  if (segments.some((segment) => segment === "" || segment === "." || segment === ".." || segment.normalize("NFKC") !== segment || DOS_DEVICE_PATTERN.test(segment.replace(/[ .]+$/g, "").split(".", 1)[0]))) fail("SEMANTIC", `${label} is noncanonical or unsafe`);
+  if (path.posix.normalize(value) !== value || excludeSportsbook && (value === "src/sportsbook" || value.startsWith("src/sportsbook/"))) fail("SEMANTIC", `${label} escaped its repository ledger`);
+  return value;
+}
+
+function rawNulRecords(bytes, label, { allowEmptyStream = false } = {}) {
+  if (bytes.length === 0) {
+    if (allowEmptyStream) return [];
+    fail("SEMANTIC", `${label} must be nonempty`);
+  }
+  if (bytes.at(-1) !== 0) fail("SEMANTIC", `${label} is unterminated`);
   const records = [];
   let start = 0;
-  for (let index = 0; index < bytes.length; index++) if (bytes[index] === separator) {
+  for (let index = 0; index < bytes.length; index++) if (bytes[index] === 0) {
+    if (index === start) fail("SEMANTIC", `${label} contains an empty record`);
     records.push(bytes.subarray(start, index));
     start = index + 1;
   }
-  if (start !== bytes.length) fail("SEMANTIC", "Git path output is unterminated");
-  const paths = records.map((record) => decodeText(record, "Git path record"));
-  if (new Set(paths).size !== paths.length || paths.some((item) => item.includes("src/sportsbook/") || !parameters.allowed_paths.includes(item))) fail("SEMANTIC", "Git path output escaped its ledger");
-  const canonical = Buffer.from(paths.join(nul ? "\0" : "\n") + (paths.length ? (nul ? "\0" : "\n") : ""));
-  if (canonical.length !== parameters.bytes || sha256(canonical) !== parameters.sha256) fail("SEMANTIC", "Git path canonical receipt mismatch");
+  return records;
+}
+
+function validateRawReceipt(bytes, stderr, parameters, bytesKey = "bytes", shaKey = "sha256") {
+  if (stderr.length !== 0 || bytes.length !== parameters[bytesKey] || sha256(bytes) !== parameters[shaKey]) fail("SEMANTIC", "Git raw stream receipt mismatch");
+}
+
+function validatePathLedger(paths, allowedPaths, ledgerPaths = allowedPaths) {
+  if (new Set(paths).size !== paths.length || paths.some((item) => !ledgerPaths.includes(item))) fail("SEMANTIC", "Git path output escaped or duplicated its ledger");
+  const current = paths.filter((item) => allowedPaths.includes(item));
+  if (new Set(current).size !== allowedPaths.length || allowedPaths.some((item) => !current.includes(item))) fail("SEMANTIC", "Git path output did not exactly match allowed_paths");
+}
+
+function parseGitPorcelainZ(bytes, stderr, parameters) {
+  exactSemanticParameters(parameters, ["framing", "allowed_statuses", "include_untracked", "include_ignored", "allowed_paths", "ledger_paths", "bytes", "sha256"], "git-porcelain-pathset/v1");
+  if (parameters.framing !== "porcelain-v1-z/raw-bytes" || JSON.stringify(parameters.allowed_statuses) !== JSON.stringify(GIT_PORCELAIN_STATUSES) || typeof parameters.include_untracked !== "boolean" || typeof parameters.include_ignored !== "boolean") fail("SEMANTIC", "porcelain framing or status policy is invalid");
+  const records = rawNulRecords(bytes, "porcelain-v1 -z output", { allowEmptyStream: parameters.allowed_paths.length === 0 });
+  const result = [];
+  const paths = [];
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index];
+    if (record.length < 4 || record[2] !== 32) fail("SEMANTIC", "porcelain primary record framing is invalid");
+    const status = record.subarray(0, 2).toString("ascii");
+    if (!parameters.allowed_statuses.includes(status) || status === "??" && !parameters.include_untracked || status === "!!" && !parameters.include_ignored) fail("SEMANTIC", "porcelain status is not authorized");
+    const itemPath = validateRepositoryRelativePath(decodeText(record.subarray(3), "porcelain current path"), "porcelain current path");
+    if (!parameters.allowed_paths.includes(itemPath)) fail("SEMANTIC", "porcelain current path escaped allowed_paths");
+    let sourcePath;
+    if (/[RC]/.test(status)) {
+      const source = records[++index];
+      if (!source || source.length >= 3 && source[2] === 32 && parameters.allowed_statuses.includes(source.subarray(0, 2).toString("ascii"))) fail("SEMANTIC", "porcelain rename/copy source is missing or framed as a primary record");
+      sourcePath = validateRepositoryRelativePath(decodeText(source, "porcelain source path"), "porcelain source path");
+      paths.push(itemPath, sourcePath);
+    } else {
+      paths.push(itemPath);
+    }
+    result.push({ status, path: itemPath, ...(sourcePath === undefined ? {} : { sourcePath }) });
+  }
+  validatePathLedger(paths, parameters.allowed_paths, parameters.ledger_paths);
+  validateRawReceipt(bytes, stderr, parameters);
+  return result;
+}
+
+function parseGitNameListZ(bytes, stderr, parameters) {
+  exactSemanticParameters(parameters, ["framing", "allowed_paths", "bytes", "sha256"], "git-name-list/v1");
+  if (parameters.framing !== "name-only-z/raw-bytes") fail("SEMANTIC", "name-only framing is invalid");
+  const records = rawNulRecords(bytes, "name-only -z output", { allowEmptyStream: parameters.allowed_paths.length === 0 });
+  const paths = records.map((record) => validateRepositoryRelativePath(decodeText(record, "name-only path"), "name-only path"));
+  validatePathLedger(paths, parameters.allowed_paths);
+  validateRawReceipt(bytes, stderr, parameters);
   return paths;
+}
+
+function parseGitLsTreeZ(bytes, stderr, parameters) {
+  exactSemanticParameters(parameters, ["framing", "pathspecs", "inventory_bytes", "inventory_sha256"], "git-ls-tree-z/v1");
+  if (parameters.framing !== "ls-tree-z/raw-bytes") fail("SEMANTIC", "ls-tree framing is invalid");
+  const records = rawNulRecords(bytes, "ls-tree -z output");
+  const inventory = records.map((record) => {
+    const tab = record.indexOf(9);
+    if (tab <= 0 || tab === record.length - 1 || record.indexOf(9, tab + 1) !== -1) fail("SEMANTIC", "ls-tree metadata/path boundary is invalid");
+    const metadata = record.subarray(0, tab);
+    if (!metadata.every((byte) => byte < 128)) fail("SEMANTIC", "ls-tree metadata is not ASCII");
+    const match = metadata.toString("ascii").match(/^([0-7]{6}) (blob|tree) ([0-9a-f]{40})$/);
+    if (!match) fail("SEMANTIC", "ls-tree metadata is malformed");
+    const itemPath = validateRepositoryRelativePath(decodeText(record.subarray(tab + 1), "ls-tree path"), "ls-tree path", { excludeSportsbook: false });
+    return { mode: match[1], type: match[2], oid: match[3], path: itemPath };
+  });
+  const paths = inventory.map((entry) => entry.path);
+  if (new Set(paths).size !== paths.length || JSON.stringify([...paths].sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)))) !== JSON.stringify(paths) || paths.some((item) => !parameters.pathspecs.some((root) => item === root || item.startsWith(`${root}/`)))) fail("SEMANTIC", "ls-tree inventory mismatch");
+  validateRawReceipt(bytes, stderr, parameters, "inventory_bytes", "inventory_sha256");
+  return inventory;
 }
 
 export function validateCommandSemantic(kind, stdout, stderr, parameters, context = {}) {
@@ -1161,10 +1266,8 @@ export function validateCommandSemantic(kind, stdout, stderr, parameters, contex
     if (JSON.stringify(value) !== JSON.stringify(expected) || value.artifact_destination_count !== value.scope_count) fail("SEMANTIC", "envelope validator output mismatch");
     return { status: "PASS", value };
   }
-  if (kind === "git-porcelain-pathset/v1" || kind === "git-name-list/v1") {
-    exactSemanticParameters(parameters, ["allowed_paths", "bytes", "sha256"], kind);
-    return { status: "PASS", paths: parseGitPaths(out, parameters, false) };
-  }
+  if (kind === "git-porcelain-pathset/v1") return { status: "PASS", records: parseGitPorcelainZ(out, err, parameters) };
+  if (kind === "git-name-list/v1") return { status: "PASS", paths: parseGitNameListZ(out, err, parameters) };
   if (kind === "git-diff-check-clean/v1") {
     exactSemanticParameters(parameters, [], kind);
     if (out.length || err.length) fail("SEMANTIC", "git diff check must be silent");
@@ -1175,20 +1278,7 @@ export function validateCommandSemantic(kind, stdout, stderr, parameters, contex
     if (decodeText(out, "check-ignore stdout") !== `${parameters.expected_line}\n` || err.length) fail("SEMANTIC", "check-ignore output mismatch");
     return { status: "PASS" };
   }
-  if (kind === "git-ls-tree-z/v1") {
-    exactSemanticParameters(parameters, ["pathspecs", "inventory_bytes", "inventory_sha256"], kind);
-    const records = out.length ? out.subarray(0, -1).toString("utf8").split("\0") : [];
-    const fixtureEmpty = Boolean(context.registry?.fixture_mode) && out.length === 0 && parameters.inventory_bytes === 0 && parameters.inventory_sha256 === sha256(Buffer.alloc(0));
-    if (!fixtureEmpty && (out.length === 0 || out.at(-1) !== 0 || err.length || records.some((record) => !/^[0-7]{6} (?:blob|tree) [0-9a-f]{40}\t[^\0]+$/.test(record)))) fail("SEMANTIC", "ls-tree output is malformed");
-    const inventory = records.map((record) => {
-      const [metadata, itemPath] = record.split("\t");
-      const [mode, type, oid] = metadata.split(" ");
-      return { mode, type, oid, path: itemPath };
-    });
-    const paths = inventory.map((entry) => entry.path);
-    if (new Set(paths).size !== paths.length || JSON.stringify([...paths].sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)))) !== JSON.stringify(paths) || paths.some((item) => !parameters.pathspecs.some((root) => item === root || item.startsWith(`${root}/`))) || out.length !== parameters.inventory_bytes || sha256(out) !== parameters.inventory_sha256) fail("SEMANTIC", "ls-tree inventory mismatch");
-    return { status: "PASS", inventory };
-  }
+  if (kind === "git-ls-tree-z/v1") return { status: "PASS", inventory: parseGitLsTreeZ(out, err, parameters) };
   if (kind === "git-archive-tar/v1") {
     exactSemanticParameters(parameters, ["archive_path", "inventory"], kind);
     if (out.length || err.length) fail("SEMANTIC", "git archive streams must be empty");
@@ -1537,6 +1627,11 @@ export function commandRegistryFixture(overrides = {}) {
   const umbrella = overrides.umbrella ?? "/fixture/repository/umbrella.md";
   const goal = overrides.goal ?? "/fixture/repository/goal.md";
   const archivePath = overrides.archivePath ?? `${runtimeRoot}/tree.tar`;
+  const porcelainTracked = Buffer.from(" M scripts/assetDeliveryManifest.js\0");
+  const porcelainUntracked = Buffer.from("?? .gitattributes\0");
+  const stagedNames = Buffer.from("scripts/assetDeliveryManifest.js\0");
+  const inventory = [{ mode: "100644", type: "blob", oid: "c".repeat(40), path: ".claude/fixture.txt", size: 7 }];
+  const lsTree = Buffer.from(`100644 blob ${inventory[0].oid}\t${inventory[0].path}\0`);
   const descriptors = [
     ["CMD-TOOL-01", "diagnostic-version", policy.node, ["--version"], "version-node/v1", { expected: overrides.nodeVersion ?? "v24.0.0" }],
     ["CMD-TOOL-02", "diagnostic-version", policy.node, [policy.npmCli, "--version"], "version-npm/v1", { expected: "11.0.0" }],
@@ -1548,14 +1643,14 @@ export function commandRegistryFixture(overrides = {}) {
     ["CMD-VAL-03", "diagnostic-validator", policy.node, [policy.umbrellaValidator, "--strict", umbrella], "validator-umbrella-json-clean/v1", { argv_path: umbrella, target_path: path.relative(repositoryRoot, umbrella).split(path.sep).join("/") }],
     ["CMD-VAL-04", "diagnostic-validator", policy.node, [policy.goalValidator, goal], "validator-goal-pass-line/v1", { goal, lane: "absent" }],
     ["CMD-VAL-06", "diagnostic-validator", policy.node, [policy.envelopeValidator, selectedPlan], "validator-envelope-json-clean/v1", { selected_plan: selectedPlan, authority_class: "repository-diagnostic-evidence-set/v2", mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md", scope_count: 76, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: 76 }],
-    ["CMD-GIT-01", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=normal", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
-    ["CMD-GIT-02", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "--untracked-files=all", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
-    ["CMD-GIT-03", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "--", ...COMMAND_LIVE_PATHS], "git-name-list/v1", { allowed_paths: [], bytes: 0, sha256: sha256(Buffer.alloc(0)) }],
+    ["CMD-GIT-01", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=normal", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { framing: "porcelain-v1-z/raw-bytes", allowed_statuses: GIT_PORCELAIN_STATUSES, include_untracked: true, include_ignored: false, allowed_paths: ["scripts/assetDeliveryManifest.js"], ledger_paths: COMMAND_LIVE_PATHS, bytes: porcelainTracked.length, sha256: sha256(porcelainTracked) }],
+    ["CMD-GIT-02", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ...COMMAND_LIVE_PATHS], "git-porcelain-pathset/v1", { framing: "porcelain-v1-z/raw-bytes", allowed_statuses: GIT_PORCELAIN_STATUSES, include_untracked: true, include_ignored: false, allowed_paths: [".gitattributes"], ledger_paths: COMMAND_LIVE_PATHS, bytes: porcelainUntracked.length, sha256: sha256(porcelainUntracked) }],
+    ["CMD-GIT-03", "diagnostic-git-path-read", policy.git, ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "-z", "--", ...COMMAND_LIVE_PATHS], "git-name-list/v1", { framing: "name-only-z/raw-bytes", allowed_paths: ["scripts/assetDeliveryManifest.js"], bytes: stagedNames.length, sha256: sha256(stagedNames) }],
     ["CMD-GIT-04", "diagnostic-git-path-read", policy.git, ["diff", "--check", "--", ...COMMAND_LIVE_PATHS], "git-diff-check-clean/v1", {}],
     ["CMD-GIT-05", "diagnostic-git-path-read", policy.git, ["check-ignore", "-v", "--", COMMAND_IGNORE_PATHS[0]], "git-check-ignore-exact/v1", { expected_line: ".gitignore:1:.agent\t.agent/phase-02-runtime/phase02-continuation-20260902-17" }],
     ["CMD-GIT-06", "diagnostic-git-path-read", policy.git, ["check-ignore", "-v", "--", COMMAND_IGNORE_PATHS[1]], "git-check-ignore-exact/v1", { expected_line: ".gitignore:2:process\tprocess/features/casino-overhaul/active/visual-animation-assets_07-08-26/phase-02-asset-provenance-delivery_EVL-CORRECTION_23-08-26.md" }],
-    ["CMD-GIT-07", "diagnostic-git-object-read", policy.git, ["ls-tree", "-r", "-z", "--full-tree", tree, "--", ...COMMAND_TREE_PATHS], "git-ls-tree-z/v1", { pathspecs: COMMAND_TREE_PATHS, inventory_bytes: 0, inventory_sha256: sha256(Buffer.alloc(0)) }],
-    ["CMD-GIT-08", "diagnostic-git-archive-write", policy.git, ["archive", "--format=tar", `--output=${archivePath}`, tree, "--", ...COMMAND_TREE_PATHS], "git-archive-tar/v1", { archive_path: archivePath, inventory: [] }],
+    ["CMD-GIT-07", "diagnostic-git-object-read", policy.git, ["ls-tree", "-r", "-z", "--full-tree", tree, "--", ...COMMAND_TREE_PATHS], "git-ls-tree-z/v1", { framing: "ls-tree-z/raw-bytes", pathspecs: COMMAND_TREE_PATHS, inventory_bytes: lsTree.length, inventory_sha256: sha256(lsTree) }],
+    ["CMD-GIT-08", "diagnostic-git-archive-write", policy.git, ["archive", "--format=tar", `--output=${archivePath}`, tree, "--", ...COMMAND_TREE_PATHS], "git-archive-tar/v1", { archive_path: archivePath, inventory }],
   ];
   const fixtureOutputs = [];
   const rows = descriptors.map(([id, capability, executable, argv, kind, parameters], index) => {
@@ -1566,6 +1661,9 @@ export function commandRegistryFixture(overrides = {}) {
     else if (kind === "validator-goal-pass-line/v1") stdout = Buffer.from(`PASS: ${parameters.goal} — all required fields present, LANE field: ${parameters.lane}\n`);
     else if (kind === "validator-envelope-json-clean/v1") stdout = Buffer.from(`${JSON.stringify({ schema: "execution-authority-validation/v1", status: "PASS", authorityClass: parameters.authority_class, selected_plan: selectedPlan, mode: parameters.mode, proof_path: parameters.proof_path, scope_count: parameters.scope_count, stop_condition_count: stopConditionCount, artifact_receipt_schema_version: RECEIPT_SCHEMA, artifact_destination_count: parameters.artifact_destination_count }, null, 2)}\n`);
     else if (kind === "git-check-ignore-exact/v1") stdout = Buffer.from(`${parameters.expected_line}\n`);
+    else if (kind === "git-porcelain-pathset/v1") stdout = id === "CMD-GIT-01" ? porcelainTracked : porcelainUntracked;
+    else if (kind === "git-name-list/v1") stdout = stagedNames;
+    else if (kind === "git-ls-tree-z/v1") stdout = lsTree;
     const stderr = Buffer.alloc(0);
     const gitLike = executable === policy.git || executable === policy.chrome;
     const env = gitLike ? { HOME: home, LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: "/usr/bin:/bin", TZ: "UTC", ...(executable === policy.git ? { GIT_CONFIG_NOSYSTEM: "1" } : {}) } : { HOME: home, LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: `${path.dirname(policy.node)}:/usr/bin:/bin`, TZ: "UTC" };
@@ -1633,7 +1731,8 @@ function validatedDestinationProjection(registry) {
 }
 
 function writeFixtureExecutable(target, outputs, archivePath = null) {
-  const source = `#!/usr/bin/env node\nimport fs from "node:fs";\nconst argv=process.argv.slice(2);\nconst key=JSON.stringify(argv);\nconst outputs=new Map(${JSON.stringify(outputs)});\nif(!outputs.has(key)){process.stderr.write("unexpected fixture argv\\n");process.exitCode=2;}else{${archivePath ? `if(argv[0]==="archive")fs.writeFileSync(${JSON.stringify(archivePath)},Buffer.alloc(1024),{flag:"wx",mode:0o600});` : ""}process.stdout.write(Buffer.from(outputs.get(key),"base64"));}\n`;
+  const archiveBytes = tarArchive([{ name: ".claude/fixture.txt", data: Buffer.from("fixture") }]).toString("base64");
+  const source = `#!/usr/bin/env node\nimport fs from "node:fs";\nconst argv=process.argv.slice(2);\nconst key=JSON.stringify(argv);\nconst outputs=new Map(${JSON.stringify(outputs)});\nif(!outputs.has(key)){process.stderr.write("unexpected fixture argv\\n");process.exitCode=2;}else{${archivePath ? `if(argv[0]==="archive")fs.writeFileSync(${JSON.stringify(archivePath)},Buffer.from(${JSON.stringify(archiveBytes)},"base64"),{flag:"wx",mode:0o600});` : ""}process.stdout.write(Buffer.from(outputs.get(key),"base64"));}\n`;
   fs.writeFileSync(target, source, { flag: "wx", mode: 0o500 });
 }
 
@@ -2044,6 +2143,90 @@ function commandRegistryChecks() {
   const semanticCases = new Set(registry.rows.map((row) => row.semantic.kind));
   if (semanticCases.size !== COMMAND_SEMANTICS.size) fail("SELF_CHECK", "semantic kind coverage drifted");
   checks.push({ name: "v2-all-semantic-kinds", status: "PASS" });
+  return checks;
+}
+
+function gitRawFramingChecks() {
+  const checks = [];
+  const receipt = (bytes) => ({ bytes: bytes.length, sha256: sha256(bytes) });
+  const porcelainParameters = (bytes, allowedPaths, ledgerPaths = allowedPaths, overrides = {}) => ({ framing: "porcelain-v1-z/raw-bytes", allowed_statuses: GIT_PORCELAIN_STATUSES, include_untracked: true, include_ignored: false, allowed_paths: allowedPaths, ledger_paths: ledgerPaths, ...receipt(bytes), ...overrides });
+  const namesParameters = (bytes, allowedPaths) => ({ framing: "name-only-z/raw-bytes", allowed_paths: allowedPaths, ...receipt(bytes) });
+  const treeParameters = (bytes, pathspecs = ["root"]) => ({ framing: "ls-tree-z/raw-bytes", pathspecs, inventory_bytes: bytes.length, inventory_sha256: sha256(bytes) });
+  const accept = (name, kind, bytes, parameters, verify = () => true) => {
+    const value = validateCommandSemantic(kind, bytes, Buffer.alloc(0), parameters);
+    checks.push({ name, status: value.status === "PASS" && verify(value) ? "PASS" : "FAIL" });
+  };
+  const reject = (name, kind, bytes, parameters, stderr = Buffer.alloc(0)) => checks.push(expectReject(name, () => validateCommandSemantic(kind, bytes, stderr, parameters), "SEMANTIC"));
+  const fixture = commandRegistryFixture();
+  const argvExpected = [
+    ["-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=normal", "--", ...COMMAND_LIVE_PATHS],
+    ["-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ...COMMAND_LIVE_PATHS],
+    ["-c", "core.quotepath=false", "diff", "--cached", "--name-only", "-z", "--", ...COMMAND_LIVE_PATHS],
+    ["ls-tree", "-r", "-z", "--full-tree", fixture.registry.head_tree_oid, "--", ...COMMAND_TREE_PATHS],
+  ];
+  for (const [index, rowIndex] of [10, 11, 12, 16].entries()) checks.push({ name: `git-command-framing-schema-${index + 1}`, status: JSON.stringify(fixture.registry.rows[rowIndex].argv) === JSON.stringify(argvExpected[index]) && commandShape(fixture.registry.rows[rowIndex], fixture.registry, fixture.policy) ? "PASS" : "FAIL" });
+
+  const porcelainSpace = Buffer.from(" M dir/file name\0");
+  accept("git-porcelain-positive-space", "git-porcelain-pathset/v1", porcelainSpace, porcelainParameters(porcelainSpace, ["dir/file name"]));
+  const untracked = Buffer.from("?? .gitattributes\0");
+  accept("git-porcelain-positive-untracked-attributes", "git-porcelain-pathset/v1", untracked, porcelainParameters(untracked, [".gitattributes"]));
+  for (const [name, itemPath] of [["dash", "dir/-name"], ["question", "dir/?name"], ["leading-space", "dir/ name"]]) {
+    const bytes = Buffer.from(` M ${itemPath}\0`);
+    accept(`git-porcelain-positive-${name}`, "git-porcelain-pathset/v1", bytes, porcelainParameters(bytes, [itemPath]));
+  }
+  const rename = Buffer.from("R  dir/new name\0dir/old name\0");
+  accept("git-porcelain-positive-rename", "git-porcelain-pathset/v1", rename, porcelainParameters(rename, ["dir/new name"], ["dir/new name", "dir/old name"]), (value) => value.records[0].sourcePath === "dir/old name");
+  const copy = Buffer.from("C  dir/copy name\0dir/source name\0");
+  accept("git-porcelain-positive-copy", "git-porcelain-pathset/v1", copy, porcelainParameters(copy, ["dir/copy name"], ["dir/copy name", "dir/source name"]), (value) => value.records[0].sourcePath === "dir/source name");
+  accept("git-porcelain-positive-untracked-gate", "git-porcelain-pathset/v1", untracked, porcelainParameters(untracked, [".gitattributes"], [".gitattributes"], { include_untracked: true }));
+  const ignored = Buffer.from("!! ignored/file\0");
+  accept("git-porcelain-positive-ignored-gate", "git-porcelain-pathset/v1", ignored, porcelainParameters(ignored, ["ignored/file"], ["ignored/file"], { include_ignored: true }));
+
+  const porcelainNegative = (name, bytes, allowed, ledger = allowed, overrides = {}) => reject(`git-porcelain-negative-${name}`, "git-porcelain-pathset/v1", bytes, porcelainParameters(bytes, allowed, ledger, overrides));
+  porcelainNegative("duplicate", Buffer.from(" M a\0 M a\0"), ["a"]);
+  porcelainNegative("illegal-xy", Buffer.from("ZZ a\0"), ["a"]);
+  porcelainNegative("separator", Buffer.from(" M\ta\0"), ["a"]);
+  porcelainNegative("forbidden-untracked", untracked, [".gitattributes"], [".gitattributes"], { include_untracked: false });
+  porcelainNegative("forbidden-ignored", ignored, ["ignored/file"]);
+  porcelainNegative("missing-source", Buffer.from("R  new\0"), ["new"], ["new", "old"]);
+  porcelainNegative("extra-source", Buffer.from(" M current\0source\0"), ["current"], ["current", "source"]);
+  porcelainNegative("truncation", Buffer.from(" M truncated"), ["truncated"]);
+  porcelainNegative("lf-quoted", Buffer.from(" M \"quoted name\"\n"), ["quoted name"]);
+  porcelainNegative("invalid-utf8", Buffer.from([0x20, 0x4d, 0x20, 0xc3, 0x28, 0]), ["bad"]);
+  porcelainNegative("outside-destination", Buffer.from(" M outside\0"), ["inside"], ["inside", "outside"]);
+  porcelainNegative("outside-source", Buffer.from("R  new\0outside\0"), ["new"], ["new", "old"]);
+  porcelainNegative("unsafe-absolute-traversal", Buffer.from(" M ../escape\0"), ["../escape"]);
+  porcelainNegative("sportsbook-noncanonical", Buffer.from(" M src/sportsbook/live.js\0"), ["src/sportsbook/live.js"]);
+  porcelainNegative("rename-collision", Buffer.from("R  same\0same\0"), ["same"], ["same"]);
+
+  const specialNames = Buffer.from("dir/file name\0dir/-name\0dir/?name\0dir/ name\0");
+  accept("git-name-positive-special", "git-name-list/v1", specialNames, namesParameters(specialNames, ["dir/file name", "dir/-name", "dir/?name", "dir/ name"]));
+  accept("git-name-positive-empty-bound", "git-name-list/v1", Buffer.alloc(0), namesParameters(Buffer.alloc(0), []));
+  const nameNegative = (name, bytes, allowed) => reject(`git-name-negative-${name}`, "git-name-list/v1", bytes, namesParameters(bytes, allowed));
+  nameNegative("duplicate", Buffer.from("a\0a\0"), ["a"]);
+  nameNegative("framing-utf8", Buffer.from([0xc3, 0x28, 0]), ["bad"]);
+  nameNegative("unsafe-outside", Buffer.from("../escape\0"), ["../escape"]);
+  nameNegative("lf-quoted", Buffer.from("\"name\"\n"), ["name"]);
+
+  const oid = "c".repeat(40);
+  const treeSpecial = Buffer.from(["root/ file", "root/-file", "root/?file", "root/file name"].map((item) => `100644 blob ${oid}\t${item}\0`).join(""));
+  accept("git-tree-positive-first-tab", "git-ls-tree-z/v1", treeSpecial, treeParameters(treeSpecial), (value) => value.inventory.length === 4);
+  accept("git-tree-positive-special-bytes", "git-ls-tree-z/v1", treeSpecial, treeParameters(treeSpecial), (value) => value.inventory[0].path === "root/ file");
+  const treeNegative = (name, bytes, pathspecs = ["root"]) => reject(`git-tree-negative-${name}`, "git-ls-tree-z/v1", bytes, treeParameters(bytes, pathspecs));
+  treeNegative("malformed-multiple-tab", Buffer.from(`100644 blob ${oid}\troot/a\textra\0`));
+  treeNegative("invalid-utf8", Buffer.concat([Buffer.from(`100644 blob ${oid}\troot/`), Buffer.from([0xc3, 0x28, 0])]));
+  treeNegative("duplicate-unsafe", Buffer.from(`100644 blob ${oid}\troot/a\0${`100644 blob ${oid}\troot/a\0`}`));
+  treeNegative("empty-bypass", Buffer.alloc(0));
+
+  const sharedUnsafe = ["/absolute", "a/../b", "a\\b", "src/sportsbook/live.js"];
+  for (const [index, itemPath] of sharedUnsafe.entries()) {
+    const bytes = Buffer.from(`${itemPath}\0`);
+    reject(`git-shared-path-safety-${index + 1}`, "git-name-list/v1", bytes, namesParameters(bytes, [itemPath]));
+  }
+  checks.push({ name: "anti-cheat-git-positive-empty-buffer", status: porcelainSpace.length > 0 ? "PASS" : "FAIL" });
+  const semanticSource = validateCommandSemantic.toString();
+  checks.push({ name: "anti-cheat-git-parser-bypass", status: semanticSource.includes("parseGitPorcelainZ(out, err, parameters)") && semanticSource.includes("parseGitNameListZ(out, err, parameters)") && semanticSource.includes("parseGitLsTreeZ(out, err, parameters)") ? "PASS" : "FAIL" });
+  if (checks.length !== 46 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `raw Git framing checks failed: ${JSON.stringify(checks.filter((item) => item.status !== "PASS"))}`);
   return checks;
 }
 
@@ -2610,7 +2793,7 @@ function selfCheck() {
     expectReject("literal-nul", () => decodeLiteralInput(Buffer.from([0x61, 0, 0x62])), "LITERAL_NUL"),
     expectReject("literal-cr", () => decodeLiteralInput(Buffer.from("a\r\n")), "LITERAL_CR"),
   ];
-  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...semanticStreamConsistencyChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks(), ...productionRuntimeContractChecks());
+  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...gitRawFramingChecks(), ...semanticStreamConsistencyChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks(), ...productionRuntimeContractChecks());
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-evidence-"));
   try {
     const paths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(root, `${name}.json`)]));
