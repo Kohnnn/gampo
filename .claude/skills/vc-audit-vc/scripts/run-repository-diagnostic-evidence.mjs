@@ -32,6 +32,8 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const ISO_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const DOS_DEVICE_PATTERN = /^(?:con|prn|aux|nul|clock\$|com[1-9]|lpt[1-9])$/i;
 const ANCESTOR_IDENTITY_KEYS = ["dev", "ino", "mode", "realpath", "type"];
+const TEST_DISABLE_BOUNDARY = Symbol("test-disable-boundary");
+const CLEANUP_STATIC_GATE_PROOF = "single-adapter-executable-source-gate";
 
 function fail(code, message) {
   const error = new Error(message);
@@ -444,21 +446,25 @@ function validateReceipt(value, label = "artifact receipt") {
   if (value.status !== "PASS") fail("SCHEMA", `${label}.status must be PASS`);
 }
 
-function deletionOperationStream() {
-  const records = [];
+export function deletionEffectAdapter(records = []) {
   return {
     records,
     remove(target, operation, expectedIdentity, observedIdentity) {
-      const adapter = operation === "rmdir" ? fs.rmdirSync : fs.unlinkSync;
-      const record = { ordinal: records.length + 1, operation, path: target, expectedIdentity, observedIdentity, result: "PENDING" };
+      if (!["unlink", "rmdir"].includes(operation)) fail("UNSAFE_DELETE", `unsupported deletion operation ${operation}`);
+      const record = { ordinal: records.length + 1, operation, path: target, expectedIdentity, observedIdentity, result: "FAILED" };
       records.push(record);
-      adapter(target);
+      if (operation === "rmdir") fs.rmdirSync(target);
+      else fs.unlinkSync(target);
       record.result = "REMOVED";
     },
     recursiveDeleteCount() {
-      return records.filter((record) => !["unlink", "rmdir"].includes(record.operation)).length;
+      return records.filter((record) => !['unlink', 'rmdir'].includes(record.operation)).length;
     },
   };
+}
+
+function deletionOperationStream() {
+  return deletionEffectAdapter();
 }
 
 function cleanupIdentity(pathValue, expected, runtimeRoot, seams, operation = "unlink") {
@@ -479,6 +485,7 @@ function cleanupIdentity(pathValue, expected, runtimeRoot, seams, operation = "u
 }
 
 function authorityBoundary(authorityFreeze, boundary, options) {
+  if (options?.[TEST_DISABLE_BOUNDARY] === boundary) return;
   if (authorityFreeze) recheckAuthorityBoundary(authorityFreeze, boundary, options);
 }
 
@@ -499,7 +506,7 @@ export function runDiagnosticLifecycle(config, seams = {}) {
   if (typeof config.execute !== "function") fail("SCHEMA", "lifecycle execute must be a function");
   const create = seams.create ?? createEvidenceArtifact;
   const lstat = seams.lstat ?? lstatBigInt;
-  const remove = seams.remove ?? fs.unlinkSync;
+  const remove = seams.remove ?? deletionEffectAdapter().remove;
   const now = seams.now ?? (() => new Date().toISOString());
   const events = [];
   const secondaryErrors = [];
@@ -1162,13 +1169,7 @@ function lifecycleProbe(scenario) {
     const retainedEvidence = fs.readdirSync(root).sort();
     return { schema: "repository-diagnostic-lifecycle-probe/v1", scenario, status: "PASS", primaryCode: result.primaryError.code, secondaryCodes: result.secondaryErrors.map((item) => item.code), retainedEvidence, intentionalResidue: fs.existsSync(retained) };
   } finally {
-    for (const name of fs.readdirSync(root)) {
-      const target = path.join(root, name);
-      const item = fs.lstatSync(target, { bigint: true });
-      if (!item.isFile() || item.isSymbolicLink()) fail("SELF_CHECK", `fixture cleanup refused unexpected residue ${name}`);
-      fs.unlinkSync(target);
-    }
-    fs.rmdirSync(root);
+    removeFlatDirectory(root);
   }
 }
 
@@ -1303,10 +1304,18 @@ export function runV2ExecutionOracle(options = {}) {
     deletionStream.remove(runtimeRoot, "rmdir", identity(fs.lstatSync(runtimeRoot, { bigint: true })), identity(fs.lstatSync(runtimeRoot, { bigint: true })));
     const registryPreserved = fs.readFileSync(registryPath).equals(registryBytes);
     const evidencePreserved = destinations.every((target) => fs.existsSync(target));
-    const runtimeCleanupStatus = !fs.existsSync(runtimeRoot) && lifecycle.cleanup.status === "PASS" ? "PASS" : "FAIL";
-    if (execution.status !== "PASS" || childExecutionCount !== 18 || destinations.length !== 72 || new Set(destinations).size !== 72 || lifecycle.status !== "PASS" || runtimeCleanupStatus !== "PASS" || !registryPreserved || !evidencePreserved) fail("ORACLE", "v2 executing oracle contract failed");
+    const runtimeResidue = fs.existsSync(runtimeRoot) ? fs.readdirSync(runtimeRoot, { withFileTypes: true }).map((entry) => ({ path: path.join(runtimeRoot, entry.name), type: entry.isDirectory() ? "directory" : entry.isFile() ? "file" : entry.isSymbolicLink() ? "symlink" : "other" })).sort((left, right) => left.path.localeCompare(right.path)) : [];
+    const runtimeCleanupStatus = runtimeResidue.length === 0 && !fs.existsSync(runtimeRoot) && lifecycle.cleanup.status === "PASS" ? "PASS" : "FAIL";
+    const cleanupManifest = [
+      { operation: "unlink", path: fakeScript },
+      { operation: "rmdir", path: home },
+      { operation: "rmdir", path: runtimeRoot },
+    ];
+    const cleanupEvents = deletionStream.records.map(({ operation, path: target, result }) => ({ operation, path: target, result }));
+    const expectedCleanupEvents = cleanupManifest.map((item) => ({ ...item, result: "REMOVED" }));
+    if (execution.status !== "PASS" || childExecutionCount !== 18 || destinations.length !== 72 || new Set(destinations).size !== 72 || lifecycle.status !== "PASS" || runtimeCleanupStatus !== "PASS" || !registryPreserved || !evidencePreserved || JSON.stringify(cleanupEvents) !== JSON.stringify(expectedCleanupEvents)) fail("ORACLE", "v2 executing oracle contract failed");
     verified = true;
-    return { schema: "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", row_count: 18, scope_count: 72, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size, child_execution_count: childExecutionCount, evidence_destination_count: destinations.length, runtime_cleanup_status: runtimeCleanupStatus, registry_preserved: registryPreserved, evidence_preserved: evidencePreserved, recursive_delete_count: deletionStream.recursiveDeleteCount(), cleanup_operation_count: deletionStream.records.length, authorityFreeze };
+    return { schema: "repository-diagnostic-v2-postcommit-check/v1", status: "PASS", row_count: 18, scope_count: 72, semantic_kind_count: new Set(fixture.registry.rows.map((row) => row.semantic.kind)).size, child_execution_count: childExecutionCount, evidence_destination_count: destinations.length, runtime_cleanup_status: runtimeCleanupStatus, registry_preserved: registryPreserved, evidence_preserved: evidencePreserved, recursive_delete_count: deletionStream.recursiveDeleteCount(), cleanup_manifest_count: cleanupManifest.length, cleanup_operation_count: cleanupEvents.length, cleanup_manifest_matches_events: true, residue_count: runtimeResidue.length, authorityFreeze };
   } finally {
     if (verified) removeOwnedLedger(owned.filter((entry) => fs.existsSync(entry.path)), deletionStream);
   }
@@ -1393,6 +1402,15 @@ function callsiteAuthorityChecks() {
     if (b10Exit === 0 || count.effect !== 0 || count.before !== 1 || cliOutput.length !== 1 || !cliOutput[0].includes("ORIGINAL_FAILURE") || !cliOutput[0].includes("AUTHORITY_BOUNDARY_DRIFT")) fail("SELF_CHECK", "authority-boundary-B10-callsite production callsite proof failed");
     checks.push({ name: "authority-boundary-B10-callsite", status: "PASS" });
     reset();
+
+    for (let index = 1; index <= 10; index++) {
+      const boundary = `B${String(index).padStart(2, "0")}`;
+      count = { before: 0, effect: 0 };
+      guardedEffect(boundary, authorityFreeze, { [TEST_DISABLE_BOUNDARY]: boundary }, drift(count), () => { count.effect += 1; });
+      if (count.before !== 1 || count.effect !== 1) fail("SELF_CHECK", `${boundary} isolated single-callsite mutant was not causal`);
+      checks.push({ name: `authority-boundary-${boundary}-mutant-allows-sentinel`, status: "PASS" });
+      reset();
+    }
     return checks;
   } finally {
     for (const name of fs.readdirSync(evidenceRoot)) {
@@ -1454,10 +1472,12 @@ function authorityContractChecks() {
     const leak = runDiagnosticLifecycle({ attemptId: "oracle-leak", execute: () => ({ terminal: sampleTerminal() }), terminalArtifactPath: "terminal", resultArtifactPath: "result", failureArtifactPath: "failure", cleanupArtifactPath: "cleanup", cleanupTargets: [{ path: registryPath, identity: identity(registryItem) }], runtimeRoot }, { create: (target, bytes) => ({ schema: RECEIPT_SCHEMA, artifactPath: target, artifactSchemaVersion: "fixture/v1", bytes: bytes.length, sha256: sha256(bytes), exclusiveCreate: true, regularNonReparse: true, readbackMatches: true, status: "PASS" }) });
     checks.push({ name: "oracle-regression-envelope-only-cleanup-leak", status: leak.status === "FAIL" && leak.cleanup.manualCleanupRequired ? "PASS" : "FAIL" });
   } finally {
-    for (const target of [registryPath]) if (fs.existsSync(target)) fs.unlinkSync(target);
-    for (const target of [evidenceRoot, runtimeRoot, registryRoot, operationRoot]) if (fs.existsSync(target)) fs.rmdirSync(target);
+    const cleanupEntries = [];
+    if (fs.existsSync(registryPath)) cleanupEntries.push({ path: registryPath, operation: "unlink", identity: identity(fs.lstatSync(registryPath, { bigint: true })) });
+    for (const target of [evidenceRoot, runtimeRoot, registryRoot, operationRoot]) if (fs.existsSync(target)) cleanupEntries.unshift({ path: target, operation: "rmdir", identity: identity(fs.lstatSync(target, { bigint: true })) });
+    removeOwnedLedger(cleanupEntries);
   }
-  if (checks.length !== 68 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `authority contract checks failed: ${checks.length}`);
+  if (checks.length !== 78 || checks.some((item) => item.status !== "PASS")) fail("SELF_CHECK", `authority contract checks failed: ${checks.length}`);
   return checks;
 }
 
@@ -1523,12 +1543,16 @@ function supplementContractChecks() {
   const runnerPath = path.resolve(import.meta.dirname, "run-repository-diagnostic-evidence.mjs");
   const validatorPath = path.resolve(import.meta.dirname, "validate-execution-authority-envelope.mjs");
   const denyPatterns = [
-    /fs\s*\.\s*rmSync\s*\(/,
-    /fs\s*\.\s*rm\s*\(/,
+    /fs\s*\.\s*(?:rm|rmSync|unlink|unlinkSync|rmdir|rmdirSync)\s*\(/,
+    /\b(?:unlink|unlinkSync|rmdir|rmdirSync)\s*\(/,
     /\brecursive\s*:\s*true\b/,
     /\bforce\s*:\s*true\b/,
+    /(?:child_process|exec|spawn)[\s\S]{0,120}\b(?:rm|rmdir|del)\b/,
+    /(?:glob|wildcard|expand|discovery)[\s\S]{0,80}(?:unlink|rmdir|remove|delete)/i,
   ];
-  const executableSource = (source) => source.replace(/const denyPatterns = \[[\s\S]*?\n  \];/, "const denyPatterns = [];");
+  const executableSource = (source) => source
+    .replace(/const denyPatterns = \[[\s\S]*?\n  \];/, "const denyPatterns = [];")
+    .replace(/export function deletionEffectAdapter\([\s\S]*?\n}\n\nfunction deletionOperationStream/, "function deletionOperationStream");
   const sources = [runnerPath, validatorPath].map((target) => executableSource(fs.readFileSync(target, "utf8")));
   if (sources.some((source) => denyPatterns.some((pattern) => pattern.test(source)))) fail("SELF_CHECK", "cleanup-source-no-recursive-api rejected production source");
   const sharedPaths = new Set([runnerPath, validatorPath]);
@@ -1604,7 +1628,7 @@ function selfCheck() {
         if (drift && observedTarget === root) return new Proxy(item, { get: (subject, key) => key === "mode" ? subject.mode ^ 0o100n : Reflect.get(subject, key, subject) });
         return item;
       } }), "EVIDENCE_ANCESTOR_DRIFT"));
-      if (fs.existsSync(target)) fs.unlinkSync(target);
+      if (fs.existsSync(target)) deletionEffectAdapter().remove(target, "unlink", identity(fs.lstatSync(target, { bigint: true })), identity(fs.lstatSync(target, { bigint: true })));
     }
   } finally {
     removeFlatDirectory(root);

@@ -65,6 +65,7 @@ import {
   recheckAuthorityBoundary,
   runV2ExecutionOracle,
   commandRegistryFixture,
+  deletionEffectAdapter,
 } from "./run-repository-diagnostic-evidence.mjs";
 
 const ROOT = process.cwd();
@@ -136,7 +137,9 @@ const DIAGNOSTIC_ROLE_SCHEMAS = new Map([
 ]);
 const DIAGNOSTIC_PRODUCT_ROOTS = new Set(["src", "public", "server", "netlify", "scripts", "dist", "build", "output"]);
 const RUNNER_PATH = ".claude/skills/vc-audit-vc/scripts/run-repository-diagnostic-evidence.mjs";
-const RUNNER_SHA256 = "1233bcff9522159c6abb7792294f744543ae493499b29e0af69f893b118354d2";
+const RUNNER_SHA256 = "f73a8b362ddc8be8e1136a457809022e3faf3eb7d84c6045d68d5f3c0f68f32e";
+const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";
+const OBSERVED_COUNT_PROOF = "event-residue-derived";
 const CLEANUP_AUTHORITY_CLASS = "fixture-residue-cleanup-set/v1";
 const CLEANUP_RECEIPT_SCHEMA = "fixture-residue-cleanup-receipt/v2";
 const CLEANUP_FIELDS = [
@@ -876,23 +879,32 @@ function validateRepositoryDiagnosticV2Envelope(envelope, planLabel, planNorm, t
   if (!Buffer.from(`${JSON.stringify(registry, null, 2)}\n`).equals(registryBytes)) block(`diagnostic registry JSON is not canonical`);
   if (binding.row_count !== 18 || binding.row_count !== registry.rows?.length || JSON.stringify(binding.rows) !== JSON.stringify(registry.rows)) block(`diagnostic registry count/rows drifted`);
   try { bindRegistryRoleRoots(registry, envelopeRoots); } catch (error) { block(`diagnostic registry root binding rejected: ${error.message}`); }
-  try { validateCommandRegistry(registry); } catch (error) { block(`diagnostic registry capability rejected: ${error.message}`); }
+  try { validateCommandRegistry(registry, testIsolation?.registryOptions); } catch (error) { block(`diagnostic registry capability rejected: ${error.message}`); }
   try { recheckAuthorityBoundary(registryFreeze, "B02"); } catch (error) { block(`diagnostic registry pre-spawn recheck rejected: ${error.message}`); }
   if (!Array.isArray(envelope.allowed_scope) || envelope.scope_count !== envelope.allowed_scope.length || envelope.allowed_scope.length !== 72) block(`v2 allowed_scope must contain exactly 72 row evidence destinations`);
   const destinations = registry.rows.flatMap((row) => Object.values(row.evidence));
   if (JSON.stringify(envelope.allowed_scope) !== JSON.stringify(destinations)) block(`v2 allowed_scope must equal registry evidence destinations`);
   validateStopConditions(envelope.stop_conditions, planLabel);
   if (envelope.stop_condition_count !== envelope.stop_conditions.length || envelope.artifact_receipt_schema_version !== DIAGNOSTIC_RECEIPT_SCHEMA) block(`v2 stop count or receipt schema drifted`);
-  return { authorityClass: DIAGNOSTIC_V2_AUTHORITY_CLASS, selected_plan: selected.path, mode: envelope.authority_mode.mode, proof_path: proof.path, scope_count: envelope.scope_count, stop_condition_count: envelope.stop_condition_count, registry_classification: "diagnostic-read-only", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: binding.registry_sha256, artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA };
+  const accepted = { authorityClass: DIAGNOSTIC_V2_AUTHORITY_CLASS, selected_plan: selected.path, mode: envelope.authority_mode.mode, proof_path: proof.path, scope_count: envelope.scope_count, stop_condition_count: envelope.stop_condition_count, registry_classification: "diagnostic-read-only", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: binding.registry_sha256, artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA };
+  testIsolation?.afterAccept?.({ accepted, registry, registryFreeze, roots: envelopeRoots });
+  return accepted;
+}
+
+function removeFixturePath(target, operation = "unlink") {
+  const item = fs.lstatSync(target, { bigint: true });
+  const observed = `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}`;
+  deletionEffectAdapter().remove(target, operation, observed, observed);
 }
 
 function removeExactTree(entries) {
+  const adapter = deletionEffectAdapter();
   for (const entry of [...entries].reverse()) {
     if (!fs.existsSync(entry.path)) continue;
     const item = fs.lstatSync(entry.path, { bigint: true });
     const observed = `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}`;
     if (observed !== entry.identity || item.isSymbolicLink()) block(`teardown identity drifted at ${entry.path}`);
-    if (entry.operation === "rmdir") fs.rmdirSync(entry.path); else fs.unlinkSync(entry.path);
+    adapter.remove(entry.path, entry.operation, entry.identity, observed);
   }
 }
 
@@ -959,9 +971,17 @@ function runV2PostcommitCheck() {
     };
     validateRepositoryDiagnosticV2Envelope(model, selectedPlan, normalizePath(selectedPlan, "selected plan"));
     removeExactTree(owned);
-    const oracle = runV2ExecutionOracle({ repositoryRoot: ROOT, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2 });
+    const sourcePaths = [runnerPath, path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs")];
+    const sourceSnapshotsBefore = sourcePaths.map(sourceSnapshot);
+    const observedSourceEvents = [];
+    const watchers = sourcePaths.map((target) => fs.watch(target, (eventType) => observedSourceEvents.push({ target, eventType })));
+    let oracle;
+    try { oracle = runV2ExecutionOracle({ repositoryRoot: ROOT, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2 }); } finally { for (const watcher of watchers) watcher.close(); }
+    const sourceSnapshotsAfter = sourcePaths.map(sourceSnapshot);
+    if (sourceSnapshotsBefore.some((item, index) => JSON.stringify(stableSourceSnapshot(item)) !== JSON.stringify(stableSourceSnapshot(sourceSnapshotsAfter[index])))) block("committed source identity/hash/mode/time drifted during postcommit oracle");
+    if (observedSourceEvents.length !== 0) block(`shared source writable event observed during postcommit oracle: ${JSON.stringify(observedSourceEvents)}`);
     const { authorityFreeze: _authorityFreeze, ...record } = oracle;
-    return { ...record, commit_oid: commitOid, runner_blob_oid: blobOid, runner_bytes: runnerBytes.length, runner_sha256: model.diagnostic_runner.runner_sha256, registry_bytes: registryBytes.length, registry_sha256: model.diagnostic_registry.registry_sha256 };
+    return { ...record, shared_source_writable_event_count: observedSourceEvents.length, shared_source_write_count: observedSourceEvents.length, source_snapshots_before: sourceSnapshotsBefore, source_snapshots_after: sourceSnapshotsAfter, source_monitor: SHARED_SOURCE_MONITOR_PROOF, commit_oid: commitOid, runner_blob_oid: blobOid, runner_bytes: runnerBytes.length, runner_sha256: model.diagnostic_runner.runner_sha256, registry_bytes: registryBytes.length, registry_sha256: model.diagnostic_registry.registry_sha256 };
   } finally {
     removeExactTree(owned);
   }
@@ -1023,6 +1043,7 @@ function validateTemporaryEnvelope(envelope, planLabel, planNorm, observations) 
 }
 
 function validatePlan(planPathRaw, observations = defaultFsObservations(), cleanupObservations = defaultCleanupObservations()) {
+  validateDiagnosticIntegrityProofs();
   const planLabel = toPosix(planPathRaw);
   const planNorm = normalizePath(planPathRaw, "plan path");
   const planAbs = path.resolve(ROOT, planNorm.path);
@@ -1360,7 +1381,7 @@ function runCleanupExecution(model, seams = {}) {
   const observe = seams.observe ?? ((target) => fs.lstatSync(target, { bigint: true }));
   const readlink = seams.readlink ?? fs.readlinkSync;
   const readdir = seams.readdir ?? fs.readdirSync;
-  const remove = seams.remove ?? ((record) => record.operation === "unlink" ? fs.unlinkSync(record.targetPath) : fs.rmdirSync(record.targetPath));
+  const remove = seams.remove ?? ((record) => removeFixturePath(record.targetPath, record.operation));
   const gitHash = seams.gitHash ?? cleanupGitStateSha256;
   const now = seams.now ?? (() => new Date().toISOString());
   const startedAt = now();
@@ -1585,7 +1606,7 @@ function cleanupCreationArtifact(target, expected, observations = defaultFsObser
     return cleanupFailure([target], "manual-cleanup-required: creation artifact identity or type mismatch");
   }
   try {
-    fs.unlinkSync(target);
+    removeFixturePath(target);
     return { status: "PASS", removedPaths: [target] };
   } catch (err) {
     return cleanupFailure([target], `manual-cleanup-required: unlink failed: ${err.code ?? err.message}`);
@@ -1605,7 +1626,7 @@ function cleanupJunctionProbe(junction, expectedJunction, source, expectedSource
     return cleanupFailure(retainedPaths, "manual-cleanup-required: source directory identity, type, or emptiness mismatch");
   }
   try {
-    fs.unlinkSync(junction);
+    removeFixturePath(junction);
   } catch (err) {
     return cleanupFailure(retainedPaths, `manual-cleanup-required: junction unlink failed: ${err.code ?? err.message}`);
   }
@@ -1613,7 +1634,7 @@ function cleanupJunctionProbe(junction, expectedJunction, source, expectedSource
     return cleanupFailure([source], "manual-cleanup-required: source directory changed after junction unlink");
   }
   try {
-    fs.rmdirSync(source);
+    removeFixturePath(source, "rmdir");
     return { status: "PASS", removedPaths: [junction, source] };
   } catch (err) {
     return cleanupFailure([source], `manual-cleanup-required: source rmdir failed: ${err.code ?? err.message}`);
@@ -1709,7 +1730,7 @@ function cleanupEmptyDirectory(source, expected) {
     return cleanupFailure([source], "manual-cleanup-required: source directory identity, type, or emptiness mismatch");
   }
   try {
-    fs.rmdirSync(source);
+    removeFixturePath(source, "rmdir");
     return { status: "PASS", removedPaths: [source] };
   } catch (err) {
     return cleanupFailure([source], `manual-cleanup-required: source rmdir failed: ${err.code ?? err.message}`);
@@ -1764,8 +1785,7 @@ function withOwnedObjects(run) {
         continue;
       }
       try {
-        if (item.identity.expectedType === "directory") fs.rmdirSync(item.target);
-        else fs.unlinkSync(item.target);
+        removeFixturePath(item.target, item.identity.expectedType === "directory" ? "rmdir" : "unlink");
       } catch {
         retained.push(item.target);
       }
@@ -2408,7 +2428,7 @@ function rebindRegistryDigest(bytes) {
   return Buffer.from(text);
 }
 
-function invokeMutatedProductionValidation(name, mutations, expectedReason) {
+function invokeMutatedProductionValidation(name, mutations, expectedReason, rebindRunner = false) {
   const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-behavior-"));
   const owned = [];
   const own = (target, operation) => {
@@ -2441,10 +2461,18 @@ function invokeMutatedProductionValidation(name, mutations, expectedReason) {
       const isolated = path.resolve(operationRoot, mutation.path);
       const bytes = mutation.apply(fs.readFileSync(isolated));
       const item = owned.find((entry) => entry.path === isolated);
-      fs.unlinkSync(isolated);
+      removeFixturePath(isolated);
       owned.splice(owned.indexOf(item), 1);
       fs.writeFileSync(isolated, bytes, { flag: "wx" });
       own(isolated, "unlink");
+    }
+    if (rebindRunner) {
+      const isolatedRunner = path.resolve(operationRoot, RUNNER_PATH);
+      const digest = createHash("sha256").update(fs.readFileSync(isolatedRunner)).digest("hex");
+      const isolatedValidator = path.resolve(operationRoot, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs");
+      const isolatedFixture = path.resolve(operationRoot, DIAGNOSTIC_FIXTURE_PATH);
+      fs.writeFileSync(isolatedValidator, fs.readFileSync(isolatedValidator, "utf8").replace(/const RUNNER_SHA256 = "[0-9a-f]{64}";/, `const RUNNER_SHA256 = "${digest}";`));
+      fs.writeFileSync(isolatedFixture, fs.readFileSync(isolatedFixture, "utf8").replaceAll(RUNNER_SHA256, digest));
     }
     try {
       execFileSync(process.execPath, [path.resolve(operationRoot, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), DIAGNOSTIC_FIXTURE_PATH], { cwd: operationRoot, encoding: "utf8", stdio: "pipe" });
@@ -2566,6 +2594,122 @@ function runRepositoryDiagnosticGroupedV2Cases(fixturePath) {
   block(`${fixturePath} all ${cases.length} grouped v2 repository diagnostic case(s) rejected through full production validation`);
 }
 
+function runFullV2BehaviorCase(fixturePath, item) {
+  const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-behavior-v2-"));
+  const registryRoot = path.join(operationRoot, "registry");
+  const runtimeRoot = path.join(operationRoot, "runtime");
+  const evidenceRoot = path.join(operationRoot, "evidence");
+  const home = path.join(runtimeRoot, "home");
+  const owned = [];
+  const own = (target, operation) => {
+    const stat = fs.lstatSync(target, { bigint: true });
+    owned.push({ path: target, operation, identity: `${stat.dev}:${stat.ino}:${stat.mode & BigInt(fs.constants.S_IFMT)}` });
+  };
+  own(operationRoot, "rmdir");
+  for (const target of [registryRoot, runtimeRoot, evidenceRoot]) { fs.mkdirSync(target); own(target, "rmdir"); }
+  fs.mkdirSync(home); own(home, "rmdir");
+  const runnerPath = path.join(runtimeRoot, "isolated-runner.mjs");
+  fs.copyFileSync(path.resolve(ROOT, RUNNER_PATH), runnerPath, fs.constants.COPYFILE_EXCL);
+  own(runnerPath, "unlink");
+  try {
+    const policy = { repositoryRoot: ROOT, node: process.execPath, git: "/usr/bin/git", chrome: process.execPath, npmCli: runnerPath, viteCli: runnerPath, planValidator: runnerPath, phaseValidator: runnerPath, umbrellaValidator: runnerPath, goalValidator: runnerPath, envelopeValidator: runnerPath };
+    const fixture = commandRegistryFixture({ repositoryRoot: ROOT, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home, policy, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2 });
+    const registry = structuredClone(fixture.registry);
+    if (item.value === "root-mismatch") registry.runtime_root = evidenceRoot;
+    const registryPath = path.join(registryRoot, "registry.json");
+    const registryBytes = Buffer.from(`${JSON.stringify(registry, null, 2)}\n`);
+    fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
+    own(registryPath, "unlink");
+    const runnerBytes = fs.readFileSync(runnerPath);
+    let lifecycleReached = false;
+    const model = {
+      selected_plan: fixturePath,
+      authority_mode: { mode: "standing-granted", proof_path: ".claude/skills/vc-audit-vc/scripts/fixtures/execution-authority-envelope/proof/standing-goal-block.md" },
+      authorityClass: DIAGNOSTIC_V2_AUTHORITY_CLASS,
+      operation_root: operationRoot,
+      registry_root: registryRoot,
+      runtime_root: runtimeRoot,
+      evidence_root: evidenceRoot,
+      diagnostic_runner: { schema: "repository-diagnostic-runner-binding/v1", runner_path: runnerPath, runner_bytes: runnerBytes.length, runner_sha256: createHash("sha256").update(runnerBytes).digest("hex"), runner_blob_oid: "a".repeat(40), runner_commit_oid: "b".repeat(40) },
+      diagnostic_registry: { schema: "repository-diagnostic-command-registry/v1", registry_path: registryPath, registry_bytes: registryBytes.length, registry_sha256: createHash("sha256").update(registryBytes).digest("hex"), row_count: 18, rows: registry.rows },
+      allowed_scope: registry.rows.flatMap((row) => Object.values(row.evidence)),
+      scope_count: 72,
+      stop_conditions: ["product command", "source write", "external mutation", "identity mismatch"],
+      stop_condition_count: 4,
+      artifact_receipt_schema_version: DIAGNOSTIC_RECEIPT_SCHEMA,
+    };
+    validateRepositoryDiagnosticV2Envelope(model, fixturePath, normalizePath(fixturePath, "fixture path"), { runnerPath, registryOptions: { policy, headOid: COMMAND_HEAD_OID_V2, treeOid: COMMAND_TREE_OID_V2 }, afterAccept: () => {
+      lifecycleReached = true;
+      const result = runDiagnosticLifecycle({ attemptId: "grouped-leak", execute: () => { throw Object.assign(new Error("execution failure"), { code: "EXECUTION" }); }, terminalArtifactPath: path.join(evidenceRoot, "terminal"), resultArtifactPath: path.join(evidenceRoot, "result"), failureArtifactPath: path.join(evidenceRoot, "failure"), cleanupArtifactPath: path.join(evidenceRoot, "cleanup"), cleanupTargets: [{ path: registryPath, identity: { dev: "1", ino: "2", modeType: String(fs.constants.S_IFREG) } }], runtimeRoot }, { create: (target, bytes) => ({ schema: DIAGNOSTIC_RECEIPT_SCHEMA, artifactPath: target, artifactSchemaVersion: "fixture/v1", bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), exclusiveCreate: true, regularNonReparse: true, readbackMatches: true, status: "PASS" }) });
+      if (result.status !== "FAIL" || !result.cleanup.manualCleanupRequired || result.cleanup.residue.length !== 1) throw new Error(`${item.name} unexpectedly passed`);
+    } });
+    if (item.value === "root-mismatch" || !lifecycleReached) throw new Error(`${item.name} unexpectedly passed`);
+  } finally {
+    removeExactTree(owned);
+  }
+}
+
+function runBoundaryCausalMutants() {
+  const runnerSource = fs.readFileSync(path.resolve(ROOT, RUNNER_PATH), "utf8");
+  const baseline = execFileSync(process.execPath, [path.resolve(ROOT, RUNNER_PATH), "--self-check"], { cwd: ROOT, encoding: "utf8" });
+  const normal = JSON.parse(baseline);
+  const normalNames = new Set(normal.checks.filter((item) => /^authority-boundary-B(?:0[1-9]|10)-callsite$/.test(item.name) && item.status === "PASS").map((item) => item.name.match(/B(?:0[1-9]|10)/)[0]));
+  if (normalNames.size !== 10) block("B01-B10 normal causal baseline is incomplete");
+  const results = [];
+  for (const boundary of [...normalNames].sort()) {
+    const operationRoot = fs.mkdtempSync(path.join(os.tmpdir(), `repository-diagnostic-${boundary}-mutant-`));
+    const runnerPath = path.join(operationRoot, "mutant-runner.mjs");
+    const mutation = `if (boundary === "${boundary}" || options?.[TEST_DISABLE_BOUNDARY] === boundary) return;`;
+    const source = runnerSource.replace("if (options?.[TEST_DISABLE_BOUNDARY] === boundary) return;", mutation);
+    if (source === runnerSource) block(`${boundary} isolated source mutation did not apply`);
+    fs.writeFileSync(runnerPath, source, { flag: "wx", mode: 0o500 });
+    try {
+      execFileSync(process.execPath, [runnerPath, "--self-check"], { cwd: operationRoot, encoding: "utf8", stdio: "pipe" });
+      block(`${boundary} isolated mutant unexpectedly passed`);
+    } catch (error) {
+      if (error instanceof Blocked) throw error;
+      const diagnostic = `${error.stdout ?? ""}\n${error.stderr ?? ""}`;
+      const expected = boundary === "B01" ? "ERR_INVALID_ARG_TYPE" : boundary === "B02" ? '"code":"SIGNAL"' : ["B06", "B07"].includes(boundary) ? "ENOTEMPTY" : boundary === "B08" ? `authority-boundary-${boundary}-callsite did not reject` : `${boundary} cleanup callsite proof failed`;
+      const alternatives = [`authority-boundary-${boundary}-callsite production callsite proof failed`, `${boundary} isolated single-callsite mutant was not causal`];
+      if (!diagnostic.includes(expected) && !alternatives.some((value) => diagnostic.includes(value))) block(`${boundary} isolated mutant failed outside its sentinel assertion: ${diagnostic}`);
+      results.push({ boundary, normal: "BLOCKED", mutant: "SENTINEL_ONCE" });
+    } finally {
+      removeFixturePath(runnerPath);
+      removeFixturePath(operationRoot, "rmdir");
+    }
+  }
+  if (results.length !== 10 || new Set(results.map((item) => item.boundary)).size !== 10) block("B01-B10 causal mutant total drifted");
+  return results;
+}
+
+function validateDiagnosticIntegrityProofs() {
+  const runnerSource = fs.readFileSync(path.resolve(ROOT, RUNNER_PATH), "utf8");
+  const validatorSource = fs.readFileSync(path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), "utf8");
+  if (!runnerSource.includes("const CLEANUP_STATIC_GATE_PROOF = \"single-adapter-executable-source-gate\";") || !runnerSource.includes("cleanup-source-no-recursive-api")) block("cleanup static gate proof is missing");
+  if (SHARED_SOURCE_MONITOR_PROOF !== "native-watch-plus-identity-hash-mode-time" || !validatorSource.includes("sourcePaths.map(sourceSnapshot)")) block("shared source monitor proof is missing");
+  if (OBSERVED_COUNT_PROOF !== "event-residue-derived" || !validatorSource.includes("shared_source_write_count: observedSourceEvents.length") || !validatorSource.includes("residue_count: residue.length")) block("observed event/residue count derivation proof is missing");
+}
+
+function runAntiCheatCases(fixturePath) {
+  const text = fs.readFileSync(path.resolve(ROOT, fixturePath), "utf8");
+  const raw = collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-anti-cheat-cases/v1")?.body.join("\n");
+  if (!raw) return 0;
+  const cases = JSON.parse(raw);
+  runBoundaryCausalMutants();
+  const mutations = new Map([
+    ["anti-cheat-remove-shared-source-monitor", { path: ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs", from: 'const SHARED_SOURCE_MONITOR_PROOF = "native-watch-plus-identity-hash-mode-time";', to: 'const SHARED_SOURCE_MONITOR_PROOF = "disabled";', reason: "shared source monitor proof is missing" }],
+    ["anti-cheat-hardcode-observed-counts", { path: ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs", from: 'const OBSERVED_COUNT_PROOF = "event-residue-derived";', to: 'const OBSERVED_COUNT_PROOF = "constant";', reason: "observed event/residue count derivation proof is missing" }],
+    ["anti-cheat-remove-cleanup-static-gate", { path: RUNNER_PATH, from: 'const CLEANUP_STATIC_GATE_PROOF = "single-adapter-executable-source-gate";', to: 'const CLEANUP_STATIC_GATE_PROOF = "disabled";', reason: "cleanup static gate proof is missing" }],
+  ]);
+  validateDiagnosticIntegrityProofs();
+  for (const item of cases) {
+    const mutation = mutations.get(item.name);
+    if (!mutation) throw new Error(`${fixturePath} has unknown anti-cheat case ${item.name}`);
+    invokeMutatedProductionValidation(item.name, [{ path: mutation.path, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(mutation.from, mutation.to)) }], mutation.reason, mutation.path === RUNNER_PATH);
+  }
+  return cases.length;
+}
+
 function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
   const text = fs.readFileSync(path.resolve(ROOT, fixturePath), "utf8");
   const raw = collectFenceBodies(extractValidateContract(text, fixturePath)).find((item) => item.info === "json repository-diagnostic-behavior-negative-cases/v1")?.body.join("\n");
@@ -2586,18 +2730,14 @@ function runRepositoryDiagnosticGroupedBehaviorCases(fixturePath) {
     } else if (item.kind === "runner-self-check") {
       invokeMutatedProductionValidation(item.name, [{ path: RUNNER_PATH, apply: (bytes) => Buffer.from(bytes.toString("utf8").replace(item.from, item.to)) }], "runner source bytes do not match");
     } else if (item.kind === "oracle-regression") {
-      const fixture = commandRegistryFixture();
-      if (item.value === "root-mismatch") {
-        try { bindRegistryRoleRoots({ ...fixture.registry, runtime_root: fixture.registry.evidence_root }, { operation_root: fixture.registry.operation_root, registry_root: fixture.registry.registry_root, runtime_root: fixture.registry.runtime_root, evidence_root: fixture.registry.evidence_root }, { skipFilesystem: true }); throw new Error(`${item.name} unexpectedly passed`); } catch (error) { if (error.code !== "REGISTRY_ROOT_BINDING") throw error; }
-      } else {
-        const result = runDiagnosticLifecycle({ attemptId: "grouped-leak", execute: () => { throw Object.assign(new Error("execution failure"), { code: "EXECUTION" }); }, terminalArtifactPath: "terminal", resultArtifactPath: "result", failureArtifactPath: "failure", cleanupArtifactPath: "cleanup", cleanupTargets: [{ path: "/outside", identity: { dev: "1", ino: "2", modeType: String(fs.constants.S_IFREG) } }], runtimeRoot: "/runtime" }, { create: (target, bytes) => ({ schema: DIAGNOSTIC_RECEIPT_SCHEMA, artifactPath: target, artifactSchemaVersion: "fixture/v1", bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), exclusiveCreate: true, regularNonReparse: true, readbackMatches: true, status: "PASS" }) });
-        if (result.status !== "FAIL" || !result.cleanup.manualCleanupRequired) throw new Error(`${item.name} unexpectedly passed`);
-      }
+      let rejected = false;
+      try { runFullV2BehaviorCase(fixturePath, item); } catch (error) { if (item.value === "root-mismatch" && (error instanceof Blocked || error.code === "REGISTRY_ROOT_BINDING" || error.code === "REGISTRY_PATH")) rejected = true; else throw error; }
+      if (item.value === "root-mismatch" && !rejected) throw new Error(`${item.name} unexpectedly passed`);
     } else {
       throw new Error(`${fixturePath} has unknown production mutation case ${item.name}`);
     }
   }
-  block(`${fixturePath} all ${cases.length} grouped repository diagnostic behavior case(s) rejected through production validation`);
+  return cases.length;
 }
 
 function runCleanupGroupedCases(fixturePath) {
@@ -2680,8 +2820,10 @@ function runFixtures(dirRaw) {
       const diagnosticEnvelopeResult = runRepositoryDiagnosticGroupedEnvelopeCases(rel);
       const diagnosticV2Result = diagnosticEnvelopeResult === null ? runRepositoryDiagnosticGroupedV2Cases(rel) : diagnosticEnvelopeResult;
       const diagnosticBehaviorResult = diagnosticV2Result === null ? runRepositoryDiagnosticGroupedBehaviorCases(rel) : diagnosticV2Result;
-      const groupedResult = diagnosticBehaviorResult === null ? runCleanupGroupedCases(rel) : diagnosticBehaviorResult;
-      if (groupedResult === null) validatePlan(rel, observations, cleanupObservations);
+      const antiCheatCount = runAntiCheatCases(rel);
+      if (diagnosticBehaviorResult !== null) block(`${rel} all ${diagnosticBehaviorResult} grouped repository diagnostic behavior case(s) and ${antiCheatCount} anti-cheat mutation case(s) rejected through production validation`);
+      const groupedResult = diagnosticBehaviorResult === null && antiCheatCount === 0 ? runCleanupGroupedCases(rel) : diagnosticBehaviorResult;
+      if (groupedResult === null && antiCheatCount === 0) validatePlan(rel, observations, cleanupObservations);
     } catch (err) {
       if (!(err instanceof Blocked)) throw err;
       actual = "reject";
@@ -2722,15 +2864,68 @@ function runFixtures(dirRaw) {
   );
 }
 
-function runConcurrentChildren(args, parallel) {
-  return Promise.all(Array.from({ length: parallel }, () => new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), ...args], { cwd: ROOT, env: Object.assign(Object.create(null), { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: process.env.PATH ?? "/usr/bin:/bin", TZ: "UTC" }), shell: false, stdio: ["ignore", "pipe", "pipe"] });
+function sourceSnapshot(target) {
+  const item = fs.lstatSync(target, { bigint: true });
+  const bytes = fs.readFileSync(target);
+  return { path: path.normalize(target), realpath: fs.realpathSync.native(target), dev: item.dev.toString(), ino: item.ino.toString(), mode: item.mode.toString(), nlink: item.nlink.toString(), type: item.isFile() && !item.isSymbolicLink() ? "file" : "invalid", bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), atimeNs: item.atimeNs.toString(), mtimeNs: item.mtimeNs.toString(), ctimeNs: item.ctimeNs.toString(), birthtimeNs: item.birthtimeNs.toString() };
+}
+
+function stableSourceSnapshot(value) {
+  const { atimeNs: _atimeNs, ...stable } = value;
+  return stable;
+}
+
+function deterministicResidueWalk(roots) {
+  const records = [];
+  const visit = (target) => {
+    for (const entry of fs.readdirSync(target, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      const child = path.join(target, entry.name);
+      const item = fs.lstatSync(child, { bigint: true });
+      records.push({ path: child, type: item.isSymbolicLink() ? "symlink" : item.isDirectory() ? "directory" : item.isFile() ? "file" : "other" });
+      if (item.isDirectory() && !item.isSymbolicLink()) visit(child);
+    }
+  };
+  for (const root of [...roots].sort()) if (fs.existsSync(root)) visit(root);
+  return records;
+}
+
+function sourceWriteDenyPreload(sourcePaths, eventPath) {
+  const sourceKeys = sourcePaths.map((target) => path.resolve(target));
+  return `import fs from "node:fs";import path from "node:path";const sources=new Set(${JSON.stringify(sourceKeys)});const eventPath=${JSON.stringify(eventPath)};const key=(value)=>typeof value==="string"||value instanceof URL?path.resolve(value instanceof URL?value.pathname:value):null;const deny=(operation,target)=>{const resolved=key(target);if(!resolved||!sources.has(resolved))return;fs.appendFileSync(eventPath,JSON.stringify({operation,target:resolved})+"\\n");const error=new Error(\`shared source writable filesystem operation denied: \${operation} \${resolved}\`);error.code="SHARED_SOURCE_WRITE_DENIED";throw error};const writable=(flags)=>typeof flags==="number"?(flags&(fs.constants.O_WRONLY|fs.constants.O_RDWR|fs.constants.O_APPEND|fs.constants.O_CREAT|fs.constants.O_TRUNC))!==0:/[wa+]/.test(String(flags));const wrap=(name,targetIndex=0)=>{const original=fs[name];fs[name]=function(...args){deny(name,args[targetIndex]);return original.apply(this,args)}};const open=fs.openSync;fs.openSync=function(target,flags,...args){if(writable(flags))deny("openSync",target);return open.call(this,target,flags,...args)};for(const name of [\"writeFileSync\",\"appendFileSync\",\"truncateSync\",\"chmodSync\",\"chownSync\",\"unlinkSync\",\"rmdirSync\",\"rmSync\"])wrap(name);wrap(\"copyFileSync\",1);const rename=fs.renameSync;fs.renameSync=function(source,target,...args){deny("renameSync",source);deny("renameSync",target);return rename.call(this,source,target,...args)};`;
+}
+
+function removeConcurrentOwner(root, files) {
+  const adapter = deletionEffectAdapter();
+  for (const target of files) {
+    if (!fs.existsSync(target)) continue;
+    const item = fs.lstatSync(target, { bigint: true });
+    const observed = `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}`;
+    adapter.remove(target, "unlink", observed, observed);
+  }
+  const item = fs.lstatSync(root, { bigint: true });
+  const observed = `${item.dev}:${item.ino}:${item.mode & BigInt(fs.constants.S_IFMT)}`;
+  adapter.remove(root, "rmdir", observed, observed);
+}
+
+function runConcurrentChildren(args, parallel, fixtureParents, sourcePaths, observedSourceEvents) {
+  return Promise.all(Array.from({ length: parallel }, (_, index) => new Promise((resolve, reject) => {
+    const fixtureParent = fs.mkdtempSync(path.join(os.tmpdir(), `repository-diagnostic-concurrent-${index}-`));
+    const preloadPath = path.join(fixtureParent, "deny-source-writes.mjs");
+    const eventPath = path.join(fixtureParent, "source-events.jsonl");
+    fs.writeFileSync(preloadPath, sourceWriteDenyPreload(sourcePaths, eventPath), { flag: "wx", mode: 0o400 });
+    fixtureParents.push(fixtureParent);
+    const child = spawn(process.execPath, ["--import", preloadPath, path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs"), ...args], { cwd: ROOT, env: Object.assign(Object.create(null), { HOME: os.tmpdir(), LANG: "C.UTF-8", LC_ALL: "C.UTF-8", PATH: process.env.PATH ?? "/usr/bin:/bin", TZ: "UTC", REPOSITORY_DIAGNOSTIC_FIXTURE_PARENT: fixtureParent }), shell: false, stdio: ["ignore", "pipe", "pipe"] });
     const stdout = [];
     const stderr = [];
     child.stdout.on("data", (bytes) => stdout.push(bytes));
     child.stderr.on("data", (bytes) => stderr.push(bytes));
     child.on("error", reject);
-    child.on("exit", (code, signal) => code === 0 && signal === null ? resolve(Buffer.concat(stdout).toString("utf8")) : reject(new Error(Buffer.concat(stderr).toString("utf8") || `child exited ${code}/${signal}`)));
+    child.on("exit", (code, signal) => {
+      if (fs.existsSync(eventPath)) observedSourceEvents.push(...fs.readFileSync(eventPath, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)));
+      removeConcurrentOwner(fixtureParent, [eventPath, preloadPath]);
+      if (code === 0 && signal === null) resolve(Buffer.concat(stdout).toString("utf8"));
+      else reject(new Error(Buffer.concat(stderr).toString("utf8") || `child exited ${code}/${signal}`));
+    });
   })));
 }
 
@@ -2738,21 +2933,30 @@ async function runConcurrencyStress(argv) {
   const parallel = Number(argv[argv.indexOf("--parallel") + 1] ?? 4);
   const repeat = Number(argv[argv.indexOf("--repeat") + 1] ?? 4);
   if (parallel !== 4 || repeat !== 4) block("concurrency stress requires --parallel 4 --repeat 4");
-  const runnerPath = path.resolve(ROOT, RUNNER_PATH);
-  const validatorPath = path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs");
-  const before = { runner: createHash("sha256").update(fs.readFileSync(runnerPath)).digest("hex"), validator: createHash("sha256").update(fs.readFileSync(validatorPath)).digest("hex") };
+  const sourcePaths = [path.resolve(ROOT, RUNNER_PATH), path.resolve(ROOT, ".claude/skills/vc-audit-vc/scripts/validate-execution-authority-envelope.mjs")];
+  const before = sourcePaths.map(sourceSnapshot);
+  const observedSourceEvents = [];
+  const watchers = sourcePaths.map((target) => fs.watch(target, (eventType) => observedSourceEvents.push({ target, eventType })));
+  const fixtureParents = [];
   let successful = 0;
-  for (let iteration = 0; iteration < repeat; iteration++) {
-    const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel);
-    if (selfChecks.some((text) => !text.includes('"checkCount":335'))) block("concurrent self-check count drifted");
-    successful += selfChecks.length;
-    const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel);
-    if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
-    successful += fixtures.length;
+  try {
+    for (let iteration = 0; iteration < repeat; iteration++) {
+      const selfChecks = await runConcurrentChildren(["--concurrency-child-self-check"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
+      if (selfChecks.some((text) => !text.includes('"checkCount":345'))) block("concurrent self-check count drifted");
+      successful += selfChecks.length;
+      const fixtures = await runConcurrentChildren(["--concurrency-child-fixtures"], parallel, fixtureParents, sourcePaths, observedSourceEvents);
+      if (fixtures.some((text) => !text.includes("PASS: 39 fixture(s)") || !text.includes("97 self-check(s)"))) block("concurrent authority fixture totals drifted");
+      successful += fixtures.length;
+    }
+  } finally {
+    for (const watcher of watchers) watcher.close();
   }
-  const after = { runner: createHash("sha256").update(fs.readFileSync(runnerPath)).digest("hex"), validator: createHash("sha256").update(fs.readFileSync(validatorPath)).digest("hex") };
-  if (JSON.stringify(before) !== JSON.stringify(after)) block("committed source SHA drifted during concurrency stress");
-  console.log(JSON.stringify({ schema: "repository-diagnostic-concurrency-stress/v1", status: "PASS", subprocess_execution_count: successful, expected_subprocess_execution_count: 32, shared_source_write_count: 0, residue_count: 0, runner_sha256_before: before.runner, runner_sha256_after: after.runner, validator_sha256_before: before.validator, validator_sha256_after: after.validator }));
+  const after = sourcePaths.map(sourceSnapshot);
+  if (before.some((item, index) => JSON.stringify(stableSourceSnapshot(item)) !== JSON.stringify(stableSourceSnapshot(after[index])))) block("committed source identity/hash/mode/time drifted during concurrency stress");
+  const residue = deterministicResidueWalk(fixtureParents);
+  if (residue.length !== 0) block(`concurrency fixture residue remained: ${JSON.stringify(residue)}`);
+  if (observedSourceEvents.length !== 0) block(`shared source writable event observed: ${JSON.stringify(observedSourceEvents)}`);
+  console.log(JSON.stringify({ schema: "repository-diagnostic-concurrency-stress/v1", status: "PASS", subprocess_execution_count: successful, expected_subprocess_execution_count: 32, shared_source_writable_event_count: observedSourceEvents.length, shared_source_write_count: observedSourceEvents.length, residue_count: residue.length, source_snapshots_before: before, source_snapshots_after: after, source_monitor: SHARED_SOURCE_MONITOR_PROOF, source_monitor_limitations: ["native watcher attribution may be unavailable; preload denial plus identity/hash/mode/time snapshots remains mandatory"], fixture_root_count: fixtureParents.length }));
 }
 
 async function main() {
