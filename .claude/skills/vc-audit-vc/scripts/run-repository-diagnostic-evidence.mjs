@@ -928,6 +928,31 @@ function validateStreamPolicy(value, semanticKind, label) {
   if (value.semantic_kind !== semanticKind) fail("REGISTRY_EXPECTED", `${label} semantic kind drifted`);
 }
 
+const VERSION_SEMANTICS = new Set(["version-node/v1", "version-npm/v1", "version-vite/v1", "version-chrome/v1"]);
+
+function derivedSemanticStreams(kind, parameters) {
+  let stdout;
+  if (VERSION_SEMANTICS.has(kind)) {
+    exactSemanticParameters(parameters, ["expected"], kind);
+    stdout = Buffer.from(`${parameters.expected}\n`, "utf8");
+  } else if (kind === "git-head-oid/v1") {
+    exactSemanticParameters(parameters, ["head_commit_oid"], kind);
+    stdout = Buffer.from(`${parameters.head_commit_oid}\n`, "ascii");
+  } else {
+    return null;
+  }
+  return { stdout, stderr: Buffer.alloc(0) };
+}
+
+function requireDerivedSemanticPolicy(row) {
+  const streams = derivedSemanticStreams(row.semantic.kind, row.semantic.parameters);
+  if (!streams) return;
+  for (const [name, bytes] of Object.entries(streams)) {
+    const policy = row.expected[`${name}_policy`];
+    if (policy.bytes !== bytes.length || policy.sha256 !== sha256(bytes)) fail("REGISTRY_EXPECTED", `row ${row.ordinal} ${name}_policy does not match semantic parameters`);
+  }
+}
+
 function commandShape(row, registry, policy) {
   const live = registry.live_pathspecs;
   const tree = registry.tree_pathspecs;
@@ -1026,6 +1051,7 @@ export function validateCommandRegistry(registry, options = {}) {
     if (!COMMAND_SEMANTICS.has(row.semantic.kind) || row.semantic.parameters === null || typeof row.semantic.parameters !== "object" || Array.isArray(row.semantic.parameters)) fail("REGISTRY_SEMANTIC", `row ${row.ordinal} semantic is unknown`);
     validateStreamPolicy(row.expected.stdout_policy, row.semantic.kind, `row ${row.ordinal} stdout_policy`);
     validateStreamPolicy(row.expected.stderr_policy, row.semantic.kind, `row ${row.ordinal} stderr_policy`);
+    requireDerivedSemanticPolicy(row);
     exactKeys(row.evidence, EVIDENCE_KEYS, `row ${row.ordinal} evidence`);
     for (const [role, destination] of Object.entries(row.evidence)) {
       absoluteNormalized(destination, `row ${row.ordinal} evidence.${role}`);
@@ -1615,6 +1641,7 @@ function runCliFixtureScenario(scenario, options = {}) {
     const repositoryHead = options.headCommitOid && options.headTreeOid ? { head_commit_oid: options.headCommitOid, head_tree_oid: options.headTreeOid } : trustedGitHead(repositoryRoot);
     const policy = { repositoryRoot, node: process.execPath, git: toolPaths.git, chrome: toolPaths.chrome, npmCli: toolPaths.npm, viteCli: toolPaths.vite, planValidator: toolPaths.plan, phaseValidator: toolPaths.phase, umbrellaValidator: toolPaths.umbrella, goalValidator: toolPaths.goal, envelopeValidator: toolPaths.envelope };
     const fixture = commandRegistryFixture({ repositoryRoot, operationRoot, registryRoot, runtimeRoot, evidenceRoot, home: path.join(runtimeRoot, "home"), policy, headCommitOid: repositoryHead.head_commit_oid, headTreeOid: repositoryHead.head_tree_oid, fixtureMode: scenario, nodeVersion: process.version });
+    if (scenario === "semantic-failure" || scenario === "combined") fixture.fixtureOutputs[4].stdout = Buffer.from(`${fixture.registry.rows[4].semantic.parameters.expected} \n`);
     const byExecutable = new Map();
     fixture.registry.rows.slice(1).forEach((row, index) => {
       const target = row.executable === process.execPath ? row.argv[0] : row.executable;
@@ -1624,7 +1651,6 @@ function runCliFixtureScenario(scenario, options = {}) {
       byExecutable.set(target, entries);
     });
     for (const [target, outputs] of byExecutable) { writeFixtureExecutable(target, outputs, target === policy.git ? fixture.archivePath : null); own(target, "unlink"); }
-    if (scenario === "semantic-failure" || scenario === "combined") fixture.registry.rows[4].expected.stdout_policy.sha256 = sha256(Buffer.alloc(0));
     const registryPath = path.join(registryRoot, "registry.json");
     const registryBytes = Buffer.from(`${JSON.stringify(fixture.registry, null, 2)}\n`);
     fs.writeFileSync(registryPath, registryBytes, { flag: "wx", mode: 0o400 });
@@ -1926,14 +1952,35 @@ function roleRootChecks() {
   return checks;
 }
 
+function prepareFixtureSemanticFilesystem(fixture) {
+  const inventory = [{ mode: "100644", type: "blob", oid: "c".repeat(40), path: ".claude/fixture.txt", size: 7 }];
+  const lsTree = Buffer.from(`100644 blob ${inventory[0].oid}\t${inventory[0].path}\0`);
+  fixture.fixtureOutputs[16].stdout = lsTree;
+  fixture.registry.rows[16].semantic.parameters.inventory_bytes = lsTree.length;
+  fixture.registry.rows[16].semantic.parameters.inventory_sha256 = sha256(lsTree);
+  fixture.registry.rows[16].expected.stdout_policy.bytes = lsTree.length;
+  fixture.registry.rows[16].expected.stdout_policy.sha256 = sha256(lsTree);
+  fixture.registry.rows[17].semantic.parameters.inventory = inventory;
+  fs.mkdirSync(path.dirname(fixture.archivePath));
+  fs.writeFileSync(fixture.archivePath, tarArchive([{ name: inventory[0].path, data: Buffer.from("fixture") }]), { flag: "wx" });
+}
+
 function commandRegistryChecks() {
-  const { registry, policy, fixtureOutputs } = commandRegistryFixture();
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-semantic-"));
+  const fixture = commandRegistryFixture({ operationRoot: root, registryRoot: path.join(root, "registry"), runtimeRoot: path.join(root, "runtime"), evidenceRoot: path.join(root, "evidence"), home: path.join(root, "runtime/home"), archivePath: path.join(root, "runtime/tree.tar") });
+  const { registry, policy, fixtureOutputs } = fixture;
   const options = { policy, skipFilesystem: true, headCommitOid: registry.head_commit_oid, headTreeOid: registry.head_tree_oid };
+  prepareFixtureSemanticFilesystem(fixture);
   validateCommandRegistry(registry, options);
   const checks = [{ name: "v2-registry-18-row-closure", status: "PASS" }];
   let spawnIndex = 0;
-  const execution = executeCommandRegistry(registry, { ...options, persistEvidence: false, spawn: () => ({ status: 0, signal: null, error: undefined, ...fixtureOutputs[spawnIndex++] }), semantic: () => ({ status: "PASS" }) });
-  if (execution.status !== "PASS" || execution.completedRowCount !== 18 || execution.receipts.length !== 18 || spawnIndex !== 18) fail("SELF_CHECK", "all 18 production row shapes did not execute");
+  let execution;
+  try {
+    execution = executeCommandRegistry(registry, { ...options, persistEvidence: false, spawn: () => ({ status: 0, signal: null, error: undefined, ...fixtureOutputs[spawnIndex++] }) });
+  } finally {
+    removeOwnedTemporaryTree(root);
+  }
+  if (execution.status !== "PASS" || execution.completedRowCount !== 18 || execution.receipts.length !== 18 || spawnIndex !== 18) fail("SELF_CHECK", `all 18 production row shapes did not execute: ${JSON.stringify(execution)}`);
   checks.push(...registry.rows.map((row) => ({ name: `v2-positive-row-${String(row.ordinal).padStart(2, "0")}-${row.semantic.kind}`, status: "PASS" })));
   const renamed = structuredClone(registry);
   renamed.rows[0].id = "RENAMED_WITHOUT_AUTHORITY";
@@ -1962,6 +2009,47 @@ function commandRegistryChecks() {
   const semanticCases = new Set(registry.rows.map((row) => row.semantic.kind));
   if (semanticCases.size !== COMMAND_SEMANTICS.size) fail("SELF_CHECK", "semantic kind coverage drifted");
   checks.push({ name: "v2-all-semantic-kinds", status: "PASS" });
+  return checks;
+}
+
+function acceptanceSemanticBypass(source) {
+  return /\bsemantic\s*:/.test(source) || /validateCommandSemantic\s*=/.test(source) || /semanticStatus\s*:\s*["']PASS["']/.test(source);
+}
+
+function semanticStreamConsistencyChecks() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-semantic-family-"));
+  const fixture = commandRegistryFixture({ operationRoot: root, registryRoot: path.join(root, "registry"), runtimeRoot: path.join(root, "runtime"), evidenceRoot: path.join(root, "evidence"), home: path.join(root, "runtime/home"), archivePath: path.join(root, "runtime/tree.tar") });
+  const options = { policy: fixture.policy, skipFilesystem: true, headCommitOid: fixture.registry.head_commit_oid, headTreeOid: fixture.registry.head_tree_oid, persistEvidence: false };
+  prepareFixtureSemanticFilesystem(fixture);
+  let spawnIndex = 0;
+  let execution;
+  try {
+    execution = executeCommandRegistry(fixture.registry, { ...options, spawn: () => ({ status: 0, signal: null, error: undefined, ...fixture.fixtureOutputs[spawnIndex++] }) });
+  } finally {
+    removeOwnedTemporaryTree(root);
+  }
+  if (execution.status !== "PASS") fail("SELF_CHECK", "production semantic positive family failed");
+  const checks = fixture.registry.rows.slice(0, 5).map((row) => ({ name: `semantic-production-positive-${row.semantic.kind}`, status: "PASS" }));
+  const rejectSemantic = (name, kind, stdout, parameters, stderr = Buffer.alloc(0)) => checks.push(expectReject(name, () => validateCommandSemantic(kind, stdout, stderr, parameters), "SEMANTIC"));
+  rejectSemantic("semantic-negative-missing-space", "version-chrome/v1", Buffer.from("Chrome 1\n"), { expected: "Chrome 1 " });
+  rejectSemantic("semantic-negative-extra-space", "version-node/v1", Buffer.from("v24.0.0 \n"), { expected: "v24.0.0" });
+  rejectSemantic("semantic-negative-missing-lf", "version-npm/v1", Buffer.from("11.0.0"), { expected: "11.0.0" });
+  rejectSemantic("semantic-negative-crlf", "version-vite/v1", Buffer.from("vite/7\r\n"), { expected: "vite/7" });
+  rejectSemantic("semantic-negative-stderr", "version-node/v1", Buffer.from("v24.0.0\n"), { expected: "v24.0.0" }, Buffer.from("warning\n"));
+  rejectSemantic("semantic-negative-wrong-value", "git-head-oid/v1", Buffer.from(`${"c".repeat(40)}\n`), { head_commit_oid: "a".repeat(40) });
+  for (const rowIndex of [0, 1, 2, 3, 4]) {
+    const candidate = structuredClone(fixture.registry);
+    candidate.rows[rowIndex].expected.stdout_policy.bytes += 1;
+    let spawnCount = 0;
+    checks.push(expectReject(`semantic-policy-preflight-${candidate.rows[rowIndex].semantic.kind}`, () => executeCommandRegistry(candidate, { ...options, spawn: () => { spawnCount += 1; return { status: 0, signal: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }; } }), "REGISTRY_EXPECTED"));
+    if (spawnCount !== 0) fail("SELF_CHECK", "semantic policy mismatch reached spawn");
+  }
+  const acceptanceSource = commandRegistryChecks.toString();
+  const isolatedSource = commandResultChecks.toString();
+  const mutant = acceptanceSource.replace("persistEvidence: false, spawn:", "persistEvidence: false, semantic: () => ({ status: \"PASS\" }), spawn:");
+  if (acceptanceSemanticBypass(acceptanceSource) || !acceptanceSemanticBypass(mutant) || !acceptanceSemanticBypass(isolatedSource)) fail("SELF_CHECK", "semantic acceptance bypass source gate failed");
+  checks.push({ name: "semantic-positive-source-bypass-rejected", status: "PASS" });
+  if (checks.length !== 17) fail("SELF_CHECK", `semantic stream consistency checks failed: ${checks.length}`);
   return checks;
 }
 
@@ -2487,7 +2575,7 @@ function selfCheck() {
     expectReject("literal-nul", () => decodeLiteralInput(Buffer.from([0x61, 0, 0x62])), "LITERAL_NUL"),
     expectReject("literal-cr", () => decodeLiteralInput(Buffer.from("a\r\n")), "LITERAL_CR"),
   ];
-  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks(), ...productionRuntimeContractChecks());
+  checks.push(...schemaMutationChecks(), ...roleRootChecks(), ...commandRegistryChecks(), ...semanticStreamConsistencyChecks(), ...authorityContractChecks(), ...supplementContractChecks(), ...validatorSemanticContractChecks(), ...commandResultChecks(), ...productionRuntimeContractChecks());
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "repository-diagnostic-evidence-"));
   try {
     const paths = Object.fromEntries(["terminal", "result", "failure", "cleanup"].map((name) => [name, path.join(root, `${name}.json`)]));
