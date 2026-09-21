@@ -188,16 +188,25 @@ export const sfxManifest = {
         reveal: '/audio/cases/reveal.wav',
         win: '/audio/cases/win.wav',
         lose: '/audio/cases/lose.wav',
-        // Wave 36 P4: per-rarity drop stingers — mapped by tier loudness
-        // Quiet tier (milspec industrial): subtle drop thud
-        rarityQuiet: '/audio/cases/rarity-quiet.wav',
-        // Medium tier (consumer restricted): mild reveal tone
-        rarityMedium: '/audio/cases/rarity-medium.wav',
-        // Loud tier (covert extraordinary classified contraband ★ knives): full fanfare
-        rarityCovert: '/audio/cases/rarity-covert.wav',
-        rarityRestricted: '/audio/cases/rarity-restricted.wav',
-        rarityContraband: '/audio/cases/rarity-contraband.wav',
-        rarityStar: '/audio/cases/rarity-star.wav',
+        // Wave 36 P4: per-rarity drop stingers — mapped by tier loudness.
+        // 2026-09-22 repair: the six `rarity-*.wav` files named here never
+        // existed in `public/audio/cases/` and were never committed, so every
+        // per-tier stinger silently no-opped: the dev/preview server answered
+        // with the SPA HTML fallback (`Content-Type: text/html`), `decode()`
+        // rejected it, and `loadBuffer` returned null. Each tier now reuses an
+        // existing case sample chosen to match the intended loudness, so the
+        // stinger actually fires. Priority ordering in `casesAnimation.js`
+        // (`RARITY_PRIORITY`) is unchanged and still arbitrates bulk opens.
+        // Quiet tier (Consumer/Industrial/Mil-Spec): subtle drop thud
+        rarityQuiet: '/audio/cases/land.wav',
+        // Medium tier (Restricted/Remarkable/High): mild reveal tone
+        rarityMedium: '/audio/cases/reveal.wav',
+        // Loud tier (Covert/Extraordinary/Classified): full chime
+        rarityCovert: '/audio/cases/rare.wav',
+        rarityRestricted: '/audio/cases/stattrak.wav',
+        // Top tiers (Contraband / ★): knife fanfare
+        rarityContraband: '/audio/cases/knife.wav',
+        rarityStar: '/audio/cases/souvenir.wav',
     },
     slots: {
         click: '/audio/common/click.wav',

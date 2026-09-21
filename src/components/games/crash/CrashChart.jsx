@@ -6,8 +6,11 @@
 // "ghost" preview curve so the screen is never empty.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { resolveImage } from '../../../utils/assetPaths'
 
-const ROCKET_SRC    = '/images/spaceship.png'
+// Resolved at module scope: the build prunes raster originals once their WebP
+// sibling ships, so the literal `.png` path no longer exists on disk.
+const ROCKET_SRC    = resolveImage('/images/spaceship.png')
 const EXHAUST_SRC   = '/images/exhaust/exhaust02_preview.gif'
 const EXPLOSION_SRC = '/images/explosions/normal_explosion.gif'
 

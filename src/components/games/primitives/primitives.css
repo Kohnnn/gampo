@@ -503,8 +503,27 @@
         font-weight: 950;
         letter-spacing: 0.16em;
     }
+    /* D3: session statistics/history must stay reachable in *normal flow*
+       after the playfield and controls — no drawer, tabs or state. This block
+       pins `.gs-panel` as a slide-up sheet so the playfield can own the
+       viewport, which leaves the aside's grid row at `auto` (content height).
+       Flex the shell so the aside's natural height survives instead of
+       collapsing, and keep it scroll-reachable below the controls. */
+    .game-shell {
+        display: flex;
+        flex-direction: column;
+    }
     .gs-aside {
-        display: none;
+        order: 3;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        flex: 0 0 auto;
+        gap: 8px;
+    }
+    .gs-aside > * {
+        flex: 1 1 260px;
+        min-width: 260px;
     }
     .gs-titlebar h1 { font-size: 14px; }
     .gs-titlebar { padding: 6px 10px; gap: 8px; }
@@ -2102,9 +2121,19 @@ input:focus-visible,
            and is inert here, since display:flex wins by !important. */
         flex-shrink: 0;
     }
+    /* AC6: mobile users must be able to reach session statistics and history
+       during play. Previously this rule was `display: none`, which made both
+       entirely unreachable below 768px — the aside is the only surface that
+       renders `StatsOverlay` + `HistoryDrawer`, and `HistoryDrawer` is already
+       a collapsed `<details>` element, so exposing the container costs a single
+       summary row rather than a full panel. Kept to the end of the shell's
+       scroll flow (order: 3, after playfield and bet panel) so it never pushes
+       the playfield or controls out of view. */
     .gs-aside {
         order: 3;
-        display: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
     }
     .gs-playfield {
         order: 1;

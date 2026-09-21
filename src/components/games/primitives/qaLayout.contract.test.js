@@ -221,4 +221,39 @@ describe('QA layout and loader contracts', () => {
         })
         expect(out).toContain('OK: no playfield clipping risks found.')
     })
+
+    it('keeps session statistics/history reachable in normal flow on mobile (D3/AC6)', () => {
+        // Root-cause regression: both mobile cascades set `.gs-aside` to
+        // `display: none`, and `HistoryDrawer` renders inside that aside, so
+        // session statistics *and* history were unreachable at every viewport
+        // <=768px plus short landscape - across the ~35 games passing an
+        // `aside`. `game-accessibility-repair_18-07-26` owns the requirement;
+        // phase-06 D3 fixes the cascade: visible in normal flow after the
+        // playfield/controls, no drawer/tabs/state, no new GameShell API.
+
+        // No mobile block may hide the shared aside again.
+        const mobileBlocks = primitivesCss.match(
+            /@media \(max-width: 768px\)[\s\S]*?(?=\n@media|$)|@media \(max-height: 520px\) and \(orientation: landscape\)[\s\S]*?(?=\n@media|$)/g,
+        ) || []
+        expect(mobileBlocks.length).toBeGreaterThanOrEqual(2)
+        for (const block of mobileBlocks) {
+            const asideRule = block.match(/\.gs-aside\s*\{[^}]*\}/s)
+            if (!asideRule) continue
+            expect(asideRule[0]).not.toMatch(/display:\s*none/)
+            // Normal flow only: no fixed/absolute drawer. Fixed positioning
+            // would let the aside escape the document flow the spec requires.
+            expect(asideRule[0]).not.toMatch(/position:\s*(fixed|absolute)/)
+        }
+
+        // The aside must be a visible flex container in both mobile cascades.
+        const allAsides = primitivesCss.match(/\.gs-aside\s*\{[^}]*\}/gs) || []
+        expect(allAsides.length).toBeGreaterThan(0)
+        for (const rule of allAsides) {
+            if (/order:\s*3/.test(rule)) expect(rule).toMatch(/display:\s*flex/)
+        }
+
+        // `HistoryDrawer` must keep living inside the shared aside, so hiding
+        // the aside can never separate history from statistics again.
+        expect(gameShellSource).toMatch(/gs-aside[\s\S]*\{aside\}/)
+    })
 })

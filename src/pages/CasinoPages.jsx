@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Activity, Award, BookOpen, CheckCircle2, Crown, Gift, Lock, Radio, ShieldCheck, Target, Trophy } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { gameDefinitions } from '../data/gameDefinitions'
+import { resolveImage } from '../utils/assetPaths'
 import { liveStudioTables, missions, slotCatalog, sourceNotes, vipLevels } from '../data/casinoCatalog'
 import { formatCredits, rolloverProgress } from '../utils/simulationMath'
 import { GameGrid } from './HomePage'
@@ -268,7 +269,7 @@ export function ActivityPage() {
             <div className="activity-table">
                 {transactions.length === 0 ? (
                     <div className="activity-empty">
-                        <img src="/assets/games/lobby/hero-arcade.png" alt="" aria-hidden="true" />
+                        <img src={resolveImage('/assets/games/lobby/hero-arcade.png')} alt="" aria-hidden="true" />
                         <h3>No activity yet</h3>
                         <p>Every bet, return, top-up and reset will land here. Try a quick game to seed the log.</p>
                         <div className="activity-empty-actions">

@@ -7,6 +7,7 @@ import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableFrames, useCancellableTimeouts } from '../../../utils/scheduling'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
+import { resolveImage } from '../../../utils/assetPaths'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast } from '../primitives'
 import { BOARD_NUMBERS, WHEEL_ORDER, buildRouletteCoverage, colorOf, makeBet } from './layout'
 import EducationPanel from '../../EducationPanel'
@@ -425,7 +426,7 @@ export default function RouletteGame() {
                                     '--rou-idle-end': `${wheelRotation + 360}deg`,
                                 }}
                         >
-                            <img className="rou-wheel-texture" src="/images/generated/roulette-wheel-premium.png" alt="" />
+                            <img className="rou-wheel-texture" src={resolveImage('/images/generated/roulette-wheel-premium.png')} alt="" />
                             <div className="rou-pocket-ring">
                                 {WHEEL_ORDER.map((n, i) => {
                                     const angle = i * (360 / 37)
