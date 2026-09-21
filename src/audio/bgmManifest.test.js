@@ -10,11 +10,20 @@ function publicFile(url) {
 
 describe('BGM manifests', () => {
     it('maps every non-null skin and game track to a committed asset', () => {
-        for (const [id, entry] of [...Object.entries(bgmManifest), ...Object.entries(gameBgmManifest)]) {
-            for (const [mode, url] of Object.entries(entry)) {
-                if (!url) continue
+        for (const [id, entry] of Object.entries(bgmManifest)) {
+            for (const mode of ['idle', 'bonus']) {
+                const url = resolveBgm(id, mode)
+                if (!entry[mode]) continue
                 expect(url, `${id}.${mode}`).not.toContain('casino-lounge')
                 expect(existsSync(publicFile(url)), `${id}.${mode} ${url}`).toBe(true)
+            }
+        }
+        for (const [gameId, entry] of Object.entries(gameBgmManifest)) {
+            for (const mode of ['idle', 'bonus']) {
+                const url = resolveGameBgm(gameId, mode)
+                if (!entry[mode]) continue
+                expect(url, `${gameId}.${mode}`).not.toContain('casino-lounge')
+                expect(existsSync(publicFile(url)), `${gameId}.${mode} ${url}`).toBe(true)
             }
         }
     })

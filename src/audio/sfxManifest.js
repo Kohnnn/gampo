@@ -22,6 +22,8 @@
 // `null` in this map means "intentionally silent right now". Useful for
 // declaring intent without hardcoding a missing path that 404s.
 
+import { resolveAudio } from '../utils/assetPaths'
+
 export const sfxManifest = {
     common: {
         click: '/audio/common/click.wav',
@@ -319,16 +321,16 @@ export function resolveSfx(slug, role) {
         // explicitly null ("intentionally silent" placeholder), fall through to
         // the shared `common` sample so the game still makes a sound through
         // useSfx instead of going silent (2026-06-11 audio migration).
-        if (game[role]) return game[role]
+        if (game[role]) return resolveAudio(game[role])
     }
     const common = sfxManifest.common || {}
     if (Object.prototype.hasOwnProperty.call(common, role)) {
-        return common[role] || null
+        return common[role] ? resolveAudio(common[role]) : null
     }
     // Map a few legacy event names onto their nearest common sample so games
     // migrating off playSound() keep their texture.
     const ALIAS = { loss: 'lose', flip: 'reveal', deal: 'reveal', explode: 'lose', tick: 'click' }
-    if (ALIAS[role] && common[ALIAS[role]]) return common[ALIAS[role]]
+    if (ALIAS[role] && common[ALIAS[role]]) return resolveAudio(common[ALIAS[role]])
     return null
 }
 

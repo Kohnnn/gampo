@@ -1,4 +1,6 @@
-export const gameDefinitions = [
+import { resolveImage } from '../utils/assetPaths'
+
+const rawGameDefinitions = [
     {
         id: 'crash',
         name: 'Crash',
@@ -715,6 +717,13 @@ export const gameDefinitions = [
         lesson: '8x8 cluster pays with a cascading multiplier orb that ladders 1x to 32x.',
     },
 ]
+
+// Cover art ships as PNG plus an optimized WebP sibling. Resolving here keeps
+// every consumer (`HomePage`, catalog pages, game routes) on the modern format
+// without touching their `<img>` sites.
+export const gameDefinitions = rawGameDefinitions.map(game =>
+    game.image ? { ...game, image: resolveImage(game.image) } : game,
+)
 
 export const sportsbookDefinition = {
     id: 'sports',

@@ -1,3 +1,5 @@
+import { resolveAudio } from '../utils/assetPaths'
+
 const FAMILIES = [
     'bank', 'bars', 'bayou', 'catcher', 'classic', 'coop', 'cyber', 'forge',
     'gummy', 'iron', 'mansion', 'mummy', 'mythic', 'olympus', 'phoenix',
@@ -16,6 +18,6 @@ export function resolveBgm(skinFamily, mode = 'idle') {
     const family = bgmManifest[skinFamily]
     if (!family) return null
     if (mode === 'loss') return null
-    if (mode === 'bonus' && family.bonus) return family.bonus
-    return family.idle || null
+    const chosen = mode === 'bonus' && family.bonus ? family.bonus : family.idle
+    return chosen ? resolveAudio(chosen) : null
 }

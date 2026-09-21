@@ -4,6 +4,8 @@ rainbetclone
 stake-clone
 GameTemplate
 .agents
+.agent
+.omo
 
 # Tooling / index / editor dirs — not part of the app build
 .codegraph
@@ -11,6 +13,9 @@ GameTemplate
 .claude
 .vibecode-backup
 docs
+.playwright-cli
+.playwright-mcp
+.cursor
 
 # Build + tooling artifacts (Vercel builds fresh from source)
 node_modules

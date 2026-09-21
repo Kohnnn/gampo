@@ -1,3 +1,4 @@
+import { resolveImage } from '../utils/assetPaths'
 import { gameDefinitions, sportsbookDefinition } from './gameDefinitions'
 import { slotPath } from './slotRoutes'
 
@@ -180,6 +181,7 @@ export const slotCatalog = [
     id: entry.id || `slot-${index + 1}`,
     provider: 'GamPo Lab',
     ...entry,
+    image: resolveImage(entry.image),
 }))
 
 const slotCatalogIds = new Set(slotCatalog.map(slot => slot.id))
@@ -188,4 +190,4 @@ export const fullGameCatalog = [
     sportsbookDefinition,
     ...gameDefinitions.filter(game => !slotCatalogIds.has(game.id)),
     ...slotCatalog,
-]
+].map(entry => (entry.image ? { ...entry, image: resolveImage(entry.image) } : entry))

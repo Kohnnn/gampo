@@ -7,6 +7,7 @@
 
 import { Link } from 'react-router-dom'
 import { formatCredits } from '../../../utils/simulationMath'
+import { resolveImage } from '../../../utils/assetPaths'
 import GameToolbar from './GameToolbar'
 import AudioToggle from './AudioToggle'
 
@@ -33,12 +34,13 @@ export default function GameShell({
         )
     const safeVariant = variant === 'rainbet' ? 'rainbet' : 'stake'
     const playfieldLabel = `${title || definition?.name || 'Game'} playfield`
+    const backdropSrc = resolveImage(backdrop)
     return (
         <div
             className={`game-shell gs-variant-${safeVariant}`}
             data-variant={safeVariant}
             data-ux-surface="shell"
-            style={{ '--accent': accent, '--shell-backdrop': backdrop ? `url("${backdrop}")` : 'none' }}
+            style={{ '--accent': accent, '--shell-backdrop': backdropSrc ? `url("${backdropSrc}")` : 'none' }}
         >
             <div className="gs-titlebar" data-ux-surface="shell">
                 <div>

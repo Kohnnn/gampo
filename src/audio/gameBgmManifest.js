@@ -1,3 +1,5 @@
+import { resolveAudio } from '../utils/assetPaths'
+
 const GAME_IDS = [
     'lobby', 'poker', 'crash', 'plinko', 'dice', 'limbo', 'keno', 'wheel', 'mines',
     'roulette', 'blackjack', 'baccarat', 'sicbo', 'war', 'videopoker', 'hilo',
@@ -28,6 +30,6 @@ export const gameBgmManifest = Object.fromEntries(
 export function resolveGameBgm(gameId, mode = 'idle') {
     const entry = gameBgmManifest[gameId]
     if (!entry || mode === 'loss') return null
-    if (mode === 'bonus' && entry.bonus) return entry.bonus
-    return entry.idle || null
+    const chosen = mode === 'bonus' && entry.bonus ? entry.bonus : entry.idle
+    return chosen ? resolveAudio(chosen) : null
 }

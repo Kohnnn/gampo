@@ -14,6 +14,8 @@ import {
     tarotCardImage,
 } from './tarotModel'
 
+import { resolveImage } from '../../../utils/assetPaths'
+
 const ROOT = process.cwd()
 
 describe('tarot model', () => {
@@ -22,13 +24,16 @@ describe('tarot model', () => {
         expect(DECK.filter(card => card.arcana === 'major')).toHaveLength(22)
         expect(DECK.filter(card => card.arcana === 'minor')).toHaveLength(56)
         expect(TAROT_BACK_IMAGE).toBe('/assets/tarot/monochrome/back.png')
-        expect(existsSync(join(ROOT, 'public', TAROT_BACK_IMAGE))).toBe(true)
+        // The build prunes a raster's legacy original once its optimized
+        // sibling ships, so the committed asset is the resolved path rather
+        // than the literal extension held in the manifest.
+        expect(existsSync(join(ROOT, 'public', resolveImage(TAROT_BACK_IMAGE)))).toBe(true)
 
         for (const card of DECK) {
             expect(card.symbols).toBeTruthy()
             expect(card.description).toBeTruthy()
             expect(tarotCardImage(card)).toMatch(/^\/assets\/tarot\/plateau\/.+\.jpg$/)
-            expect(existsSync(join(ROOT, 'public', card.image))).toBe(true)
+            expect(existsSync(join(ROOT, 'public', resolveImage(card.image)))).toBe(true)
             expect(card.backImage).toBe(TAROT_BACK_IMAGE)
         }
     })
