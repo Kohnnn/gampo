@@ -7,6 +7,11 @@ GameTemplate
 .agent
 .omo
 
+# Planning/protocol store. Gitignored, but excluded explicitly so the ~1 GB of
+# local plan evidence never becomes part of a remote upload if this directory
+# is ever tracked.
+process
+
 # Tooling / index / editor dirs — not part of the app build
 .codegraph
 .codex
