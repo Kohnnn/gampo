@@ -41,6 +41,11 @@ rainbetclone/
 .vibecode-backup*/
 docs/*
 !docs/agents/
+# `docs/agents/domain.md` declares this repo's ADR layer lives at `docs/adr/`, so
+# that path must be tracked or every ADR silently dies on clone. The rest of
+# `docs/` stays local-only working material.
+!docs/adr/
+!docs/adr/**
 _evl_*.log
 _dev.log
 .cursor/
