@@ -2,20 +2,17 @@
 // hit chance, EV per play, volatility, and 20-play bankroll risk for the
 // current game. Replaces the in-titlebar block of education metrics.
 
-import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import useNativeDialog from './useNativeDialog'
 import { X } from 'lucide-react'
 import { bankrollRisk, expectedValue, formatCredits } from '../../../utils/simulationMath'
 
 function pct(v) { return `${((Number(v) || 0) * 100).toFixed(2)}%` }
 
 export default function OddsPopup({ open, onClose, definition, betAmount = 5, balance = 0, recentProfit = 0 }) {
-    useEffect(() => {
-        if (!open) return
-        const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
-        window.addEventListener('keydown', onKey)
-        return () => window.removeEventListener('keydown', onKey)
-    }, [open, onClose])
+    // Native <dialog> owns focus entry, containment and Escape; the hook
+    // restores focus to the control that opened us on close.
+    const dialogRef = useNativeDialog(open, onClose)
 
     if (!open) return null
     const rtp = definition?.rtp ?? 0.99
@@ -31,8 +28,8 @@ export default function OddsPopup({ open, onClose, definition, betAmount = 5, ba
     })
 
     const popup = (
-        <div className="odds-popup-backdrop" onClick={onClose} role="dialog" aria-label="Game odds and probability">
-            <div className="odds-popup-card" onClick={e => e.stopPropagation()}>
+        <dialog ref={dialogRef} className="odds-popup-backdrop" aria-label="Game odds and probability">
+            <div className="odds-popup-card">
                 <header className="odds-popup-head">
                     <div>
                         <span className="odds-popup-eyebrow">Probability lab</span>
@@ -62,7 +59,7 @@ export default function OddsPopup({ open, onClose, definition, betAmount = 5, ba
                     </strong>
                 </footer>
             </div>
-        </div>
+        </dialog>
     )
 
     return typeof document === 'undefined' ? popup : createPortal(popup, document.body)

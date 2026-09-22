@@ -1649,6 +1649,31 @@ input:focus-visible,
     }
 }
 
+/* === Native <dialog> overlays (AC5) ===
+   The fairness drawer and odds popup are real <dialog> elements opened with
+   showModal(), which gives platform focus entry, containment and Escape. The
+   UA stylesheet adds a border, background and auto margins we do not want, so
+   reset them here and keep each component's own backdrop look below. */
+
+dialog.fair-drawer-backdrop,
+dialog.odds-popup-backdrop {
+    border: 0;
+    padding: 0;
+    max-width: none;
+    max-height: none;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    color: inherit;
+}
+
+/* The ::backdrop pseudo-element sits behind the dialog; the component
+   backdrops already paint their own scrim, so keep the UA one invisible. */
+dialog.fair-drawer-backdrop::backdrop,
+dialog.odds-popup-backdrop::backdrop {
+    background: transparent;
+}
+
 /* Wave 17: Odds popup */
 
 .odds-popup-backdrop {

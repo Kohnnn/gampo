@@ -10,6 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import useNativeDialog from './useNativeDialog'
 import { Shield, X, RotateCw } from 'lucide-react'
 import {
     getProvablyFair,
@@ -33,12 +34,9 @@ export default function FairnessDrawer({ open, onClose }) {
         return () => window.clearInterval(interval)
     }, [open])
 
-    useEffect(() => {
-        if (!open) return
-        const onKey = (e) => { if (e.key === 'Escape') onClose?.() }
-        window.addEventListener('keydown', onKey)
-        return () => window.removeEventListener('keydown', onKey)
-    }, [open, onClose])
+    // Native <dialog> owns focus entry, containment and Escape; the hook
+    // restores focus to the control that opened us on close.
+    const dialogRef = useNativeDialog(open, onClose)
 
     const masked = useMemo(() => maskSeed(state.serverSeed), [state.serverSeed])
 
@@ -57,8 +55,12 @@ export default function FairnessDrawer({ open, onClose }) {
     if (!open) return null
 
     const drawer = (
-        <div className="fair-drawer-backdrop" onClick={onClose}>
-            <aside className="fair-drawer" role="dialog" aria-label="Provably-fair drawer" onClick={e => e.stopPropagation()}>
+        <dialog
+            ref={dialogRef}
+            className="fair-drawer-backdrop"
+            aria-label="Provably-fair drawer"
+        >
+            <aside className="fair-drawer">
                 <header className="fair-drawer-head">
                     <h2><Shield size={16} /> Provably Fair</h2>
                     <button className="fair-close" onClick={onClose} aria-label="Close fairness drawer"><X size={16} /></button>
@@ -119,7 +121,7 @@ export default function FairnessDrawer({ open, onClose }) {
                     <small>Educational only. No real money is wagered or paid out.</small>
                 </footer>
             </aside>
-        </div>
+        </dialog>
     )
 
     return typeof document === 'undefined' ? drawer : createPortal(drawer, document.body)
