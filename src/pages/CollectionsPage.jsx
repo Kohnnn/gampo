@@ -1,7 +1,7 @@
 // Collections browse hub. Uses the same local CS case/catalog data as /cases
 // and stays simulator-only: no real items, trades, or markets.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
     caseExpectedValueGc,
@@ -10,6 +10,20 @@ import {
     caseVolatilityScore,
 } from '../components/games/cases/caseEconomy'
 import { formatCredits } from '../utils/simulationMath'
+import {
+    CATALOG_RESOURCE,
+    CASES_RESOURCE,
+    ERROR,
+    LOADING,
+    RESOURCE_COPY,
+    SUCCESS,
+    fail,
+    initialResources,
+    invalidateAttempt,
+    readJsonResponse,
+    startAttempt,
+    succeed,
+} from './collectionsLoadState'
 import './CollectionsPage.css'
 
 const CASE_FILTERS = [
@@ -40,8 +54,6 @@ function itemRange(item, priceByName) {
 
 export default function CollectionsPage() {
     const [searchParams, setSearchParams] = useSearchParams()
-    const [cases, setCases] = useState(null)
-    const [catalog, setCatalog] = useState(null)
     const [view, setView] = useState(searchParams.get('view') === 'items' ? 'items' : 'cases')
     const [query, setQuery] = useState(searchParams.get('q') || '')
     const [caseFilter, setCaseFilter] = useState('all')
@@ -51,28 +63,81 @@ export default function CollectionsPage() {
     const [selectedCaseId, setSelectedCaseId] = useState(null)
     const [selectedItemId, setSelectedItemId] = useState(null)
 
-    useEffect(() => {
-        let cancelled = false
-        fetch('/data/cs-cases.json').then(r => r.json()).then(d => {
-            if (!cancelled) setCases(d)
-        }).catch(err => {
-            // eslint-disable-next-line no-console
-            console.warn('[collections] cases manifest load failed', err)
-        })
-        return () => { cancelled = true }
+    // Each resource carries a monotonic attempt id; a response commits only
+    // while its id is still current (see `collectionsLoadState`). Every
+    // transition goes through the functional form of `setResources`, so each is
+    // derived from the latest committed state. A mirrored ref would
+    // desynchronise under batching and drop a legitimate retry commit.
+    const [resources, setResources] = useState(initialResources)
+
+
+    // Single allocation point for attempt ids, shared by `load` and the
+    // invalidation path. Kept as a ref so the id is known synchronously, before
+    // the awaited fetch can resolve.
+    const attemptIds = useRef({ [CASES_RESOURCE]: 0, [CATALOG_RESOURCE]: 0 })
+    const nextAttemptId = useCallback((resource) => {
+        attemptIds.current[resource] += 1
+        return attemptIds.current[resource]
     }, [])
 
+    const load = useCallback(async (resource, url) => {
+        // The attempt id is derived from the same state the reducer owns, so the
+        // id a response carries can never drift from the id stored on the
+        // resource. A separate counter does drift: React StrictMode re-invokes
+        // effects, so the counter advances without a matching invalidation and
+        // every later commit is tagged stale and silently dropped (the observed
+        // "stuck in loading, no cards, no error"). `nextAttemptId` is the single
+        // allocation point, called synchronously before the await.
+        const attempt = nextAttemptId(resource)
+        setResources(prev => startAttempt(prev, resource, attempt))
+        try {
+            const response = await fetch(url)
+            const data = await readJsonResponse(response)
+            setResources(prev => succeed(prev, resource, attempt, data))
+        } catch (err) {
+            // Failure is surfaced in the UI, not only in the console.
+            console.warn(`[collections] ${resource} load failed`, err)
+            setResources(prev => fail(prev, resource, attempt))
+        }
+    }, [nextAttemptId])
+    const retry = useCallback((resource) => {
+        load(resource, resource === CASES_RESOURCE ? '/data/cs-cases.json' : '/data/cs-collection.json')
+    }, [load])
+
+    // Cases loads once on mount. Its teardown is unmount-only (see below), so a
+    // re-render or a retry can never invalidate an attempt that is still live.
     useEffect(() => {
-        if (view !== 'items' || catalog) return undefined
-        let cancelled = false
-        fetch('/data/cs-collection.json').then(r => r.json()).then(d => {
-            if (!cancelled) setCatalog(d)
-        }).catch(err => {
-            // eslint-disable-next-line no-console
-            console.warn('[collections] item catalog load failed', err)
-        })
-        return () => { cancelled = true }
-    }, [catalog, view])
+        load(CASES_RESOURCE, '/data/cs-cases.json')
+    }, [load])
+
+    // The catalog starts on first selection of Items, so this effect must react
+    // to `view`. It must NOT own a teardown that invalidates the catalog: React
+    // runs cleanup on every dependency change, and once `load` has been called
+    // from a retry, that teardown would invalidate the retry's own attempt and
+    // the successful response would be dropped (stuck in loading, no cards, no
+    // error). Invalidation for a genuine unmount is handled by a dedicated
+    // effect that runs once, so re-rendering never cancels a live attempt.
+    const catalogStarted = useRef(false)
+    useEffect(() => {
+        if (view !== 'items' || catalogStarted.current) return
+        catalogStarted.current = true
+        load(CATALOG_RESOURCE, '/data/cs-collection.json')
+    }, [load, view])
+
+    // Unmount-only invalidations. An empty dependency list means this teardown
+    // runs exactly once, when the page is left.
+    useEffect(() => () => {
+        setResources(prev => invalidateAttempt(prev, CASES_RESOURCE, nextAttemptId(CASES_RESOURCE)))
+    }, [nextAttemptId])
+    useEffect(() => () => {
+        setResources(prev => invalidateAttempt(prev, CATALOG_RESOURCE, nextAttemptId(CATALOG_RESOURCE)))
+    }, [nextAttemptId])
+
+    const casesState = resources[CASES_RESOURCE]
+    const catalogState = resources[CATALOG_RESOURCE]
+    const cases = casesState.status === SUCCESS ? casesState.data : null
+    const catalog = catalogState.status === SUCCESS ? catalogState.data : null
+
 
     useEffect(() => {
         const next = new URLSearchParams()
@@ -192,13 +257,38 @@ export default function CollectionsPage() {
             </nav>
 
             <div className="collections-browser" data-ux-surface="stage">
-                <main className="collections-results" data-ux-surface="stage">
+                <main
+                    className="collections-results"
+                    data-ux-surface="stage"
+                    aria-busy={casesState.status === LOADING ? 'true' : undefined}
+                >
                     {view === 'cases' && (
                         <>
-                            <div className="collections-count">{cases ? `${filteredCases.length} cases` : 'Loading cases...'}</div>
-                            {!cases && <div className="collections-loading">Loading cases...</div>}
-                            {cases && shownCases.length === 0 && <div className="collections-empty">No cases match that search.</div>}
-                            <div className="collections-case-grid">
+                            {casesState.status === ERROR && (
+                                <div className="collections-error" role="alert">
+                                    <p>{RESOURCE_COPY[CASES_RESOURCE].error}</p>
+                                    <button
+                                        type="button"
+                                        className="collections-retry"
+                                        onClick={() => retry(CASES_RESOURCE)}
+                                    >
+                                        {RESOURCE_COPY[CASES_RESOURCE].retry}
+                                    </button>
+                                </div>
+                            )}
+                            {casesState.status === LOADING && (
+                                <div className="collections-loading" role="status" aria-live="polite">
+                                    {RESOURCE_COPY[CASES_RESOURCE].loading}
+                                </div>
+                            )}
+                            {casesState.status === SUCCESS && (
+                                <>
+                                    <div className="collections-count">{filteredCases.length} cases</div>
+                                    {shownCases.length === 0 && <div className="collections-empty">No cases match that search.</div>}
+                                </>
+                            )}
+                            {casesState.status === SUCCESS && (
+                                <div className="collections-case-grid">
                                 {shownCases.map(c => {
                                     const ev = caseExpectedValueGc(c)
                                     const volatility = caseVolatilityScore(c).label
@@ -223,16 +313,37 @@ export default function CollectionsPage() {
                                         </article>
                                     )
                                 })}
-                            </div>
+                                </div>
+                            )}
                         </>
                     )}
-
                     {view === 'items' && (
                         <>
-                            <div className="collections-count">{catalog ? `${filteredItems.length} items` : 'Loading items...'}</div>
-                            {!catalog && <div className="collections-loading">Loading full item catalog...</div>}
-                            {catalog && shownItems.length === 0 && <div className="collections-empty">No items match that search.</div>}
-                            <div className="collections-item-grid">
+                            {catalogState.status === ERROR && (
+                                <div className="collections-error" role="alert">
+                                    <p>{RESOURCE_COPY[CATALOG_RESOURCE].error}</p>
+                                    <button
+                                        type="button"
+                                        className="collections-retry"
+                                        onClick={() => retry(CATALOG_RESOURCE)}
+                                    >
+                                        {RESOURCE_COPY[CATALOG_RESOURCE].retry}
+                                    </button>
+                                </div>
+                            )}
+                            {catalogState.status === LOADING && (
+                                <div className="collections-loading" role="status" aria-live="polite">
+                                    {RESOURCE_COPY[CATALOG_RESOURCE].loading}
+                                </div>
+                            )}
+                            {catalogState.status === SUCCESS && (
+                                <>
+                                    <div className="collections-count">{filteredItems.length} items</div>
+                                    {shownItems.length === 0 && <div className="collections-empty">No items match that search.</div>}
+                                </>
+                            )}
+                            {catalogState.status === SUCCESS && (
+                                <div className="collections-item-grid">
                                 {shownItems.map(item => {
                                     const range = itemRange(item, priceByName)
                                     return (
@@ -248,7 +359,8 @@ export default function CollectionsPage() {
                                         </article>
                                     )
                                 })}
-                            </div>
+                                </div>
+                            )}
                         </>
                     )}
                 </main>
