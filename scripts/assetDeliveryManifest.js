@@ -14,19 +14,19 @@ const manifest = {
       ".svg",
       ".avif"
     ],
-    "expectedCount": 542,
-    "expectedBytes": 321205288,
+    "expectedCount": 518,
+    "expectedBytes": 29126659,
     "expectedFormats": {
-      ".png": 428,
-      ".jpg": 89,
+      ".png": 57,
+      ".jpg": 21,
       ".svg": 14,
       ".gif": 7,
       ".avif": 4,
       ".jpeg": 0,
-      ".webp": 0
+      ".webp": 415
     },
     "algorithm": "public-tree-v1-buffer-utf8",
-    "treeSha256": "88d3b774f2cc02623cff50f31f7ea35950d44249f4041f65de2d6c08fdc12d18"
+    "treeSha256": "4f5617a61e6eb43b0efd6300afa913571628b194a539bb1323a2b31814eb50cd"
   },
   "policy": {
     "preloadBudgetBytes": 0,
@@ -44,389 +44,386 @@ const manifest = {
     "staticOccurrences": 340,
     "staticPathCounts": 220,
     "staticRecords": 155,
-    "staticBytes": 116885931,
-    "occurrenceBytes": 378957673,
-    "largestAssetBytes": 4191675,
+    "staticBytes": 11685427,
+    "occurrenceBytes": 33375069,
+    "largestAssetBytes": 471460,
     "dynamicDeclarations": 4,
     "groups": [
       {
         "group": "/baccarat",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 3415242
+        "budgetBytes": 236468
       },
       {
         "group": "/bars",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1645824
+        "budgetBytes": 147380
       },
       {
         "group": "/bass-bayou",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1905539
+        "budgetBytes": 175916
       },
       {
         "group": "/bassline-bonus",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1605164
+        "budgetBytes": 114274
       },
       {
         "group": "/blackjack",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5279069
+        "budgetBytes": 394830
       },
       {
         "group": "/blue-samurai",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1798440
+        "budgetBytes": 135172
       },
       {
         "group": "/cases",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 4191675
+        "budgetBytes": 471460
       },
       {
         "group": "/chickencross",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5829135
+        "budgetBytes": 574704
       },
       {
         "group": "/coinflip",
         "kind": "route-family",
         "assetCount": 3,
-        "budgetBytes": 7543297
+        "budgetBytes": 780046
       },
       {
         "group": "/color",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 3497613
+        "budgetBytes": 185714
       },
       {
         "group": "/coop-cluck",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1901879
+        "budgetBytes": 169556
       },
       {
         "group": "/crash",
         "kind": "route-family",
         "assetCount": 5,
-        "budgetBytes": 3998834
+        "budgetBytes": 242685
       },
       {
         "group": "/darts",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 6224281
+        "budgetBytes": 664444
       },
       {
         "group": "/diamonds",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 6048350
+        "budgetBytes": 657424
       },
       {
         "group": "/dice",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5404772
+        "budgetBytes": 503796
       },
       {
         "group": "/dino",
         "kind": "route-family",
         "assetCount": 3,
-        "budgetBytes": 4780219
+        "budgetBytes": 310561
       },
       {
         "group": "/drill",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5809929
+        "budgetBytes": 574044
       },
       {
         "group": "/dust-rail",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1797780
+        "budgetBytes": 152188
       },
       {
         "group": "/flip",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5787023
+        "budgetBytes": 534620
       },
       {
         "group": "/forge-anvil",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1804317
+        "budgetBytes": 170104
       },
       {
         "group": "/gates-ascent",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1779841
+        "budgetBytes": 153774
       },
       {
         "group": "/ghostblade-strike",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1723430
+        "budgetBytes": 128244
       },
       {
         "group": "/guess",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 4130050
+        "budgetBytes": 221100
       },
       {
         "group": "/gummy-drops",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1529959
+        "budgetBytes": 104322
       },
       {
         "group": "/hilo",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5291765
+        "budgetBytes": 369444
       },
       {
         "group": "/iron-fist",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1719494
+        "budgetBytes": 150790
       },
       {
         "group": "/keno",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 4191675
+        "budgetBytes": 471460
       },
       {
         "group": "/limbo",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 2327158
+        "budgetBytes": 107110
       },
       {
         "group": "/lottery",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 4191675
+        "budgetBytes": 471460
       },
       {
         "group": "/mansion-megaways",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1855933
+        "budgetBytes": 150244
       },
       {
         "group": "/miko-spirit",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1668840
+        "budgetBytes": 107578
       },
       {
         "group": "/mines",
         "kind": "route-family",
         "assetCount": 4,
-        "budgetBytes": 4311766
+        "budgetBytes": 591551
       },
       {
         "group": "/moles",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5706236
+        "budgetBytes": 552230
       },
       {
         "group": "/mummy-cascade",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1954900
+        "budgetBytes": 189788
       },
       {
         "group": "/packs",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5737836
+        "budgetBytes": 550514
       },
       {
         "group": "/phoenix-megaways",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1840389
+        "budgetBytes": 192270
       },
       {
         "group": "/plinko",
         "kind": "route-family",
         "assetCount": 8,
-        "budgetBytes": 5626816
+        "budgetBytes": 641934
       },
       {
         "group": "/poker",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 2011257
+        "budgetBytes": 156900
       },
       {
         "group": "/pump",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 4191675
+        "budgetBytes": 471460
       },
       {
         "group": "/resources",
         "kind": "source-group",
         "assetCount": 17,
-        "budgetBytes": 28396316
+        "budgetBytes": 1900094
       },
       {
         "group": "/river-catcher",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1845861
+        "budgetBytes": 144730
       },
       {
         "group": "/roulette",
         "kind": "route-family",
         "assetCount": 4,
-        "budgetBytes": 10441114
+        "budgetBytes": 892642
       },
       {
         "group": "/rps",
         "kind": "route-family",
         "assetCount": 5,
-        "budgetBytes": 7044516
+        "budgetBytes": 441686
       },
       {
         "group": "/scarab-spin",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1964099
+        "budgetBytes": 188806
       },
       {
         "group": "/sicbo",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 4999355
+        "budgetBytes": 339734
       },
       {
         "group": "/slide",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 4191675
+        "budgetBytes": 471460
       },
       {
         "group": "/slots",
         "kind": "route-family",
         "assetCount": 6,
-        "budgetBytes": 16987789
+        "budgetBytes": 1346288
       },
       {
         "group": "/snakes",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 3415242
+        "budgetBytes": 236468
       },
       {
         "group": "/sportsbook",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 2306
+        "budgetBytes": 2259
       },
       {
         "group": "/storm-banner",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1888337
+        "budgetBytes": 144970
       },
       {
         "group": "/tarot",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 4379544
+        "budgetBytes": 281402
       },
       {
         "group": "/tomeoflife",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 3705129
+        "budgetBytes": 173930
       },
       {
         "group": "/tower",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 4191675
+        "budgetBytes": 471460
       },
       {
         "group": "/vault-rush",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 1771293
+        "budgetBytes": 169048
       },
       {
         "group": "/videopoker",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 3415242
+        "budgetBytes": 236468
       },
       {
         "group": "/wanted-revelation",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 2117442
+        "budgetBytes": 196488
       },
       {
         "group": "/war",
         "kind": "route-family",
         "assetCount": 2,
-        "budgetBytes": 5218992
+        "budgetBytes": 373978
       },
       {
         "group": "/wheel",
         "kind": "route-family",
         "assetCount": 1,
-        "budgetBytes": 4191675
+        "budgetBytes": 471460
       },
       {
         "group": "catalog/manifests",
         "kind": "source-group",
         "assetCount": 15,
-        "budgetBytes": 27210326
+        "budgetBytes": 2360432
       },
       {
         "group": "shared-game-primitives",
         "kind": "source-group",
         "assetCount": 1,
-        "budgetBytes": 1324878
+        "budgetBytes": 76920
       },
       {
         "group": "shared/runtime",
         "kind": "route-family",
         "assetCount": 84,
-        "budgetBytes": 10189608
+        "budgetBytes": 3212573
       }
     ]
   },
   "records": [
     {
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
-      "bytes": 3415242,
-      "sha256": "9853f72c31c6eabfe91eb40e25314becc66c8a587e95f5fde4fe4a5c74a16b12",
-      "format": "png",
-      "dimensions": [
-        1792,
-        1024
-      ],
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
+      "bytes": 236468,
+      "sha256": "7fca288a27725047407b7856a3ae8415ac4b8cc7cc9e61fcd75baa332df4540c",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/baccarat",
         "/blackjack",
@@ -444,14 +441,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
-      "bytes": 4191675,
-      "sha256": "1c85f7e739a9e452d85eddc1540742d9ce0610922e371173555aba326ad06ea6",
-      "format": "png",
-      "dimensions": [
-        1792,
-        1024
-      ],
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
+      "bytes": 471460,
+      "sha256": "3e11d00e3991e9c3dfbe4747d02a346305d1436f7e1d477ce19d9bb5e44a52e1",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/cases",
         "/chickencross",
@@ -479,14 +473,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/backdrops/backdrop-neon-grid.png",
-      "bytes": 2025521,
-      "sha256": "86f91549e4dabf4f7a81808a8c76e7531bf609db1656909943d2d877e443d0f4",
-      "format": "png",
-      "dimensions": [
-        1792,
-        1024
-      ],
+      "path": "/assets/games/backdrops/backdrop-neon-grid.webp",
+      "bytes": 125664,
+      "sha256": "8cf77ef7e8ddba148d2e51c924052c394e445fe20d129020e1f9e95b5e762c10",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/color",
         "/rps",
@@ -498,14 +489,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/backdrops/backdrop-parchment.png",
-      "bytes": 3352784,
-      "sha256": "0b3f180edf10bbd9891637f67be9001ab98cbb7ec740fb4bb7dad2a5330557b6",
-      "format": "png",
-      "dimensions": [
-        1792,
-        1024
-      ],
+      "path": "/assets/games/backdrops/backdrop-parchment.webp",
+      "bytes": 299102,
+      "sha256": "85cc329a82bbdd520484559090e12ff95af64dd9e160af08f73ac3d2f8af0070",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/slots"
       ],
@@ -515,14 +503,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/backdrops/backdrop-stars.png",
-      "bytes": 2327158,
-      "sha256": "0da1efe4bd597e408526f67353180010b5cc731bc603226cc58560b5b7c13bfb",
-      "format": "png",
-      "dimensions": [
-        1792,
-        1024
-      ],
+      "path": "/assets/games/backdrops/backdrop-stars.webp",
+      "bytes": 107110,
+      "sha256": "0a1251b96d635e8f07d63e89195436de8eb6cc211eaf30b7db613a357082d9ac",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/crash",
         "/guess",
@@ -537,14 +522,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/cards/card-back.png",
-      "bytes": 1324878,
-      "sha256": "ae2836d430da5a3539a9ddad28a6fa9137ec72a487c5effe114f79a1af2af321",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/cards/card-back.webp",
+      "bytes": 76920,
+      "sha256": "b14fb073e0bc47f5221a864704895860ffb0c0b45049d43b63c67aeaf53260e8",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared-game-primitives"
       ],
@@ -554,14 +536,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/coin/coin-heads.png",
-      "bytes": 1521954,
-      "sha256": "ed9692d8b01beb5760b2d90ba409a787ff185de2b41712c076ef32bad371149f",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/coin/coin-heads.webp",
+      "bytes": 123420,
+      "sha256": "11c8b5ddabc639adb0ada6ca457714b20b0973e763faa4713220ade15616c89e",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/coinflip"
       ],
@@ -571,14 +550,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/coin/coin-tails.png",
-      "bytes": 1829668,
-      "sha256": "23e23c21d079c4ad63ef4b8d2db36f3c8f8f75aef51dd7c7a4a7aa8f87edee5d",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/coin/coin-tails.webp",
+      "bytes": 185166,
+      "sha256": "dafcce236fdd3f4affd0981c60c61e81d18e2e7c9d53094cd52cfa91f4823c10",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/coinflip"
       ],
@@ -588,14 +564,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/lobby/hero-arcade.png",
-      "bytes": 1863192,
-      "sha256": "4268db56afb3b0e4ab4ff4f79336eec242ce2d8c0f0e4655a91e65211ec8134e",
-      "format": "png",
-      "dimensions": [
-        1792,
-        1024
-      ],
+      "path": "/assets/games/lobby/hero-arcade.webp",
+      "bytes": 140540,
+      "sha256": "907649590980334bf6a05694c532415177f87e16e75619444f3d6bbf9c2e5bfe",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -605,14 +578,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/promo/promo-edge.png",
-      "bytes": 1176323,
-      "sha256": "f0aee42f328d75b7ca133ab532bac2b385ff7ca5b07a4a692287f851660a5696",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/promo/promo-edge.webp",
+      "bytes": 80054,
+      "sha256": "8d158addd19c65ad8d858451900c92e88609824c60f0c1b84665765ccfd2f740",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -622,14 +592,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/promo/promo-race.png",
-      "bytes": 1235685,
-      "sha256": "c2150356c920a342b7b8dfc10ebcb01ab9c212cbd139d0fbcdcf66c03c4d0b6b",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/promo/promo-race.webp",
+      "bytes": 65080,
+      "sha256": "497a5eef73c2715c94123aa75d04334fe092b47c1e4ef39c0a4534795ca489c5",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -639,14 +606,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/promo/promo-sports.png",
-      "bytes": 1268481,
-      "sha256": "4bdf80536e42b56af14fb3e6dcf9433c73df77d86df66eeeae7a0189a08ef61b",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/promo/promo-sports.webp",
+      "bytes": 81884,
+      "sha256": "a106d69ae0b1328ecc2806d5e07d483968d598a3354a1db5be5aae161b3ab729",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -656,14 +620,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/promo/promo-verify.png",
-      "bytes": 1245741,
-      "sha256": "2a83ba3d214bb4a9cdf633488e32b09e3ee5f4eebab35000b570ba5f2e48aace",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/promo/promo-verify.webp",
+      "bytes": 69420,
+      "sha256": "a9b83e0bc38b7b71bb16869dab1047720dab973ea92e3743eac3defc6c05e084",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -673,14 +634,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/roulette/roulette-felt.png",
-      "bytes": 3943425,
-      "sha256": "346544d084dee83ee62ec11abd2270f7acc7aa398c9bdb4e4737d88ed6f53b3a",
-      "format": "png",
-      "dimensions": [
-        1792,
-        1024
-      ],
+      "path": "/assets/games/roulette/roulette-felt.webp",
+      "bytes": 370712,
+      "sha256": "b0eca21089ccb141f67fb393aa83fd8275279aebbad99715ab81e6c1d15a370d",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/roulette"
       ],
@@ -690,14 +648,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/rps/rps-paper.png",
-      "bytes": 930314,
-      "sha256": "18473983383f30ddb1e3a2f471e8c6f67a3a1a66f56f79561d30e99f05539d2e",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/rps/rps-paper.webp",
+      "bytes": 30708,
+      "sha256": "90914486566e2ff3373d29ef9d3d88dc204d763bb1a46faf40efed5451f4e075",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/rps"
       ],
@@ -707,14 +662,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/rps/rps-rock.png",
-      "bytes": 1209145,
-      "sha256": "d331700b3763c067dfc7b2707b012f3297ea2406d962c6e9ee27029f50ece652",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/rps/rps-rock.webp",
+      "bytes": 76500,
+      "sha256": "629eb7af831edf44cbc408486fc0cca277d90023ebae6808bb0fb4fcef16003b",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/rps"
       ],
@@ -724,14 +676,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/games/rps/rps-scissors.png",
-      "bytes": 947445,
-      "sha256": "789c89abcb36dcea11b097837b3bbbb4b9e90dc8b25f654af6f7883205c4b256",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/assets/games/rps/rps-scissors.webp",
+      "bytes": 48352,
+      "sha256": "3648b6d7ca4c004c4bd46564e5fc1da8fc2a0a4416be057a7afe28143193664d",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/rps"
       ],
@@ -758,14 +707,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/01-the-fool.jpg",
-      "bytes": 52370,
-      "sha256": "cbdf6ee2c97623af54a5aaec9120c424d655f1f7aa4c0a347ff0eb2d3cb1b3ea",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/01-the-fool.webp",
+      "bytes": 40702,
+      "sha256": "7d20e1b8df64603fa7a90987c82b43608c22a1c06feb83dd3bc0af149d94af29",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -775,14 +721,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/02-the-magician.jpg",
-      "bytes": 44454,
-      "sha256": "1395e2b12868d3ac71c4e3451d53954d7fd8b7e96c182ab10f5351deceb0f32b",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/02-the-magician.webp",
+      "bytes": 34772,
+      "sha256": "4099d0026693d05b614c4d93055e36d69e3c7c66c3b8a54f663473ee5c139d1b",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -894,14 +837,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/09-strength.jpg",
-      "bytes": 38854,
-      "sha256": "ffbeff58eb617319ac2d6e87e34b8a7ee7425f0017a6b308dd41261e1a6b1c2d",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/09-strength.webp",
+      "bytes": 27842,
+      "sha256": "7a388ba9b72a0665db0c7545c41bbc166ac94dad08b6eceacbcebbc2518ad0b5",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -911,14 +851,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/10-the-hermit.jpg",
-      "bytes": 34819,
-      "sha256": "0a9f7cd117621e6ca8fc0b5c82e3c2f41d964c0e880e0d285bc3da640df2dcda",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/10-the-hermit.webp",
+      "bytes": 22996,
+      "sha256": "7c6c041e88fb96fc00d29b2f75ebebff3e80d3ead1d56f8b7f8c6227729a99c2",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -928,14 +865,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/11-the-wheel-of-fortune.jpg",
-      "bytes": 44946,
-      "sha256": "cf141ce97ddf0171f2a49e42967700e1367d4fb6576cc345e902ea164e9198c8",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/11-the-wheel-of-fortune.webp",
+      "bytes": 32704,
+      "sha256": "bcee15a2627450c2d04bcc0adc25a78f398596ad3f468fd2933142936a38225e",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -962,14 +896,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/13-the-hanged-man.jpg",
-      "bytes": 36663,
-      "sha256": "d81e4feaf49fa28168e6b4c6a3c0bb2813d99809736a761564987a9b259c0f4a",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/13-the-hanged-man.webp",
+      "bytes": 25958,
+      "sha256": "87de1645f8b25fc7f1862143fc60e1f46d2bed9865df5aacdc5b4584b7431a5b",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1013,14 +944,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/16-the-devil.jpg",
-      "bytes": 45248,
-      "sha256": "9b684383c6453688d5dbd46d995721c665520ca4647f8ef58d87dbb2509141ec",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/16-the-devil.webp",
+      "bytes": 34432,
+      "sha256": "161bb5e6fc13fb3abfa227c8e27e8c69b5a1a355e324e480d303a2bceecd4754",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1030,14 +958,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/17-the-tower.jpg",
-      "bytes": 43136,
-      "sha256": "8dfe53f35b048b713f5ce7d2f56c0fdcf8aa9aa09acbd619a67828d13f99290d",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/17-the-tower.webp",
+      "bytes": 31326,
+      "sha256": "595e4b32d3a9c033309e0baa5723b3e516021f8c592edca2ce0127eb6ce48313",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1047,14 +972,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/18-the-star.jpg",
-      "bytes": 46763,
-      "sha256": "00e17c4419486a4b87df50e46698125e7c52b7e66088753a4ed7754a130cea2f",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/18-the-star.webp",
+      "bytes": 36524,
+      "sha256": "86fe3e3f82b021e71cce6e530a371226d3ff4605551ef33d9d52e708098532e9",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1064,14 +986,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/19-the-moon.jpg",
-      "bytes": 46112,
-      "sha256": "83f0e7a6fcd4d74387c2a8681fe51ebd53838e100d0d4ec7539f4fd343c353ab",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/19-the-moon.webp",
+      "bytes": 36098,
+      "sha256": "84b95f08a89b59079bf5359c92a65c13c59cb7bc6f3820dd71e6ab6f521f8f58",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1132,14 +1051,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/23-ace-of-wands.jpg",
-      "bytes": 36387,
-      "sha256": "1def6591aedfa7e7e91ec9eb714d265a51c5473ecff032d43c43a88e52885cc5",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/23-ace-of-wands.webp",
+      "bytes": 25286,
+      "sha256": "4ce6d35c10c95006d5ddd30e49b5a07ddf0dd56fd9aae41e2bf47fff8f115927",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1149,14 +1065,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/24-two-of-wands.jpg",
-      "bytes": 40288,
-      "sha256": "f46526768c41425b9074d21e04ddc039cdc1a59079fa32d919ddd4ab59001e22",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/24-two-of-wands.webp",
+      "bytes": 31822,
+      "sha256": "5a260642db685705a95eaa4c27289d50d0e721551d39d2efa6e4ae5364fe59f6",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1166,14 +1079,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/25-three-of-wands.jpg",
-      "bytes": 39232,
-      "sha256": "433dd28709a7f9d6da379ec1cdc68b1995f9c1f4d82f5482bbd8f06017ab80f2",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/25-three-of-wands.webp",
+      "bytes": 28772,
+      "sha256": "b998ff64d38165d96b6495fc9d59b68e535a46db5b15475006a9c793afbc132f",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1183,14 +1093,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/26-four-of-wands.jpg",
-      "bytes": 41457,
-      "sha256": "b8c6a02e570bd6ca6424bfe45dc3eb5f99f852e3fd95d4e6a52a8172adf7f086",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/26-four-of-wands.webp",
+      "bytes": 29170,
+      "sha256": "4b40a0744f67c5edab2c66cfe6df4bfef368ca924e11d7bab9ebef2e56bce65e",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1200,14 +1107,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/27-five-of-wands.jpg",
-      "bytes": 41551,
-      "sha256": "7a279ded2c52cdbfc6ab68eaf59c3d108e90612b8f39e4f17ad0faf321f05dae",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/27-five-of-wands.webp",
+      "bytes": 30274,
+      "sha256": "f26bff86add977d857e5b22152ddb3952b9c58eb4922dfdd0c0390e6580af249",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1251,14 +1155,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/30-eight-of-wands.jpg",
-      "bytes": 36633,
-      "sha256": "92ec7a8618057ad0dff53e6398070761702c1d69e383a32d7fe06643a03b4e8e",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/30-eight-of-wands.webp",
+      "bytes": 24498,
+      "sha256": "5d36b8946548a3ee945c951a3968050dfbb23b4720423066994c1ebd45a8f81e",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1268,14 +1169,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/31-nine-of-wands.jpg",
-      "bytes": 44639,
-      "sha256": "4a1ca2738e92112231e4d0c02c10dc7f6399a1b0f6acc5d69d6f24aba169c0b5",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/31-nine-of-wands.webp",
+      "bytes": 33672,
+      "sha256": "2032d58dacade3c147840a133fd38fe548b9c71cae15efbba3586a078512f983",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1285,14 +1183,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/32-ten-of-wands.jpg",
-      "bytes": 41500,
-      "sha256": "c7010d8de3a101e5c15ff1f6a14b74fc87c80522a25c2cf4d1161616ec0682f9",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/32-ten-of-wands.webp",
+      "bytes": 32278,
+      "sha256": "8e652ed3ca952040d3808c8a4bf9ccc906912278ec4df33418aa924b1039ac21",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1302,14 +1197,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/33-page-of-wands.jpg",
-      "bytes": 39590,
-      "sha256": "788cf5638762b4407eb3b5bd556a2324af8cabaa6e1ce42821e3a70473473c8f",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/33-page-of-wands.webp",
+      "bytes": 28938,
+      "sha256": "007fd5076ecd89b45e07d8c5c3a0c0df0e2e0f171773c2f43823057e785398b6",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1319,14 +1211,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/34-knight-of-wands.jpg",
-      "bytes": 46606,
-      "sha256": "4b812b4d99be4d787cf29d31545b1d81e1e62b30e888dcf89456fd293ef1f0aa",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/34-knight-of-wands.webp",
+      "bytes": 37004,
+      "sha256": "5827992ca4a0cbde34e9d7e6731b6d9cb1c8e136ad2e4157dc64608137a6c28d",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1370,14 +1259,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/37-ace-of-cups.jpg",
-      "bytes": 41691,
-      "sha256": "403ce9f0c4f0f95289bb15a75af6d92ab7fb565fe835acb8497602647dad4f28",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/37-ace-of-cups.webp",
+      "bytes": 31644,
+      "sha256": "4c6d8a93a77ef63584b771a537fcee16f52d0948a0ac6bbb6fc7e2d082f88b1c",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1387,14 +1273,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/38-two-of-cups.jpg",
-      "bytes": 41037,
-      "sha256": "0ac0de1ef21811d9ac427eb704652bff9b8ba25d7932c223b2b061e9c7176297",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/38-two-of-cups.webp",
+      "bytes": 29066,
+      "sha256": "cd621130912b2be4f9c6a436ce98c7a1e2f06429337a2c3eee506c2d1d2c34e0",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1404,14 +1287,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/39-three-of-cups.jpg",
-      "bytes": 43925,
-      "sha256": "64db2bcf88ec70f4682208a5f77a925f39480ed9066152cce407ce26379d8509",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/39-three-of-cups.webp",
+      "bytes": 32530,
+      "sha256": "6b511ee33d5c4e0c95b1e0a9f0b7630151d2debe8c1c25c21a57cd70db8f8e0a",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1421,14 +1301,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/40-four-of-cups.jpg",
-      "bytes": 38830,
-      "sha256": "beeafc5a7e580943ffd204fb5fe88173773eb5a9e3a51c31256c56305c909129",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/40-four-of-cups.webp",
+      "bytes": 27014,
+      "sha256": "0d446099864639c4263cca7f39146f524deb34f2d5e7c833f46656f34a078bb0",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1438,14 +1315,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/41-five-of-cups.jpg",
-      "bytes": 28678,
-      "sha256": "b9dd975ed5781449099421b8a98489a570bbfd9d3021462f0d752a52520176f3",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/41-five-of-cups.webp",
+      "bytes": 17340,
+      "sha256": "4bc8f1d990e51581cb92971c5c2c3a3adc83cc02f3a74edaf90c64844d88562c",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1489,14 +1363,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/44-eight-of-cups.jpg",
-      "bytes": 34163,
-      "sha256": "fc5c83e5538fc305050818cc0078184b76697c1b50a265972d6e6106c99f01d5",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/44-eight-of-cups.webp",
+      "bytes": 23088,
+      "sha256": "b3cd0f5b3e4bd5b7db17547eca0775de2ab5c7697f930a4bd03bfd1de08db59d",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1506,14 +1377,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/45-nine-of-cups.jpg",
-      "bytes": 45636,
-      "sha256": "f802dfeb0e123a91ee98e91551614955aa59f73b1f8db5be15464736b70ec620",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/45-nine-of-cups.webp",
+      "bytes": 35600,
+      "sha256": "5bc8632f2f4b0a7391c21e8598e6426a5424ec2dfff3ff1d1aeef8b64b190998",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1523,14 +1391,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/46-ten-of-cups.jpg",
-      "bytes": 41200,
-      "sha256": "37b8df482cf0e60ad742249874f13823bd9be7a2dd01b5bf31cd9bd79ea7ede0",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/46-ten-of-cups.webp",
+      "bytes": 32222,
+      "sha256": "275fba90232a376f3dd3f5ce0a329b01e4f3ad1b25835d27e02fa18dfcb6c29f",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1540,14 +1405,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/47-page-of-cups.jpg",
-      "bytes": 36256,
-      "sha256": "111374acb71150efcafc0332c86eb943814a55e12dc7d75da3a88399057f967f",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/47-page-of-cups.webp",
+      "bytes": 24500,
+      "sha256": "6ad76a349c4fb513bbcd3f8395c8031dc6a2a507f78a7c165d561da0d0680255",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1557,14 +1419,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/48-knight-of-cups.jpg",
-      "bytes": 41935,
-      "sha256": "3841c8458bf4470c7f3540689ae2e499970f826ce0d82314912e803f3ec3fb22",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/48-knight-of-cups.webp",
+      "bytes": 31358,
+      "sha256": "3840d2c6f9b7b0cafdc5abf538476870d57d3bd29801c79463097eb7134277ae",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1574,14 +1433,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/49-queen-of-cups.jpg",
-      "bytes": 44518,
-      "sha256": "7a7d294f1a1f0b153f2dc7ec66ef4368fa478c50f4d059e89357ad80bb14402d",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/49-queen-of-cups.webp",
+      "bytes": 33656,
+      "sha256": "0626fa07e276bfa8752c6cb80863c03e9b1dc083a75e84239fcd25cf0496ce79",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1591,14 +1447,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/50-king-of-cups.jpg",
-      "bytes": 43698,
-      "sha256": "380c00eab0f195a54a0a03082f0e24a292f92c50dfbec328f581d51e519fe4f1",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/50-king-of-cups.webp",
+      "bytes": 33110,
+      "sha256": "a89fb4bb9c4017dbe5a02c7608932f321acbd2d41876d45649fe3f40a7d26141",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1608,14 +1461,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/51-ace-of-swords.jpg",
-      "bytes": 34556,
-      "sha256": "08003f0e9c8f6d005bcb569f1669a848efaf3692439e2f8ef295378aa3cca277",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/51-ace-of-swords.webp",
+      "bytes": 21544,
+      "sha256": "3800764378c4f7f84f243f7d064f18f4ebdc6eab79237107e58d18c21ce3678b",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1625,14 +1475,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/52-two-of-swords.jpg",
-      "bytes": 33092,
-      "sha256": "7e5ddf353b89533ebedc8d6e7bf77fc2861907ea7111cdfe8acef8115820859b",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/52-two-of-swords.webp",
+      "bytes": 21730,
+      "sha256": "aed914b476677f60834648891eeeb9db15cf19b972a63ad3573eb94b22542e26",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1642,14 +1489,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/53-three-of-swords.jpg",
-      "bytes": 33506,
-      "sha256": "fb3a8ab563cc65464ea8e71133d3b74255031717531039cf8feea267c5bdfb31",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/53-three-of-swords.webp",
+      "bytes": 21946,
+      "sha256": "744cb74f691220a977c2a7e426621562a17ebc415124280d370af0e3ba482431",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1659,14 +1503,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/54-four-of-swords.jpg",
-      "bytes": 39360,
-      "sha256": "6ee38f674263b24518cf9309e5a71eb0514dacacc4fb6ba65b16da5ba8b674ca",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/54-four-of-swords.webp",
+      "bytes": 26588,
+      "sha256": "5d1a8e8dfc0381f8a131cf38856d6b72ec62da6a4473bb8cd5fa3276b25fd8b8",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1676,14 +1517,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/55-five-of-swords.jpg",
-      "bytes": 41155,
-      "sha256": "a0f87a500eb215c3a324962073d6a34a767da00bbcac4dbd90326aae1dc20d5d",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/55-five-of-swords.webp",
+      "bytes": 29812,
+      "sha256": "3437f7d7e11e158be442913ae7821535bf245faac54e090c6e230679e1deb24f",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1693,14 +1531,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/56-six-of-swords.jpg",
-      "bytes": 41139,
-      "sha256": "60bdb11881df3a30f102acee2afb4e8033ce8d2dcbee349985c50de1cf1c997d",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/56-six-of-swords.webp",
+      "bytes": 31212,
+      "sha256": "0d9af787ede63f014d1fd4f99667f0db255985e7b276d36cbb67d1f209b06616",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1710,14 +1545,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/57-seven-of-swords.jpg",
-      "bytes": 38917,
-      "sha256": "9acf62a03058ab6fbd91e1465e0a926e0f1881fb8cd5d426bee230fca1def9fa",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/57-seven-of-swords.webp",
+      "bytes": 27370,
+      "sha256": "6482e8fe46f37f33e13782feef7ebdb0138c83c5ccd9b08fcff3edda5d18f3cc",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1727,14 +1559,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/58-eight-of-swords.jpg",
-      "bytes": 47195,
-      "sha256": "9c0c066cf4ab23ae46360eb9aa45e0bc3254ed70ba6fcb8e8f2fe39f096a4d39",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/58-eight-of-swords.webp",
+      "bytes": 37348,
+      "sha256": "554ea8a8de40ebf99c3527d36d430d9ec93f42f73d6a2fc36b48d0bca88ba364",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1744,14 +1573,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/59-nine-of-swords.jpg",
-      "bytes": 40428,
-      "sha256": "38ce44de6ff691116d448c6f1ce2c8600b687726b1e3adc4f908fd4296e4a8c6",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/59-nine-of-swords.webp",
+      "bytes": 28894,
+      "sha256": "9e5a199e6fd549e1e7181c6bb8c414b7a70537aba27c0c7f54946a25c4fcb593",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1761,14 +1587,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/60-ten-of-swords.jpg",
-      "bytes": 40332,
-      "sha256": "8e1848c5048f8405515dbe31593ddae9b8439978cfc2356f8503add25a2f835a",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/60-ten-of-swords.webp",
+      "bytes": 28902,
+      "sha256": "a5e5975cfb431d62f68b95b59edc5a261825a283d8fe1beec021242d31e33180",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1778,14 +1601,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/61-page-of-swords.jpg",
-      "bytes": 39100,
-      "sha256": "9bc23411bafb7a2200371f51010bf929be5e7d53199a444b23e81495e31418b7",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/61-page-of-swords.webp",
+      "bytes": 27084,
+      "sha256": "81b0fff4e4882efa6b5311c96fc196e193e10775c4fb42c5e09df1d355e057cc",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1795,14 +1615,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/62-knight-of-swords.jpg",
-      "bytes": 43819,
-      "sha256": "275596aecae5af459806b0e0c1d758115c75ebedf3afb0a9f5f4a240f765601f",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/62-knight-of-swords.webp",
+      "bytes": 32616,
+      "sha256": "f7ab61f97f5d2ff3df5f41f4e6339150fd3f951c5dd2806d049ccb666ae00a1c",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1812,14 +1629,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/63-queen-of-swords.jpg",
-      "bytes": 41564,
-      "sha256": "7f74862da81813eb2dd62464984a7c5d3ca42f926574b04048cdd6795e83e5c7",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/63-queen-of-swords.webp",
+      "bytes": 30782,
+      "sha256": "40f9b27e4e02f38b76e66df3be51d9dde659e91be3a8914a439381a37d06d1d0",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1829,14 +1643,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/64-king-of-swords.jpg",
-      "bytes": 43389,
-      "sha256": "5e2f2ba6c71ee4060fd5a051311f4930a5e12cdd6621ae7b4900c81b481ef148",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/64-king-of-swords.webp",
+      "bytes": 32612,
+      "sha256": "74fc4d44cf8a9cdb335b0e028ef63b727c16ba5c47c0f9c260170a3e1c4fda27",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1846,14 +1657,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/65-ace-of-pentacles.jpg",
-      "bytes": 36894,
-      "sha256": "bec07e0ebc56b647baed184f394f35972de8bfaf6d1d2641def6411bced81a59",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/65-ace-of-pentacles.webp",
+      "bytes": 25756,
+      "sha256": "c4cacc4784397a5c242c11ddd9ad15662539a0b609dc397f1f95d0a788aa11af",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1863,14 +1671,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/66-two-of-pentacles.jpg",
-      "bytes": 39816,
-      "sha256": "0497efac5da7ad43f3089d8031bd72c447a4cbd56e3b996724959aa3fce99f54",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/66-two-of-pentacles.webp",
+      "bytes": 30128,
+      "sha256": "7d0a2a41035ffb6197af1ac8112a3c61875f3faffa4d4c4c536a55a2f8ac49ed",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1880,14 +1685,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/67-three-of-pentacles.jpg",
-      "bytes": 49419,
-      "sha256": "042c975c99942f77bdf05a1ff6266cfd168d21e5e81b54c44a506a930db042b3",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/67-three-of-pentacles.webp",
+      "bytes": 39142,
+      "sha256": "36ee237ffe3a2cdc74fc4df46c1113d4acd2e62a3a1ad3f9365aff62ca477591",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1897,14 +1699,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/68-four-of-pentacles.jpg",
-      "bytes": 29443,
-      "sha256": "e114e2a1e3a80b340b693970f7c87be24cecc6c67cdb8822a12639b2cb88c54c",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/68-four-of-pentacles.webp",
+      "bytes": 17826,
+      "sha256": "1667aed85030560391fb6aeec387365f63e7041573b7a22bf9c37850c8f79b90",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1931,14 +1730,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/70-six-of-pentacles.jpg",
-      "bytes": 40116,
-      "sha256": "16fdad0d81a395a36c04c485ad944787be269489c5da06571a91bb0367801fe9",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/70-six-of-pentacles.webp",
+      "bytes": 29786,
+      "sha256": "e2d610d3bb9280f977b26ae9cc8dd9fd6fc431d774b152b1e56b2099e96af8c9",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1948,14 +1744,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/71-seven-of-pentacles.jpg",
-      "bytes": 41304,
-      "sha256": "fe3c31bd8493fe94f374a9eb11251cf57b8b214685e886187f7f161a78b2fc97",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/71-seven-of-pentacles.webp",
+      "bytes": 29470,
+      "sha256": "e61c5559537b77b270ae7125e19569bf23b431f704eeefe714a173592047d7f6",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1965,14 +1758,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/72-eight-of-pentacles.jpg",
-      "bytes": 37321,
-      "sha256": "9aff15b6a600347dfdc05728f90f88cdda87cf321a3f340004994a6e2057232d",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/72-eight-of-pentacles.webp",
+      "bytes": 26524,
+      "sha256": "37f0b39f9def2795ea3bdad5d58a77bb49982f5586555e53ce9138e08758ec14",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -1982,14 +1772,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/73-nine-of-pentacles.jpg",
-      "bytes": 46386,
-      "sha256": "c4c2bda13a93968400dde02b2edce0319ee4f3b0c2cf67bf0a4821f6f06d1f4b",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/73-nine-of-pentacles.webp",
+      "bytes": 36716,
+      "sha256": "de3d3c5d0429186ca297b8cd24cd6e3a57bb8554e40ebf19ebdc3800f8be5cfa",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -2016,14 +1803,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/75-page-of-pentacles.jpg",
-      "bytes": 34179,
-      "sha256": "804544f0d482e92c3cdec9c06dc0c1cb7d35abdc36171d24deb00678ee969015",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/75-page-of-pentacles.webp",
+      "bytes": 22126,
+      "sha256": "b1e9d35f85b8b60c476ebbbc7f6ece632062f9dd36c522bea0114415aeb3f5d4",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -2033,14 +1817,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/76-knight-of-pentacles.jpg",
-      "bytes": 37631,
-      "sha256": "5776356bc9250df31d2d724681df10998b2a7854c7624ba59888021a6654845a",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/76-knight-of-pentacles.webp",
+      "bytes": 26478,
+      "sha256": "4f5d567787eca553313d44caf7574f32ca901397560453be4038e31fd1e18702",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -2067,14 +1848,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/assets/tarot/plateau/78-king-of-pentacles.jpg",
-      "bytes": 48761,
-      "sha256": "00c9fb61726e84b13cd9664ab1b1e6cba00b1bc368aa9a1efd0f9181634fa218",
-      "format": "jpg",
-      "dimensions": [
-        527,
-        300
-      ],
+      "path": "/assets/tarot/plateau/78-king-of-pentacles.webp",
+      "bytes": 38458,
+      "sha256": "69d1018bbe8e1cf1918912460188a5fbd53fd51f5a420f6c6743a219b1151d04",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "shared/runtime"
       ],
@@ -2185,14 +1963,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/baccarat.png",
-      "bytes": 2052386,
-      "sha256": "7614cce5f64cb770b9e7a172cf8a44069c855ad95c1c4adce27b984364c80e7c",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/baccarat.webp",
+      "bytes": 174292,
+      "sha256": "6f9cc07c975422a437424a21818af6d5ecfdee2a9853596e913ef8eba1633a7b",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/resources",
         "/tarot"
@@ -2203,14 +1978,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/bars.png",
-      "bytes": 1645824,
-      "sha256": "e06dd23677c45fa9553f526f7b76c844659c48e775cdfac7991565dc56a5a67c",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/bars.webp",
+      "bytes": 147380,
+      "sha256": "ae5339f7597c8f654ec7ea6803289adb369f5e436c2c7c9e5cd2c20b8c61f1f4",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/bars",
         "catalog/manifests"
@@ -2221,14 +1993,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/bass-bayou.png",
-      "bytes": 1905539,
-      "sha256": "3fb65a9cecec71fded2887a2ab974480e881c05077457c751aa647508992841f",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/bass-bayou.webp",
+      "bytes": 175916,
+      "sha256": "2109e7fb43f67e2dfae4f707c264fe7c83d50abfc4cc29f9ccd74969514d1d1e",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/bass-bayou",
         "catalog/manifests"
@@ -2239,14 +2008,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/bassline-bonus.png",
-      "bytes": 1605164,
-      "sha256": "b86d66160dab6dcf8adb27e464d40863d89972456c5222716c760173ccd4b945",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/bassline-bonus.webp",
+      "bytes": 114274,
+      "sha256": "8d1c99a6b8bf5abab3790cc17ebee39122b33b2ad42b8ae181e0f78f591fac1b",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/bassline-bonus"
       ],
@@ -2256,14 +2022,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/blackjack.png",
-      "bytes": 1863827,
-      "sha256": "240bab07772d5f66c8e774f476bbe46cdd6362627916bbd47dbfe671942d2dd1",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/blackjack.webp",
+      "bytes": 158362,
+      "sha256": "328edb5580e616773200011017c7ee09f48d2149a51cd1291267bfa3ad098fe6",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/blackjack",
         "/resources"
@@ -2274,14 +2037,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/blue-samurai.png",
-      "bytes": 1798440,
-      "sha256": "0fd0e547fe84caf5d21acbeb5163e19cf30682f45e3ec8198ebd09abbc089914",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/blue-samurai.webp",
+      "bytes": 135172,
+      "sha256": "a719e41344ba7f3f43093b500af2ce956509cfc0fc6c77190cabf8f041d11b3a",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/blue-samurai",
         "catalog/manifests"
@@ -2292,14 +2052,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/casino-war.png",
-      "bytes": 1803750,
-      "sha256": "002cb88a125224ab0e4f94facf8bba964651e9a2c554622bf6255b72f979d2c8",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/casino-war.webp",
+      "bytes": 137510,
+      "sha256": "4db4964c38af6213f3e8b5a2562fb24d09bb5fac3ca61a5df2effbb6635b51a5",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/resources",
         "/war"
@@ -2310,14 +2067,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/chickencross.png",
-      "bytes": 1637460,
-      "sha256": "20d893ef686889a49e0e7b4315dcfc48ddfe3c524cdba552bb9efcf2f674e623",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/chickencross.webp",
+      "bytes": 103244,
+      "sha256": "5b71833e76da2cf562de6aa9e017a5c9fd846c652767e47e14f8723a4b1f14d4",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/chickencross",
         "/resources"
@@ -2328,14 +2082,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/coinflip.png",
-      "bytes": 1595348,
-      "sha256": "9adc88856e97a101bd603683b9c01c87a20448649a40ceacbdcfd9f23d1860be",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/coinflip.webp",
+      "bytes": 63160,
+      "sha256": "ae040109fefe56135e2d6266bc310faebd869cf8a66eaeb85a2d6d47ca3b7b33",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/flip",
         "/resources"
@@ -2346,14 +2097,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/color.png",
-      "bytes": 1472092,
-      "sha256": "d6a5beca7580ffc43ae29ab535c842614546b7649e3951b827623a851dbc3075",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/color.webp",
+      "bytes": 60050,
+      "sha256": "e0758323b632efc473174db71304902c8786637162751bd188b92b3be9aff064",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/color"
       ],
@@ -2363,14 +2111,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/coop-cluck.png",
-      "bytes": 1901879,
-      "sha256": "05fb81e71ff659a5fac9ec827a889b3870c2b49161bc28c59c2d863b72a8dc4c",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/coop-cluck.webp",
+      "bytes": 169556,
+      "sha256": "b89cb7d1794ad27552377a69a8150f5a8dd9b60cec92b2e785e08e20bd334dca",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/coop-cluck",
         "catalog/manifests"
@@ -2381,14 +2126,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/crash.png",
-      "bytes": 1409244,
-      "sha256": "b92429a77b4eaf408706135c030b73abf942b93f06ddd1e9af1ba5bfa8b966ab",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/crash.webp",
+      "bytes": 79534,
+      "sha256": "562e013ea2850a9264ee174038add6a10a84ad191824d8e0cdf5d8dc7a86764c",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/crash",
         "/resources"
@@ -2399,14 +2141,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/dice.png",
-      "bytes": 1213097,
-      "sha256": "f0fa050306a64af27213c6e4f19c44313432a247d7b683842f2a5643587a7300",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/dice.webp",
+      "bytes": 32336,
+      "sha256": "e7d484a119f94e90ad9ad5d12114792000266c3f8ea4c7723dd5181cddc03f65",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/dice",
         "/resources"
@@ -2417,14 +2156,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/dino.png",
-      "bytes": 1360798,
-      "sha256": "e2c512bfe6040d297bdcf5e1a43483bd4d72ae59ddc115af9386a23db720fa1d",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/dino.webp",
+      "bytes": 69914,
+      "sha256": "3a46df707fd453acd545e2ed3a804c20d598f4006e696f1a20749471936e21ef",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/dino"
       ],
@@ -2434,14 +2170,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/dust-rail.png",
-      "bytes": 1797780,
-      "sha256": "01a70d3347ef71179de6d6f4d974a12a4e1a9af593f74c086d16aa1a5ce4784a",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/dust-rail.webp",
+      "bytes": 152188,
+      "sha256": "9e6b146816207eaa4a541d93bc2418e377fefaf3ad356bb65b7ac4ca77ec1213",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/dust-rail"
       ],
@@ -2451,14 +2184,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/forge-anvil.png",
-      "bytes": 1804317,
-      "sha256": "a3aa448a10596ec986a8141668671154521abfb938c44e9cbc0a5da9f5f78221",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/forge-anvil.webp",
+      "bytes": 170104,
+      "sha256": "d96241600a68dea9dbd3f97f7c874a2cd3e743e1eb4225b9e1ffd9cd98474649",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/forge-anvil",
         "catalog/manifests"
@@ -2469,14 +2199,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/gates-ascent.png",
-      "bytes": 1779841,
-      "sha256": "20767af790f86f21d1c565bf5eaa18d636b7e8fc85a0f97071c5bc3a40e79a9a",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/gates-ascent.webp",
+      "bytes": 153774,
+      "sha256": "dfa8d9b626c572938a4718fd7cc68172148c81f6e731428355f3083f7865ed96",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/gates-ascent",
         "catalog/manifests"
@@ -2487,14 +2214,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/ghostblade-strike.png",
-      "bytes": 1723430,
-      "sha256": "0392c2f160c9fb0a7725eba49387b2d343a468e4f61d0a898a7e4206b5940327",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/ghostblade-strike.webp",
+      "bytes": 128244,
+      "sha256": "8b83c357cfa67144d62dd0ba117aa7af069a4be548e58b58b03f7901d71adbf1",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/ghostblade-strike",
         "catalog/manifests"
@@ -2505,14 +2229,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/guess.png",
-      "bytes": 1802892,
-      "sha256": "d98150995b3b936c44613609e792774a046d24c228191c60cc292f28fffa9afd",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/guess.webp",
+      "bytes": 113990,
+      "sha256": "969d20839d83bf1dbc6a3bd2a6df051a84e1f074caf123bb13533714860b27cd",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/guess"
       ],
@@ -2522,14 +2243,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/gummy-drops.png",
-      "bytes": 1529959,
-      "sha256": "a57e8afd2fac48b8709c1aaa01dd48e995ee7b55448a6d95a2f672f3ba6398bc",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/gummy-drops.webp",
+      "bytes": 104322,
+      "sha256": "fff81a3307194e5ddef857e6a2cc072d0df9f92b170bf56e52ab56f0d3ad2403",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/gummy-drops",
         "catalog/manifests"
@@ -2540,14 +2258,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/hilo.png",
-      "bytes": 1876523,
-      "sha256": "2a35e25f95d0058e6fe0c4b5cb2a4dc5ca431d934a28ef15578a288217a1fea2",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/hilo.webp",
+      "bytes": 132976,
+      "sha256": "4c485d832b009c5c4178fd8831795fc35ae286f9280f6a179f57cad9201b535f",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/hilo",
         "/resources"
@@ -2558,14 +2273,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/iron-fist.png",
-      "bytes": 1719494,
-      "sha256": "8ef4485e60ef8f68ff938df21438755102d7dbdf2650fe37f8f30e8ff2fe5608",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/iron-fist.webp",
+      "bytes": 150790,
+      "sha256": "c793d414c5fa9a8f2992607fc6148e880f0e6037a0161ebb1f16ae57e984a6f6",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/iron-fist",
         "catalog/manifests"
@@ -2576,14 +2288,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/keno.png",
-      "bytes": 1856675,
-      "sha256": "c94645b168490af215bf18b0a60e596a28536ebdbce1c6398897627c1ee2331e",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/keno.webp",
+      "bytes": 185964,
+      "sha256": "6ce306e3778af699dae78b22b2385d3ec00b83dbb1c86b5f7d2359df43bb7ff8",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/diamonds",
         "/resources"
@@ -2594,14 +2303,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/limbo.png",
-      "bytes": 1377971,
-      "sha256": "8c353fe23a92d3e33a65ec7e1bf4ca6abedef9659fa0c11b0b1da2111f2a8b85",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/limbo.webp",
+      "bytes": 66820,
+      "sha256": "b66e157ce930257baf683643e3f22244257e60790b554962b8da42c83ac0657e",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/resources",
         "/tomeoflife"
@@ -2612,14 +2318,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/lottery.png",
-      "bytes": 1546161,
-      "sha256": "89027ea0591c2503bb2e152a2f0fb235cbce56adebf8e7f360fae7fc521a5c64",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/lottery.webp",
+      "bytes": 79054,
+      "sha256": "e316a83267dedcfda0bb5615a251582f972dc417d9d7b340667d98850f738437",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/packs",
         "/resources"
@@ -2630,14 +2333,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/mansion-megaways.png",
-      "bytes": 1855933,
-      "sha256": "2f6265fcd90a7bda8c4c1d2034d44e80970f180b0dc7d3fb1fe27d3e358f3d92",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/mansion-megaways.webp",
+      "bytes": 150244,
+      "sha256": "d15fd24c006effc0bce85b8250a4ec8c3d8a7e25b93026d23fb7a1539adee3ec",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/mansion-megaways",
         "catalog/manifests"
@@ -2648,14 +2348,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/miko-spirit.png",
-      "bytes": 1668840,
-      "sha256": "c3bc038fc778f8cb936196c8e2e2c3b8a6e21e35abcd471fe71e77dffc4f2ff2",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/miko-spirit.webp",
+      "bytes": 107578,
+      "sha256": "336c30cf5eaa96567cf13cd3800114bdb79c16ca64009ae59f58a472e20eaaf4",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/miko-spirit",
         "catalog/manifests"
@@ -2666,14 +2363,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/mines.png",
-      "bytes": 1514561,
-      "sha256": "318991c553b29e3d9bf46e87f6fe1e9ff1937815fa90713e69d99be19f7f72dc",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/mines.webp",
+      "bytes": 80770,
+      "sha256": "982c9d01037da33bcb2919f071c59bd5bdb901627734304fe2e128e4b020a99c",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/moles",
         "/resources"
@@ -2684,14 +2378,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/mummy-cascade.png",
-      "bytes": 1954900,
-      "sha256": "2efe42db5b2b9049c1a115054341e2ea4713c55c13508b2ddd39f5d301204f7d",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/mummy-cascade.webp",
+      "bytes": 189788,
+      "sha256": "2f3a2e61bb6a77aa400f307fbda723043550cf6de41d28ce4339da761589c7ae",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/mummy-cascade",
         "catalog/manifests"
@@ -2702,14 +2393,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/phoenix-megaways.png",
-      "bytes": 1840389,
-      "sha256": "e7e4e7196102ad4ac5022b9ca21075f3c398cc465d0549c50f98cf9c2d9da95a",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/phoenix-megaways.webp",
+      "bytes": 192270,
+      "sha256": "ba33088f5b739c85d1e3b690cdcacac59b4a034d40d6917338655d7f31627275",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/phoenix-megaways",
         "catalog/manifests"
@@ -2720,14 +2408,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/plinko.png",
-      "bytes": 1311787,
-      "sha256": "67e33a308fe8339a7cdddb3fe8937b37860d71d37a789835839b1b2f395eb786",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/plinko.webp",
+      "bytes": 47120,
+      "sha256": "1a98cf7d0722da019d448ed43e257d0ce94ce8e8f818ccf0b1ff97e1a2fba5b6",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/plinko",
         "/resources"
@@ -2738,14 +2423,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/river-catcher.png",
-      "bytes": 1845861,
-      "sha256": "ab204e68e78959e556ed2aee4f0b2ef0cc4cf6091f3807d1d76d4d8d8cddf6f7",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/river-catcher.webp",
+      "bytes": 144730,
+      "sha256": "4b414819837f9255157c5ea39b5b841411b62d7a247baa351bbc6bdc96bd06c9",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/river-catcher"
       ],
@@ -2755,14 +2437,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/roulette.png",
-      "bytes": 1561610,
-      "sha256": "395a58905ccd416561218f4e4a1d42473a6ec9b847369585ac1a5e11b558a0d9",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/roulette.webp",
+      "bytes": 114326,
+      "sha256": "da9df68df0f8460fb249c4b573cfdfffef7a666b6fd6d996a8ccc43a097f82d3",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/roulette"
       ],
@@ -2772,14 +2451,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/rps.png",
-      "bytes": 1932091,
-      "sha256": "509109cbc25ef8f54400fb70c3cd30244fdb6cde5d93adf307bbd8bd2f02f139",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/rps.webp",
+      "bytes": 160462,
+      "sha256": "4bac101dceb328ea3274c4e6733734e46a929df151ff21cf4d00bd3790a4901e",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/rps"
       ],
@@ -2789,14 +2465,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/scarab-spin.png",
-      "bytes": 1964099,
-      "sha256": "d2f69727bf14ee62d7dbf0f12eb10eeb7f3da3b3ff26b33ad5c4b1e855e04775",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/scarab-spin.webp",
+      "bytes": 188806,
+      "sha256": "8460c0f4c0eaf3f8bc6146a4102d66d080282be11392732d5ebcbfe7151a0e4e",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/scarab-spin",
         "catalog/manifests"
@@ -2807,14 +2480,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/sicbo.png",
-      "bytes": 1584113,
-      "sha256": "6d4fbd600b8ea8a50024260239a6a1f386d58ed46e034198a0701636e761b390",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/sicbo.webp",
+      "bytes": 103266,
+      "sha256": "1185932844ccc147581d8a0047b59407feb77f38133128bd98b67b44b9a3d909",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/sicbo"
       ],
@@ -2824,14 +2494,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/slots.png",
-      "bytes": 1675409,
-      "sha256": "5ec98a513c2366ae998329e0e25007abbbba46928177b33d1ccef8a3f4c7b6ef",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/slots.webp",
+      "bytes": 106484,
+      "sha256": "7249c54f8b0d114a963f7185022fd7a33ff6c25c3143951c6f030692152319ce",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/resources",
         "/slots"
@@ -2843,8 +2510,8 @@ const manifest = {
     },
     {
       "path": "/images/covers/generated/sports.svg",
-      "bytes": 2306,
-      "sha256": "e1f32ea77591bde4bab7dd20a3cd75de28096ca84ba2a8c4383d0328a4c13c18",
+      "bytes": 2259,
+      "sha256": "a5ceb2d959c6190c13f692cef9a3b55939d134f8f28b1233544c27a247a3038f",
       "format": "svg",
       "dimensions": null,
       "consumerGroups": [
@@ -2856,14 +2523,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/storm-banner.png",
-      "bytes": 1888337,
-      "sha256": "457727ffddda154d889a8b46beafa168da86521d23040d16999b360dc333e06c",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/storm-banner.webp",
+      "bytes": 144970,
+      "sha256": "ceadc8923276de1a6f73c18fba2612a3c8d9decf2d83642521f7bc1b1504a3a7",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/storm-banner"
       ],
@@ -2873,14 +2537,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/tower.png",
-      "bytes": 1618254,
-      "sha256": "85edab256ea02d0142e1544cf411b0d60575d84b263845ed49c62d71183ee7f0",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/tower.webp",
+      "bytes": 102584,
+      "sha256": "5d55acbab5c640a4b7e0e103bb12fe4f09bba772a02895d41cc4f1100253723a",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/drill",
         "/resources"
@@ -2891,14 +2552,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/vault-rush.png",
-      "bytes": 1771293,
-      "sha256": "cd1b85d2319291766b78d45b4829599a209d91a52ca5fe8a9f7caa37ba3459a0",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/vault-rush.webp",
+      "bytes": 169048,
+      "sha256": "72dc8acfa4fb7c3068b3a7804ad69c0953ab3befb8470f9698238270ed4991c5",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/vault-rush"
       ],
@@ -2908,14 +2566,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/video-poker.png",
-      "bytes": 2011257,
-      "sha256": "6caf80e682526eee19f4be75d1debd5656f6384bc9bb5a5c00320ba84e73b619",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/video-poker.webp",
+      "bytes": 156900,
+      "sha256": "6ebc23ec49c6eb44470d7b867199040c36499c4f2b745f8e56f7c3553c4a8647",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/poker",
         "/resources"
@@ -2926,14 +2581,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/wanted-revelation.png",
-      "bytes": 2117442,
-      "sha256": "46ebfb64b3a91ee94e01cc7d377f9644f07079fbad075f28f04e7c377c7791be",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/wanted-revelation.webp",
+      "bytes": 196488,
+      "sha256": "14ddd129ddfbf865e3b173096dbf458e0def40edfcb246ad1bf13fd5d4387819",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/wanted-revelation",
         "catalog/manifests"
@@ -2944,14 +2596,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/covers/generated/wheel.png",
-      "bytes": 2032606,
-      "sha256": "24097e9dce04f185c7d21048c23b695b9bd12f4a137b9bb8a1f99ba7acad0a7a",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/covers/generated/wheel.webp",
+      "bytes": 192984,
+      "sha256": "94a47bebb4a1e8b3fe6c05e43a92a1a8117f83aeb6346ea5c6a18f4228afb175",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/darts",
         "/resources"
@@ -2996,14 +2645,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/generated/roulette-felt-rainbet.png",
-      "bytes": 3352828,
-      "sha256": "c0cd7610184816f9afc08df804349f809fe6316cfddb9bd9c06d0965ac157c94",
-      "format": "png",
-      "dimensions": [
-        1792,
-        1024
-      ],
+      "path": "/images/generated/roulette-felt-rainbet.webp",
+      "bytes": 269054,
+      "sha256": "f3aa9dc58c690296603f87683eb861968b1db67bd418ff7c5b5f639592d9ade4",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/roulette"
       ],
@@ -3013,14 +2659,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/generated/roulette-wheel-premium.png",
-      "bytes": 1583251,
-      "sha256": "cc668f6efef7871965cd25fd1044918f2c6346b9e17de4c3a23102699062681d",
-      "format": "png",
-      "dimensions": [
-        1024,
-        1024
-      ],
+      "path": "/images/generated/roulette-wheel-premium.webp",
+      "bytes": 138550,
+      "sha256": "b84b22ec791322783c05341fb8180a8ca21fe21dc4dee0ed10dbc0afcfd47376",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/roulette"
       ],
@@ -3075,14 +2718,11 @@ const manifest = {
       "evidenceRefs": []
     },
     {
-      "path": "/images/spaceship.png",
-      "bytes": 250995,
-      "sha256": "1580e138e7536c5cceb098430a551acb1f89bb73b40eea9339f638bc6a91c95d",
-      "format": "png",
-      "dimensions": [
-        800,
-        1280
-      ],
+      "path": "/images/spaceship.webp",
+      "bytes": 44604,
+      "sha256": "3b7fdeb535832f0e39742c507731c3a7c3eab515407f4c0fe53502feb49773c7",
+      "format": "webp",
+      "dimensions": null,
       "consumerGroups": [
         "/crash"
       ],
@@ -3100,47 +2740,47 @@ const manifest = {
     {
       "source": "src/components/games/baccarat/BaccaratGame.jsx",
       "line": 268,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/blackjack/BlackjackGame.jsx",
       "line": 457,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/cases/CasesGame.jsx",
       "line": 1448,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/chickencross/ChickenCrossGame.jsx",
       "line": 150,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/coinflip/CoinFlipGame.jsx",
       "line": 15,
-      "path": "/assets/games/coin/coin-heads.png"
+      "path": "/assets/games/coin/coin-heads.webp"
     },
     {
       "source": "src/components/games/coinflip/CoinFlipGame.jsx",
       "line": 16,
-      "path": "/assets/games/coin/coin-tails.png"
+      "path": "/assets/games/coin/coin-tails.webp"
     },
     {
       "source": "src/components/games/coinflip/CoinFlipGame.jsx",
       "line": 73,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/color/ColorGame.jsx",
       "line": 89,
-      "path": "/assets/games/backdrops/backdrop-neon-grid.png"
+      "path": "/assets/games/backdrops/backdrop-neon-grid.webp"
     },
     {
       "source": "src/components/games/crash/CrashChart.jsx",
       "line": 10,
-      "path": "/images/spaceship.png"
+      "path": "/images/spaceship.webp"
     },
     {
       "source": "src/components/games/crash/CrashChart.jsx",
@@ -3155,27 +2795,27 @@ const manifest = {
     {
       "source": "src/components/games/crash/CrashGame.jsx",
       "line": 430,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/darts/DartsGame.jsx",
       "line": 202,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/diamonds/DiamondsGame.jsx",
       "line": 237,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/dice/DiceGame.jsx",
       "line": 184,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/dino/DinoGame.jsx",
       "line": 154,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/dino/engine/atlas.js",
@@ -3185,42 +2825,42 @@ const manifest = {
     {
       "source": "src/components/games/drill/DrillGame.jsx",
       "line": 190,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/flip/FlipGame.jsx",
       "line": 156,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/guess/GuessGame.jsx",
       "line": 77,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/hilo/HiloGame.jsx",
       "line": 179,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/keno/KenoGame.jsx",
       "line": 168,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/limbo/LimboGame.jsx",
       "line": 172,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/lottery/LotteryGame.jsx",
       "line": 98,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/mines/MinesGame.jsx",
       "line": 271,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/mines/MinesGame.jsx",
@@ -3240,12 +2880,12 @@ const manifest = {
     {
       "source": "src/components/games/moles/MolesGame.jsx",
       "line": 208,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/packs/PacksGame.jsx",
       "line": 218,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/plinko/PlinkoGame.jsx",
@@ -3280,342 +2920,342 @@ const manifest = {
     {
       "source": "src/components/games/plinko/PlinkoGame.jsx",
       "line": 307,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/primitives/Asset.jsx",
       "line": 2,
-      "path": "/assets/games/cards/card-back.png"
+      "path": "/assets/games/cards/card-back.webp"
     },
     {
       "source": "src/components/games/pump/PumpGame.jsx",
       "line": 153,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 25,
-      "path": "/images/covers/generated/dice.png"
+      "path": "/images/covers/generated/dice.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 35,
-      "path": "/images/covers/generated/mines.png"
+      "path": "/images/covers/generated/mines.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 45,
-      "path": "/images/covers/generated/keno.png"
+      "path": "/images/covers/generated/keno.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 51,
-      "path": "/images/covers/generated/limbo.png"
+      "path": "/images/covers/generated/limbo.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 57,
-      "path": "/images/covers/generated/crash.png"
+      "path": "/images/covers/generated/crash.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 63,
-      "path": "/images/covers/generated/plinko.png"
+      "path": "/images/covers/generated/plinko.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 69,
-      "path": "/images/covers/generated/wheel.png"
+      "path": "/images/covers/generated/wheel.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 75,
-      "path": "/images/covers/generated/blackjack.png"
+      "path": "/images/covers/generated/blackjack.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 81,
-      "path": "/images/covers/generated/hilo.png"
+      "path": "/images/covers/generated/hilo.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 87,
-      "path": "/images/covers/generated/baccarat.png"
+      "path": "/images/covers/generated/baccarat.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 93,
-      "path": "/images/covers/generated/video-poker.png"
+      "path": "/images/covers/generated/video-poker.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 99,
-      "path": "/images/covers/generated/coinflip.png"
+      "path": "/images/covers/generated/coinflip.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 105,
-      "path": "/images/covers/generated/keno.png"
+      "path": "/images/covers/generated/keno.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 111,
-      "path": "/images/covers/generated/wheel.png"
+      "path": "/images/covers/generated/wheel.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 117,
-      "path": "/images/covers/generated/tower.png"
+      "path": "/images/covers/generated/tower.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 123,
-      "path": "/images/covers/generated/limbo.png"
+      "path": "/images/covers/generated/limbo.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 129,
-      "path": "/images/covers/generated/mines.png"
+      "path": "/images/covers/generated/mines.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 135,
-      "path": "/images/covers/generated/tower.png"
+      "path": "/images/covers/generated/tower.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 141,
-      "path": "/images/covers/generated/lottery.png"
+      "path": "/images/covers/generated/lottery.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 147,
-      "path": "/images/covers/generated/tower.png"
+      "path": "/images/covers/generated/tower.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 153,
-      "path": "/images/covers/generated/lottery.png"
+      "path": "/images/covers/generated/lottery.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 159,
-      "path": "/images/covers/generated/limbo.png"
+      "path": "/images/covers/generated/limbo.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 165,
-      "path": "/images/covers/generated/baccarat.png"
+      "path": "/images/covers/generated/baccarat.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 171,
-      "path": "/images/covers/generated/slots.png"
+      "path": "/images/covers/generated/slots.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 177,
-      "path": "/images/covers/generated/slots.png"
+      "path": "/images/covers/generated/slots.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 183,
-      "path": "/images/covers/generated/slots.png"
+      "path": "/images/covers/generated/slots.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 189,
-      "path": "/images/covers/generated/casino-war.png"
+      "path": "/images/covers/generated/casino-war.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 195,
-      "path": "/images/covers/generated/chickencross.png"
+      "path": "/images/covers/generated/chickencross.webp"
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
       "line": 201,
-      "path": "/images/covers/generated/tower.png"
+      "path": "/images/covers/generated/tower.webp"
     },
     {
       "source": "src/components/games/roulette/RouletteGame.jsx",
       "line": 353,
-      "path": "/assets/games/roulette/roulette-felt.png"
+      "path": "/assets/games/roulette/roulette-felt.webp"
     },
     {
       "source": "src/components/games/roulette/RouletteGame.jsx",
       "line": 428,
-      "path": "/images/generated/roulette-wheel-premium.png"
+      "path": "/images/generated/roulette-wheel-premium.webp"
     },
     {
       "source": "src/components/games/roulette/roulette.css",
       "line": 546,
-      "path": "/images/generated/roulette-felt-rainbet.png"
+      "path": "/images/generated/roulette-felt-rainbet.webp"
     },
     {
       "source": "src/components/games/rps/RpsGame.jsx",
       "line": 17,
-      "path": "/assets/games/rps/rps-rock.png"
+      "path": "/assets/games/rps/rps-rock.webp"
     },
     {
       "source": "src/components/games/rps/RpsGame.jsx",
       "line": 18,
-      "path": "/assets/games/rps/rps-paper.png"
+      "path": "/assets/games/rps/rps-paper.webp"
     },
     {
       "source": "src/components/games/rps/RpsGame.jsx",
       "line": 19,
-      "path": "/assets/games/rps/rps-scissors.png"
+      "path": "/assets/games/rps/rps-scissors.webp"
     },
     {
       "source": "src/components/games/rps/RpsGame.jsx",
       "line": 96,
-      "path": "/assets/games/backdrops/backdrop-neon-grid.png"
+      "path": "/assets/games/backdrops/backdrop-neon-grid.webp"
     },
     {
       "source": "src/components/games/sicbo/SicBoGame.jsx",
       "line": 153,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/slide/SlideGame.jsx",
       "line": 159,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 37,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 75,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 113,
-      "path": "/assets/games/backdrops/backdrop-parchment.png"
+      "path": "/assets/games/backdrops/backdrop-parchment.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 151,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 182,
-      "path": "/assets/games/backdrops/backdrop-neon-grid.png"
+      "path": "/assets/games/backdrops/backdrop-neon-grid.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 221,
-      "path": "/assets/games/backdrops/backdrop-parchment.png"
+      "path": "/assets/games/backdrops/backdrop-parchment.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 248,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 273,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 305,
-      "path": "/assets/games/backdrops/backdrop-parchment.png"
+      "path": "/assets/games/backdrops/backdrop-parchment.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 347,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 384,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 419,
-      "path": "/assets/games/backdrops/backdrop-parchment.png"
+      "path": "/assets/games/backdrops/backdrop-parchment.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 455,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 484,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 524,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 564,
-      "path": "/assets/games/backdrops/backdrop-parchment.png"
+      "path": "/assets/games/backdrops/backdrop-parchment.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 600,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 637,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 675,
-      "path": "/assets/games/backdrops/backdrop-parchment.png"
+      "path": "/assets/games/backdrops/backdrop-parchment.webp"
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
       "line": 720,
-      "path": "/assets/games/backdrops/backdrop-neon-grid.png"
+      "path": "/assets/games/backdrops/backdrop-neon-grid.webp"
     },
     {
       "source": "src/components/games/snakes/SnakesGame.jsx",
       "line": 195,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/tarot/TarotGame.jsx",
       "line": 148,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/tomeoflife/TomeOfLifeGame.jsx",
       "line": 232,
-      "path": "/assets/games/backdrops/backdrop-stars.png"
+      "path": "/assets/games/backdrops/backdrop-stars.webp"
     },
     {
       "source": "src/components/games/tower/TowerGame.jsx",
       "line": 160,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/components/games/videopoker/VideoPokerGame.jsx",
       "line": 205,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/war/CasinoWarGame.jsx",
       "line": 169,
-      "path": "/assets/games/backdrops/backdrop-felt-green.png"
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp"
     },
     {
       "source": "src/components/games/wheel/WheelGame.jsx",
       "line": 192,
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png"
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
@@ -3625,357 +3265,357 @@ const manifest = {
     {
       "source": "src/data/casinoCatalog.js",
       "line": 159,
-      "path": "/images/covers/generated/vault-rush.png"
+      "path": "/images/covers/generated/vault-rush.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 160,
-      "path": "/images/covers/generated/river-catcher.png"
+      "path": "/images/covers/generated/river-catcher.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 161,
-      "path": "/images/covers/generated/dust-rail.png"
+      "path": "/images/covers/generated/dust-rail.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 162,
-      "path": "/images/covers/generated/storm-banner.png"
+      "path": "/images/covers/generated/storm-banner.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 163,
-      "path": "/images/covers/generated/bassline-bonus.png"
+      "path": "/images/covers/generated/bassline-bonus.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 164,
-      "path": "/images/covers/generated/scarab-spin.png"
+      "path": "/images/covers/generated/scarab-spin.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 165,
-      "path": "/images/covers/generated/bars.png"
+      "path": "/images/covers/generated/bars.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 166,
-      "path": "/images/covers/generated/blue-samurai.png"
+      "path": "/images/covers/generated/blue-samurai.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 167,
-      "path": "/images/covers/generated/wanted-revelation.png"
+      "path": "/images/covers/generated/wanted-revelation.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 168,
-      "path": "/images/covers/generated/gates-ascent.png"
+      "path": "/images/covers/generated/gates-ascent.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 169,
-      "path": "/images/covers/generated/bass-bayou.png"
+      "path": "/images/covers/generated/bass-bayou.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 170,
-      "path": "/images/covers/generated/mummy-cascade.png"
+      "path": "/images/covers/generated/mummy-cascade.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 171,
-      "path": "/images/covers/generated/phoenix-megaways.png"
+      "path": "/images/covers/generated/phoenix-megaways.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 172,
-      "path": "/images/covers/generated/mansion-megaways.png"
+      "path": "/images/covers/generated/mansion-megaways.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 173,
-      "path": "/images/covers/generated/ghostblade-strike.png"
+      "path": "/images/covers/generated/ghostblade-strike.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 174,
-      "path": "/images/covers/generated/iron-fist.png"
+      "path": "/images/covers/generated/iron-fist.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 175,
-      "path": "/images/covers/generated/coop-cluck.png"
+      "path": "/images/covers/generated/coop-cluck.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 176,
-      "path": "/images/covers/generated/miko-spirit.png"
+      "path": "/images/covers/generated/miko-spirit.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 177,
-      "path": "/images/covers/generated/forge-anvil.png"
+      "path": "/images/covers/generated/forge-anvil.webp"
     },
     {
       "source": "src/data/casinoCatalog.js",
       "line": 178,
-      "path": "/images/covers/generated/gummy-drops.png"
+      "path": "/images/covers/generated/gummy-drops.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 12,
-      "path": "/images/covers/generated/crash.png"
+      "path": "/images/covers/generated/crash.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 26,
-      "path": "/images/covers/generated/plinko.png"
+      "path": "/images/covers/generated/plinko.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 40,
-      "path": "/images/covers/generated/mines.png"
+      "path": "/images/covers/generated/mines.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 54,
-      "path": "/images/covers/generated/dino.png"
+      "path": "/images/covers/generated/dino.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 68,
-      "path": "/images/covers/generated/dice.png"
+      "path": "/images/covers/generated/dice.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 82,
-      "path": "/images/covers/generated/limbo.png"
+      "path": "/images/covers/generated/limbo.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 96,
-      "path": "/images/covers/generated/keno.png"
+      "path": "/images/covers/generated/keno.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 110,
-      "path": "/images/covers/generated/wheel.png"
+      "path": "/images/covers/generated/wheel.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 124,
-      "path": "/images/covers/generated/roulette.png"
+      "path": "/images/covers/generated/roulette.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 138,
-      "path": "/images/covers/generated/blackjack.png"
+      "path": "/images/covers/generated/blackjack.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 152,
-      "path": "/images/covers/generated/slots.png"
+      "path": "/images/covers/generated/slots.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 166,
-      "path": "/images/covers/generated/coinflip.png"
+      "path": "/images/covers/generated/coinflip.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 180,
-      "path": "/images/covers/generated/rps.png"
+      "path": "/images/covers/generated/rps.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 194,
-      "path": "/images/covers/generated/guess.png"
+      "path": "/images/covers/generated/guess.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 208,
-      "path": "/images/covers/generated/hilo.png"
+      "path": "/images/covers/generated/hilo.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 222,
-      "path": "/images/covers/generated/baccarat.png"
+      "path": "/images/covers/generated/baccarat.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 236,
-      "path": "/images/covers/generated/sicbo.png"
+      "path": "/images/covers/generated/sicbo.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 250,
-      "path": "/images/covers/generated/video-poker.png"
+      "path": "/images/covers/generated/video-poker.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 265,
-      "path": "/images/covers/generated/video-poker.png"
+      "path": "/images/covers/generated/video-poker.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 279,
-      "path": "/images/covers/generated/color.png"
+      "path": "/images/covers/generated/color.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 293,
-      "path": "/images/covers/generated/tower.png"
+      "path": "/images/covers/generated/tower.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 307,
-      "path": "/images/covers/generated/lottery.png"
+      "path": "/images/covers/generated/lottery.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 321,
-      "path": "/images/covers/generated/casino-war.png"
+      "path": "/images/covers/generated/casino-war.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 335,
-      "path": "/images/covers/generated/chickencross.png"
+      "path": "/images/covers/generated/chickencross.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 349,
-      "path": "/images/covers/generated/coinflip.png"
+      "path": "/images/covers/generated/coinflip.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 363,
-      "path": "/images/covers/generated/keno.png"
+      "path": "/images/covers/generated/keno.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 377,
-      "path": "/images/covers/generated/wheel.png"
+      "path": "/images/covers/generated/wheel.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 391,
-      "path": "/images/covers/generated/tower.png"
+      "path": "/images/covers/generated/tower.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 405,
-      "path": "/images/covers/generated/limbo.png"
+      "path": "/images/covers/generated/limbo.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 419,
-      "path": "/images/covers/generated/mines.png"
+      "path": "/images/covers/generated/mines.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 433,
-      "path": "/images/covers/generated/tower.png"
+      "path": "/images/covers/generated/tower.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 447,
-      "path": "/images/covers/generated/lottery.png"
+      "path": "/images/covers/generated/lottery.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 461,
-      "path": "/images/covers/generated/tower.png"
+      "path": "/images/covers/generated/tower.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 475,
-      "path": "/images/covers/generated/lottery.png"
+      "path": "/images/covers/generated/lottery.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 489,
-      "path": "/images/covers/generated/limbo.png"
+      "path": "/images/covers/generated/limbo.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 503,
-      "path": "/images/covers/generated/baccarat.png"
+      "path": "/images/covers/generated/baccarat.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 517,
-      "path": "/images/covers/generated/scarab-spin.png"
+      "path": "/images/covers/generated/scarab-spin.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 531,
-      "path": "/images/covers/generated/bars.png"
+      "path": "/images/covers/generated/bars.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 545,
-      "path": "/images/covers/generated/blue-samurai.png"
+      "path": "/images/covers/generated/blue-samurai.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 559,
-      "path": "/images/covers/generated/wanted-revelation.png"
+      "path": "/images/covers/generated/wanted-revelation.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 573,
-      "path": "/images/covers/generated/gates-ascent.png"
+      "path": "/images/covers/generated/gates-ascent.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 587,
-      "path": "/images/covers/generated/bass-bayou.png"
+      "path": "/images/covers/generated/bass-bayou.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 601,
-      "path": "/images/covers/generated/mummy-cascade.png"
+      "path": "/images/covers/generated/mummy-cascade.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 615,
-      "path": "/images/covers/generated/phoenix-megaways.png"
+      "path": "/images/covers/generated/phoenix-megaways.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 629,
-      "path": "/images/covers/generated/mansion-megaways.png"
+      "path": "/images/covers/generated/mansion-megaways.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 643,
-      "path": "/images/covers/generated/ghostblade-strike.png"
+      "path": "/images/covers/generated/ghostblade-strike.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 657,
-      "path": "/images/covers/generated/iron-fist.png"
+      "path": "/images/covers/generated/iron-fist.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 671,
-      "path": "/images/covers/generated/coop-cluck.png"
+      "path": "/images/covers/generated/coop-cluck.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 685,
-      "path": "/images/covers/generated/miko-spirit.png"
+      "path": "/images/covers/generated/miko-spirit.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 699,
-      "path": "/images/covers/generated/forge-anvil.png"
+      "path": "/images/covers/generated/forge-anvil.webp"
     },
     {
       "source": "src/data/gameDefinitions.js",
       "line": 713,
-      "path": "/images/covers/generated/gummy-drops.png"
+      "path": "/images/covers/generated/gummy-drops.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -3985,7 +3625,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 20,
-      "path": "/assets/tarot/plateau/01-the-fool.jpg"
+      "path": "/assets/tarot/plateau/01-the-fool.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -3995,7 +3635,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 33,
-      "path": "/assets/tarot/plateau/02-the-magician.jpg"
+      "path": "/assets/tarot/plateau/02-the-magician.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4065,7 +3705,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 124,
-      "path": "/assets/tarot/plateau/09-strength.jpg"
+      "path": "/assets/tarot/plateau/09-strength.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4075,7 +3715,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 137,
-      "path": "/assets/tarot/plateau/10-the-hermit.jpg"
+      "path": "/assets/tarot/plateau/10-the-hermit.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4085,7 +3725,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 150,
-      "path": "/assets/tarot/plateau/11-the-wheel-of-fortune.jpg"
+      "path": "/assets/tarot/plateau/11-the-wheel-of-fortune.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4105,7 +3745,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 176,
-      "path": "/assets/tarot/plateau/13-the-hanged-man.jpg"
+      "path": "/assets/tarot/plateau/13-the-hanged-man.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4135,7 +3775,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 215,
-      "path": "/assets/tarot/plateau/16-the-devil.jpg"
+      "path": "/assets/tarot/plateau/16-the-devil.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4145,7 +3785,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 228,
-      "path": "/assets/tarot/plateau/17-the-tower.jpg"
+      "path": "/assets/tarot/plateau/17-the-tower.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4155,7 +3795,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 241,
-      "path": "/assets/tarot/plateau/18-the-star.jpg"
+      "path": "/assets/tarot/plateau/18-the-star.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4165,7 +3805,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 254,
-      "path": "/assets/tarot/plateau/19-the-moon.jpg"
+      "path": "/assets/tarot/plateau/19-the-moon.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4205,7 +3845,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 306,
-      "path": "/assets/tarot/plateau/23-ace-of-wands.jpg"
+      "path": "/assets/tarot/plateau/23-ace-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4215,7 +3855,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 319,
-      "path": "/assets/tarot/plateau/24-two-of-wands.jpg"
+      "path": "/assets/tarot/plateau/24-two-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4225,7 +3865,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 332,
-      "path": "/assets/tarot/plateau/25-three-of-wands.jpg"
+      "path": "/assets/tarot/plateau/25-three-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4235,7 +3875,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 345,
-      "path": "/assets/tarot/plateau/26-four-of-wands.jpg"
+      "path": "/assets/tarot/plateau/26-four-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4245,7 +3885,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 358,
-      "path": "/assets/tarot/plateau/27-five-of-wands.jpg"
+      "path": "/assets/tarot/plateau/27-five-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4275,7 +3915,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 397,
-      "path": "/assets/tarot/plateau/30-eight-of-wands.jpg"
+      "path": "/assets/tarot/plateau/30-eight-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4285,7 +3925,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 410,
-      "path": "/assets/tarot/plateau/31-nine-of-wands.jpg"
+      "path": "/assets/tarot/plateau/31-nine-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4295,7 +3935,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 423,
-      "path": "/assets/tarot/plateau/32-ten-of-wands.jpg"
+      "path": "/assets/tarot/plateau/32-ten-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4305,7 +3945,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 436,
-      "path": "/assets/tarot/plateau/33-page-of-wands.jpg"
+      "path": "/assets/tarot/plateau/33-page-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4315,7 +3955,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 449,
-      "path": "/assets/tarot/plateau/34-knight-of-wands.jpg"
+      "path": "/assets/tarot/plateau/34-knight-of-wands.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4345,7 +3985,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 488,
-      "path": "/assets/tarot/plateau/37-ace-of-cups.jpg"
+      "path": "/assets/tarot/plateau/37-ace-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4355,7 +3995,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 501,
-      "path": "/assets/tarot/plateau/38-two-of-cups.jpg"
+      "path": "/assets/tarot/plateau/38-two-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4365,7 +4005,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 514,
-      "path": "/assets/tarot/plateau/39-three-of-cups.jpg"
+      "path": "/assets/tarot/plateau/39-three-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4375,7 +4015,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 527,
-      "path": "/assets/tarot/plateau/40-four-of-cups.jpg"
+      "path": "/assets/tarot/plateau/40-four-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4385,7 +4025,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 540,
-      "path": "/assets/tarot/plateau/41-five-of-cups.jpg"
+      "path": "/assets/tarot/plateau/41-five-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4415,7 +4055,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 579,
-      "path": "/assets/tarot/plateau/44-eight-of-cups.jpg"
+      "path": "/assets/tarot/plateau/44-eight-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4425,7 +4065,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 592,
-      "path": "/assets/tarot/plateau/45-nine-of-cups.jpg"
+      "path": "/assets/tarot/plateau/45-nine-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4435,7 +4075,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 605,
-      "path": "/assets/tarot/plateau/46-ten-of-cups.jpg"
+      "path": "/assets/tarot/plateau/46-ten-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4445,7 +4085,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 618,
-      "path": "/assets/tarot/plateau/47-page-of-cups.jpg"
+      "path": "/assets/tarot/plateau/47-page-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4455,7 +4095,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 631,
-      "path": "/assets/tarot/plateau/48-knight-of-cups.jpg"
+      "path": "/assets/tarot/plateau/48-knight-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4465,7 +4105,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 644,
-      "path": "/assets/tarot/plateau/49-queen-of-cups.jpg"
+      "path": "/assets/tarot/plateau/49-queen-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4475,7 +4115,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 657,
-      "path": "/assets/tarot/plateau/50-king-of-cups.jpg"
+      "path": "/assets/tarot/plateau/50-king-of-cups.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4485,7 +4125,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 670,
-      "path": "/assets/tarot/plateau/51-ace-of-swords.jpg"
+      "path": "/assets/tarot/plateau/51-ace-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4495,7 +4135,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 683,
-      "path": "/assets/tarot/plateau/52-two-of-swords.jpg"
+      "path": "/assets/tarot/plateau/52-two-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4505,7 +4145,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 696,
-      "path": "/assets/tarot/plateau/53-three-of-swords.jpg"
+      "path": "/assets/tarot/plateau/53-three-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4515,7 +4155,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 709,
-      "path": "/assets/tarot/plateau/54-four-of-swords.jpg"
+      "path": "/assets/tarot/plateau/54-four-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4525,7 +4165,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 722,
-      "path": "/assets/tarot/plateau/55-five-of-swords.jpg"
+      "path": "/assets/tarot/plateau/55-five-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4535,7 +4175,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 735,
-      "path": "/assets/tarot/plateau/56-six-of-swords.jpg"
+      "path": "/assets/tarot/plateau/56-six-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4545,7 +4185,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 748,
-      "path": "/assets/tarot/plateau/57-seven-of-swords.jpg"
+      "path": "/assets/tarot/plateau/57-seven-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4555,7 +4195,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 761,
-      "path": "/assets/tarot/plateau/58-eight-of-swords.jpg"
+      "path": "/assets/tarot/plateau/58-eight-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4565,7 +4205,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 774,
-      "path": "/assets/tarot/plateau/59-nine-of-swords.jpg"
+      "path": "/assets/tarot/plateau/59-nine-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4575,7 +4215,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 787,
-      "path": "/assets/tarot/plateau/60-ten-of-swords.jpg"
+      "path": "/assets/tarot/plateau/60-ten-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4585,7 +4225,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 800,
-      "path": "/assets/tarot/plateau/61-page-of-swords.jpg"
+      "path": "/assets/tarot/plateau/61-page-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4595,7 +4235,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 813,
-      "path": "/assets/tarot/plateau/62-knight-of-swords.jpg"
+      "path": "/assets/tarot/plateau/62-knight-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4605,7 +4245,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 826,
-      "path": "/assets/tarot/plateau/63-queen-of-swords.jpg"
+      "path": "/assets/tarot/plateau/63-queen-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4615,7 +4255,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 839,
-      "path": "/assets/tarot/plateau/64-king-of-swords.jpg"
+      "path": "/assets/tarot/plateau/64-king-of-swords.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4625,7 +4265,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 852,
-      "path": "/assets/tarot/plateau/65-ace-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/65-ace-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4635,7 +4275,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 865,
-      "path": "/assets/tarot/plateau/66-two-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/66-two-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4645,7 +4285,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 878,
-      "path": "/assets/tarot/plateau/67-three-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/67-three-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4655,7 +4295,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 891,
-      "path": "/assets/tarot/plateau/68-four-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/68-four-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4675,7 +4315,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 917,
-      "path": "/assets/tarot/plateau/70-six-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/70-six-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4685,7 +4325,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 930,
-      "path": "/assets/tarot/plateau/71-seven-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/71-seven-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4695,7 +4335,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 943,
-      "path": "/assets/tarot/plateau/72-eight-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/72-eight-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4705,7 +4345,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 956,
-      "path": "/assets/tarot/plateau/73-nine-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/73-nine-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4725,7 +4365,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 982,
-      "path": "/assets/tarot/plateau/75-page-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/75-page-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4735,7 +4375,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 995,
-      "path": "/assets/tarot/plateau/76-knight-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/76-knight-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4755,7 +4395,7 @@ const manifest = {
     {
       "source": "src/data/tarotDeck.generated.js",
       "line": 1021,
-      "path": "/assets/tarot/plateau/78-king-of-pentacles.jpg"
+      "path": "/assets/tarot/plateau/78-king-of-pentacles.webp"
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -4765,78 +4405,83 @@ const manifest = {
     {
       "source": "src/pages/CasinoPages.jsx",
       "line": 271,
-      "path": "/assets/games/lobby/hero-arcade.png"
+      "path": "/assets/games/lobby/hero-arcade.webp"
     },
     {
       "source": "src/pages/CasinoPages.jsx",
       "line": 306,
-      "path": "/assets/games/promo/promo-edge.png"
+      "path": "/assets/games/promo/promo-edge.webp"
     },
     {
       "source": "src/pages/CasinoPages.jsx",
       "line": 319,
-      "path": "/assets/games/promo/promo-edge.png"
+      "path": "/assets/games/promo/promo-edge.webp"
     },
     {
       "source": "src/pages/CasinoPages.jsx",
       "line": 332,
-      "path": "/assets/games/promo/promo-race.png"
+      "path": "/assets/games/promo/promo-race.webp"
     },
     {
       "source": "src/pages/CasinoPages.jsx",
       "line": 345,
-      "path": "/assets/games/promo/promo-verify.png"
+      "path": "/assets/games/promo/promo-verify.webp"
     },
     {
       "source": "src/pages/CasinoPages.jsx",
       "line": 358,
-      "path": "/assets/games/promo/promo-race.png"
+      "path": "/assets/games/promo/promo-race.webp"
     },
     {
       "source": "src/pages/CasinoPages.jsx",
       "line": 371,
-      "path": "/assets/games/promo/promo-sports.png"
+      "path": "/assets/games/promo/promo-sports.webp"
     }
   ],
   "staticPathCounts": [
     {
       "source": "src/components/games/baccarat/BaccaratGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/blackjack/BlackjackGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/cases/CasesGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/chickencross/ChickenCrossGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/coinflip/CoinFlipGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/coin/coin-heads.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/coinflip/CoinFlipGame.jsx",
-      "path": "/assets/games/coin/coin-heads.png",
+      "path": "/assets/games/coin/coin-tails.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/coinflip/CoinFlipGame.jsx",
-      "path": "/assets/games/coin/coin-tails.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/color/ColorGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-neon-grid.png",
+      "path": "/assets/games/backdrops/backdrop-neon-grid.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/components/games/crash/CrashChart.jsx",
+      "path": "/images/spaceship.webp",
       "expectedCount": 1
     },
     {
@@ -4850,33 +4495,28 @@ const manifest = {
       "expectedCount": 1
     },
     {
-      "source": "src/components/games/crash/CrashChart.jsx",
-      "path": "/images/spaceship.png",
-      "expectedCount": 1
-    },
-    {
       "source": "src/components/games/crash/CrashGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-stars.png",
+      "path": "/assets/games/backdrops/backdrop-stars.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/darts/DartsGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/diamonds/DiamondsGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/dice/DiceGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/dino/DinoGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 1
     },
     {
@@ -4886,42 +4526,42 @@ const manifest = {
     },
     {
       "source": "src/components/games/drill/DrillGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/flip/FlipGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/guess/GuessGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-stars.png",
+      "path": "/assets/games/backdrops/backdrop-stars.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/hilo/HiloGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/keno/KenoGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/limbo/LimboGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-stars.png",
+      "path": "/assets/games/backdrops/backdrop-stars.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/lottery/LotteryGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/mines/MinesGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
@@ -4941,17 +4581,17 @@ const manifest = {
     },
     {
       "source": "src/components/games/moles/MolesGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/packs/PacksGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/plinko/PlinkoGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/images/coins/coin_original.svg",
       "expectedCount": 1
     },
     {
@@ -4961,12 +4601,12 @@ const manifest = {
     },
     {
       "source": "src/components/games/plinko/PlinkoGame.jsx",
-      "path": "/images/coins/coin_emerald.svg",
+      "path": "/images/coins/coin_silver.svg",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/plinko/PlinkoGame.jsx",
-      "path": "/images/coins/coin_original.svg",
+      "path": "/images/coins/coin_emerald.svg",
       "expectedCount": 1
     },
     {
@@ -4981,292 +4621,207 @@ const manifest = {
     },
     {
       "source": "src/components/games/plinko/PlinkoGame.jsx",
-      "path": "/images/coins/coin_silver.svg",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/primitives/Asset.jsx",
-      "path": "/assets/games/cards/card-back.png",
+      "path": "/assets/games/cards/card-back.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/pump/PumpGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/baccarat.png",
+      "path": "/images/covers/generated/dice.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/mines.webp",
       "expectedCount": 2
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/blackjack.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/casino-war.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/chickencross.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/coinflip.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/crash.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/dice.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/hilo.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/keno.png",
+      "path": "/images/covers/generated/keno.webp",
       "expectedCount": 2
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/limbo.png",
+      "path": "/images/covers/generated/limbo.webp",
       "expectedCount": 3
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/lottery.png",
-      "expectedCount": 2
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/mines.png",
-      "expectedCount": 2
-    },
-    {
-      "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/plinko.png",
+      "path": "/images/covers/generated/crash.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/slots.png",
-      "expectedCount": 3
+      "path": "/images/covers/generated/plinko.webp",
+      "expectedCount": 1
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/tower.png",
+      "path": "/images/covers/generated/wheel.webp",
+      "expectedCount": 2
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/blackjack.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/hilo.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/baccarat.webp",
+      "expectedCount": 2
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/video-poker.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/coinflip.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/tower.webp",
       "expectedCount": 4
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/video-poker.png",
+      "path": "/images/covers/generated/lottery.webp",
+      "expectedCount": 2
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/slots.webp",
+      "expectedCount": 3
+    },
+    {
+      "source": "src/components/games/resources/originalsManifest.js",
+      "path": "/images/covers/generated/casino-war.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/resources/originalsManifest.js",
-      "path": "/images/covers/generated/wheel.png",
-      "expectedCount": 2
-    },
-    {
-      "source": "src/components/games/roulette/RouletteGame.jsx",
-      "path": "/assets/games/roulette/roulette-felt.png",
+      "path": "/images/covers/generated/chickencross.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/roulette/RouletteGame.jsx",
-      "path": "/images/generated/roulette-wheel-premium.png",
+      "path": "/assets/games/roulette/roulette-felt.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/components/games/roulette/RouletteGame.jsx",
+      "path": "/images/generated/roulette-wheel-premium.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/roulette/roulette.css",
-      "path": "/images/generated/roulette-felt-rainbet.png",
+      "path": "/images/generated/roulette-felt-rainbet.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/rps/RpsGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-neon-grid.png",
+      "path": "/assets/games/rps/rps-rock.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/rps/RpsGame.jsx",
-      "path": "/assets/games/rps/rps-paper.png",
+      "path": "/assets/games/rps/rps-paper.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/rps/RpsGame.jsx",
-      "path": "/assets/games/rps/rps-rock.png",
+      "path": "/assets/games/rps/rps-scissors.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/rps/RpsGame.jsx",
-      "path": "/assets/games/rps/rps-scissors.png",
+      "path": "/assets/games/backdrops/backdrop-neon-grid.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/sicbo/SicBoGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/slide/SlideGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
+      "expectedCount": 2
+    },
+    {
+      "source": "src/components/games/slots/slotFactory.js",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 3
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
-      "expectedCount": 2
-    },
-    {
-      "source": "src/components/games/slots/slotFactory.js",
-      "path": "/assets/games/backdrops/backdrop-neon-grid.png",
-      "expectedCount": 2
-    },
-    {
-      "source": "src/components/games/slots/slotFactory.js",
-      "path": "/assets/games/backdrops/backdrop-parchment.png",
+      "path": "/assets/games/backdrops/backdrop-parchment.webp",
       "expectedCount": 6
     },
     {
       "source": "src/components/games/slots/slotFactory.js",
-      "path": "/assets/games/backdrops/backdrop-stars.png",
+      "path": "/assets/games/backdrops/backdrop-stars.webp",
       "expectedCount": 7
     },
     {
+      "source": "src/components/games/slots/slotFactory.js",
+      "path": "/assets/games/backdrops/backdrop-neon-grid.webp",
+      "expectedCount": 2
+    },
+    {
       "source": "src/components/games/snakes/SnakesGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/tarot/TarotGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-stars.png",
+      "path": "/assets/games/backdrops/backdrop-stars.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/tomeoflife/TomeOfLifeGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-stars.png",
+      "path": "/assets/games/backdrops/backdrop-stars.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/tower/TowerGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/videopoker/VideoPokerGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/war/CasinoWarGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-green.png",
+      "path": "/assets/games/backdrops/backdrop-felt-green.webp",
       "expectedCount": 1
     },
     {
       "source": "src/components/games/wheel/WheelGame.jsx",
-      "path": "/assets/games/backdrops/backdrop-felt-navy.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/bars.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/bass-bayou.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/bassline-bonus.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/blue-samurai.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/coop-cluck.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/dust-rail.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/forge-anvil.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/gates-ascent.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/ghostblade-strike.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/gummy-drops.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/iron-fist.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/mansion-megaways.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/miko-spirit.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/mummy-cascade.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/phoenix-megaways.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/river-catcher.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/scarab-spin.png",
+      "path": "/assets/games/backdrops/backdrop-felt-navy.webp",
       "expectedCount": 1
     },
     {
@@ -5276,208 +4831,293 @@ const manifest = {
     },
     {
       "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/storm-banner.png",
+      "path": "/images/covers/generated/vault-rush.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/vault-rush.png",
+      "path": "/images/covers/generated/river-catcher.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/casinoCatalog.js",
-      "path": "/images/covers/generated/wanted-revelation.png",
+      "path": "/images/covers/generated/dust-rail.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/storm-banner.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/bassline-bonus.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/scarab-spin.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/bars.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/blue-samurai.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/wanted-revelation.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/gates-ascent.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/bass-bayou.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/mummy-cascade.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/phoenix-megaways.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/mansion-megaways.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/ghostblade-strike.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/iron-fist.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/coop-cluck.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/miko-spirit.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/forge-anvil.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/casinoCatalog.js",
+      "path": "/images/covers/generated/gummy-drops.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/baccarat.png",
+      "path": "/images/covers/generated/crash.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/plinko.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/mines.webp",
       "expectedCount": 2
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/bars.png",
+      "path": "/images/covers/generated/dino.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/bass-bayou.png",
+      "path": "/images/covers/generated/dice.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/blackjack.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/blue-samurai.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/casino-war.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/chickencross.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/coinflip.png",
-      "expectedCount": 2
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/color.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/coop-cluck.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/crash.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/dice.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/dino.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/forge-anvil.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/gates-ascent.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/ghostblade-strike.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/guess.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/gummy-drops.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/hilo.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/iron-fist.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/keno.png",
-      "expectedCount": 2
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/limbo.png",
+      "path": "/images/covers/generated/limbo.webp",
       "expectedCount": 3
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/lottery.png",
-      "expectedCount": 3
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/mansion-megaways.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/miko-spirit.png",
-      "expectedCount": 1
-    },
-    {
-      "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/mines.png",
+      "path": "/images/covers/generated/keno.webp",
       "expectedCount": 2
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/mummy-cascade.png",
+      "path": "/images/covers/generated/wheel.webp",
+      "expectedCount": 2
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/roulette.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/phoenix-megaways.png",
+      "path": "/images/covers/generated/blackjack.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/plinko.png",
+      "path": "/images/covers/generated/slots.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/roulette.png",
+      "path": "/images/covers/generated/coinflip.webp",
+      "expectedCount": 2
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/rps.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/rps.png",
+      "path": "/images/covers/generated/guess.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/scarab-spin.png",
+      "path": "/images/covers/generated/hilo.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/sicbo.png",
+      "path": "/images/covers/generated/baccarat.webp",
+      "expectedCount": 2
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/sicbo.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/slots.png",
+      "path": "/images/covers/generated/video-poker.webp",
+      "expectedCount": 2
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/color.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/tower.png",
+      "path": "/images/covers/generated/tower.webp",
       "expectedCount": 4
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/video-poker.png",
-      "expectedCount": 2
+      "path": "/images/covers/generated/lottery.webp",
+      "expectedCount": 3
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/wanted-revelation.png",
+      "path": "/images/covers/generated/casino-war.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/gameDefinitions.js",
-      "path": "/images/covers/generated/wheel.png",
-      "expectedCount": 2
+      "path": "/images/covers/generated/chickencross.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/scarab-spin.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/bars.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/blue-samurai.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/wanted-revelation.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/gates-ascent.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/bass-bayou.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/mummy-cascade.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/phoenix-megaways.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/mansion-megaways.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/ghostblade-strike.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/iron-fist.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/coop-cluck.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/miko-spirit.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/forge-anvil.webp",
+      "expectedCount": 1
+    },
+    {
+      "source": "src/data/gameDefinitions.js",
+      "path": "/images/covers/generated/gummy-drops.webp",
+      "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
@@ -5486,12 +5126,12 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/01-the-fool.jpg",
+      "path": "/assets/tarot/plateau/01-the-fool.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/02-the-magician.jpg",
+      "path": "/assets/tarot/plateau/02-the-magician.webp",
       "expectedCount": 1
     },
     {
@@ -5526,17 +5166,17 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/09-strength.jpg",
+      "path": "/assets/tarot/plateau/09-strength.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/10-the-hermit.jpg",
+      "path": "/assets/tarot/plateau/10-the-hermit.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/11-the-wheel-of-fortune.jpg",
+      "path": "/assets/tarot/plateau/11-the-wheel-of-fortune.webp",
       "expectedCount": 1
     },
     {
@@ -5546,7 +5186,7 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/13-the-hanged-man.jpg",
+      "path": "/assets/tarot/plateau/13-the-hanged-man.webp",
       "expectedCount": 1
     },
     {
@@ -5561,22 +5201,22 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/16-the-devil.jpg",
+      "path": "/assets/tarot/plateau/16-the-devil.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/17-the-tower.jpg",
+      "path": "/assets/tarot/plateau/17-the-tower.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/18-the-star.jpg",
+      "path": "/assets/tarot/plateau/18-the-star.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/19-the-moon.jpg",
+      "path": "/assets/tarot/plateau/19-the-moon.webp",
       "expectedCount": 1
     },
     {
@@ -5596,27 +5236,27 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/23-ace-of-wands.jpg",
+      "path": "/assets/tarot/plateau/23-ace-of-wands.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/24-two-of-wands.jpg",
+      "path": "/assets/tarot/plateau/24-two-of-wands.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/25-three-of-wands.jpg",
+      "path": "/assets/tarot/plateau/25-three-of-wands.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/26-four-of-wands.jpg",
+      "path": "/assets/tarot/plateau/26-four-of-wands.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/27-five-of-wands.jpg",
+      "path": "/assets/tarot/plateau/27-five-of-wands.webp",
       "expectedCount": 1
     },
     {
@@ -5631,27 +5271,27 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/30-eight-of-wands.jpg",
+      "path": "/assets/tarot/plateau/30-eight-of-wands.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/31-nine-of-wands.jpg",
+      "path": "/assets/tarot/plateau/31-nine-of-wands.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/32-ten-of-wands.jpg",
+      "path": "/assets/tarot/plateau/32-ten-of-wands.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/33-page-of-wands.jpg",
+      "path": "/assets/tarot/plateau/33-page-of-wands.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/34-knight-of-wands.jpg",
+      "path": "/assets/tarot/plateau/34-knight-of-wands.webp",
       "expectedCount": 1
     },
     {
@@ -5666,27 +5306,27 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/37-ace-of-cups.jpg",
+      "path": "/assets/tarot/plateau/37-ace-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/38-two-of-cups.jpg",
+      "path": "/assets/tarot/plateau/38-two-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/39-three-of-cups.jpg",
+      "path": "/assets/tarot/plateau/39-three-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/40-four-of-cups.jpg",
+      "path": "/assets/tarot/plateau/40-four-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/41-five-of-cups.jpg",
+      "path": "/assets/tarot/plateau/41-five-of-cups.webp",
       "expectedCount": 1
     },
     {
@@ -5701,127 +5341,127 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/44-eight-of-cups.jpg",
+      "path": "/assets/tarot/plateau/44-eight-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/45-nine-of-cups.jpg",
+      "path": "/assets/tarot/plateau/45-nine-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/46-ten-of-cups.jpg",
+      "path": "/assets/tarot/plateau/46-ten-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/47-page-of-cups.jpg",
+      "path": "/assets/tarot/plateau/47-page-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/48-knight-of-cups.jpg",
+      "path": "/assets/tarot/plateau/48-knight-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/49-queen-of-cups.jpg",
+      "path": "/assets/tarot/plateau/49-queen-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/50-king-of-cups.jpg",
+      "path": "/assets/tarot/plateau/50-king-of-cups.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/51-ace-of-swords.jpg",
+      "path": "/assets/tarot/plateau/51-ace-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/52-two-of-swords.jpg",
+      "path": "/assets/tarot/plateau/52-two-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/53-three-of-swords.jpg",
+      "path": "/assets/tarot/plateau/53-three-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/54-four-of-swords.jpg",
+      "path": "/assets/tarot/plateau/54-four-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/55-five-of-swords.jpg",
+      "path": "/assets/tarot/plateau/55-five-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/56-six-of-swords.jpg",
+      "path": "/assets/tarot/plateau/56-six-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/57-seven-of-swords.jpg",
+      "path": "/assets/tarot/plateau/57-seven-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/58-eight-of-swords.jpg",
+      "path": "/assets/tarot/plateau/58-eight-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/59-nine-of-swords.jpg",
+      "path": "/assets/tarot/plateau/59-nine-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/60-ten-of-swords.jpg",
+      "path": "/assets/tarot/plateau/60-ten-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/61-page-of-swords.jpg",
+      "path": "/assets/tarot/plateau/61-page-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/62-knight-of-swords.jpg",
+      "path": "/assets/tarot/plateau/62-knight-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/63-queen-of-swords.jpg",
+      "path": "/assets/tarot/plateau/63-queen-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/64-king-of-swords.jpg",
+      "path": "/assets/tarot/plateau/64-king-of-swords.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/65-ace-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/65-ace-of-pentacles.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/66-two-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/66-two-of-pentacles.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/67-three-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/67-three-of-pentacles.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/68-four-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/68-four-of-pentacles.webp",
       "expectedCount": 1
     },
     {
@@ -5831,22 +5471,22 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/70-six-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/70-six-of-pentacles.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/71-seven-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/71-seven-of-pentacles.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/72-eight-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/72-eight-of-pentacles.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/73-nine-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/73-nine-of-pentacles.webp",
       "expectedCount": 1
     },
     {
@@ -5856,12 +5496,12 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/75-page-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/75-page-of-pentacles.webp",
       "expectedCount": 1
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/76-knight-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/76-knight-of-pentacles.webp",
       "expectedCount": 1
     },
     {
@@ -5871,32 +5511,32 @@ const manifest = {
     },
     {
       "source": "src/data/tarotDeck.generated.js",
-      "path": "/assets/tarot/plateau/78-king-of-pentacles.jpg",
+      "path": "/assets/tarot/plateau/78-king-of-pentacles.webp",
       "expectedCount": 1
     },
     {
       "source": "src/pages/CasinoPages.jsx",
-      "path": "/assets/games/lobby/hero-arcade.png",
+      "path": "/assets/games/lobby/hero-arcade.webp",
       "expectedCount": 1
     },
     {
       "source": "src/pages/CasinoPages.jsx",
-      "path": "/assets/games/promo/promo-edge.png",
+      "path": "/assets/games/promo/promo-edge.webp",
       "expectedCount": 2
     },
     {
       "source": "src/pages/CasinoPages.jsx",
-      "path": "/assets/games/promo/promo-race.png",
+      "path": "/assets/games/promo/promo-race.webp",
       "expectedCount": 2
     },
     {
       "source": "src/pages/CasinoPages.jsx",
-      "path": "/assets/games/promo/promo-sports.png",
+      "path": "/assets/games/promo/promo-verify.webp",
       "expectedCount": 1
     },
     {
       "source": "src/pages/CasinoPages.jsx",
-      "path": "/assets/games/promo/promo-verify.png",
+      "path": "/assets/games/promo/promo-sports.webp",
       "expectedCount": 1
     }
   ],
@@ -5907,24 +5547,24 @@ const manifest = {
         "/poker"
       ],
       "paths": [
-        "/assets/games/poker/poker-avatar-1.png",
-        "/assets/games/poker/poker-avatar-2.png",
-        "/assets/games/poker/poker-avatar-3.png",
-        "/assets/games/poker/poker-avatar-4.png",
-        "/assets/games/poker/poker-avatar-5.png"
+        "/assets/games/poker/poker-avatar-1.webp",
+        "/assets/games/poker/poker-avatar-2.webp",
+        "/assets/games/poker/poker-avatar-3.webp",
+        "/assets/games/poker/poker-avatar-4.webp",
+        "/assets/games/poker/poker-avatar-5.webp"
       ],
       "guards": [
         {
           "source": "src/components/games/poker/PokerGame.jsx",
           "startAnchor": "const BOT_AVATARS = ",
           "endAnchor": "function blindLevelForHand(",
-          "span": "const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => `/assets/games/poker/poker-avatar-${i}.png`)\n\n",
+          "span": "const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => resolveImage(`/assets/games/poker/poker-avatar-${i}.png`))\n\n",
           "requiredTokens": [
             "BOT_AVATARS",
             "[1, 2, 3, 4, 5]",
             "`/assets/games/poker/poker-avatar-${i}.png`"
           ],
-          "sha256": "e17bc7d51b8eec832d86e0a6d545f7dc1760f94e8d1b7dd9f5c55a16d1c97496"
+          "sha256": "2095a9181f2c7abe74afec937f115a07e9bc0a46cee59bed97ed4b35ff3972c4"
         }
       ]
     },
@@ -5934,24 +5574,24 @@ const manifest = {
         "shared/runtime"
       ],
       "paths": [
-        "/assets/games/poker/poker-avatar-1.png",
-        "/assets/games/poker/poker-avatar-2.png",
-        "/assets/games/poker/poker-avatar-3.png",
-        "/assets/games/poker/poker-avatar-4.png",
-        "/assets/games/poker/poker-avatar-5.png"
+        "/assets/games/poker/poker-avatar-1.webp",
+        "/assets/games/poker/poker-avatar-2.webp",
+        "/assets/games/poker/poker-avatar-3.webp",
+        "/assets/games/poker/poker-avatar-4.webp",
+        "/assets/games/poker/poker-avatar-5.webp"
       ],
       "guards": [
         {
           "source": "src/pages/CasinoPages.jsx",
           "startAnchor": "                    const avatar = player.isYou",
           "endAnchor": "                        <article key={player.id}",
-          "span": "                    const avatar = player.isYou\n                        ? null\n                        : `/assets/games/poker/poker-avatar-${(index % 5) + 1}.png`\n                    return (\n",
+          "span": "                    const avatar = player.isYou\n                        ? null\n                        : resolveImage(`/assets/games/poker/poker-avatar-${(index % 5) + 1}.png`)\n                    return (\n",
           "requiredTokens": [
             "player.isYou",
             "(index % 5) + 1",
             "`/assets/games/poker/poker-avatar-${(index % 5) + 1}.png`"
           ],
-          "sha256": "d6ca862ca5cd17c7bd68e3be7d129a934cc4a26e87dcb3af8738bbd3afb239a0"
+          "sha256": "97bfc0f0bd80e4adb2fb1e62551b5b399135d93a5ec6a5b0ecc65e5b9cd61b22"
         }
       ]
     },
@@ -6005,26 +5645,26 @@ const manifest = {
         "/gummy-drops"
       ],
       "paths": [
-        "/images/covers/generated/vault-rush.png",
-        "/images/covers/generated/river-catcher.png",
-        "/images/covers/generated/dust-rail.png",
-        "/images/covers/generated/storm-banner.png",
-        "/images/covers/generated/bassline-bonus.png",
-        "/images/covers/generated/scarab-spin.png",
-        "/images/covers/generated/bars.png",
-        "/images/covers/generated/blue-samurai.png",
-        "/images/covers/generated/wanted-revelation.png",
-        "/images/covers/generated/gates-ascent.png",
-        "/images/covers/generated/bass-bayou.png",
-        "/images/covers/generated/mummy-cascade.png",
-        "/images/covers/generated/phoenix-megaways.png",
-        "/images/covers/generated/mansion-megaways.png",
-        "/images/covers/generated/ghostblade-strike.png",
-        "/images/covers/generated/iron-fist.png",
-        "/images/covers/generated/coop-cluck.png",
-        "/images/covers/generated/miko-spirit.png",
-        "/images/covers/generated/forge-anvil.png",
-        "/images/covers/generated/gummy-drops.png"
+        "/images/covers/generated/vault-rush.webp",
+        "/images/covers/generated/river-catcher.webp",
+        "/images/covers/generated/dust-rail.webp",
+        "/images/covers/generated/storm-banner.webp",
+        "/images/covers/generated/bassline-bonus.webp",
+        "/images/covers/generated/scarab-spin.webp",
+        "/images/covers/generated/bars.webp",
+        "/images/covers/generated/blue-samurai.webp",
+        "/images/covers/generated/wanted-revelation.webp",
+        "/images/covers/generated/gates-ascent.webp",
+        "/images/covers/generated/bass-bayou.webp",
+        "/images/covers/generated/mummy-cascade.webp",
+        "/images/covers/generated/phoenix-megaways.webp",
+        "/images/covers/generated/mansion-megaways.webp",
+        "/images/covers/generated/ghostblade-strike.webp",
+        "/images/covers/generated/iron-fist.webp",
+        "/images/covers/generated/coop-cluck.webp",
+        "/images/covers/generated/miko-spirit.webp",
+        "/images/covers/generated/forge-anvil.webp",
+        "/images/covers/generated/gummy-drops.webp"
       ],
       "guards": [
         {
@@ -6393,186 +6033,186 @@ const manifest = {
         "/assets/games/slots/gummy/gummy-drops-bonus.png"
       ],
       "paths": [
-        "/assets/games/slots/vault/slot-rank-vault-rush-10.png",
-        "/assets/games/slots/vault/slot-rank-vault-rush-A.png",
-        "/assets/games/slots/vault/slot-rank-vault-rush-J.png",
-        "/assets/games/slots/vault/slot-rank-vault-rush-K.png",
-        "/assets/games/slots/vault/slot-rank-vault-rush-Q.png",
-        "/assets/games/slots/catcher/slot-rank-river-catcher-10.png",
-        "/assets/games/slots/catcher/slot-rank-river-catcher-A.png",
-        "/assets/games/slots/catcher/slot-rank-river-catcher-J.png",
-        "/assets/games/slots/catcher/slot-rank-river-catcher-K.png",
-        "/assets/games/slots/catcher/slot-rank-river-catcher-Q.png",
-        "/assets/games/slots/western/slot-rank-dust-rail-10.png",
-        "/assets/games/slots/western/slot-rank-dust-rail-A.png",
-        "/assets/games/slots/western/slot-rank-dust-rail-J.png",
-        "/assets/games/slots/western/slot-rank-dust-rail-K.png",
-        "/assets/games/slots/western/slot-rank-dust-rail-Q.png",
-        "/assets/games/slots/mythic/slot-rank-storm-banner-10.png",
-        "/assets/games/slots/mythic/slot-rank-storm-banner-A.png",
-        "/assets/games/slots/mythic/slot-rank-storm-banner-J.png",
-        "/assets/games/slots/mythic/slot-rank-storm-banner-K.png",
-        "/assets/games/slots/mythic/slot-rank-storm-banner-Q.png",
-        "/assets/games/slots/rock/slot-rank-bassline-bonus-10.png",
-        "/assets/games/slots/rock/slot-rank-bassline-bonus-A.png",
-        "/assets/games/slots/rock/slot-rank-bassline-bonus-J.png",
-        "/assets/games/slots/rock/slot-rank-bassline-bonus-K.png",
-        "/assets/games/slots/rock/slot-rank-bassline-bonus-Q.png",
-        "/assets/games/slots/mythic/slot-rank-scarab-spin-10.png",
-        "/assets/games/slots/mythic/slot-rank-scarab-spin-A.png",
-        "/assets/games/slots/mythic/slot-rank-scarab-spin-J.png",
-        "/assets/games/slots/mythic/slot-rank-scarab-spin-K.png",
-        "/assets/games/slots/mythic/slot-rank-scarab-spin-Q.png",
-        "/assets/games/slots/classic/slot-rank-bars-10.png",
-        "/assets/games/slots/classic/slot-rank-bars-A.png",
-        "/assets/games/slots/classic/slot-rank-bars-J.png",
-        "/assets/games/slots/classic/slot-rank-bars-K.png",
-        "/assets/games/slots/classic/slot-rank-bars-Q.png",
-        "/assets/games/slots/cyber/slot-rank-blue-samurai-10.png",
-        "/assets/games/slots/cyber/slot-rank-blue-samurai-A.png",
-        "/assets/games/slots/cyber/slot-rank-blue-samurai-J.png",
-        "/assets/games/slots/cyber/slot-rank-blue-samurai-K.png",
-        "/assets/games/slots/cyber/slot-rank-blue-samurai-Q.png",
-        "/assets/games/slots/wanted/slot-rank-wanted-revelation-10.png",
-        "/assets/games/slots/wanted/slot-rank-wanted-revelation-A.png",
-        "/assets/games/slots/wanted/slot-rank-wanted-revelation-J.png",
-        "/assets/games/slots/wanted/slot-rank-wanted-revelation-K.png",
-        "/assets/games/slots/wanted/slot-rank-wanted-revelation-Q.png",
-        "/assets/games/slots/olympus/slot-rank-gates-ascent-10.png",
-        "/assets/games/slots/olympus/slot-rank-gates-ascent-A.png",
-        "/assets/games/slots/olympus/slot-rank-gates-ascent-J.png",
-        "/assets/games/slots/olympus/slot-rank-gates-ascent-K.png",
-        "/assets/games/slots/olympus/slot-rank-gates-ascent-Q.png",
-        "/assets/games/slots/bayou/slot-rank-bass-bayou-10.png",
-        "/assets/games/slots/bayou/slot-rank-bass-bayou-A.png",
-        "/assets/games/slots/bayou/slot-rank-bass-bayou-J.png",
-        "/assets/games/slots/bayou/slot-rank-bass-bayou-K.png",
-        "/assets/games/slots/bayou/slot-rank-bass-bayou-Q.png",
-        "/assets/games/slots/mummy/slot-rank-mummy-cascade-10.png",
-        "/assets/games/slots/mummy/slot-rank-mummy-cascade-A.png",
-        "/assets/games/slots/mummy/slot-rank-mummy-cascade-J.png",
-        "/assets/games/slots/mummy/slot-rank-mummy-cascade-K.png",
-        "/assets/games/slots/mummy/slot-rank-mummy-cascade-Q.png",
-        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-10.png",
-        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-A.png",
-        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-J.png",
-        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-K.png",
-        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-Q.png",
-        "/assets/games/slots/mansion/slot-rank-mansion-megaways-10.png",
-        "/assets/games/slots/mansion/slot-rank-mansion-megaways-A.png",
-        "/assets/games/slots/mansion/slot-rank-mansion-megaways-J.png",
-        "/assets/games/slots/mansion/slot-rank-mansion-megaways-K.png",
-        "/assets/games/slots/mansion/slot-rank-mansion-megaways-Q.png",
-        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-10.png",
-        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-A.png",
-        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-J.png",
-        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-K.png",
-        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-Q.png",
-        "/assets/games/slots/iron/slot-rank-iron-fist-10.png",
-        "/assets/games/slots/iron/slot-rank-iron-fist-A.png",
-        "/assets/games/slots/iron/slot-rank-iron-fist-J.png",
-        "/assets/games/slots/iron/slot-rank-iron-fist-K.png",
-        "/assets/games/slots/iron/slot-rank-iron-fist-Q.png",
-        "/assets/games/slots/coop/slot-rank-coop-cluck-10.png",
-        "/assets/games/slots/coop/slot-rank-coop-cluck-A.png",
-        "/assets/games/slots/coop/slot-rank-coop-cluck-J.png",
-        "/assets/games/slots/coop/slot-rank-coop-cluck-K.png",
-        "/assets/games/slots/coop/slot-rank-coop-cluck-Q.png",
-        "/assets/games/slots/spirit/slot-rank-miko-spirit-10.png",
-        "/assets/games/slots/spirit/slot-rank-miko-spirit-A.png",
-        "/assets/games/slots/spirit/slot-rank-miko-spirit-J.png",
-        "/assets/games/slots/spirit/slot-rank-miko-spirit-K.png",
-        "/assets/games/slots/spirit/slot-rank-miko-spirit-Q.png",
-        "/assets/games/slots/forge/slot-rank-forge-anvil-10.png",
-        "/assets/games/slots/forge/slot-rank-forge-anvil-A.png",
-        "/assets/games/slots/forge/slot-rank-forge-anvil-J.png",
-        "/assets/games/slots/forge/slot-rank-forge-anvil-K.png",
-        "/assets/games/slots/forge/slot-rank-forge-anvil-Q.png",
-        "/assets/games/slots/gummy/slot-rank-gummy-drops-10.png",
-        "/assets/games/slots/gummy/slot-rank-gummy-drops-A.png",
-        "/assets/games/slots/gummy/slot-rank-gummy-drops-J.png",
-        "/assets/games/slots/gummy/slot-rank-gummy-drops-K.png",
-        "/assets/games/slots/gummy/slot-rank-gummy-drops-Q.png",
-        "/assets/games/slots/vault/vault-rush-hero.png",
-        "/assets/games/slots/vault/vault-rush-mid1.png",
-        "/assets/games/slots/vault/vault-rush-mid2.png",
-        "/assets/games/slots/vault/vault-rush-bonus.png",
-        "/assets/games/slots/catcher/river-catcher-hero.png",
-        "/assets/games/slots/catcher/river-catcher-mid1.png",
-        "/assets/games/slots/catcher/river-catcher-mid2.png",
-        "/assets/games/slots/catcher/river-catcher-bonus.png",
-        "/assets/games/slots/western/dust-rail-hero.png",
-        "/assets/games/slots/western/dust-rail-mid1.png",
-        "/assets/games/slots/western/dust-rail-mid2.png",
-        "/assets/games/slots/western/dust-rail-bonus.png",
-        "/assets/games/slots/mythic/storm-banner-hero.png",
-        "/assets/games/slots/mythic/storm-banner-mid1.png",
-        "/assets/games/slots/mythic/storm-banner-mid2.png",
-        "/assets/games/slots/mythic/storm-banner-bonus.png",
-        "/assets/games/slots/rock/bassline-bonus-hero.png",
-        "/assets/games/slots/rock/bassline-bonus-mid1.png",
-        "/assets/games/slots/rock/bassline-bonus-mid2.png",
-        "/assets/games/slots/rock/bassline-bonus-bonus.png",
-        "/assets/games/slots/mythic/scarab-spin-hero.png",
-        "/assets/games/slots/mythic/scarab-spin-mid1.png",
-        "/assets/games/slots/mythic/scarab-spin-mid2.png",
-        "/assets/games/slots/mythic/scarab-spin-bonus.png",
-        "/assets/games/slots/classic/bars-hero.png",
-        "/assets/games/slots/classic/bars-mid1.png",
-        "/assets/games/slots/classic/bars-mid2.png",
-        "/assets/games/slots/classic/bars-bonus.png",
-        "/assets/games/slots/cyber/blue-samurai-hero.png",
-        "/assets/games/slots/cyber/blue-samurai-mid1.png",
-        "/assets/games/slots/cyber/blue-samurai-mid2.png",
-        "/assets/games/slots/cyber/blue-samurai-bonus.png",
-        "/assets/games/slots/wanted/wanted-revelation-hero.png",
-        "/assets/games/slots/wanted/wanted-revelation-mid1.png",
-        "/assets/games/slots/wanted/wanted-revelation-mid2.png",
-        "/assets/games/slots/wanted/wanted-revelation-bonus.png",
-        "/assets/games/slots/olympus/gates-ascent-hero.png",
-        "/assets/games/slots/olympus/gates-ascent-mid1.png",
-        "/assets/games/slots/olympus/gates-ascent-mid2.png",
-        "/assets/games/slots/olympus/gates-ascent-bonus.png",
-        "/assets/games/slots/bayou/bass-bayou-hero.png",
-        "/assets/games/slots/bayou/bass-bayou-mid1.png",
-        "/assets/games/slots/bayou/bass-bayou-mid2.png",
-        "/assets/games/slots/bayou/bass-bayou-bonus.png",
-        "/assets/games/slots/mummy/mummy-cascade-hero.png",
-        "/assets/games/slots/mummy/mummy-cascade-mid1.png",
-        "/assets/games/slots/mummy/mummy-cascade-mid2.png",
-        "/assets/games/slots/mummy/mummy-cascade-bonus.png",
-        "/assets/games/slots/phoenix/phoenix-megaways-hero.png",
-        "/assets/games/slots/phoenix/phoenix-megaways-mid1.png",
-        "/assets/games/slots/phoenix/phoenix-megaways-mid2.png",
-        "/assets/games/slots/phoenix/phoenix-megaways-bonus.png",
-        "/assets/games/slots/mansion/mansion-megaways-hero.png",
-        "/assets/games/slots/mansion/mansion-megaways-mid1.png",
-        "/assets/games/slots/mansion/mansion-megaways-mid2.png",
-        "/assets/games/slots/mansion/mansion-megaways-bonus.png",
-        "/assets/games/slots/ronin/ghostblade-strike-hero.png",
-        "/assets/games/slots/ronin/ghostblade-strike-mid1.png",
-        "/assets/games/slots/ronin/ghostblade-strike-mid2.png",
-        "/assets/games/slots/ronin/ghostblade-strike-bonus.png",
-        "/assets/games/slots/iron/iron-fist-hero.png",
-        "/assets/games/slots/iron/iron-fist-mid1.png",
-        "/assets/games/slots/iron/iron-fist-mid2.png",
-        "/assets/games/slots/iron/iron-fist-bonus.png",
-        "/assets/games/slots/coop/coop-cluck-hero.png",
-        "/assets/games/slots/coop/coop-cluck-mid1.png",
-        "/assets/games/slots/coop/coop-cluck-mid2.png",
-        "/assets/games/slots/coop/coop-cluck-bonus.png",
-        "/assets/games/slots/spirit/miko-spirit-hero.png",
-        "/assets/games/slots/spirit/miko-spirit-mid1.png",
-        "/assets/games/slots/spirit/miko-spirit-mid2.png",
-        "/assets/games/slots/spirit/miko-spirit-bonus.png",
-        "/assets/games/slots/forge/forge-anvil-hero.png",
-        "/assets/games/slots/forge/forge-anvil-mid1.png",
-        "/assets/games/slots/forge/forge-anvil-mid2.png",
-        "/assets/games/slots/forge/forge-anvil-bonus.png",
-        "/assets/games/slots/gummy/gummy-drops-hero.png",
-        "/assets/games/slots/gummy/gummy-drops-mid1.png",
-        "/assets/games/slots/gummy/gummy-drops-mid2.png",
-        "/assets/games/slots/gummy/gummy-drops-bonus.png"
+        "/assets/games/slots/vault/slot-rank-vault-rush-10.webp",
+        "/assets/games/slots/vault/slot-rank-vault-rush-A.webp",
+        "/assets/games/slots/vault/slot-rank-vault-rush-J.webp",
+        "/assets/games/slots/vault/slot-rank-vault-rush-K.webp",
+        "/assets/games/slots/vault/slot-rank-vault-rush-Q.webp",
+        "/assets/games/slots/catcher/slot-rank-river-catcher-10.webp",
+        "/assets/games/slots/catcher/slot-rank-river-catcher-A.webp",
+        "/assets/games/slots/catcher/slot-rank-river-catcher-J.webp",
+        "/assets/games/slots/catcher/slot-rank-river-catcher-K.webp",
+        "/assets/games/slots/catcher/slot-rank-river-catcher-Q.webp",
+        "/assets/games/slots/western/slot-rank-dust-rail-10.webp",
+        "/assets/games/slots/western/slot-rank-dust-rail-A.webp",
+        "/assets/games/slots/western/slot-rank-dust-rail-J.webp",
+        "/assets/games/slots/western/slot-rank-dust-rail-K.webp",
+        "/assets/games/slots/western/slot-rank-dust-rail-Q.webp",
+        "/assets/games/slots/mythic/slot-rank-storm-banner-10.webp",
+        "/assets/games/slots/mythic/slot-rank-storm-banner-A.webp",
+        "/assets/games/slots/mythic/slot-rank-storm-banner-J.webp",
+        "/assets/games/slots/mythic/slot-rank-storm-banner-K.webp",
+        "/assets/games/slots/mythic/slot-rank-storm-banner-Q.webp",
+        "/assets/games/slots/rock/slot-rank-bassline-bonus-10.webp",
+        "/assets/games/slots/rock/slot-rank-bassline-bonus-A.webp",
+        "/assets/games/slots/rock/slot-rank-bassline-bonus-J.webp",
+        "/assets/games/slots/rock/slot-rank-bassline-bonus-K.webp",
+        "/assets/games/slots/rock/slot-rank-bassline-bonus-Q.webp",
+        "/assets/games/slots/mythic/slot-rank-scarab-spin-10.webp",
+        "/assets/games/slots/mythic/slot-rank-scarab-spin-A.webp",
+        "/assets/games/slots/mythic/slot-rank-scarab-spin-J.webp",
+        "/assets/games/slots/mythic/slot-rank-scarab-spin-K.webp",
+        "/assets/games/slots/mythic/slot-rank-scarab-spin-Q.webp",
+        "/assets/games/slots/classic/slot-rank-bars-10.webp",
+        "/assets/games/slots/classic/slot-rank-bars-A.webp",
+        "/assets/games/slots/classic/slot-rank-bars-J.webp",
+        "/assets/games/slots/classic/slot-rank-bars-K.webp",
+        "/assets/games/slots/classic/slot-rank-bars-Q.webp",
+        "/assets/games/slots/cyber/slot-rank-blue-samurai-10.webp",
+        "/assets/games/slots/cyber/slot-rank-blue-samurai-A.webp",
+        "/assets/games/slots/cyber/slot-rank-blue-samurai-J.webp",
+        "/assets/games/slots/cyber/slot-rank-blue-samurai-K.webp",
+        "/assets/games/slots/cyber/slot-rank-blue-samurai-Q.webp",
+        "/assets/games/slots/wanted/slot-rank-wanted-revelation-10.webp",
+        "/assets/games/slots/wanted/slot-rank-wanted-revelation-A.webp",
+        "/assets/games/slots/wanted/slot-rank-wanted-revelation-J.webp",
+        "/assets/games/slots/wanted/slot-rank-wanted-revelation-K.webp",
+        "/assets/games/slots/wanted/slot-rank-wanted-revelation-Q.webp",
+        "/assets/games/slots/olympus/slot-rank-gates-ascent-10.webp",
+        "/assets/games/slots/olympus/slot-rank-gates-ascent-A.webp",
+        "/assets/games/slots/olympus/slot-rank-gates-ascent-J.webp",
+        "/assets/games/slots/olympus/slot-rank-gates-ascent-K.webp",
+        "/assets/games/slots/olympus/slot-rank-gates-ascent-Q.webp",
+        "/assets/games/slots/bayou/slot-rank-bass-bayou-10.webp",
+        "/assets/games/slots/bayou/slot-rank-bass-bayou-A.webp",
+        "/assets/games/slots/bayou/slot-rank-bass-bayou-J.webp",
+        "/assets/games/slots/bayou/slot-rank-bass-bayou-K.webp",
+        "/assets/games/slots/bayou/slot-rank-bass-bayou-Q.webp",
+        "/assets/games/slots/mummy/slot-rank-mummy-cascade-10.webp",
+        "/assets/games/slots/mummy/slot-rank-mummy-cascade-A.webp",
+        "/assets/games/slots/mummy/slot-rank-mummy-cascade-J.webp",
+        "/assets/games/slots/mummy/slot-rank-mummy-cascade-K.webp",
+        "/assets/games/slots/mummy/slot-rank-mummy-cascade-Q.webp",
+        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-10.webp",
+        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-A.webp",
+        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-J.webp",
+        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-K.webp",
+        "/assets/games/slots/phoenix/slot-rank-phoenix-megaways-Q.webp",
+        "/assets/games/slots/mansion/slot-rank-mansion-megaways-10.webp",
+        "/assets/games/slots/mansion/slot-rank-mansion-megaways-A.webp",
+        "/assets/games/slots/mansion/slot-rank-mansion-megaways-J.webp",
+        "/assets/games/slots/mansion/slot-rank-mansion-megaways-K.webp",
+        "/assets/games/slots/mansion/slot-rank-mansion-megaways-Q.webp",
+        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-10.webp",
+        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-A.webp",
+        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-J.webp",
+        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-K.webp",
+        "/assets/games/slots/ronin/slot-rank-ghostblade-strike-Q.webp",
+        "/assets/games/slots/iron/slot-rank-iron-fist-10.webp",
+        "/assets/games/slots/iron/slot-rank-iron-fist-A.webp",
+        "/assets/games/slots/iron/slot-rank-iron-fist-J.webp",
+        "/assets/games/slots/iron/slot-rank-iron-fist-K.webp",
+        "/assets/games/slots/iron/slot-rank-iron-fist-Q.webp",
+        "/assets/games/slots/coop/slot-rank-coop-cluck-10.webp",
+        "/assets/games/slots/coop/slot-rank-coop-cluck-A.webp",
+        "/assets/games/slots/coop/slot-rank-coop-cluck-J.webp",
+        "/assets/games/slots/coop/slot-rank-coop-cluck-K.webp",
+        "/assets/games/slots/coop/slot-rank-coop-cluck-Q.webp",
+        "/assets/games/slots/spirit/slot-rank-miko-spirit-10.webp",
+        "/assets/games/slots/spirit/slot-rank-miko-spirit-A.webp",
+        "/assets/games/slots/spirit/slot-rank-miko-spirit-J.webp",
+        "/assets/games/slots/spirit/slot-rank-miko-spirit-K.webp",
+        "/assets/games/slots/spirit/slot-rank-miko-spirit-Q.webp",
+        "/assets/games/slots/forge/slot-rank-forge-anvil-10.webp",
+        "/assets/games/slots/forge/slot-rank-forge-anvil-A.webp",
+        "/assets/games/slots/forge/slot-rank-forge-anvil-J.webp",
+        "/assets/games/slots/forge/slot-rank-forge-anvil-K.webp",
+        "/assets/games/slots/forge/slot-rank-forge-anvil-Q.webp",
+        "/assets/games/slots/gummy/slot-rank-gummy-drops-10.webp",
+        "/assets/games/slots/gummy/slot-rank-gummy-drops-A.webp",
+        "/assets/games/slots/gummy/slot-rank-gummy-drops-J.webp",
+        "/assets/games/slots/gummy/slot-rank-gummy-drops-K.webp",
+        "/assets/games/slots/gummy/slot-rank-gummy-drops-Q.webp",
+        "/assets/games/slots/vault/vault-rush-hero.webp",
+        "/assets/games/slots/vault/vault-rush-mid1.webp",
+        "/assets/games/slots/vault/vault-rush-mid2.webp",
+        "/assets/games/slots/vault/vault-rush-bonus.webp",
+        "/assets/games/slots/catcher/river-catcher-hero.webp",
+        "/assets/games/slots/catcher/river-catcher-mid1.webp",
+        "/assets/games/slots/catcher/river-catcher-mid2.webp",
+        "/assets/games/slots/catcher/river-catcher-bonus.webp",
+        "/assets/games/slots/western/dust-rail-hero.webp",
+        "/assets/games/slots/western/dust-rail-mid1.webp",
+        "/assets/games/slots/western/dust-rail-mid2.webp",
+        "/assets/games/slots/western/dust-rail-bonus.webp",
+        "/assets/games/slots/mythic/storm-banner-hero.webp",
+        "/assets/games/slots/mythic/storm-banner-mid1.webp",
+        "/assets/games/slots/mythic/storm-banner-mid2.webp",
+        "/assets/games/slots/mythic/storm-banner-bonus.webp",
+        "/assets/games/slots/rock/bassline-bonus-hero.webp",
+        "/assets/games/slots/rock/bassline-bonus-mid1.webp",
+        "/assets/games/slots/rock/bassline-bonus-mid2.webp",
+        "/assets/games/slots/rock/bassline-bonus-bonus.webp",
+        "/assets/games/slots/mythic/scarab-spin-hero.webp",
+        "/assets/games/slots/mythic/scarab-spin-mid1.webp",
+        "/assets/games/slots/mythic/scarab-spin-mid2.webp",
+        "/assets/games/slots/mythic/scarab-spin-bonus.webp",
+        "/assets/games/slots/classic/bars-hero.webp",
+        "/assets/games/slots/classic/bars-mid1.webp",
+        "/assets/games/slots/classic/bars-mid2.webp",
+        "/assets/games/slots/classic/bars-bonus.webp",
+        "/assets/games/slots/cyber/blue-samurai-hero.webp",
+        "/assets/games/slots/cyber/blue-samurai-mid1.webp",
+        "/assets/games/slots/cyber/blue-samurai-mid2.webp",
+        "/assets/games/slots/cyber/blue-samurai-bonus.webp",
+        "/assets/games/slots/wanted/wanted-revelation-hero.webp",
+        "/assets/games/slots/wanted/wanted-revelation-mid1.webp",
+        "/assets/games/slots/wanted/wanted-revelation-mid2.webp",
+        "/assets/games/slots/wanted/wanted-revelation-bonus.webp",
+        "/assets/games/slots/olympus/gates-ascent-hero.webp",
+        "/assets/games/slots/olympus/gates-ascent-mid1.webp",
+        "/assets/games/slots/olympus/gates-ascent-mid2.webp",
+        "/assets/games/slots/olympus/gates-ascent-bonus.webp",
+        "/assets/games/slots/bayou/bass-bayou-hero.webp",
+        "/assets/games/slots/bayou/bass-bayou-mid1.webp",
+        "/assets/games/slots/bayou/bass-bayou-mid2.webp",
+        "/assets/games/slots/bayou/bass-bayou-bonus.webp",
+        "/assets/games/slots/mummy/mummy-cascade-hero.webp",
+        "/assets/games/slots/mummy/mummy-cascade-mid1.webp",
+        "/assets/games/slots/mummy/mummy-cascade-mid2.webp",
+        "/assets/games/slots/mummy/mummy-cascade-bonus.webp",
+        "/assets/games/slots/phoenix/phoenix-megaways-hero.webp",
+        "/assets/games/slots/phoenix/phoenix-megaways-mid1.webp",
+        "/assets/games/slots/phoenix/phoenix-megaways-mid2.webp",
+        "/assets/games/slots/phoenix/phoenix-megaways-bonus.webp",
+        "/assets/games/slots/mansion/mansion-megaways-hero.webp",
+        "/assets/games/slots/mansion/mansion-megaways-mid1.webp",
+        "/assets/games/slots/mansion/mansion-megaways-mid2.webp",
+        "/assets/games/slots/mansion/mansion-megaways-bonus.webp",
+        "/assets/games/slots/ronin/ghostblade-strike-hero.webp",
+        "/assets/games/slots/ronin/ghostblade-strike-mid1.webp",
+        "/assets/games/slots/ronin/ghostblade-strike-mid2.webp",
+        "/assets/games/slots/ronin/ghostblade-strike-bonus.webp",
+        "/assets/games/slots/iron/iron-fist-hero.webp",
+        "/assets/games/slots/iron/iron-fist-mid1.webp",
+        "/assets/games/slots/iron/iron-fist-mid2.webp",
+        "/assets/games/slots/iron/iron-fist-bonus.webp",
+        "/assets/games/slots/coop/coop-cluck-hero.webp",
+        "/assets/games/slots/coop/coop-cluck-mid1.webp",
+        "/assets/games/slots/coop/coop-cluck-mid2.webp",
+        "/assets/games/slots/coop/coop-cluck-bonus.webp",
+        "/assets/games/slots/spirit/miko-spirit-hero.webp",
+        "/assets/games/slots/spirit/miko-spirit-mid1.webp",
+        "/assets/games/slots/spirit/miko-spirit-mid2.webp",
+        "/assets/games/slots/spirit/miko-spirit-bonus.webp",
+        "/assets/games/slots/forge/forge-anvil-hero.webp",
+        "/assets/games/slots/forge/forge-anvil-mid1.webp",
+        "/assets/games/slots/forge/forge-anvil-mid2.webp",
+        "/assets/games/slots/forge/forge-anvil-bonus.webp",
+        "/assets/games/slots/gummy/gummy-drops-hero.webp",
+        "/assets/games/slots/gummy/gummy-drops-mid1.webp",
+        "/assets/games/slots/gummy/gummy-drops-mid2.webp",
+        "/assets/games/slots/gummy/gummy-drops-bonus.webp"
       ],
       "consumptionExpressions": [
         "RANK_ART_INDEX[config.id]",

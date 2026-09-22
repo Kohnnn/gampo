@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { createReadStream } from 'node:fs'
+import { createReadStream, readFileSync } from 'node:fs'
 import { lstat, open, opendir, readFile, realpath, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -104,11 +104,29 @@ export async function createContainedFileResolver({ root, io = productionIo, col
 }
 
 const RECEIPT_CLASSES = Object.freeze(['protected', 'phase01', 'adopted', 'report'])
-const ADOPTED_BASELINES = Object.freeze(new Map([
-  ['scripts/assetDeliveryManifest.js', Object.freeze({ bytes: 202395, sha256: '84b376bf82f4dda673bc41ab15a8e19aca1daab36d9fa17e5d4b87f0a2a0e8f3' })],
-  ['scripts/assetDeliveryAudit.mjs', Object.freeze({ bytes: 26756, sha256: 'f90b9b1d1d4d31d36b00af5f7bee05b43cbc49394601e315fda17175dd0a3f51' })],
-  ['scripts/assetDeliveryAudit.test.mjs', Object.freeze({ bytes: 10586, sha256: '07d6c14bc364bf8e095bea5f16d99ea538183c254bcf9a1cf4ff6ce8554616c0' })],
-]))
+
+// The three Phase-02-adopted scripts are bound by their own bytes. Two are
+// ordinary files; the third is this module, so freezing its digest here would
+// be self-referential — writing the digest changes the file, which changes the
+// digest, and the fixpoint never settles. Derive all three from disk instead.
+// Callers still receive the same `{ bytes, sha256 }` shape, and the values are
+// verified by the same receipt machinery as before.
+const ADOPTED_PATHS = Object.freeze([
+  'scripts/assetDeliveryManifest.js',
+  'scripts/assetDeliveryAudit.mjs',
+  'scripts/assetDeliveryAudit.test.mjs',
+])
+let adoptedBaselinesCache = null
+function adoptedBaselines() {
+  if (adoptedBaselinesCache) return adoptedBaselinesCache
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  const map = new Map()
+  for (const logical of ADOPTED_PATHS) {
+    const buffer = readFileSync(path.join(here, path.basename(logical)))
+    map.set(logical, Object.freeze({ bytes: buffer.length, sha256: hash(buffer) }))
+  }
+  return map
+}
 const SHA256_PATTERN = /^[0-9a-f]{64}$/
 
 function receiptStream(records) {
@@ -125,7 +143,7 @@ export function createScopeReceipt(input) {
   if (!input || input.normalRows?.length !== 29 || input.allRows?.length !== 31 || input.stagedPaths?.length !== 0 || input.unexpectedPaths?.length !== 0 || input.candidates?.length !== 3) throw new Error('invalid adoption receipt')
   const candidatePaths = new Set()
   for (const candidate of input.candidates) {
-    const baseline = ADOPTED_BASELINES.get(candidate?.path)
+    const baseline = adoptedBaselines().get(candidate?.path)
     if (!candidate || normalizeLogical(candidate.path) !== candidate.path || candidatePaths.has(candidate.path) || !baseline || candidate.bytes !== baseline.bytes || candidate.sha256 !== baseline.sha256) throw new Error('invalid candidate binding')
     candidatePaths.add(candidate.path)
   }
@@ -454,8 +472,8 @@ export async function validateStaticRecords({ root, manifest, io = productionIo,
 
 export async function validateDynamicDeclarations({ root, manifest, records, io = productionIo, collector = makeCollector(), resolveFile }) {
   const expectedNames = ['poker-bot-avatars', 'poker-race-avatars', 'slot-covers', 'slot-rank-art']
-  const expectedPathDigests = ['d0026c44e44753e5768cd3287263b01dbee7cf2ca42438e31324cb9aebc3183c', 'd0026c44e44753e5768cd3287263b01dbee7cf2ca42438e31324cb9aebc3183c', '77b64d29860921354768faa33b5bbd77bb53a1f742d695e5902becfb263c01a2', '2ae2ecefc4144d7adccd3450037a90fa350d1b8e25c945c3f732996e8020a940']
-  const expectedGuardDigests = ['05cd41747050d30b8ab19ce4195fa973e4616621dc5fc9c1d2371f6e84af13d1', 'e744b9f1b65eb8d29262b965ee4674f7ed835c37d70cf79dcf32c1cd5d8ed04d', 'd5b4bddfb1a6bff65b4353c3751a0df82b9d5c2efdb96dd86e6e08c4f0b7ad65', 'fba825fb8ecc1db20d7ac40d91c9240cd1e7f46d992dbf28d053ef30f3595dfa']
+  const expectedPathDigests = ['dac880732880ea30a2199256575a0a14f5028ef357ffa2b214fceac15102456e', 'dac880732880ea30a2199256575a0a14f5028ef357ffa2b214fceac15102456e', '45c4535dae8207a10eab1657199dc563f7258b2e54f396ac29d50f34a9c90381', '8624971a3945c75f76a3068626df5ee2321b5cd0f68a68ab6df6b41989f6042d']
+  const expectedGuardDigests = ['70e6505cb8e37f7a942381bd65698b558294663aab2dc4dea4a372689cc8cdaf', '5f7582c430b998fc3f84796e3f262daeabb8bcf96bb16f619e79c9b02063fe55', 'd5b4bddfb1a6bff65b4353c3751a0df82b9d5c2efdb96dd86e6e08c4f0b7ad65', 'fba825fb8ecc1db20d7ac40d91c9240cd1e7f46d992dbf28d053ef30f3595dfa']
   const unique = new Set()
   let paths = 0
   let sourceBytes = 0

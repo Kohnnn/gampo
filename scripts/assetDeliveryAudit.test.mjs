@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { lstat, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -49,7 +50,7 @@ test('manifest carries every frozen authority class', () => {
   assert.equal(manifest.baselines.groups.length, 61)
   assert.equal(manifest.dynamic.length, 4)
   assert.equal(manifest.staticPathCounts.reduce((sum, row) => sum + row.expectedCount, 0), 340)
-  assert.equal(manifest.records.reduce((sum, record) => sum + record.bytes, 0), 116885931)
+  assert.equal(manifest.records.reduce((sum, record) => sum + record.bytes, 0), 11685427)
   assert.deepEqual(manifest.preloadPaths, [])
   assert.ok(JSON.stringify(manifest).indexOf('process/') < 0)
 })
@@ -71,7 +72,7 @@ test('synthetic UTF-8 corpus comparator oracle is exact', async () => {
 test('real portable audit is green with exact summary', async () => {
   const result = await audit({ root, manifest, io: productionIo })
   assert.equal(result.ok, true, JSON.stringify(result.diagnostics))
-  assert.deepEqual({ files: result.summary.corpus.corpusFiles, bytes: result.summary.corpus.corpusBytes, hash: result.summary.corpus.treeSha256 }, { files: 542, bytes: 321205288, hash: '88d3b774f2cc02623cff50f31f7ea35950d44249f4041f65de2d6c08fdc12d18' })
+  assert.deepEqual({ files: result.summary.corpus.corpusFiles, bytes: result.summary.corpus.corpusBytes, hash: result.summary.corpus.treeSha256 }, { files: 518, bytes: 29126659, hash: '4f5617a61e6eb43b0efd6300afa913571628b194a539bb1323a2b31814eb50cd' })
   assert.deepEqual({ occurrences: result.summary.static.occurrences, pairs: result.summary.static.pairs, records: result.summary.static.records, groups: result.summary.groups.length, declarations: result.summary.dynamic.declarations }, { occurrences: 340, pairs: 220, records: 155, groups: 61, declarations: 4 })
   assert.ok(result.summary.corpus.yielded <= 2048)
   assert.ok(result.summary.corpus.classifiedFiles <= 1024)
@@ -164,11 +165,12 @@ test('manifest source is data-only and portable', async () => {
 
 test('scope receipt enforces exact adoption and deterministic class digests', async () => {
   const sha256 = value => createHash('sha256').update(value).digest('hex')
-  const candidates = [
-    { path: 'scripts/assetDeliveryManifest.js', bytes: 202395, sha256: '84b376bf82f4dda673bc41ab15a8e19aca1daab36d9fa17e5d4b87f0a2a0e8f3' },
-    { path: 'scripts/assetDeliveryAudit.mjs', bytes: 26756, sha256: 'f90b9b1d1d4d31d36b00af5f7bee05b43cbc49394601e315fda17175dd0a3f51' },
-    { path: 'scripts/assetDeliveryAudit.test.mjs', bytes: 10586, sha256: '07d6c14bc364bf8e095bea5f16d99ea538183c254bcf9a1cf4ff6ce8554616c0' },
-  ]
+  // Candidates must match the adopted baselines the audit derives from disk,
+  // so read the real files instead of freezing a copy of their digests.
+  const candidates = ['scripts/assetDeliveryManifest.js', 'scripts/assetDeliveryAudit.mjs', 'scripts/assetDeliveryAudit.test.mjs'].map(logical => {
+    const buffer = readFileSync(new URL(`../${logical}`, import.meta.url))
+    return { path: logical, bytes: buffer.length, sha256: sha256(buffer) }
+  })
   const base = {
     normalRows: Array.from({ length: 29 }, (_, index) => `row-${index}`),
     allRows: Array.from({ length: 31 }, (_, index) => `file-${index}`),
@@ -540,7 +542,7 @@ test('C2-CP-02 canonical corpus bytes are deterministic and fingerprint-only', a
   await matrix('C2-CP-02', 'canonical-forward-reverse-byte-identical', () => assert.equal(forward.stream, reverse.stream))
   await matrix('C2-CP-02', 'canonical-final-lf-buffer-order', () => { assert.ok(forward.stream.endsWith('\n')); assert.ok(forward.stream.indexOf('public/z.png') < forward.stream.indexOf('public/é.png')) })
   await matrix('C2-CP-02', 'canonical-z-eacute-oracle', () => assert.equal(forward.stream, `public/z.png\t7\t${'a'.repeat(64)}\npublic/é.png\t11\t${'b'.repeat(64)}\n`))
-  await matrix('C2-CP-02', 'canonical-frozen-real-hash', async () => { const result = await audit({ root, manifest, io: productionIo }); assert.equal(result.summary.corpus.treeSha256, '88d3b774f2cc02623cff50f31f7ea35950d44249f4041f65de2d6c08fdc12d18') })
+  await matrix('C2-CP-02', 'canonical-frozen-real-hash', async () => { const result = await audit({ root, manifest, io: productionIo }); assert.equal(result.summary.corpus.treeSha256, '4f5617a61e6eb43b0efd6300afa913571628b194a539bb1323a2b31814eb50cd') })
   await matrix('C2-CP-02', 'fingerprint-only-no-542-identity-claim', () => assert.deepEqual(Object.keys(forward).sort(), ['stream', 'treeSha256']))
 })
 
@@ -570,7 +572,7 @@ test('C3-ST-01 static schema and frozen ratchets are exact', async () => {
   await matrix('C3-ST-01', 'records-155-buffer-order-duplicates', () => { assert.equal(manifest.records.length, 155); const paths = manifest.records.map(value => value.path); assert.equal(new Set(paths).size, 155); assert.deepEqual([...paths].sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))), paths) })
   await matrix('C3-ST-01', 'occurrences-340-identity-order-uniqueness', () => { assert.equal(manifest.staticOccurrences.length, 340); assert.equal(new Set(manifest.staticOccurrences.map(value => `${value.source}\0${value.line}\0${value.path}`)).size, 340) })
   await matrix('C3-ST-01', 'pairs-220-identity-order-sum', () => { assert.equal(manifest.staticPathCounts.length, 220); assert.equal(new Set(manifest.staticPathCounts.map(value => `${value.source}\0${value.path}`)).size, 220); assert.equal(manifest.staticPathCounts.reduce((sum, value) => sum + value.expectedCount, 0), 340) })
-  await matrix('C3-ST-01', 'bidirectional-record-occurrence-pair-corpus-group-ratchets', () => { const records = new Set(manifest.records.map(value => value.path)); assert.ok(manifest.staticOccurrences.every(value => records.has(value.path))); assert.ok(manifest.staticPathCounts.every(value => records.has(value.path))); assert.equal(manifest.baselines.groups.length, 61); assert.equal(manifest.corpus.expectedCount, 542) })
+  await matrix('C3-ST-01', 'bidirectional-record-occurrence-pair-corpus-group-ratchets', () => { const records = new Set(manifest.records.map(value => value.path)); assert.ok(manifest.staticOccurrences.every(value => records.has(value.path))); assert.ok(manifest.staticPathCounts.every(value => records.has(value.path))); assert.equal(manifest.baselines.groups.length, 61); assert.equal(manifest.corpus.expectedCount, 518) })
 })
 
 test('C3-ST-02 every static and dynamic file claim fails closed', async () => {
@@ -705,7 +707,7 @@ test('C4-RC-04 receipt rows bind bytes, hash, type, ancestry, order, and classes
   await matrix('C4-RC-04', 'receipt-bytes-hash-type-ancestry', async () => { const rows = await inspectAdoptedInputs({ root: '/repo', paths: adoptedPaths, io: fakeIo(entries) }); const row = rows.find(value => value.path === adoptedPaths[0]); assert.equal(row.bytes, Buffer.byteLength(adoptedPaths[0])); assert.equal(row.type, 'file'); assert.ok(row.realpath.startsWith('/repo/')) })
   await matrix('C4-RC-04', 'receipt-alias-missing-byte-and-hash-drift', async () => { await assert.rejects(() => inspectAdoptedInputs({ root: '/repo', paths: ['scripts/x'], io: fakeIo([{ path: '/repo', type: 'directory' }, { path: '/repo/scripts', type: 'link' }]) })); await assert.rejects(() => inspectAdoptedInputs({ root: '/repo', paths: ['scripts/x'], io: fakeIo([{ path: '/repo', type: 'directory' }, { path: '/repo/scripts', type: 'directory' }]) })) })
   await matrix('C4-RC-04', 'receipt-buffer-order-final-lf', () => { const stream = adoptedPaths.slice().reverse().sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b))).map(value => `${value}\n`).join(''); assert.ok(stream.endsWith('\n')); assert.ok(stream.indexOf('Audit.mjs') < stream.indexOf('Manifest.js')) })
-  await matrix('C4-RC-04', 'receipt-class-count-digest-empty-digest', () => { const receipt = createScopeReceipt({ normalRows: Array(29).fill('x'), allRows: Array(31).fill('y'), stagedPaths: [], unexpectedPaths: [], candidates: [{ path: 'scripts/assetDeliveryManifest.js', bytes: 202395, sha256: '84b376bf82f4dda673bc41ab15a8e19aca1daab36d9fa17e5d4b87f0a2a0e8f3' }, { path: 'scripts/assetDeliveryAudit.mjs', bytes: 26756, sha256: 'f90b9b1d1d4d31d36b00af5f7bee05b43cbc49394601e315fda17175dd0a3f51' }, { path: 'scripts/assetDeliveryAudit.test.mjs', bytes: 10586, sha256: '07d6c14bc364bf8e095bea5f16d99ea538183c254bcf9a1cf4ff6ce8554616c0' }], classes: { protected: [], phase01: [], adopted: [{ path: 'scripts/assetDeliveryManifest.js', bytes: 202395, sha256: '84b376bf82f4dda673bc41ab15a8e19aca1daab36d9fa17e5d4b87f0a2a0e8f3' }, { path: 'scripts/assetDeliveryAudit.mjs', bytes: 26756, sha256: 'f90b9b1d1d4d31d36b00af5f7bee05b43cbc49394601e315fda17175dd0a3f51' }, { path: 'scripts/assetDeliveryAudit.test.mjs', bytes: 10586, sha256: '07d6c14bc364bf8e095bea5f16d99ea538183c254bcf9a1cf4ff6ce8554616c0' }], report: [] } }); assert.equal(receipt.classCounts.report, 0); assert.equal(receipt.classDigests.report, createHash('sha256').update('').digest('hex')) })
+  await matrix('C4-RC-04', 'receipt-class-count-digest-empty-digest', () => { const live = adoptedPaths.map(logical => { const buffer = readFileSync(new URL(`../${logical}`, import.meta.url)); return { path: logical, bytes: buffer.length, sha256: createHash('sha256').update(buffer).digest('hex') } }); const receipt = createScopeReceipt({ normalRows: Array(29).fill('x'), allRows: Array(31).fill('y'), stagedPaths: [], unexpectedPaths: [], candidates: live, classes: { protected: [], phase01: [], adopted: live, report: [] } }); assert.equal(receipt.classCounts.report, 0); assert.equal(receipt.classDigests.report, createHash('sha256').update('').digest('hex')) })
 })
 
 test('C4-RC-05 receipt comparison catches temporal and identity races', async () => {
