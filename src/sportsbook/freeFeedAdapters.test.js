@@ -6,7 +6,6 @@ import {
     normalizeOddsApiIoEvent,
     normalizePandaScoreMatch,
     normalizeSportsGameOddsEvent,
-    normalizeTheOddsApiEvent,
 } from './freeFeedAdapters'
 import { driftSyntheticEvents } from './sportsbookData'
 
@@ -288,7 +287,12 @@ describe('free provider sportsbook adapters', () => {
         expect(payload.events.find(event => event.sourceRefs[0].eventId === 'missing').startsAt).toBeNull()
     })
 
-    it('keeps missing API-SPORTS and The Odds API starts unknown and provider-isolated', () => {
+    it('keeps missing API-SPORTS starts unknown and provider-isolated', () => {
+        // Originally this proved isolation between API-SPORTS and The Odds API.
+        // The Odds API provider was removed on 2026-09-22, so the second source
+        // is now PandaScore. The property under test is unchanged: two
+        // independent providers that both omit a start time must each stay
+        // unknown and must not be merged into one another's event.
         const fixture = {
             generatedAt: '2026-05-26T20:00:00.000Z',
             apiFootball: {
@@ -299,19 +303,12 @@ describe('free provider sportsbook adapters', () => {
                     teams: { home: { name: 'Alpha' }, away: { name: 'Beta' } },
                 }],
             },
-            theOddsApi: {
-                events: [{
-                    id: 'theoddsapi-missing-start',
-                    sport_key: 'basketball_nba',
-                    sport_title: 'NBA',
-                    home_team: 'Alpha',
-                    away_team: 'Beta',
-                    bookmakers: [{
-                        key: 'draftkings',
-                        title: 'DraftKings',
-                        last_update: '2026-05-26T19:58:00.000Z',
-                        markets: [{ key: 'h2h', outcomes: [{ name: 'Alpha', price: 1.91 }, { name: 'Beta', price: 2.09 }] }],
-                    }],
+            pandascore: {
+                matches: [{
+                    id: 'pandascore-missing-start',
+                    videogame: { slug: 'valorant' },
+                    league: { name: 'VCT' },
+                    opponents: [{ opponent: { name: 'Gamma' } }, { opponent: { name: 'Delta' } }],
                 }],
             },
         }
@@ -326,7 +323,7 @@ describe('free provider sportsbook adapters', () => {
         expect(new Set(first.map(event => event.id)).size).toBe(2)
         expect(first.map(event => event.sourceRefs[0])).toEqual(expect.arrayContaining([
             { provider: 'api-sports-basketball', eventId: 'apisports-basketball-apisports-missing-start' },
-            { provider: 'the-odds-api', eventId: 'theoddsapi-missing-start' },
+            { provider: 'pandascore', eventId: 'pandascore-pandascore-missing-start' },
         ]))
     })
 
@@ -352,7 +349,7 @@ describe('free provider sportsbook adapters', () => {
         expect(event.period).toBeNull()
     })
 
-    it('preserves API-Football and The Odds API bookmaker names', () => {
+    it('preserves API-Football bookmaker names', () => {
         const apiFootball = normalizeFreeProviderPayload({
             generatedAt: '2026-05-26T20:00:00.000Z',
             apiFootball: {
@@ -369,19 +366,9 @@ describe('free provider sportsbook adapters', () => {
                 }],
             },
         }).events[0]
-        const theOddsApi = normalizeTheOddsApiEvent({
-            id: 'toa-1',
-            sport_key: 'basketball_nba',
-            sport_title: 'NBA',
-            commence_time: '2026-05-27T20:00:00.000Z',
-            home_team: 'Alpha',
-            away_team: 'Beta',
-            bookmakers: [{ key: 'draftkings', title: 'DraftKings', markets: [{ key: 'h2h', outcomes: [{ name: 'Alpha', price: 1.91 }, { name: 'Beta', price: 2.09 }] }] }],
-        }, 'us', { generatedAt: '2026-05-26T20:00:00.000Z' })
 
         expect(apiFootball.offers.map(offer => offer.bookmaker)).toEqual(['Pinnacle', 'Pinnacle'])
-        expect(theOddsApi.offers.map(offer => offer.bookmaker)).toEqual(['DraftKings', 'DraftKings'])
-        expect([...apiFootball.offers, ...theOddsApi.offers].every(offer => offer.freshness === 'current' && offer.submittable)).toBe(true)
+        expect(apiFootball.offers.every(offer => offer.freshness === 'current' && offer.submittable)).toBe(true)
     })
 
     it('keeps model estimates separate and prevents synthetic drift from changing provider facts', () => {

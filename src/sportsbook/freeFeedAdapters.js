@@ -1,6 +1,5 @@
 import { LEAGUES } from './sportsbookData'
 import { deVigProbabilities, roundCurrency } from './sportsbookMath'
-import { fixtureFromOddsApi } from '../services/sportsApi'
 
 function slugify(value) {
     return String(value || 'feed').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'feed'
@@ -759,71 +758,6 @@ export function normalizeApiSportsMultiSportEvent(item) {
     })
 }
 
-// === The Odds API ===
-// The proxy now fetches The Odds API server-side (keys stay off the client).
-// Each event carries `_gampoRegion` ('us'|'uk'). We reuse the pure
-// `fixtureFromOddsApi` helper to normalize the h2h markets, then map it into a
-// GamPo feed event with a real (de-vigged) winner market group.
-const ODDS_API_SPORT_ALIASES = [
-    ['soccer', ['soccer', 'football']],
-    ['tennis', ['tennis']],
-    ['basketball', ['basketball', 'nba', 'ncaab']],
-    ['football', ['american football', 'nfl', 'ncaaf']],
-    ['ice-hockey', ['hockey', 'nhl']],
-    ['baseball', ['baseball', 'mlb']],
-    ['cricket', ['cricket']],
-    ['dota-2', ['dota']],
-    ['cs2', ['counter', 'cs2', 'csgo']],
-    ['valorant', ['valorant']],
-    ['league-of-legends', ['league of legends', 'lol']],
-]
-
-function oddsApiSportId(title = '') {
-    const text = String(title).toLowerCase()
-    const found = ODDS_API_SPORT_ALIASES.find(([, tokens]) => tokens.some(token => text.includes(token)))
-    return found?.[0] || 'soccer'
-}
-
-export function normalizeTheOddsApiEvent(event, region = 'us', context = {}) {
-    const fixture = fixtureFromOddsApi(event, null, region)
-    if (!fixture?.markets?.length) return null
-    const sportId = oddsApiSportId(`${fixture.sport} ${event.sport_key || ''}`)
-    const eventId = `theoddsapi-${fixture.id}`
-    const outcomes = (event?.bookmakers || []).flatMap(bookmaker => {
-        const market = (bookmaker?.markets || []).find(candidate => candidate?.key === 'h2h')
-        return (market?.outcomes || []).flatMap(outcome => {
-            const decimalOdds = Number(outcome?.price)
-            if (!Number.isFinite(decimalOdds) || decimalOdds <= 1) return []
-            return [{
-                side: outcome.name === fixture.home ? 'home' : outcome.name === fixture.away ? 'away' : 'draw',
-                label: outcome.name,
-                decimalOdds,
-                bookmaker: bookmaker.title || bookmaker.key || null,
-                observedAt: market?.last_update || bookmaker?.last_update || event?.last_update || event?.lastUpdate || null,
-            }]
-        })
-    })
-    const marketGroups = [providerMarketGroup({ eventId, id: 'winner', label: outcomes.some(outcome => outcome.side === 'draw') ? '1x2' : 'Winner', source: 'the-odds-api', outcomes })].filter(Boolean)
-    return normalizedEvent({
-        id: eventId,
-        providerEventId: fixture.id,
-        sportId,
-        source: 'the-odds-api',
-        leagueName: fixture.league || `${region.toUpperCase()} Feed`,
-        region: region.toUpperCase(),
-        startsAt: event.commence_time,
-        status: 'prematch',
-        home: fixture.home,
-        away: fixture.away,
-        homeLogo: imageUrl(event?.home_logo, event?.homeLogo),
-        awayLogo: imageUrl(event?.away_logo, event?.awayLogo),
-        marketGroups,
-        observedAt: event?.last_update || event?.lastUpdate || null,
-        referenceAt: context.generatedAt || null,
-        sourceContext: 'theOddsApi',
-        tags: ['primary-odds'],
-    })
-}
 
 function aggregateCanonicalEvents(events) {
     const byKey = new Map()
@@ -880,7 +814,6 @@ export function normalizeFreeProviderPayload(payload = {}) {
         ...(payload?.oddsApiIo?.events || []).map(event => normalizeOddsApiIoEvent(event, payload?.oddsApiIo?.odds || [], context)),
         ...(payload?.apiFootball?.fixtures || []).map(item => normalizeApiFootballFixture(item, apiFootballOdds, context)),
         ...(payload?.apiFootball?.multiSport || []).map(item => normalizeApiSportsMultiSportEvent(item, context)),
-        ...(payload?.theOddsApi?.events || []).map(event => normalizeTheOddsApiEvent(event, event?._gampoRegion || 'us', context)),
     ].filter(Boolean)
     const events = aggregateCanonicalEvents(normalized)
     const errors = payload?.errors || []
@@ -891,7 +824,6 @@ export function normalizeFreeProviderPayload(payload = {}) {
         quotas: payload?.quotas || {},
         sources: payload?.sources || {},
         marquee: payload?.marquee || null,
-        inSeason: payload?.theOddsApi?.inSeason || [],
         generatedAt: context.generatedAt,
         cached: Boolean(payload?.cached),
         feedState: aggregateFeedState(events, errors),

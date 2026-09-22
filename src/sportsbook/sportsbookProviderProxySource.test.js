@@ -2,16 +2,14 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const proxySource = readFileSync(new URL('../../server/sportsbookProviderProxy.js', import.meta.url), 'utf8')
+// The Odds API provider was removed on 2026-09-22 (owner decision: no longer
+// wanted). Its server-only-key contract had a dedicated case here; that case is
+// deleted with the provider rather than re-pinned to an unrelated key, since
+// the security property it guarded (keys never inlined into the client bundle)
+// no longer has a subject. The remaining case below still holds the proxy's
+// marquee/fanout contract.
 
 describe('sportsbook provider proxy source contract', () => {
-    it('reads The Odds API keys only from the server-only environment variable', () => {
-        const match = proxySource.match(/function oddsApiKeys\(env\)\s*\{([\s\S]*?)\n\}/)
-
-        expect(match?.[1]).toContain("['ODDS_API_KEYS']")
-        expect(match?.[1]).not.toContain('VITE_ODDS_API_KEYS')
-        expect(match?.[1]).not.toContain('odds_api_keys')
-    })
-
     it('applies marquee filtering server-side before odds fanout and exposes metrics', () => {
         expect(proxySource).toContain("import { curateTopSportsbookItems, mergeMarqueeMetrics }")
         expect(proxySource).toContain('const MAX_EVENTS_PER_SPORT = 12')

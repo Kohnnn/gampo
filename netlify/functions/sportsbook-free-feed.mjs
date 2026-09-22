@@ -13,7 +13,6 @@ const OPAQUE_SECRET_PATTERN = /\b[a-z0-9_-]{32,}\b/gi
 export function sanitizeUpstreamFailure(error, env = {}) {
     let message = typeof error?.message === 'string' ? error.message : 'upstream request failed'
     const secretNames = [
-        'ODDS_API_KEYS',
         'SPORTSGAMEODDS_TOKEN',
         'PANDASCORE_TOKEN',
         'ODDS_API_IO_TOKEN',
