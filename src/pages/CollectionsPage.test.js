@@ -11,8 +11,10 @@ import {
     SUCCESS,
     fail,
     initialResources,
+    isVisibleResourceBusy,
     invalidateAttempt,
     readJsonResponse,
+    shouldStartCatalog,
     startAttempt,
     succeed,
 } from './collectionsLoadState'
@@ -107,19 +109,51 @@ describe('collections load state', () => {
         expect(late[CASES_RESOURCE].data).toEqual(['kept'])
     })
 
-    it('covers StrictMode replay: first pass invalidated, replayed attempt wins', () => {
-        // StrictMode runs the effect twice; cleanup invalidates pass one.
+    it('restarts the catalog after StrictMode invalidates its first mount attempt', () => {
+        let s = initialResources()
+        expect(shouldStartCatalog('items', s[CATALOG_RESOURCE])).toBe(true)
+        expect(shouldStartCatalog('cases', s[CATALOG_RESOURCE])).toBe(false)
+
+        s = startAttempt(s, CATALOG_RESOURCE, 1)
+        expect(shouldStartCatalog('items', s[CATALOG_RESOURCE])).toBe(false)
+
+        // StrictMode cleanup invalidates pass one. Its replay must see an idle
+        // catalog and allocate a replacement rather than remain stuck loading.
+        s = invalidateAttempt(s, CATALOG_RESOURCE, 2)
+        expect(s[CATALOG_RESOURCE].status).toBe(IDLE)
+        expect(shouldStartCatalog('items', s[CATALOG_RESOURCE])).toBe(true)
+
+        const replayed = startAttempt(s, CATALOG_RESOURCE, 3)
+        const afterStaleCompletion = succeed(replayed, CATALOG_RESOURCE, 1, ['first-pass'])
+        expect(afterStaleCompletion[CATALOG_RESOURCE].status).toBe(LOADING)
+        expect(afterStaleCompletion[CATALOG_RESOURCE].data).toBeNull()
+
+        const replayCompletes = succeed(afterStaleCompletion, CATALOG_RESOURCE, 3, ['replay'])
+        expect(replayCompletes[CATALOG_RESOURCE].data).toEqual(['replay'])
+        expect(shouldStartCatalog('items', replayCompletes[CATALOG_RESOURCE])).toBe(false)
+    })
+
+    it('reports busy from only the resource visible in the selected view', () => {
         let s = startAttempt(initialResources(), CASES_RESOURCE, 1)
-        s = invalidateAttempt(s, CASES_RESOURCE, 2)
+        expect(isVisibleResourceBusy(s, 'cases')).toBe(true)
+        expect(isVisibleResourceBusy(s, 'items')).toBe(false)
+        s = succeed(s, CASES_RESOURCE, 1, ['case'])
+        expect(isVisibleResourceBusy(s, 'cases')).toBe(false)
+        expect(isVisibleResourceBusy(s, 'items')).toBe(false)
 
-        const replayed = startAttempt(s, CASES_RESOURCE, 3)
-        expect(replayed[CASES_RESOURCE].attempt).toBe(3)
+        s = startAttempt(s, CASES_RESOURCE, 2)
 
-        const firstPassCompletes = succeed(replayed, CASES_RESOURCE, 1, ['first-pass'])
-        expect(firstPassCompletes[CASES_RESOURCE].status).toBe(LOADING)
+        s = startAttempt(s, CATALOG_RESOURCE, 1)
+        s = fail(s, CASES_RESOURCE, 2)
+        expect(isVisibleResourceBusy(s, 'cases')).toBe(false)
+        expect(isVisibleResourceBusy(s, 'items')).toBe(true)
 
-        const replayCompletes = succeed(firstPassCompletes, CASES_RESOURCE, 3, ['replay'])
-        expect(replayCompletes[CASES_RESOURCE].data).toEqual(['replay'])
+        s = fail(s, CATALOG_RESOURCE, 1)
+        expect(isVisibleResourceBusy(s, 'items')).toBe(false)
+        s = startAttempt(s, CATALOG_RESOURCE, 2)
+        expect(isVisibleResourceBusy(s, 'items')).toBe(true)
+        s = succeed(s, CATALOG_RESOURCE, 2, ['item'])
+        expect(isVisibleResourceBusy(s, 'items')).toBe(false)
     })
 
     it('retries only the failed resource and recovers it, preserving its sibling', () => {
@@ -190,11 +224,13 @@ describe('CollectionsPage browse hub', () => {
         expect(seam).toMatch(/return response\.json\(\)/)
     })
 
-    it('wires accessible error, loading and retry semantics for both resources', () => {
+    it('wires accessible error, loading, retry, and visible-resource busy semantics', () => {
         expect(source).toContain('role="alert"')
         expect(source).toContain('role="status"')
         expect(source).toContain('aria-live="polite"')
-        expect(source).toContain("aria-busy={casesState.status === LOADING ? 'true' : undefined}")
+        expect(source).toContain("aria-busy={isVisibleResourceBusy(resources, view) ? 'true' : undefined}")
+        expect(source).toContain('if (!shouldStartCatalog(view, catalogState)) return')
+        expect(source).not.toContain('catalogStarted')
         expect(source).toContain('type="button"')
         expect(source).toContain('onClick={() => retry(CASES_RESOURCE)}')
         expect(source).toContain('onClick={() => retry(CATALOG_RESOURCE)}')

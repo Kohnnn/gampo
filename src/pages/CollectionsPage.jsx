@@ -20,8 +20,10 @@ import {
     fail,
     initialResources,
     invalidateAttempt,
+    isVisibleResourceBusy,
     readJsonResponse,
     startAttempt,
+    shouldStartCatalog,
     succeed,
 } from './collectionsLoadState'
 import './CollectionsPage.css'
@@ -69,6 +71,8 @@ export default function CollectionsPage() {
     // derived from the latest committed state. A mirrored ref would
     // desynchronise under batching and drop a legitimate retry commit.
     const [resources, setResources] = useState(initialResources)
+    const casesState = resources[CASES_RESOURCE]
+    const catalogState = resources[CATALOG_RESOURCE]
 
 
     // Single allocation point for attempt ids, shared by `load` and the
@@ -110,19 +114,14 @@ export default function CollectionsPage() {
         load(CASES_RESOURCE, '/data/cs-cases.json')
     }, [load])
 
-    // The catalog starts on first selection of Items, so this effect must react
-    // to `view`. It must NOT own a teardown that invalidates the catalog: React
-    // runs cleanup on every dependency change, and once `load` has been called
-    // from a retry, that teardown would invalidate the retry's own attempt and
-    // the successful response would be dropped (stuck in loading, no cards, no
-    // error). Invalidation for a genuine unmount is handled by a dedicated
-    // effect that runs once, so re-rendering never cancels a live attempt.
-    const catalogStarted = useRef(false)
+    // Catalog remains idle until Items is selected. The resource state is the
+    // start guard: cleanup invalidation returns an in-flight attempt to idle,
+    // allowing React StrictMode's effect replay to allocate a fresh current
+    // attempt. Loading/success/error block duplicate loads on ordinary renders.
     useEffect(() => {
-        if (view !== 'items' || catalogStarted.current) return
-        catalogStarted.current = true
+        if (!shouldStartCatalog(view, catalogState)) return
         load(CATALOG_RESOURCE, '/data/cs-collection.json')
-    }, [load, view])
+    }, [catalogState, load, view])
 
     // Unmount-only invalidations. An empty dependency list means this teardown
     // runs exactly once, when the page is left.
@@ -133,8 +132,6 @@ export default function CollectionsPage() {
         setResources(prev => invalidateAttempt(prev, CATALOG_RESOURCE, nextAttemptId(CATALOG_RESOURCE)))
     }, [nextAttemptId])
 
-    const casesState = resources[CASES_RESOURCE]
-    const catalogState = resources[CATALOG_RESOURCE]
     const cases = casesState.status === SUCCESS ? casesState.data : null
     const catalog = catalogState.status === SUCCESS ? catalogState.data : null
 
@@ -260,7 +257,7 @@ export default function CollectionsPage() {
                 <main
                     className="collections-results"
                     data-ux-surface="stage"
-                    aria-busy={casesState.status === LOADING ? 'true' : undefined}
+                    aria-busy={isVisibleResourceBusy(resources, view) ? 'true' : undefined}
                 >
                     {view === 'cases' && (
                         <>

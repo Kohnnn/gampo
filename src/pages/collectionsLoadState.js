@@ -46,6 +46,19 @@ export function initialResources() {
     }
 }
 
+// Catalog loading is driven by the resource state rather than a one-shot ref.
+// React StrictMode replays a mount effect with its original idle snapshot, so
+// that replay starts a fresh attempt after cleanup invalidates the first one.
+// Once loading or settled, ordinary renders cannot start a duplicate request.
+export function shouldStartCatalog(view, catalogState) {
+    return view === 'items' && catalogState?.status === IDLE
+}
+
+export function isVisibleResourceBusy(resources, view) {
+    const resource = view === 'items' ? CATALOG_RESOURCE : CASES_RESOURCE
+    return resources[resource]?.status === LOADING
+}
+
 // Starting an attempt moves the resource to `loading` and drops any previously
 // rendered data or error, so a retry cannot show stale content beside its own
 // loading state. The attempt id is allocated by the caller and passed in: the
@@ -57,14 +70,17 @@ export function startAttempt(resources, resource, attempt) {
     }
 }
 
-// Invalidate without loading: an unmount or a superseding attempt advances the
-// id so an in-flight response can no longer commit, while the visible state is
-// left alone. The new id is allocated by the caller from the same allocator
-// `startAttempt` uses, so the two can never drift apart.
+// Invalidate an in-flight request by returning it to idle. On a real unmount
+// that state is never rendered; during StrictMode's effect replay it is the
+// signal that the replay must allocate a replacement attempt. Settled states
+// stay unchanged because there is no request to replace.
 export function invalidateAttempt(resources, resource, attempt) {
+    const current = resources[resource] || initialResource()
     return {
         ...resources,
-        [resource]: { ...(resources[resource] || initialResource()), attempt },
+        [resource]: current.status === LOADING
+            ? { status: IDLE, data: null, error: null, attempt }
+            : { ...current, attempt },
     }
 }
 
