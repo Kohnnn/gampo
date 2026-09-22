@@ -3,6 +3,7 @@ import {
     isMuted, setMuted as setCtxMuted,
     playSample, unlockAudio, subscribeAudio,
 } from './audioContext'
+import { resolveAudio } from '../utils/assetPaths'
 
 const AudioContext_ = createContext(null)
 
@@ -40,7 +41,7 @@ export function AudioProvider({ children }) {
         // `dedupe: 'outcome'` collapses win/bigwin/loss fired for the same
         // round so layered calls (old synth + sample) can't double up.
         const dedupeKey = def.dedupe ? `outcome` : undefined
-        playSample(def.url, { volume: def.volume, dedupeKey })
+        playSample(resolveAudio(def.url), { volume: def.volume, dedupeKey })
     }, [])
 
     const setMuted = useCallback((next) => {

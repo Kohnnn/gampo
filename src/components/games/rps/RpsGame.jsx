@@ -12,11 +12,12 @@ import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './rps.css'
 import { useGameBgm } from '../../../audio/useBgm'
+import { resolveImage } from '../../../utils/assetPaths'
 
 const OPTIONS = [
-    { id: 'rock', label: 'Rock', img: '/assets/games/rps/rps-rock.png', emoji: '🪨', beats: 'scissors' },
-    { id: 'paper', label: 'Paper', img: '/assets/games/rps/rps-paper.png', emoji: '📄', beats: 'rock' },
-    { id: 'scissors', label: 'Scissors', img: '/assets/games/rps/rps-scissors.png', emoji: '✂️', beats: 'paper' },
+    { id: 'rock', label: 'Rock', img: resolveImage('/assets/games/rps/rps-rock.png'), emoji: '🪨', beats: 'scissors' },
+    { id: 'paper', label: 'Paper', img: resolveImage('/assets/games/rps/rps-paper.png'), emoji: '📄', beats: 'rock' },
+    { id: 'scissors', label: 'Scissors', img: resolveImage('/assets/games/rps/rps-scissors.png'), emoji: '✂️', beats: 'paper' },
 ]
 
 export default function RpsGame() {

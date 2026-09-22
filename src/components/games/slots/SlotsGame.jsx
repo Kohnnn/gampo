@@ -34,6 +34,7 @@ import {
     randomVisualSymbol,
     resolveSlotSpin,
 } from './slotFactory'
+import { resolveImage } from '../../../utils/assetPaths'
 import {
     SLOT_RETRIGGER_FLY_MS,
     buildCascadeLadderSteps,
@@ -1502,7 +1503,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         if (running || !lastResult?.featureEvents?.length) return []
         return lastResult.featureEvents.slice(0, 3)
     }, [lastResult, running])
-    const cover = useMemo(() => `/images/covers/generated/${config.id}.png`, [config.id])
+    const cover = useMemo(() => resolveImage(`/images/covers/generated/${config.id}.png`), [config.id])
     const displayGrid = useMemo(() => {
         if (grid.length === cellPositions.length && grid.every(Boolean)) return grid
         return makeInitialGrid(config)

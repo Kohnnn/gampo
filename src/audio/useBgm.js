@@ -10,6 +10,7 @@ import { useEffect, useRef } from 'react'
 import { getAudioCtx, getBgmGain, unlockAudio, decode } from './audioContext'
 import { resolveBgm } from './bgmManifest'
 import { resolveGameBgm } from './gameBgmManifest'
+import { resolveAudio } from '../utils/assetPaths'
 
 const bufferCache = new Map()
 export const BGM_UNLOCK_EVENTS = ['pointerdown', 'keydown', 'touchstart']
@@ -156,5 +157,5 @@ export function useGameBgm(gameId, mode = 'idle') {
 // Option 3: lobby/menu background music. Plays a single loop on menu
 // surfaces. Defaults muted via the BGM bus; the volume mixer toggles it.
 export function useMenuBgm(enabled = true) {
-    useBgmInner(enabled ? '/audio/bgm/menu/idle.wav' : null)
+    useBgmInner(enabled ? resolveAudio('/audio/bgm/menu/idle.wav') : null)
 }

@@ -11,9 +11,10 @@ import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './coinflip.css'
 import { useGameBgm } from '../../../audio/useBgm'
+import { resolveImage } from '../../../utils/assetPaths'
 
-const HEAD = '/assets/games/coin/coin-heads.png'
-const TAIL = '/assets/games/coin/coin-tails.png'
+const HEAD = resolveImage('/assets/games/coin/coin-heads.png')
+const TAIL = resolveImage('/assets/games/coin/coin-tails.png')
 
 export default function CoinFlipGame() {
     useGameBgm('coinflip', 'idle')

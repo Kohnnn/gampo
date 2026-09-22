@@ -16,6 +16,7 @@ import HandHistoryTab, { recordHand } from './HandHistoryTab'
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { useCancellableFrames, useCancellableTimeouts } from '../../../utils/scheduling'
 import './PokerGame.css'
+import { resolveImage } from '../../../utils/assetPaths'
 
 const BUY_INS = [1000, 5000, 25000, 100000, 500000]
 // 6-max sit-and-go: real tournament. No rebuys once seated, play to elimination,
@@ -44,7 +45,7 @@ const BOT_PERSONAS = [
     { name: 'straddle_sue', avatar: 4, aggression: 0.78, pokerStyle: 'loose-aggressive', chat: ['straddle pot', 'open jam', 'level it up'] },
     { name: 'fish_finn', avatar: 5, aggression: 0.34, pokerStyle: 'whale', chat: ['call call call', 'I had a draw', 'nh'] },
 ]
-const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => `/assets/games/poker/poker-avatar-${i}.png`)
+const BOT_AVATARS = [1, 2, 3, 4, 5].map(i => resolveImage(`/assets/games/poker/poker-avatar-${i}.png`))
 
 function blindLevelForHand(handNumber) {
     const level = Math.min(BLIND_LADDER.length - 1, Math.floor((handNumber - 1) / LEVEL_HANDS))

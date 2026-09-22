@@ -304,7 +304,7 @@ export function PromotionsPage() {
             accent: '#00e701',
             emoji: '\uD83C\uDFAE',
             gradient: 'linear-gradient(135deg, rgba(0, 231, 1, 0.34), rgba(7, 24, 18, 0.95))',
-            art: '/assets/games/promo/promo-edge.png',
+            art: resolveImage('/assets/games/promo/promo-edge.png'),
         },
         {
             id: 'edge-101',
@@ -317,7 +317,7 @@ export function PromotionsPage() {
             accent: '#00e701',
             emoji: '\uD83D\uDCCA',
             gradient: 'linear-gradient(135deg, rgba(0, 231, 1, 0.32), rgba(0, 95, 0, 0.92))',
-            art: '/assets/games/promo/promo-edge.png',
+            art: resolveImage('/assets/games/promo/promo-edge.png'),
         },
         {
             id: 'race-week',
@@ -330,7 +330,7 @@ export function PromotionsPage() {
             accent: '#ffcf5a',
             emoji: '\uD83C\uDFC6',
             gradient: 'linear-gradient(135deg, rgba(255, 207, 90, 0.32), rgba(120, 70, 0, 0.95))',
-            art: '/assets/games/promo/promo-race.png',
+            art: resolveImage('/assets/games/promo/promo-race.png'),
         },
         {
             id: 'verify-day',
@@ -343,7 +343,7 @@ export function PromotionsPage() {
             accent: '#58a6ff',
             emoji: '\uD83D\uDD12',
             gradient: 'linear-gradient(135deg, rgba(88, 166, 255, 0.32), rgba(20, 50, 130, 0.95))',
-            art: '/assets/games/promo/promo-verify.png',
+            art: resolveImage('/assets/games/promo/promo-verify.png'),
         },
         {
             id: 'poker-lab',
@@ -356,7 +356,7 @@ export function PromotionsPage() {
             accent: '#ff7ab6',
             emoji: '\u2660',
             gradient: 'linear-gradient(135deg, rgba(255, 122, 182, 0.32), rgba(70, 18, 54, 0.95))',
-            art: '/assets/games/promo/promo-race.png',
+            art: resolveImage('/assets/games/promo/promo-race.png'),
         },
         {
             id: 'sports-lab',
@@ -369,7 +369,7 @@ export function PromotionsPage() {
             accent: '#7c5cff',
             emoji: '\u26BD',
             gradient: 'linear-gradient(135deg, rgba(124, 92, 255, 0.32), rgba(50, 25, 120, 0.95))',
-            art: '/assets/games/promo/promo-sports.png',
+            art: resolveImage('/assets/games/promo/promo-sports.png'),
         },
     ]
 
@@ -538,7 +538,7 @@ export function RacePage() {
                 {race.map((player, index) => {
                     const avatar = player.isYou
                         ? null
-                        : `/assets/games/poker/poker-avatar-${(index % 5) + 1}.png`
+                        : resolveImage(`/assets/games/poker/poker-avatar-${(index % 5) + 1}.png`)
                     return (
                         <article key={player.id} className={`race-row ${player.isYou ? 'you' : ''}`}>
                             <span className="race-rank">{index + 1}</span>

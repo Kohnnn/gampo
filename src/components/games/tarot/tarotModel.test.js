@@ -32,7 +32,10 @@ describe('tarot model', () => {
         for (const card of DECK) {
             expect(card.symbols).toBeTruthy()
             expect(card.description).toBeTruthy()
-            expect(tarotCardImage(card)).toMatch(/^\/assets\/tarot\/plateau\/.+\.jpg$/)
+            // The accessor must hand back a path that actually ships; the
+            // literal extension in the generated deck is pre-prune and is not
+            // the contract.
+            expect(existsSync(join(ROOT, 'public', tarotCardImage(card)))).toBe(true)
             expect(existsSync(join(ROOT, 'public', resolveImage(card.image)))).toBe(true)
             expect(card.backImage).toBe(TAROT_BACK_IMAGE)
         }

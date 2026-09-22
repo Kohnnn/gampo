@@ -1,5 +1,6 @@
 import { nextRoll } from '../../../utils/fairRng'
 import { TAROT_CARD_BACK, TAROT_DECK } from '../../../data/tarotDeck.generated'
+import { resolveImage } from '../../../utils/assetPaths'
 
 export const TARGET_RTP = 0.96
 export const MATCH_BONUS = 2.5
@@ -94,11 +95,11 @@ export const DECK = TAROT_DECK.map(card => ({
 }))
 
 export function tarotCardImage(card) {
-    return card?.image || ''
+    return resolveImage(card?.image || '')
 }
 
 export function tarotCardImageByIndex(index) {
-    return DECK[index]?.image || ''
+    return resolveImage(DECK[index]?.image || '')
 }
 
 export function rawCardValue(card, pickedSuit) {
