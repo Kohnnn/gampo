@@ -1517,6 +1517,22 @@ input:focus-visible,
     border-color: rgba(255, 255, 255, 0.12);
 }
 
+/* S6: History jump. Below 768px the game aside stacks under the playfield and
+   `HistoryDrawer` ends up at the bottom of a long scroller (measured at scroll
+   top 2002 of a 2280px area vs in-viewport on desktop), so it is reachable but
+   effectively undiscoverable. This control exists to make that path findable.
+   It is hidden on desktop, where the aside already sits beside the stage and
+   History is visible without scrolling. */
+.gt-btn-history {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .gt-btn-history {
+        display: inline-flex;
+    }
+}
+
 .gt-popover {
     position: absolute;
     top: calc(100% + 8px);

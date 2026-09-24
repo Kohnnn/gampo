@@ -9,7 +9,7 @@ import {
     Volume2, VolumeX,
     Eye, EyeOff,
     Maximize2, Minimize2,
-    Shield, HelpCircle, BarChart3, Wrench, X,
+    Shield, HelpCircle, BarChart3, Wrench, X, History,
 } from 'lucide-react'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useReduceMotion } from '../../fx'
@@ -19,7 +19,7 @@ import OddsPopup from './OddsPopup'
 import { recordLearningEvent } from '../../../hooks/useProgress'
 import VolumeMixer from './VolumeMixer'
 
-export default function GameToolbar({ helpHref, definition }) {
+export default function GameToolbar({ helpHref, definition, balance, odds, betAmount }) {
     const { muted, toggle: toggleMute } = useAudio()
     const [reduceMotion, setReduceMotion] = useReduceMotion()
     const [fullscreen, setFullscreen] = useState(() => Boolean(document.fullscreenElement))
@@ -100,6 +100,22 @@ export default function GameToolbar({ helpHref, definition }) {
     const openHotkeys = () => { setHotkeyOpen(true); setPopoverOpen(false) }
     const openOdds = () => { setOddsOpen(true); setPopoverOpen(false); recordLearningEvent('odds') }
 
+    // Below 768px the game aside stacks *under* the playfield, so `HistoryDrawer`
+    // sits at the bottom of a long scroller and is easy to never find. This jumps
+    // the user to it. It is a discoverability affordance only — it moves the
+    // existing scroll container, renders nothing, and changes no game state.
+    const jumpToHistory = () => {
+        const aside = document.querySelector('.gs-aside')
+        if (!aside) return
+        // The <details> is collapsed by default; open it so the destination is
+        // actually useful once the user arrives.
+        const panel = aside.querySelector('.hd-panel')
+        if (panel && 'open' in panel) panel.open = true
+        const reduceMotionNow = typeof window !== 'undefined'
+            && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        aside.scrollIntoView({ behavior: reduceMotionNow ? 'auto' : 'smooth', block: 'start' })
+    }
+
     const popover = popoverOpen && pos.ready && createPortal(
         <div
             ref={popoverRef}
@@ -173,12 +189,21 @@ export default function GameToolbar({ helpHref, definition }) {
                     >
                         <Wrench size={14} />
                     </button>
+                    <button
+                        className="gt-btn gt-btn-history"
+                        aria-label="Jump to game history"
+                        title="Jump to game history"
+                        data-gt-history
+                        onClick={jumpToHistory}
+                    >
+                        <History size={14} />
+                    </button>
                 </div>
             </div>
             {popover}
             <FairnessDrawer open={fairOpen} onClose={() => setFairOpen(false)} />
             <HotkeyHelp controlledOpen={hotkeyOpen} onOpenChange={setHotkeyOpen} />
-            <OddsPopup open={oddsOpen} onClose={() => setOddsOpen(false)} definition={definition} />
+            <OddsPopup open={oddsOpen} onClose={() => setOddsOpen(false)} definition={definition} odds={odds} betAmount={betAmount} balance={balance} />
         </>
     )
 }

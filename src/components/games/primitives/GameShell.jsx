@@ -23,12 +23,17 @@ export default function GameShell({
     titleBarExtras,
     helpHref = '#game-info',
     variant = 'stake',
+    // Live selection owned by the game (see OddsPopup). Optional: games that
+    // cannot state authoritative conditions leave these undefined and the popup
+    // reports "Unavailable" rather than inventing figures.
+    odds,
+    betAmount,
 }) {
     const extras = titleBarExtras !== undefined
         ? titleBarExtras
         : (
             <>
-                <GameToolbar helpHref={helpHref} definition={definition} />
+                <GameToolbar helpHref={helpHref} definition={definition} balance={balance} odds={odds} betAmount={betAmount} />
                 <AudioToggle />
             </>
         )

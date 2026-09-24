@@ -729,7 +729,7 @@ export default function PokerGame() {
             <div className="poker-page" data-ux-surface="shell">
             <div className="poker-titlebar" data-ux-surface="shell">
                 <Link to="/" className="poker-back" onClick={leaveToHub}>‹ Hub</Link>
-                <h1>Live Poker (No-Limit Hold'em, 6-max)</h1>
+                <h1>Practice Poker (No-Limit Hold'em, 6-max)</h1>
                 <div className="poker-balance"><span>Balance</span><strong>{formatCredits(balance)}</strong></div>
             </div>
 
@@ -910,7 +910,7 @@ export default function PokerGame() {
 
                     <div className="poker-layout" ref={tableRef}>
                         <div className="poker-table" data-ux-surface="stage">
-                            <div className="pk-table-status" aria-label="Live poker table status">
+                            <div className="pk-table-status" aria-label="Simulated poker table status">
                                 <div>
                                     <span>Street</span>
                                     <strong>{prettyStreet(state.street)}</strong>

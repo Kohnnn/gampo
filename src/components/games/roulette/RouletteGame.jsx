@@ -460,7 +460,7 @@ export default function RouletteGame() {
                         )}
                     </div>
                     <div className="rou-feed-col">
-                        <div className="rou-live-head"><span>Live table</span><strong>{simPlayers.length} bettors</strong></div>
+                        <div className="rou-live-head"><span>Sim table</span><strong>{simPlayers.length} bots</strong></div>
                         <ul className="rou-player-feed" aria-label="Simulated roulette players">
                             {simPlayers.map(p => (
                                 <li key={p.id} className={p.won === null ? 'pending' : p.won ? 'won' : 'lost'}>

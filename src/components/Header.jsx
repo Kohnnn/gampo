@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Settings as SettingsIcon } from 'lucide-react'
+import { Settings as SettingsIcon, Menu } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { fullGameCatalog } from '../data/casinoCatalog'
+import { useSidebarUI } from '../context/SidebarUIContext'
 import { searchGames } from '../utils/gameSearch'
 
 const GAME_PATHS = [
@@ -45,6 +46,7 @@ const CreditIcon = ({ size = 20, fontSize = 11 }) => (
 function Header() {
     const location = useLocation()
     const navigate = useNavigate()
+    const { isSidebarOpen, toggleSidebar } = useSidebarUI()
     const {
         balance,
         grantPracticeCredits,
@@ -133,10 +135,20 @@ function Header() {
     return (
         <header className={`header ${isPlaySurface ? 'header-play-surface' : ''}`} data-ux-surface="shell">
             <div className="header-left">
+                <button
+                    type="button"
+                    className="icon-btn header-menu-btn"
+                    onClick={toggleSidebar}
+                    aria-label="Open navigation menu"
+                    aria-expanded={isSidebarOpen}
+                    title="Open navigation menu"
+                >
+                    <Menu size={20} />
+                </button>
                 <Link to="/" className="logo-link" aria-label="GamPo home">
                     <span className="logo">GamPo</span>
                 </Link>
-                <span className="header-mode">Live</span>
+                <span className="header-mode">Practice</span>
             </div>
 
             <div className="header-center">
@@ -190,8 +202,8 @@ function Header() {
             </div>
 
             <div className="header-right" ref={dropdownRef}>
-            <div className="live-wins-badge" title="Recent big wins">
-                <span>Live Wins</span>
+            <div className="live-wins-badge" title="Local practice credits received — no real players or cash">
+                <span>Practice Credits</span>
             </div>
             <div className="header-toggles">
                 <Link

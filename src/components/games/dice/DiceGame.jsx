@@ -183,6 +183,15 @@ export default function DiceGame() {
             accent="#00e701"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             variant="stake"
+            // Dice owns the authoritative under/over + win chance, so it states
+            // them explicitly. Without this the odds popup would fall back to a
+            // fabricated hit chance instead of the player's actual selection.
+            odds={{
+                winChance: winChance / 100,
+                payoutMultiplier: payout,
+                label: `${rollMode === 'under' ? 'Roll under' : 'Roll over'} ${targetValue}`,
+            }}
+            betAmount={lastBet || undefined}
             panel={
                 <BetPanel
                     balance={balance}

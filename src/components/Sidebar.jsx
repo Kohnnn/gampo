@@ -14,7 +14,7 @@ const navSections = [
             { icon: 'home', label: 'Lobby', path: '/' },
             { icon: 'originals', label: 'Originals', path: '/originals' },
             { icon: 'slotsLobby', label: 'Slots Lobby', path: '/slots-lobby' },
-            { icon: 'live', label: 'Live Studio', path: '/live' },
+            { icon: 'live', label: 'Studio Simulations', path: '/live' },
             { icon: 'sports', label: 'Sportsbook', path: '/sportsbook' },
         ],
     },
@@ -22,17 +22,17 @@ const navSections = [
         title: 'Rewards',
         items: [
             { icon: 'gift', label: 'Promotions', path: '/promotions' },
-            { icon: 'mission', label: 'Challenges', path: '/missions' },
+            { icon: 'mission', label: 'Missions', path: '/missions' },
             { icon: 'vip', label: 'VIP Club', path: '/vip' },
-            { icon: 'academy', label: 'Rakeback', path: '/learn' },
-            { icon: 'barChart', label: 'Challenges', path: '/sandbox' },
+            { icon: 'academy', label: 'Probability Lab', path: '/learn' },
+            { icon: 'barChart', label: 'Strategy Sandbox', path: '/sandbox' },
             { icon: 'pnl', label: 'Stats', path: '/insights' },
         ],
     },
     {
         title: 'Profile',
         items: [
-            { icon: 'verify', label: 'Provably Fair', path: '/verify' },
+            { icon: 'verify', label: 'Local Result Log', path: '/verify' },
             { icon: 'race', label: 'Race', path: '/race' },
             { icon: 'activity', label: 'Activity', path: '/activity' },
             { icon: 'progress', label: 'Settings', path: '/settings' },
@@ -58,7 +58,7 @@ const sidebarActions = [
 // ---- Sportsbook sidebar data (Wave 22) ----
 const sportsViews = [
     { id: 'home', icon: 'sports', label: 'Sportsbook Home', view: 'home' },
-    { id: 'live', icon: 'radio', label: 'Live Events', view: 'live' },
+    { id: 'live', icon: 'radio', label: 'In-Play', view: 'live' },
     { id: 'starting', icon: 'clock', label: 'Starting Soon', view: 'starting' },
     { id: 'all', icon: 'grid', label: 'All Events', view: 'all' },
     { id: 'my-bets', icon: 'list', label: 'My Bets', view: 'my-bets' },
@@ -89,7 +89,7 @@ const sportsEsports = [
 
 // ---- Casino games (unchanged) ----
 const gameItems = [
-    { group: 'Featured', icon: 'poker', label: 'Live Poker', path: '/poker' },
+    { group: 'Featured', icon: 'poker', label: 'Practice Poker', path: '/poker' },
     { group: 'Featured', icon: 'crash', label: 'Crash', path: '/crash' },
     { group: 'Featured', icon: 'plinko', label: 'Plinko', path: '/plinko' },
     { group: 'Featured', icon: 'mines', label: 'Mines', path: '/mines' },
@@ -290,9 +290,9 @@ function CasinoSidebar({ search, setSearch }) {
             ))}
 
             <div className="sidebar-rakeback-widget">
-                <span>Rakeback</span>
-                <strong>10%</strong>
-                <small>Weekly — updates every Monday</small>
+                <span>Practice Mode</span>
+                <strong>GC</strong>
+                <small>Local fake credits — no real money, no cash-out</small>
             </div>
 
             <div className="nav-section compact">
@@ -447,6 +447,16 @@ function Sidebar({ isOpen, toggleSidebar }) {
 
     return (
         <aside className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''} ${isSportsRoute ? 'app-sidebar-sports' : 'app-sidebar-casino'}`} data-ux-surface="shell">
+            {/* Below 769px the sidebar is an off-canvas drawer, so a tap outside
+                it must close it. Inert on desktop where it is hidden by CSS. */}
+            {isOpen && (
+                <button
+                    type="button"
+                    className="sidebar-backdrop"
+                    aria-label="Close navigation"
+                    onClick={toggleSidebar}
+                />
+            )}
             <div className="sidebar-header">
                 <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"></path></svg>

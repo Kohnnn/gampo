@@ -512,9 +512,9 @@ export default function CrashGame() {
                             </div>
                             {burstKey > 0 && phase === 'cashed' && !reduceMotion && <Particles key={burstKey} count={20} color="#ff7ab6" />}
                         </div>
-                        <aside className="crash-side-rail" aria-label="Live crash players">
+                        <aside className="crash-side-rail" aria-label="Simulated bot players — not real users">
                             <div className="crash-rail-head">
-                                <span>Live bets</span>
+                                <span>Bots · Simulated</span>
                                 <strong>{players.length}</strong>
                             </div>
                             <ul>
@@ -532,7 +532,7 @@ export default function CrashGame() {
                                                 {isBetting ? 'queued'
                                                     : state === 'cashed' ? `+${(p.bet * (p.cashedAt - 1)).toFixed(2)}`
                                                     : state === 'busted' ? `-${p.bet.toFixed(2)}`
-                                                    : 'live'}
+                                                    : 'in play'}
                                             </strong>
                                         </li>
                                     )
@@ -542,7 +542,7 @@ export default function CrashGame() {
                     </div>
                     <div className="crash-meta">
                         <MultiplierBadge label="Target" value={target} state={inRound ? 'active' : 'idle'} size="sm" />
-                        <span>{phase === 'betting' ? `Round opens in ${bettingSeconds}s` : phase === 'crashed' ? `Last bust ${crashedAt?.toFixed(2)}×` : phase === 'cashed' ? `Cashed ${cashedAt?.toFixed(2)}×` : phase === 'running' ? `Live ${multiplier.toFixed(2)}×` : 'Stable'}</span>
+                        <span>{phase === 'betting' ? `Round opens in ${bettingSeconds}s` : phase === 'crashed' ? `Last bust ${crashedAt?.toFixed(2)}×` : phase === 'cashed' ? `Cashed ${cashedAt?.toFixed(2)}×` : phase === 'running' ? `Running ${multiplier.toFixed(2)}×` : 'Stable'}</span>
                     </div>
                     <ActionLockOverlay active={phase === 'crashed'} label="Bust" />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />

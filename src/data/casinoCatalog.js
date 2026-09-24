@@ -36,7 +36,7 @@ export const lobbyStats = [
     { label: 'Games', value: gameDefinitions.length },
     { label: 'Balance', value: 'Local' },
     { label: 'Real money', value: 'None' },
-    { label: 'Fairness', value: 'Provably' },
+    { label: 'Fairness', value: 'Local result log' },
 ]
 
 export const featuredCollections = [
@@ -64,13 +64,15 @@ export const featuredCollections = [
     },
 ]
 
+// Simulated practice studios. `host` is a scripted persona, not a real presenter.
+// There is no live audience: viewer counts were removed rather than shown as
+// fabricated numbers. See `liveStudioTables[].pace` for the only pacing label.
 export const liveStudioTables = [
     {
         id: 'poker-live',
-        name: 'Live Poker Lab',
+        name: 'Poker Practice Table',
         gamePath: '/poker',
-        host: 'Persona Table',
-        viewers: 211,
+        host: 'Bot Persona (scripted)',
         pace: 'Hand-by-hand',
         lesson: 'Mixed bot personas bring pressure and table talk. Try reading the tight players.',
     },
@@ -78,8 +80,7 @@ export const liveStudioTables = [
         id: 'roulette-live',
         name: 'Roulette Studio',
         gamePath: '/roulette',
-        host: 'Sim Host A',
-        viewers: 128,
+        host: 'Scripted Host (example)',
         pace: '45s rounds',
         lesson: 'Fast table pace builds pressure before the ball drops.',
     },
@@ -87,8 +88,7 @@ export const liveStudioTables = [
         id: 'blackjack-live',
         name: 'Blackjack Trainer Table',
         gamePath: '/blackjack',
-        host: 'Sim Host B',
-        viewers: 96,
+        host: 'Scripted Host (example)',
         pace: 'Decision rounds',
         lesson: 'Dealer shows one card — use it to size up your expected value.',
     },
@@ -96,65 +96,19 @@ export const liveStudioTables = [
         id: 'wheel-live',
         name: 'Wheel Studio',
         gamePath: '/wheel',
-        host: 'Sim Host C',
-        viewers: 174,
+        host: 'Scripted Host (example)',
         pace: '30s spins',
         lesson: 'Broadcast pacing makes every spin feel like it matters.',
     },
 ]
 
-export const missions = [
-    {
-        id: 'rake-quest',
-        title: 'Rake Quest',
-        target: 'Wager GC 1,000 across any games to earn rakeback.',
-        reward: '+0.5% Weekly Rakeback',
-        progress: 0.35,
-    },
-    {
-        id: 'bonus-hunter',
-        title: 'Bonus Hunter',
-        target: 'Play three different game categories and complete a wager.',
-        reward: 'Bonus Credits Pack',
-        progress: 0.6,
-    },
-    {
-        id: 'streak-master',
-        title: 'Streak Master',
-        target: 'Win 5 rounds in a row on any originals game.',
-        reward: 'Streak Badge',
-        progress: 0.15,
-    },
-    {
-        id: 'high-roller',
-        title: 'High Roller',
-        target: 'Place a single bet of 500+ GC.',
-        reward: 'High Roller Badge',
-        progress: 0.45,
-    },
-    {
-        id: 'drop-hunter',
-        title: 'Drop Hunter',
-        target: 'Play Crash, Plinko, and Dice — each at least 3 rounds.',
-        reward: 'Random Drop Bonus',
-        progress: 0.2,
-    },
-    {
-        id: 'slots-spinner',
-        title: 'Slot Spinner',
-        target: 'Complete 20 slot spins across any slot machine.',
-        reward: '100 Free Spins',
-        progress: 0.08,
-    },
-]
-
-export const vipLevels = [
-    { tier: 'Bronze', threshold: 0, perk: '5% Weekly Rakeback, daily bonuses unlocked' },
-    { tier: 'Silver', threshold: 500, perk: '7.5% Rakeback, priority support, monthly bonus' },
-    { tier: 'Gold', threshold: 2000, perk: '10% Rakeback, personal manager, weekly bonus' },
-    { tier: 'Platinum', threshold: 10000, perk: '12% Rakeback, fast virtual top-up, exclusive drops' },
-    { tier: 'Diamond', threshold: 50000, perk: '15% Rakeback, luxury rewards, private tournaments' },
-]
+// NOTE: the dead exports `missions` and `vipLevels` were removed here. They encoded
+// unsupported reward promises ("Weekly Rakeback", "Free Spins", real perks). The
+// `missions` array was NOT dead: HomePage rendered it as a fallback whenever the
+// user had no unclaimed live missions, so those false promises were user-visible.
+// `vipLevels` was imported but never rendered. The live Missions/VIP system is
+// `src/data/missions.js` + `useMissions()`, which pays practice credits and grants
+// cosmetic progress labels only.
 
 export const slotCatalog = [
     { id: 'vault-rush', name: 'Vault Rush', path: slotPath('vault-rush'), volatility: 'High', rtp: 0.94, image: '/images/covers/generated/vault-rush.png' },

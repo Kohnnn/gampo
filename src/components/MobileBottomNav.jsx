@@ -1,4 +1,4 @@
-import { MessageCircle, GraduationCap, Home, Trophy, Gamepad2 } from 'lucide-react'
+import { MessageCircle, GraduationCap, Home, Trophy, Gamepad2, Target } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { gameDefinitions } from '../data/gameDefinitions'
 import { SLOT_TEMPLATE_ROUTES } from '../data/slotRoutes'
@@ -13,11 +13,12 @@ const GAME_PATHS = new Set([
 
 export const isGamePath = pathname => GAME_PATHS.has(pathname)
 
-const navItems = [
+export const navItems = [
     { id: 'home', label: 'Home', path: '/', icon: Home, match: pathname => pathname === '/' },
     { id: 'games', label: 'Games', path: '/originals', icon: Gamepad2, match: pathname => GAME_PATHS.has(pathname) },
     { id: 'sportsbook', label: 'Sports', path: '/sportsbook', icon: Trophy, match: pathname => pathname.startsWith('/sportsbook') || pathname.startsWith('/sports') },
-    { id: 'learn', label: 'Learn', path: '/learn', icon: GraduationCap, match: pathname => pathname.startsWith('/learn') || pathname.startsWith('/missions') || pathname.startsWith('/vip') },
+    { id: 'learn', label: 'Learn', path: '/learn', icon: GraduationCap, match: pathname => pathname.startsWith('/learn') },
+    { id: 'missions', label: 'Missions', path: '/missions', icon: Target, match: pathname => pathname.startsWith('/missions') || pathname.startsWith('/vip') || pathname.startsWith('/sandbox') },
 ]
 
 function MobileBottomNav() {

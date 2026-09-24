@@ -4,7 +4,7 @@ import { Activity, Award, BookOpen, CheckCircle2, Crown, Gift, Lock, Radio, Shie
 import { useCredits } from '../context/CreditContext'
 import { gameDefinitions } from '../data/gameDefinitions'
 import { resolveImage } from '../utils/assetPaths'
-import { liveStudioTables, missions, slotCatalog, sourceNotes, vipLevels } from '../data/casinoCatalog'
+import { liveStudioTables, slotCatalog, sourceNotes } from '../data/casinoCatalog'
 import { formatCredits, rolloverProgress } from '../utils/simulationMath'
 import { GameGrid } from './HomePage'
 import { useRaceData } from '../context/SocialContext'
@@ -69,9 +69,9 @@ export function SlotsLobbyPage() {
 export function LiveStudioPage() {
     return (
         <CasinoSection
-            kicker="Synthetic live tables"
-            title="Live Studio"
-            text="Broadcast-style table simulations with fake viewers and pacing pressure, routed into local probability games."
+            kicker="Synthetic studios"
+            title="Studio Simulations"
+            text="Broadcast-style table simulations with scripted hosts and pacing pressure, routed into local probability games. No live audience."
             icon={<Radio size={18} />}
         >
             <div className="studio-grid">
@@ -81,7 +81,7 @@ export function LiveStudioPage() {
                         <h2>{table.name}</h2>
                         <p>{table.lesson}</p>
                         <div>
-                            <b>{table.viewers} viewers</b>
+                            <b>Simulated studio</b>
                             <b>{table.pace}</b>
                         </div>
                     </Link>
@@ -115,7 +115,7 @@ export function MissionsPage() {
         <CasinoSection
             kicker="Practice goals"
             title="Missions"
-            text="Complete challenges, earn bonuses and climb the weekly leaderboard for extra rewards."
+            text="Complete local practice missions to earn bonus practice credits. Single-player only — no real leaderboard, race, or cash prize."
             icon={<Target size={18} />}
             action={confirmReset ? (
                 <span className="casino-action-row">
@@ -308,12 +308,12 @@ export function PromotionsPage() {
         },
         {
             id: 'edge-101',
-            title: 'VIP Rewards Week',
+            title: 'VIP Practice Tiers',
             kicker: 'VIP',
-            badge: 'Open now',
-            description: 'Earn rakeback on every wager. Climb the VIP tiers for exclusive bonuses and priority support.',
-            cta: 'Open Rakeback',
-            link: '/learn',
+            badge: 'Cosmetic',
+            description: 'Climb local VIP tiers by lifetime practice wagering. Tiers are progress labels only — no cash, no withdrawal, no real perks.',
+            cta: 'View VIP Tiers',
+            link: '/vip',
             accent: '#00e701',
             emoji: '\uD83D\uDCCA',
             gradient: 'linear-gradient(135deg, rgba(0, 231, 1, 0.32), rgba(0, 95, 0, 0.92))',
@@ -321,12 +321,12 @@ export function PromotionsPage() {
         },
         {
             id: 'race-week',
-            title: 'Weekly Race',
-            kicker: 'Race',
-            badge: 'Live',
-            description: 'Climb the leaderboard. Earn bonus credits based on your weekly wager volume.',
-            cta: 'View Race',
-            link: '/race',
+            title: 'Local Missions Board',
+            kicker: 'Practice',
+            badge: 'Simulated',
+            description: 'Complete local practice missions to earn bonus practice credits. Single-player only — no real leaderboard, race, or cash prize.',
+            cta: 'Open Missions',
+            link: '/missions',
             accent: '#ffcf5a',
             emoji: '\uD83C\uDFC6',
             gradient: 'linear-gradient(135deg, rgba(255, 207, 90, 0.32), rgba(120, 70, 0, 0.95))',
@@ -334,11 +334,11 @@ export function PromotionsPage() {
         },
         {
             id: 'verify-day',
-            title: 'Provably Fair',
+            title: 'Local Result Log',
             kicker: 'Verify',
             badge: 'New',
-            description: 'Inspect your seed/nonce, rotate seeds, and replay every recent roll.',
-            cta: 'Open Verify',
+            description: 'Inspect your browser-local seed and nonce, rotate seeds, and review the exact composite key behind every recent local roll.',
+            cta: 'Open Log',
             link: '/verify',
             accent: '#58a6ff',
             emoji: '\uD83D\uDD12',
@@ -348,7 +348,7 @@ export function PromotionsPage() {
         {
             id: 'poker-lab',
             title: 'Poker Persona Lab',
-            kicker: 'Live Poker',
+            kicker: 'Practice Poker',
             badge: 'Interactive',
             description: 'Play against randomized bot personalities, read table talk, then compare your line against the GTO chart.',
             cta: 'Open Poker',
@@ -459,19 +459,19 @@ export function VerifyPage() {
 
     return (
         <CasinoSection
-            kicker="Provably fair lab"
+            kicker="Local result log"
             title="Verify recent simulations"
-            text="Each play uses a server seed, your client seed, and a nonce. Rotating the seeds reveals the previous server seed so past plays can be re-derived."
+            text="Games that use the local RNG record each roll below with the exact composite key it was computed from. Nothing is committed to a server — these are records you generated locally, so they are reproducible, not tamper-proof. Sportsbook settlements use their own model and are not part of this roll log (they still appear in the transaction list below)."
             icon={<ShieldCheck size={18} />}
         >
             <div className="verify-toolbar">
                 <div>
-                    <span>Server seed (hashed)</span>
+                    <span>Local seed (masked preview — not a hash)</span>
                     <code>{maskSeed(pf.serverSeed)}</code>
                 </div>
                 <div>
-                    <span>Previous server seed (revealed)</span>
-                    <code>{pf.previousServerSeed || '— rotate to reveal —'}</code>
+                    <span>Previous local seed (already browser-readable)</span>
+                    <code>{pf.previousServerSeed || '— rotate to show —'}</code>
                 </div>
                 <div>
                     <span>Nonce</span>

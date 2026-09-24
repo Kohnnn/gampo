@@ -75,7 +75,7 @@ function filterEvents(events, viewState) {
 }
 
 function titleForView(viewState, sports) {
-    if (viewState.view === 'live') return 'Live Events'
+    if (viewState.view === 'live') return 'In-Play'
     if (viewState.view === 'starting') return 'Starting Soon'
     if (viewState.view === 'all') return 'All Events'
     if (viewState.view === 'sport') return sports.find(sport => sport.id === viewState.sportId)?.label || 'Sport'

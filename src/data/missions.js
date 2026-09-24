@@ -234,14 +234,16 @@ export function evaluateMissions(stats) {
     })
 }
 
-// VIP tier ladder, unlocked by `lifetime.wagered`.
+// VIP tier ladder, unlocked by `lifetime.wagered`. Perks are COSMETIC LABELS only:
+// no mechanic in this simulator awards spins, bonus claims, chip skins or badges
+// from tier membership, so the copy states nothing the app does not do.
 export const VIP_TIERS = [
-    { id: 'rookie', label: 'Rookie', wager: 0, perk: 'Welcome to GamPo Lab.' },
-    { id: 'bronze', label: 'Bronze', wager: 1000, perk: 'Daily spin reward unlocked.' },
-    { id: 'silver', label: 'Silver', wager: 10000, perk: 'Weekly mission rewards +25%.' },
-    { id: 'gold', label: 'Gold', wager: 50000, perk: 'Bonus claim every 24h.' },
-    { id: 'platinum', label: 'Platinum', wager: 250000, perk: 'Custom chip skin unlocked.' },
-    { id: 'diamond', label: 'Diamond', wager: 1000000, perk: 'GamPo Lab founder badge.' },
+    { id: 'rookie', label: 'Rookie', wager: 0, perk: 'Starting tier — no perks, just progress tracking.' },
+    { id: 'bronze', label: 'Bronze', wager: 1000, perk: 'Local progress label only.' },
+    { id: 'silver', label: 'Silver', wager: 10000, perk: 'Local progress label only.' },
+    { id: 'gold', label: 'Gold', wager: 50000, perk: 'Local progress label only.' },
+    { id: 'platinum', label: 'Platinum', wager: 250000, perk: 'Local progress label only.' },
+    { id: 'diamond', label: 'Diamond', wager: 1000000, perk: 'Highest local progress label.' },
 ]
 
 export function vipTierFor(wagered) {

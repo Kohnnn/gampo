@@ -1894,6 +1894,21 @@ body {
     }
 }
 
+/* Mobile menu button. Hidden on desktop, where the sidebar is laid out beside
+   the content and needs no toggle. Below 769px it is the only visible way to
+   open the off-canvas drawer. */
+.header-menu-btn {
+    display: none;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 10px;
+}
+
+.sidebar-backdrop {
+    display: none;
+}
+
 @media (max-width: 768px) {
     :root {
         --mobile-nav-height: 64px;
@@ -1901,6 +1916,20 @@ body {
         --mobile-safe-bottom: calc(var(--mobile-nav-height) + var(--mobile-action-height) + max(8px, env(safe-area-inset-bottom)));
         /* P4: bottom-sheet safe area — used by mobile bet sheet and other overlays */
         --sheet-safe-bottom: calc(var(--mobile-nav-height) + max(8px, env(safe-area-inset-bottom)));
+    }
+
+    .header-menu-btn {
+        display: inline-flex;
+    }
+
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: calc(var(--z-mobile-sheet) - 1);
+        background: rgba(0, 0, 0, 0.55);
+        border: 0;
+        padding: 0;
     }
 
     .header {
@@ -1924,8 +1953,30 @@ body {
         text-overflow: ellipsis;
     }
 
+    /* The sidebar becomes an off-canvas drawer below 769px instead of
+       `display:none`. It carries destinations with no other mobile entry point
+       (sandbox, vip, insights, race, verify, settings, promotions), so hiding it
+       left them unreachable. Driven by the same `isOpen` state the desktop
+       collapse already uses — no second navigation model. */
     .app-sidebar {
-        display: none;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: min(84vw, 300px);
+        z-index: var(--z-mobile-sheet);
+        transform: translateX(0);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Closed drawer slides off-screen; `.app-sidebar-hidden` is the existing
+       collapsed signal, reused. */
+    .app-sidebar.app-sidebar-hidden {
+        width: min(84vw, 300px);
+        transform: translateX(-105%);
+        box-shadow: none;
+        visibility: hidden;
     }
 
     .game-container {
@@ -1948,7 +1999,7 @@ body {
         z-index: var(--z-mobile-nav);
         min-height: calc(var(--mobile-nav-height) - 8px);
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
         gap: 4px;
         padding: 6px;
         border: 1px solid rgba(255, 255, 255, 0.1);
