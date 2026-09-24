@@ -461,8 +461,14 @@ function Sidebar({ isOpen, toggleSidebar }) {
             first?.focus?.()
         } else if (!isOpen && mobileDrawerOpen.current) {
             mobileDrawerOpen.current = false
-            // Hand focus back to the control that opened the drawer, if present.
-            document.querySelector('.header-menu-btn')?.focus?.()
+            // Hand focus back to the control that opened the drawer — but not
+            // when a dialog owns the screen. On a first mobile visit the drawer
+            // is open by default and Layout closes it on mount, which is not a
+            // dismissal; the welcome dialog is open and must keep focus, so
+            // restore only when focus is not already inside a dialog.
+            if (!document.querySelector('[aria-modal="true"], [role="dialog"]')) {
+                document.querySelector('.header-menu-btn')?.focus?.()
+            }
         }
 
         const onKeyDown = (event) => {
@@ -473,11 +479,16 @@ function Sidebar({ isOpen, toggleSidebar }) {
             const active = document.activeElement
             if (!sidebarRef.current?.contains(active)) return
             event.preventDefault()
+            // ChatDock listens for Escape on `window` without checking
+            // `defaultPrevented`, so an unstopped event would also minimize an
+            // open chat. One key must dismiss one interface: consume it here.
+            event.stopPropagation()
             toggleSidebar()
         }
         document.addEventListener('keydown', onKeyDown)
         return () => document.removeEventListener('keydown', onKeyDown)
     }, [isOpen, toggleSidebar])
+
 
     return (
         <>

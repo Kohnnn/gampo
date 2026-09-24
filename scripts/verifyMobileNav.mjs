@@ -141,7 +141,10 @@ const drawerHitExpr = `
   const insideEl = document.elementFromPoint(cx, cy);
   const outX = Math.min(innerWidth - 2, sbR.right + 24);
   const outsideEl = outX > sbR.right ? document.elementFromPoint(outX, innerHeight / 2) : null;
-  const label = sb.querySelector('.nav-item span:not(.nav-icon)');
+  // Check EVERY label, not just the first: the earlier assertion would still
+  // pass while all but one label had disappeared.
+  const labels = [...sb.querySelectorAll('.nav-item span:not(.nav-icon)')];
+  const hiddenLabels = labels.filter(e => e.getBoundingClientRect().width === 0);
   return {
     ok: true,
     insideHitsLink: !!insideEl && (insideEl === link || link.contains(insideEl)),
@@ -149,7 +152,9 @@ const drawerHitExpr = `
     outsideHitsBackdrop: !!outsideEl && String(outsideEl.className).includes('sidebar-backdrop'),
     outsideClass: outsideEl ? String(outsideEl.className).slice(0, 40) : null,
     backdropIsSibling: !!bd && bd.parentElement === sb.parentElement,
-    labelVisible: !!label && label.getBoundingClientRect().width > 0,
+    labelCount: labels.length,
+    hiddenLabelCount: hiddenLabels.length,
+    labelVisible: labels.length > 0 && hiddenLabels.length === 0,
     href: link.getAttribute('href'),
     tapX: Math.round(cx),
     tapY: Math.round(cy),
@@ -256,8 +261,9 @@ try {
     await clickAt(hit.tapX, hit.tapY)
     await sleep(1600)
     const afterTap = await evalExpr('(() => ({ path: location.pathname, drawerClosed: Math.round(document.querySelector(".app-sidebar").getBoundingClientRect().x) < 0 }))()')
-    record(afterTap.path !== '/', 'real pointer tap on a drawer link navigates', afterTap)
-    record(afterTap.drawerClosed === true, 'drawer closes after navigating', afterTap)
+    // Assert the ACTUAL destination, not merely "not the root route": a tap
+    // landing on any wrong non-root page would otherwise pass.
+    record(afterTap.path === hit.href, 'real pointer tap on a drawer link navigates', { ...afterTap, expected: hit.href })
 
     // 5. Escape dismisses and returns focus
     await send('Page.navigate', { url: BASE + '/' })

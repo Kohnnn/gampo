@@ -1926,9 +1926,11 @@ body {
        covered. `.main-content` is `overflow: hidden` here, so an overlapping
        last element cannot be scrolled clear — at short landscape heights the
        home hero CTA sat 27px under the dock and was unclickable. Reserve the
-       nav band on the scroll container; game routes add their own action-dock
-       reserve via --mobile-safe-bottom. */
-    .main-content {
+       nav band on the scroll container.
+       `:has(.game-shell)` is excluded: a game shell scrolls itself and already
+       reserves nav plus action dock via --mobile-safe-bottom, so padding here
+       would double-reserve and steal 70px of an already short viewport. */
+    .main-content:not(:has(.game-shell)) {
         padding-bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
     }
 
