@@ -468,16 +468,28 @@ function Sidebar({ isOpen, toggleSidebar }) {
             // it on mount, while the welcome dialog opens — that is not a
             // dismissal and must not steal the dialog's focus.
             //
-            // Test whether a dialog *owns focus right now*, not whether any
-            // dialog is mounted: game routes keep a closed BetPanel sheet
-            // portaled as `role="dialog"` (opacity 0, pointer-events none), so
-            // a bare presence check would suppress restoration on every game.
+            // Decide with the two things that actually indicate a dialog owns
+            // the screen, in order of strength:
+            //
+            // 1. Focus ownership. This is the reliable signal, and it must not
+            //    be a bare presence check: game routes keep a closed BetPanel
+            //    sheet mounted as `role="dialog"` (opacity 0, pointer-events
+            //    none), so matching any mounted node would suppress
+            //    restoration on every game route.
+            // 2. A genuinely open modal. On the first mobile visit the drawer
+            //    is open by default and Layout closes it on mount while the
+            //    welcome modal opens — a programmatic close leaves focus on
+            //    <body>, so the focus test alone cannot see it. `aria-modal`
+            //    is set only while a dialog is open (verified against
+            //    BetPanel), so this does not latch on a stale hidden node. A
+            //    `:modal` check was tried and rejected: it only matches a
+            //    native <dialog>/top-layer element, and the welcome modal is a
+            //    plain div with `aria-modal`, so `:modal` missed the very case
+            //    this guards.
             const active = document.activeElement
             const dialogOwnsFocus = !!active
                 && active !== document.body
                 && !!active.closest?.('[aria-modal="true"], [role="dialog"]')
-            // A programmatic close (route change) has body focus and may not
-            // restore over a dialog that is still on screen.
             const dialogIsOpen = !!document.querySelector('[aria-modal="true"]')
             if (!dialogOwnsFocus && !dialogIsOpen) {
                 document.querySelector('.header-menu-btn')?.focus?.()
