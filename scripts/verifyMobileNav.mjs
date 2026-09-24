@@ -141,10 +141,17 @@ const drawerHitExpr = `
   const insideEl = document.elementFromPoint(cx, cy);
   const outX = Math.min(innerWidth - 2, sbR.right + 24);
   const outsideEl = outX > sbR.right ? document.elementFromPoint(outX, innerHeight / 2) : null;
-  // Check EVERY label, not just the first: the earlier assertion would still
-  // pass while all but one label had disappeared.
+  // Check EVERY label, and test real rendered visibility (width AND
+  // visibility/opacity) — a width-only check passes while a label is hidden
+  // with visibility:hidden.
   const labels = [...sb.querySelectorAll('.nav-item span:not(.nav-icon)')];
-  const hiddenLabels = labels.filter(e => e.getBoundingClientRect().width === 0);
+  const rendered = (e) => {
+    const r = e.getBoundingClientRect();
+    const cs = getComputedStyle(e);
+    return r.width === 0 || r.height === 0
+      || cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0;
+  };
+  const hiddenLabels = labels.filter(rendered);
   return {
     ok: true,
     insideHitsLink: !!insideEl && (insideEl === link || link.contains(insideEl)),
@@ -264,6 +271,10 @@ try {
     // Assert the ACTUAL destination, not merely "not the root route": a tap
     // landing on any wrong non-root page would otherwise pass.
     record(afterTap.path === hit.href, 'real pointer tap on a drawer link navigates', { ...afterTap, expected: hit.href })
+    // Restore the independent closure assertion (round 3, defect 2): the exact
+    // path check below cannot detect a drawer that navigates but stays open, so
+    // assert closure separately rather than only printing it in the details.
+    record(afterTap.drawerClosed === true, 'drawer closes after navigating', afterTap)
 
     // 5. Escape dismisses and returns focus
     await send('Page.navigate', { url: BASE + '/' })

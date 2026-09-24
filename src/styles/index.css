@@ -1927,10 +1927,11 @@ body {
        last element cannot be scrolled clear — at short landscape heights the
        home hero CTA sat 27px under the dock and was unclickable. Reserve the
        nav band on the scroll container.
-       `:has(.game-shell)` is excluded: a game shell scrolls itself and already
-       reserves nav plus action dock via --mobile-safe-bottom, so padding here
-       would double-reserve and steal 70px of an already short viewport. */
-    .main-content:not(:has(.game-shell)) {
+       Two families already reserve the nav band on their own scrolling
+       container, so this rule must skip them or it double-reserves:
+       `.game-shell` (nav + action dock via --mobile-safe-bottom) and the
+       `.settings-page` / `.insights-page` scrollers (own nav reserve). */
+    .main-content:not(:has(.game-shell)):not(:has(.settings-page)):not(:has(.insights-page)) {
         padding-bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
     }
 

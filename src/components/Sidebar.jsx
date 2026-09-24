@@ -461,12 +461,25 @@ function Sidebar({ isOpen, toggleSidebar }) {
             first?.focus?.()
         } else if (!isOpen && mobileDrawerOpen.current) {
             mobileDrawerOpen.current = false
-            // Hand focus back to the control that opened the drawer — but not
-            // when a dialog owns the screen. On a first mobile visit the drawer
-            // is open by default and Layout closes it on mount, which is not a
-            // dismissal; the welcome dialog is open and must keep focus, so
-            // restore only when focus is not already inside a dialog.
-            if (!document.querySelector('[aria-modal="true"], [role="dialog"]')) {
+            // Hand focus back to the control that opened the drawer. Restoring
+            // to the body would strand a keyboard user at the top of the page.
+            //
+            // On a first mobile visit the drawer starts open and Layout closes
+            // it on mount, while the welcome dialog opens — that is not a
+            // dismissal and must not steal the dialog's focus.
+            //
+            // Test whether a dialog *owns focus right now*, not whether any
+            // dialog is mounted: game routes keep a closed BetPanel sheet
+            // portaled as `role="dialog"` (opacity 0, pointer-events none), so
+            // a bare presence check would suppress restoration on every game.
+            const active = document.activeElement
+            const dialogOwnsFocus = !!active
+                && active !== document.body
+                && !!active.closest?.('[aria-modal="true"], [role="dialog"]')
+            // A programmatic close (route change) has body focus and may not
+            // restore over a dialog that is still on screen.
+            const dialogIsOpen = !!document.querySelector('[aria-modal="true"]')
+            if (!dialogOwnsFocus && !dialogIsOpen) {
                 document.querySelector('.header-menu-btn')?.focus?.()
             }
         }
