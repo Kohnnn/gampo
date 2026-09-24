@@ -41,6 +41,27 @@ function abbreviateVolatility(volatility) {
     return VOLATILITY_ABBR[volatility] || volatility
 }
 
+// Catalogue cover art. `alt` is empty on purpose: the game name is rendered as
+// a heading beside the art, so the image is decorative and a non-empty alt
+// would double-announce it. The name-initials fallback already covered a
+// missing `image` prop, but not a source that 404s — that left an empty box
+// with no identity. The error handler closes that gap.
+function GameArt({ image, name }) {
+    const [failed, setFailed] = useState(false)
+    if (!image || failed) return <span>{name.slice(0, 2)}</span>
+    return (
+        <img
+            src={image}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            width="320"
+            height="320"
+            onError={() => setFailed(true)}
+        />
+    )
+}
+
 const labelToGameId = {
     'Dice': 'dice', 'Limbo': 'limbo', 'Keno': 'keno', 'Wheel': 'wheel', 'Roulette': 'roulette',
     'Blackjack': 'blackjack', 'Slots': 'slots', 'Coin Flip': 'coinflip', 'Rock Paper Scissors': 'rps',
@@ -298,7 +319,7 @@ function CategoryRow({ icon, title, link, games }) {
                 {games.map(game => (
                     <Link key={game.id} to={game.path} className="category-card" style={{ '--accent': game.accent || '#00e701' }} data-ux-surface="card">
                         <div className="category-art">
-                            {game.image ? <img src={game.image} alt="" loading="lazy" decoding="async" width="320" height="320" /> : <span>{game.name.slice(0, 2)}</span>}
+                            <GameArt image={game.image} name={game.name} />
                             {game.tag ? <span className="casino-game-tag">{game.tag}</span> : null}
                             <i className="category-glow" />
                         </div>
@@ -334,7 +355,7 @@ export function GameGrid({ games = [] }) {
                 return (
                     <Link key={game.id} to={game.path} className="casino-game-card" style={{ '--accent': game.accent || '#00e701' }} data-ux-surface="card">
                         <div className="casino-game-art">
-                            {game.image ? <img src={game.image} alt="" loading="lazy" decoding="async" width="320" height="320" /> : <span>{game.name.slice(0, 2)}</span>}
+                            <GameArt image={game.image} name={game.name} />
                             {game.tag ? <span className="casino-game-tag">{game.tag}</span> : null}
                             <div className="casino-game-titlemark">
                                 <span>{game.category?.split(' ')[0] || 'Game'}</span>
