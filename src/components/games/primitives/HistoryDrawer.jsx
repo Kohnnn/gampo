@@ -9,7 +9,12 @@ export function historyRowKey(item = {}, index = 0) {
 export default function HistoryDrawer({ history, onClear }) {
     return (
         <details className="hd-panel">
-            <summary className="hd-header">
+            {/* tabIndex makes the summary a valid programmatic focus target: the
+                toolbar's History jump moves focus here so keyboard users land in
+                the panel they just revealed rather than staying in the toolbar.
+                Native <summary> is already in the tab order, so this adds no
+                duplicate stop. */}
+            <summary className="hd-header" tabIndex={-1}>
                 <span>History</span>
                 <strong>{history.length}</strong>
             </summary>

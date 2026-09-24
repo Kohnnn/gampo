@@ -1519,16 +1519,22 @@ input:focus-visible,
 
 /* S6: History jump. Below 768px the game aside stacks under the playfield and
    `HistoryDrawer` ends up at the bottom of a long scroller (measured at scroll
-   top 2002 of a 2280px area vs in-viewport on desktop), so it is reachable but
+   top ~2000 of a ~2280px area vs in-viewport on desktop), so it is reachable but
    effectively undiscoverable. This control exists to make that path findable.
-   It is hidden on desktop, where the aside already sits beside the stage and
-   History is visible without scrolling. */
+   Hidden on desktop, where the aside already sits beside the stage. Also hidden
+   for games whose aside has no HistoryDrawer at all (e.g. Cases, which keeps its
+   own `view === 'history'` tab) so the button never promises a drawer that is
+   not there. */
 .gt-btn-history {
     display: none;
 }
 
 @media (max-width: 768px) {
-    .gt-btn-history {
+    .game-shell:not(:has(.gs-aside .hd-panel)) .gt-btn-history {
+        display: none;
+    }
+
+    .game-shell:has(.gs-aside .hd-panel) .gt-btn-history {
         display: inline-flex;
     }
 }

@@ -1922,6 +1922,16 @@ body {
         display: inline-flex;
     }
 
+    /* The bottom nav is fixed, so anything the page puts in its band is
+       covered. `.main-content` is `overflow: hidden` here, so an overlapping
+       last element cannot be scrolled clear — at short landscape heights the
+       home hero CTA sat 27px under the dock and was unclickable. Reserve the
+       nav band on the scroll container; game routes add their own action-dock
+       reserve via --mobile-safe-bottom. */
+    .main-content {
+        padding-bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
+    }
+
     .sidebar-backdrop {
         display: block;
         position: fixed;
@@ -1930,6 +1940,20 @@ body {
         background: rgba(0, 0, 0, 0.55);
         border: 0;
         padding: 0;
+    }
+
+    /* The 1200px rule collapses the sidebar to an icon rail, which is correct
+       for the shrunken desktop rail but wrong for the open mobile drawer: a
+       300px drawer of unlabelled icons makes the destinations that only exist
+       here (sandbox, vip, insights, verify, settings, promotions)
+       indistinguishable. Restore labels whenever the drawer is actually open. */
+    .app-sidebar:not(.app-sidebar-hidden) .nav-item span:not(.nav-icon),
+    .app-sidebar:not(.app-sidebar-hidden) .nav-title {
+        display: inline;
+    }
+
+    .app-sidebar:not(.app-sidebar-hidden) .nav-item {
+        justify-content: flex-start;
     }
 
     .header {
@@ -1983,14 +2007,6 @@ body {
         flex-direction: column;
     }
 
-    .betting-panel {
-        width: 100%;
-    }
-
-    .main-content {
-        padding-bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
-    }
-
     .mobile-bottom-nav {
         position: fixed;
         left: 8px;
@@ -1999,7 +2015,12 @@ body {
         z-index: var(--z-mobile-nav);
         min-height: calc(var(--mobile-nav-height) - 8px);
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+        /* Six items (Home, Games, Sports, Learn, Missions, Chat). `auto-fit` let
+           the grid wrap to a second row at 375px because only five 56px tracks
+           fit, so the dock grew to ~114px while --mobile-nav-height still
+           reserved 64px — the extra row painted over page content. Six explicit
+           flexible tracks keep a single row at every supported width. */
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 4px;
         padding: 6px;
         border: 1px solid rgba(255, 255, 255, 0.1);

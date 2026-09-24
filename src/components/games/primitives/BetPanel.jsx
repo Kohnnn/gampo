@@ -33,6 +33,10 @@ export default function BetPanel({
     dockExtras = null, // optional compact controls rendered inside the portaled mobile dock
     autoChildren, // optional extra auto controls
     lastBet = null,
+    // Reports the *currently selected* stake upward so shell-level surfaces that
+    // explain the bet (e.g. the odds popup's EV / risk) use what the player is
+    // editing now, not the amount of the previous settled round.
+    onStakeChange = null,
     // Mid-round CTA support: when playPhase is set, BetPanel hides the bet input
     // controls (or marks them disabled) and the bp-play button becomes the in-round
     // primary action ("Climb", "Cashout", "Draw", etc).
@@ -79,6 +83,11 @@ export default function BetPanel({
     const [strategy, setStrategy] = useState('flat')
     const hasFixedBet = Number.isFinite(Number(fixedBetAmount)) && Number(fixedBetAmount) > 0
     const effectiveBetAmount = hasFixedBet ? Number(fixedBetAmount) : betAmount
+
+    // Publish the live selection so the shell can describe the *current* bet.
+    useEffect(() => {
+        onStakeChange?.(effectiveBetAmount)
+    }, [effectiveBetAmount, onStakeChange])
 
     const autoRunning = useRef(false)
     const autoLeft = useRef(0)

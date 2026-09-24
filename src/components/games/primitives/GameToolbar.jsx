@@ -104,16 +104,22 @@ export default function GameToolbar({ helpHref, definition, balance, odds, betAm
     // sits at the bottom of a long scroller and is easy to never find. This jumps
     // the user to it. It is a discoverability affordance only — it moves the
     // existing scroll container, renders nothing, and changes no game state.
+
     const jumpToHistory = () => {
         const aside = document.querySelector('.gs-aside')
-        if (!aside) return
+        const panel = aside?.querySelector('.hd-panel')
+        if (!aside || !panel) return
         // The <details> is collapsed by default; open it so the destination is
         // actually useful once the user arrives.
-        const panel = aside.querySelector('.hd-panel')
-        if (panel && 'open' in panel) panel.open = true
+        if ('open' in panel) panel.open = true
+        const summary = panel.querySelector('summary')
         const reduceMotionNow = typeof window !== 'undefined'
             && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
         aside.scrollIntoView({ behavior: reduceMotionNow ? 'auto' : 'smooth', block: 'start' })
+        // Move focus with the viewport, otherwise a keyboard user is left on a
+        // toolbar button near the top and Tab continues from there instead of
+        // entering the history they just revealed.
+        summary?.focus?.()
     }
 
     const popover = popoverOpen && pos.ready && createPortal(

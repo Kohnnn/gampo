@@ -33,8 +33,14 @@ function LayoutShell() {
     // Play lobby music only on menu surfaces; in-game routes own their BGM.
     useMenuBgm(LOBBY_PATHS.has(location.pathname))
 
-    // Navigating away should not leave the mobile drawer covering the game.
-    useEffect(() => { closeSidebar() }, [location.pathname, closeSidebar])
+    // Close the mobile drawer on navigation so it never covers a game. The
+    // desktop sidebar is a different surface driven by the same flag: collapsing
+    // it here would override the user's persisted rail preference on every
+    // route change and on reload. Only the overlay dismisses itself.
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        if (window.matchMedia('(max-width: 768px)').matches) closeSidebar()
+    }, [location.pathname, closeSidebar])
 
     // Lobby UI click feedback. Delegated listener plays a soft click when a
     // button/link/tile is activated on menu surfaces. Honors SFX/master mute

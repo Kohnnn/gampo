@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pin, PinOff } from 'lucide-react'
 import { useSidebarPins } from '../hooks/useSidebarPins'
 import { sidebarPaths } from '../data/sidebarIcons'
@@ -444,19 +444,63 @@ function Sidebar({ isOpen, toggleSidebar }) {
     const [gameSearch, setGameSearch] = useState('')
     const location = useLocation()
     const isSportsRoute = location.pathname.startsWith('/sportsbook') || location.pathname.startsWith('/sports')
+    const sidebarRef = useRef(null)
+    const mobileDrawerOpen = useRef(false)
+
+    // Below 769px the drawer behaves as an overlay, so it owes the same keyboard
+    // contract as a dialog: Escape dismisses it, focus moves into it on open, and
+    // focus returns to the trigger on close. Above that width the sidebar is
+    // ordinary page furniture and none of this should apply.
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined
+        const isMobile = () => window.matchMedia('(max-width: 768px)').matches
+
+        if (isOpen && isMobile()) {
+            mobileDrawerOpen.current = true
+            const first = sidebarRef.current?.querySelector('a, button')
+            first?.focus?.()
+        } else if (!isOpen && mobileDrawerOpen.current) {
+            mobileDrawerOpen.current = false
+            // Hand focus back to the control that opened the drawer, if present.
+            document.querySelector('.header-menu-btn')?.focus?.()
+        }
+
+        const onKeyDown = (event) => {
+            if (event.key !== 'Escape' || !isMobile()) return
+            if (!isOpen) return
+            // Only claim Escape when focus is actually inside the drawer; page
+            // dialogs (odds/fairness) own their own Escape handling.
+            const active = document.activeElement
+            if (!sidebarRef.current?.contains(active)) return
+            event.preventDefault()
+            toggleSidebar()
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+    }, [isOpen, toggleSidebar])
 
     return (
-        <aside className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''} ${isSportsRoute ? 'app-sidebar-sports' : 'app-sidebar-casino'}`} data-ux-surface="shell">
+        <>
             {/* Below 769px the sidebar is an off-canvas drawer, so a tap outside
-                it must close it. Inert on desktop where it is hidden by CSS. */}
+                it must close it. This MUST stay a sibling of <aside>, not a child:
+                the drawer is a transformed element with its own z-index, so a
+                child backdrop is trapped in that stacking context and paint over
+                the drawer's own links instead of sitting behind it. */}
             {isOpen && (
                 <button
                     type="button"
                     className="sidebar-backdrop"
                     aria-label="Close navigation"
                     onClick={toggleSidebar}
+                    tabIndex={-1}
                 />
             )}
+            <aside
+                className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''} ${isSportsRoute ? 'app-sidebar-sports' : 'app-sidebar-casino'}`}
+                data-ux-surface="shell"
+                id="app-sidebar"
+                ref={sidebarRef}
+            >
             <div className="sidebar-header">
                 <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"></path></svg>
@@ -476,7 +520,8 @@ function Sidebar({ isOpen, toggleSidebar }) {
                     ? <SportsbookSidebar />
                     : <CasinoSidebar search={gameSearch} setSearch={setGameSearch} />}
             </nav>
-        </aside>
+            </aside>
+        </>
     )
 }
 

@@ -59,6 +59,9 @@ export default function DiceGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    // Live stake owned by BetPanel; mirrored here only so the odds popup can
+    // explain the bet the player is currently editing.
+    const [stake, setStake] = useState(null)
     const [toast, setToast] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('dice', { count: 9, cap: 10 }))
     const { schedule } = useCancellableTimeouts()
@@ -191,7 +194,7 @@ export default function DiceGame() {
                 payoutMultiplier: payout,
                 label: `${rollMode === 'under' ? 'Roll under' : 'Roll over'} ${targetValue}`,
             }}
-            betAmount={lastBet || undefined}
+            betAmount={stake}
             panel={
                 <BetPanel
                     balance={balance}
@@ -199,6 +202,7 @@ export default function DiceGame() {
                     runningRound={running}
                     actionLabel="Roll Dice"
                     onPlay={performPlay}
+                    onStakeChange={setStake}
                     lastBet={lastBet}
                 >
                     <div className="bp-section">
