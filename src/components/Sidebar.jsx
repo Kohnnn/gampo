@@ -446,6 +446,14 @@ function Sidebar({ isOpen, toggleSidebar }) {
     const isSportsRoute = location.pathname.startsWith('/sportsbook') || location.pathname.startsWith('/sports')
     const sidebarRef = useRef(null)
     const mobileDrawerOpen = useRef(false)
+    // Why the drawer last closed. Focus is restored ONLY after a dismissal the
+    // user actually performed (Escape, backdrop tap). This is recorded rather
+    // than inferred from DOM state: rounds 2-4 each defeated an inference — a
+    // closed-but-mounted BetPanel dialog, an open shortcuts overlay with no
+    // `aria-modal`, and a returning player whose drawer is auto-closed on route
+    // entry. No selector arrangement separates those from a real dismissal,
+    // because the difference is intent, not markup. The closer states it here.
+    const closedByUser = useRef(false)
 
     // Below 769px the drawer behaves as an overlay, so it owes the same keyboard
     // contract as a dialog: Escape dismisses it, focus moves into it on open, and
@@ -461,37 +469,13 @@ function Sidebar({ isOpen, toggleSidebar }) {
             first?.focus?.()
         } else if (!isOpen && mobileDrawerOpen.current) {
             mobileDrawerOpen.current = false
-            // Hand focus back to the control that opened the drawer. Restoring
-            // to the body would strand a keyboard user at the top of the page.
-            //
-            // On a first mobile visit the drawer starts open and Layout closes
-            // it on mount, while the welcome dialog opens — that is not a
-            // dismissal and must not steal the dialog's focus.
-            //
-            // Decide with the two things that actually indicate a dialog owns
-            // the screen, in order of strength:
-            //
-            // 1. Focus ownership. This is the reliable signal, and it must not
-            //    be a bare presence check: game routes keep a closed BetPanel
-            //    sheet mounted as `role="dialog"` (opacity 0, pointer-events
-            //    none), so matching any mounted node would suppress
-            //    restoration on every game route.
-            // 2. A genuinely open modal. On the first mobile visit the drawer
-            //    is open by default and Layout closes it on mount while the
-            //    welcome modal opens — a programmatic close leaves focus on
-            //    <body>, so the focus test alone cannot see it. `aria-modal`
-            //    is set only while a dialog is open (verified against
-            //    BetPanel), so this does not latch on a stale hidden node. A
-            //    `:modal` check was tried and rejected: it only matches a
-            //    native <dialog>/top-layer element, and the welcome modal is a
-            //    plain div with `aria-modal`, so `:modal` missed the very case
-            //    this guards.
-            const active = document.activeElement
-            const dialogOwnsFocus = !!active
-                && active !== document.body
-                && !!active.closest?.('[aria-modal="true"], [role="dialog"]')
-            const dialogIsOpen = !!document.querySelector('[aria-modal="true"]')
-            if (!dialogOwnsFocus && !dialogIsOpen) {
+            // Restore focus only after a dismissal the user performed. A
+            // programmatic close (route entry, first-visit auto-close) leaves
+            // focus alone: the page is about to be used, so stealing focus to
+            // the menu button both strands a keyboard user mid-page and yanks
+            // focus out of any overlay that is opening at the same time.
+            if (closedByUser.current) {
+                closedByUser.current = false
                 document.querySelector('.header-menu-btn')?.focus?.()
             }
         }
@@ -503,16 +487,32 @@ function Sidebar({ isOpen, toggleSidebar }) {
             // dialogs (odds/fairness) own their own Escape handling.
             const active = document.activeElement
             if (!sidebarRef.current?.contains(active)) return
+            // Defer to an overlay stacked above the drawer. The shortcuts panel
+            // opens on `?` without moving focus, so focus stays in the drawer
+            // while it is up; claiming Escape here would consume the key before
+            // that panel's own `window` handler saw it, closing the drawer and
+            // leaving the panel open over the page. A backdrop is the reliable
+            // marker that something is stacked above, because these overlays do
+            // not all use `aria-modal`.
+            if (document.querySelector('.hotkey-backdrop, [role="dialog"][aria-modal="true"]')) return
             event.preventDefault()
             // ChatDock listens for Escape on `window` without checking
             // `defaultPrevented`, so an unstopped event would also minimize an
             // open chat. One key must dismiss one interface: consume it here.
             event.stopPropagation()
+            closedByUser.current = true
             toggleSidebar()
         }
         document.addEventListener('keydown', onKeyDown)
         return () => document.removeEventListener('keydown', onKeyDown)
     }, [isOpen, toggleSidebar])
+
+    // A dismissal the user performed. Records intent before closing so the
+    // effect above knows to restore focus to the menu button.
+    const dismissDrawer = () => {
+        closedByUser.current = true
+        toggleSidebar()
+    }
 
 
     return (
@@ -527,7 +527,7 @@ function Sidebar({ isOpen, toggleSidebar }) {
                     type="button"
                     className="sidebar-backdrop"
                     aria-label="Close navigation"
-                    onClick={toggleSidebar}
+                    onClick={dismissDrawer}
                     tabIndex={-1}
                 />
             )}
