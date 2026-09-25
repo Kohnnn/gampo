@@ -67,7 +67,13 @@ describe('QA layout and loader contracts', () => {
         // restore to the trigger on close.
         expect(betPanelSource).toContain("role={isMobile ? 'dialog' : undefined}")
         expect(betPanelSource).toContain("aria-modal={isMobile && mobileControlsOpen ? 'true' : undefined}")
-        expect(betPanelSource).toContain("if (e.key === 'Escape')")
+        // Escape-to-close is now routed through the Escape-claim registry so
+        // that exactly one layer acts per keypress; the sheet registers its
+        // handler there instead of keeping a second Escape branch in the Tab
+        // trap. Assert the contract (the sheet closes on Escape via a claim),
+        // not the removed literal.
+        expect(betPanelSource).toContain('claimEscape')
+        expect(betPanelSource).toContain('setMobileControlsOpen(false)')
         expect(betPanelSource).toContain("if (e.key !== 'Tab') return")
         expect(betPanelSource).toContain('sheetTriggerRef')
         expect(betPanelSource).toContain('ref={sheetRef}')

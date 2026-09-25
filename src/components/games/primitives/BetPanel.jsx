@@ -329,7 +329,12 @@ export default function BetPanel({
     // beneath it defers rather than consuming the key and stranding the sheet.
     useEffect(() => {
         if (!isMobile || !mobileControlsOpen) return undefined
-        return claimEscape()
+        // Registered as a handler, not a flag, so only the topmost layer acts
+        // on one Escape. The sheet's own listener below handles the Tab trap.
+        return claimEscape(() => {
+            setMobileControlsOpen(false)
+            return true
+        })
     }, [isMobile, mobileControlsOpen])
 
     // Accessibility for the portaled mobile sheet: trap Tab focus inside the
@@ -349,11 +354,10 @@ export default function BetPanel({
         if (first) first.focus()
 
         const onKey = (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault()
-                setMobileControlsOpen(false)
-                return
-            }
+            // Escape is routed through the claim registry (see the claim effect
+            // above), so this listener handles only the Tab focus trap. A second
+            // Escape branch here would close this sheet and, independently,
+            // whichever layer was registered above it.
             if (e.key !== 'Tab') return
             const items = focusables()
             if (items.length === 0) return

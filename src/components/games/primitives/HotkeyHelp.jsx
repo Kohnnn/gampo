@@ -35,27 +35,26 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
     useEffect(() => {
         const onKey = (e) => {
             if (isEditableHotkeyTarget(e.target) || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
-            if (e.key === '?') {
-                e.preventDefault()
-                requestOpen(!isOpen)
-            } else if (e.key === 'Escape' && isOpen) {
-                // Mark handled so ChatDock's window listener (which runs after
-                // this one and skips handled events) does not also dismiss the
-                // chat: one Escape dismisses one interface.
-                e.preventDefault()
-                requestOpen(false)
-            }
+            if (e.key !== '?') return
+            e.preventDefault()
+            requestOpen(!isOpen)
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
     }, [isOpen, controlledOpen, onOpenChange])
 
-    // While this panel is up it owns Escape, so the mobile drawer beneath it
-    // defers instead of consuming the key and stranding this panel open.
+    // Own Escape while this panel is up. Registering a HANDLER rather than a
+    // flag is what keeps one Escape to one layer: the router asks the topmost
+    // registered layer first, and only that one closes. This effect must not
+    // keep its own Escape branch — with two overlays open, two independent
+    // `window` listeners both saw the same key and both closed.
     useEffect(() => {
         if (!isOpen) return undefined
-        return claimEscape()
-    }, [isOpen])
+        return claimEscape(() => {
+            requestOpen(false)
+            return true
+        })
+    }, [isOpen, controlledOpen, onOpenChange])
 
     const dismiss = () => requestOpen(false)
 

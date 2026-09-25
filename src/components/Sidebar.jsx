@@ -5,7 +5,7 @@ import { useSidebarPins } from '../hooks/useSidebarPins'
 import { sidebarPaths } from '../data/sidebarIcons'
 import { slotPath } from '../data/slotRoutes'
 import { sportsbookPathForView } from '../sportsbook/sportsbookRoutes'
-import { overlayOwnsEscape } from '../utils/escapeClaims'
+import { dispatchEscape } from '../utils/escapeClaims'
 
 // ---- Casino sidebar data (unchanged from prior waves) ----
 const navSections = [
@@ -502,24 +502,25 @@ function Sidebar({ isOpen, toggleSidebar }) {
             // dialogs (odds/fairness) own their own Escape handling.
             const active = document.activeElement
             if (!sidebarRef.current?.contains(active)) return
-            // Defer to an overlay that has claimed Escape. Some overlays open
-            // without moving focus, so focus stays inside the drawer while they
-            // are up; consuming the key here would close the drawer and leave
-            // the overlay stranded over the page.
+            // Route the key to exactly one layer. Registered overlays get first
+            // refusal, most recent first, and a handler that declines yields to
+            // the next — so a layer that is open without handling Escape never
+            // traps the key.
             //
-            // The claim is declared by the overlay, not inferred here. Two
-            // inference attempts failed: matching mounted nodes broke on a
-            // closed-but-portaled BetPanel, and comparing z-index or paint
-            // order broke because a computed z-index inside a stacking context
-            // says nothing about the real stacking order (slots' sheet computes
-            // 1500 inside a z-index:1 ancestor, so it is painted *below* the
-            // drawer). The layer that knows it owns the screen declares it.
-            //
-            // This returns without touching the event: the overlay above still
-            // needs to receive it.
-            if (overlayOwnsEscape()) return
-            // Mark the key handled. ChatDock's listener runs on `window` and
-            // skips handled Escape, so this keeps one Escape to one interface.
+            // Ownership is declared, not inferred here. Three inference
+            // attempts failed: matching mounted nodes broke on a
+            // closed-but-portaled BetPanel, matching class names missed the
+            // slots bet sheet, and comparing z-index or paint order is invalid
+            // because a computed z-index inside a stacking context says nothing
+            // about real stacking (slots' sheet computes 1500 inside a
+            // z-index:1 ancestor, so it paints *below* the drawer).
+            // The layer that acts calls `preventDefault()`, so ChatDock (and
+            // anything else on `window`) can see the key was already consumed.
+            if (dispatchEscape(event)) {
+                event.preventDefault()
+                return
+            }
+            // No overlay took it, so the drawer does.
             event.preventDefault()
             closedByUser.current = true
             toggleSidebar()

@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom'
 import { MessageCircle, Minus, X, Send, Trophy, BarChart3, Award } from 'lucide-react'
 import { useSocial } from '../context/SocialContext'
 import { formatCredits } from '../utils/simulationMath'
-import { overlayOwnsEscape } from '../utils/escapeClaims'
 import StatsPanel from './StatsPanel'
 import ProgressPanel from './ProgressPanel'
 import './ChatDock.css'
@@ -118,15 +117,12 @@ function ChatDock() {
     useEffect(() => {
         const onKeyDown = (event) => {
             if (event.key !== 'Escape') return
-            // One Escape dismisses one interface. Two ways another layer can
-            // already own this key, and this listener must honour both because
-            // it cannot rely on being registered last (the shortcuts panel
-            // mounts later and also listens on `window`):
-            //  - it handled the event and said so via `preventDefault`, or
-            //  - it is an open overlay/overlay-adjacent layer registered in the
-            //    Escape claim registry.
+            // One Escape dismisses one interface. The drawer routes the key to
+            // the topmost registered overlay, and whichever layer acts calls
+            // `preventDefault()`. So this listener only honours that signal: it
+            // must not test ownership itself, because it may run before or
+            // after those handlers depending on registration order.
             if (event.defaultPrevented) return
-            if (overlayOwnsEscape()) return
             if (stateRef.current === 'open') {
                 transientDockRef.current = false
                 setState('minimized')

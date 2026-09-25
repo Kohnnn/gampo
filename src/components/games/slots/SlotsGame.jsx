@@ -18,6 +18,7 @@ import {
 } from '../primitives'
 import EducationPanel from '../../EducationPanel'
 import { claimEscape } from '../../../utils/escapeClaims'
+import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { getFeatureContract } from '../../../data/slotFeatureContracts'
 import { recordFeatureEvent } from '../../../hooks/useProgress'
@@ -406,6 +407,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     // (win tier + multiplier, or "No win").
     const [liveAnnounce, setLiveAnnounce] = useState('')
     const [showMobileBet, setShowMobileBet] = useState(false)
+    // The mobile sheets below are hidden by CSS below the breakpoint while this
+    // React state stays true, so Escape behaviour is tied to real visibility.
+    const isMobile = useIsMobileViewport()
     // Mobile-only: full paytable / feature-contract bottom-sheet modal. On
     // desktop the same content lives inline in the panel (showInfo); on phones
     // that panel reflows off-screen behind the dock, so we surface it as a
@@ -610,11 +614,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             ;(first || sheet).focus()
         }, 0)
         const onKey = (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault()
-                setShowMobileInfo(false)
-                return
-            }
+            // Escape is routed through the claim registry (see below), so this
+            // listener handles only the Tab focus trap. Keeping a second Escape
+            // branch here would let one key close this sheet and, via the other
+            // listener, whichever layer was registered above it.
             if (e.key !== 'Tab') return
             const sheet = mobileInfoSheetRef.current
             if (!sheet) return
@@ -642,32 +645,29 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         }
     }, [showMobileInfo])
 
-    // Mobile bet sheet: Escape-to-close, plus an Escape claim so the mobile
-    // drawer beneath it defers. The sheet opens without moving focus, so focus
-    // stays in the drawer while it is up; without the claim the drawer's
-    // handler consumed Escape and left this sheet stranded over the page. The
-    // sheet previously had no Escape handler at all, so Escape did nothing.
+    // The mobile sheets are hidden by CSS below the breakpoint, but their React
+    // state stays true. Tie Escape handling and claims to actual mobile
+    // visibility, otherwise an invisible sheet keeps the claim after a resize
+    // to desktop and swallows the first Escape.
+    //
+    // Ownership is a registered HANDLER, not a flag: the router asks the
+    // topmost layer first, so with the bet sheet and the shortcuts panel both
+    // open only one of them closes per keypress.
     useEffect(() => {
-        if (!showMobileBet) return undefined
-        const release = claimEscape()
-        const onKey = (e) => {
-            if (e.key !== 'Escape') return
-            e.preventDefault()
+        if (!showMobileBet || !isMobile) return undefined
+        return claimEscape(() => {
             setShowMobileBet(false)
-        }
-        document.addEventListener('keydown', onKey)
-        return () => {
-            release()
-            document.removeEventListener('keydown', onKey)
-        }
-    }, [showMobileBet])
+            return true
+        })
+    }, [showMobileBet, isMobile])
 
-    // The paytable sheet already handles its own Escape; claim so the drawer
-    // defers to it rather than consuming the key first.
     useEffect(() => {
-        if (!showMobileInfo) return undefined
-        return claimEscape()
-    }, [showMobileInfo])
+        if (!showMobileInfo || !isMobile) return undefined
+        return claimEscape(() => {
+            setShowMobileInfo(false)
+            return true
+        })
+    }, [showMobileInfo, isMobile])
 
     // QA seam — DEVELOPMENT ONLY.
     //

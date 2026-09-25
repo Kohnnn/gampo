@@ -180,12 +180,17 @@ export default function PokerGame() {
     const [bubbles, setBubbles] = useState({})
     const [confirmCashout, setConfirmCashout] = useState(false)
     const [pendingExit, setPendingExit] = useState(null)
-    // While the exit guard is up it owns Escape, so the mobile drawer beneath
-    // it defers rather than consuming the key and leaving this guard stranded
-    // over the table.
+    // While the exit guard is up it owns Escape. It must CONSUME the key, not
+    // merely claim it: a claim with no handler blocks the drawer and leaves the
+    // user with a key that does nothing. Escape dismisses the guard exactly like
+    // its "Stay seated" control, which is the safe default — an accidental
+    // Escape must never abandon table chips.
     useEffect(() => {
         if (!pendingExit) return undefined
-        return claimEscape()
+        return claimEscape(() => {
+            setPendingExit(null)
+            return true
+        })
     }, [pendingExit])
 
     const [rotationLog, setRotationLog] = useState([])

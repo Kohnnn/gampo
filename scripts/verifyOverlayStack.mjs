@@ -265,6 +265,43 @@ try {
     // stacking behaviour — one Escape, one layer — not on which layer wins.
     record(s3.betSheetOpen === false, 'Escape closes the bet sheet that owns the key', s3)
 
+    // --- 4. Two claimed overlays open at once. This is the case that broke the
+    //        previous boolean-claim design: with two independent handlers on the
+    //        same node, one Escape closed BOTH. Ownership now routes to a single
+    //        handler, so each keypress must close exactly one layer.
+    await go('/slots')
+    const betAgain = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const el = document.querySelector('.slot-mobile-readout');
+  if (!el) return { ok: false, reason: 'no bet readout control' };
+  el.click();
+  for (let i = 0; i < 20; i++) {
+    await sleep(100);
+    if (document.querySelector('.slot-mobile-bet-sheet-backdrop')) return { ok: true };
+  }
+  return { ok: false, reason: 'sheet did not open' };
+})()
+`)
+    record(betAgain.ok === true, 'slots bet sheet opens for the concurrent case', betAgain)
+    await evalExpr(openDrawerExpr)
+    await pressQuestion()
+    await evalExpr(focusDrawerLinkExpr)
+    const cPre = await evalExpr(stateExpr)
+    record(cPre.betSheetOpen === true && cPre.shortcutsOpen === true, 'two claimed overlays are open at once', cPre)
+    await pressEscape()
+    const cMid = await evalExpr(stateExpr)
+    const closed = (cPre.betSheetOpen && !cMid.betSheetOpen ? 1 : 0) + (cPre.shortcutsOpen && !cMid.shortcutsOpen ? 1 : 0)
+    record(closed === 1, 'one Escape closes exactly ONE of the two overlays', { ...cMid, closedCount: closed })
+    await pressEscape()
+    const cEnd = await evalExpr(stateExpr)
+    record(
+        cEnd.betSheetOpen === false && cEnd.shortcutsOpen === false,
+        'the second Escape closes the remaining overlay',
+        cEnd,
+    )
+    record(cEnd.drawerOpen === true, 'the drawer survives both overlay Escapes', cEnd)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1
