@@ -110,12 +110,16 @@ function Header() {
 
     const handleSearchKeyDown = (event) => {
         if (event.key === 'Escape') {
-            // The suggestions list only owns Escape while it is actually open.
-            // Mark the key handled when it is, so the drawer's registry router
-            // (which now runs on every viewport) does not also dismiss an open
-            // overlay: one Escape dismisses one layer. When there are no
-            // suggestions this declines, and Escape falls through normally.
-            if (!searchOpen) return
+            // The suggestions list only owns Escape while it is actually
+            // RENDERED, so gate on the same condition that renders it rather
+            // than on `searchOpen` alone. `onFocus` sets `searchOpen` true even
+            // for an empty query, which renders no list; gating on the flag
+            // swallowed Escape with nothing open to dismiss.
+            //
+            // Marking the key handled is what keeps one Escape to one layer:
+            // the drawer's registry router now runs on every viewport, so an
+            // unhandled Escape would dismiss an open overlay too.
+            if (!searchOpen || searchQuery.trim().length === 0) return
             event.preventDefault()
             setSearchOpen(false)
             setActiveSearchIndex(0)

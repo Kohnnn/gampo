@@ -653,6 +653,51 @@ try {
     record(sqPost.suggestions === false, 'one Escape closes the search suggestions', sqPost)
     record(sqPost.shortcutsOpen === true, 'that same Escape leaves the shortcuts panel open', sqPost)
 
+    // --- 13. The search input focused with an EMPTY query renders no list but
+    //         still sets the component's open flag. The handler must gate on
+    //         what is rendered, not on that flag, or it swallows Escape with
+    //         nothing open to dismiss.
+    await go('/dice')
+    await evalExpr(`(() => {
+      const input = document.querySelector('input[type="search"], .header-search input, header input');
+      if (input) input.focus();
+      return { focused: !!input };
+    })()`)
+    await sleep(500)
+    const emptyFocus = await evalExpr(`
+(() => ({
+  suggestions: !!document.querySelector('[role="listbox"], .header-search-results'),
+  value: document.querySelector('input[type="search"], .header-search input, header input')?.value ?? null,
+}))()
+`)
+    record(emptyFocus.suggestions === false, 'focusing the input with an empty query renders no list', emptyFocus)
+    // Blur first: HotkeyHelp ignores `?` typed into an editable target.
+    await evalExpr(`(() => {
+      const input = document.querySelector('input[type="search"], .header-search input, header input');
+      if (input) input.blur();
+      return { blurred: !!input };
+    })()`)
+    await sleep(200)
+    await pressQuestion()
+    const panelUp = await evalExpr(`({ shortcutsOpen: !!document.querySelector('.hotkey-card') })`)
+    record(panelUp.shortcutsOpen === true, 'panel opens once the input is blurred', panelUp)
+    await evalExpr(`(() => {
+      const input = document.querySelector('input[type="search"], .header-search input, header input');
+      if (input) input.focus();
+      return { focused: !!input };
+    })()`)
+    await sleep(400)
+    const emptyPre = await evalExpr(`
+(() => ({
+  suggestions: !!document.querySelector('[role="listbox"], .header-search-results'),
+  shortcutsOpen: !!document.querySelector('.hotkey-card'),
+}))()
+`)
+    record(emptyPre.suggestions === false && emptyPre.shortcutsOpen === true, 'input focused with no list, panel open', emptyPre)
+    await pressEscape()
+    const emptyPost = await evalExpr(`({ shortcutsOpen: !!document.querySelector('.hotkey-card') })`)
+    record(emptyPost.shortcutsOpen === false, 'Escape reaches the panel even with the input focused and no list', emptyPost)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1
