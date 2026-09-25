@@ -17,6 +17,7 @@ import {
     useGameSession,
 } from '../primitives'
 import EducationPanel from '../../EducationPanel'
+import { claimEscape } from '../../../utils/escapeClaims'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { getFeatureContract } from '../../../data/slotFeatureContracts'
 import { recordFeatureEvent } from '../../../hooks/useProgress'
@@ -639,6 +640,33 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             const ret = mobileInfoReturnRef.current
             if (ret && typeof ret.focus === 'function') ret.focus()
         }
+    }, [showMobileInfo])
+
+    // Mobile bet sheet: Escape-to-close, plus an Escape claim so the mobile
+    // drawer beneath it defers. The sheet opens without moving focus, so focus
+    // stays in the drawer while it is up; without the claim the drawer's
+    // handler consumed Escape and left this sheet stranded over the page. The
+    // sheet previously had no Escape handler at all, so Escape did nothing.
+    useEffect(() => {
+        if (!showMobileBet) return undefined
+        const release = claimEscape()
+        const onKey = (e) => {
+            if (e.key !== 'Escape') return
+            e.preventDefault()
+            setShowMobileBet(false)
+        }
+        document.addEventListener('keydown', onKey)
+        return () => {
+            release()
+            document.removeEventListener('keydown', onKey)
+        }
+    }, [showMobileBet])
+
+    // The paytable sheet already handles its own Escape; claim so the drawer
+    // defers to it rather than consuming the key first.
+    useEffect(() => {
+        if (!showMobileInfo) return undefined
+        return claimEscape()
     }, [showMobileInfo])
 
     // QA seam — DEVELOPMENT ONLY.

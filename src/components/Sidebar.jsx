@@ -5,6 +5,7 @@ import { useSidebarPins } from '../hooks/useSidebarPins'
 import { sidebarPaths } from '../data/sidebarIcons'
 import { slotPath } from '../data/slotRoutes'
 import { sportsbookPathForView } from '../sportsbook/sportsbookRoutes'
+import { overlayOwnsEscape } from '../utils/escapeClaims'
 
 // ---- Casino sidebar data (unchanged from prior waves) ----
 const navSections = [
@@ -440,35 +441,6 @@ function SportsbookSidebar() {
     )
 }
 
-// True when some overlay is actually painted above the mobile drawer, so the
-// drawer must not consume Escape. Detected from real geometry and paint rather
-// than a list of class names: the overlays in this app do not share a class, a
-// role or an `aria-modal` convention, so any list goes stale on the next
-// overlay added. A hardcoded list was tried and immediately missed the slots
-// bet sheet, which uses `role="dialog"` without `aria-modal` and none of the
-// listed classes. An overlay qualifies when it is rendered, has area, is not
-// display/visibility suppressed, and is stacked at or above the drawer.
-function overlayIsAboveDrawer() {
-    if (typeof document === 'undefined') return false
-    const drawer = document.querySelector('.app-sidebar')
-    if (!drawer) return false
-    const drawerZ = Number(getComputedStyle(drawer).zIndex) || 0
-    const candidates = document.querySelectorAll(
-        '[role="dialog"], [aria-modal="true"], [class*="backdrop"], [class*="overlay"], [class*="sheet"]',
-    )
-    for (const el of candidates) {
-        if (drawer.contains(el)) continue
-        const cs = getComputedStyle(el)
-        if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue
-        const rect = el.getBoundingClientRect()
-        if (rect.width === 0 || rect.height === 0) continue
-        // Only an overlay stacked at or above the drawer competes for Escape.
-        if ((Number(cs.zIndex) || 0) >= drawerZ) return true
-    }
-    return false
-}
-
-
 function Sidebar({ isOpen, toggleSidebar }) {
     const [gameSearch, setGameSearch] = useState('')
     const location = useLocation()
@@ -496,15 +468,22 @@ function Sidebar({ isOpen, toggleSidebar }) {
             mobileDrawerOpen.current = true
             const first = sidebarRef.current?.querySelector('a, button')
             first?.focus?.()
-        } else if (!isOpen && mobileDrawerOpen.current) {
+        } else if (!isOpen) {
+            // The drawer is closed. Consume any intent recorded while it was
+            // closing, whether or not this component tracked it as an open
+            // mobile drawer: on a desktop→phone resize the sidebar can be
+            // closed from its own toggle without `mobileDrawerOpen` ever having
+            // been set, which would otherwise leave the flag pending and fire
+            // on a later, unrelated automatic close.
+            const restoreFocus = mobileDrawerOpen.current && closedByUser.current
             mobileDrawerOpen.current = false
+            closedByUser.current = false
             // Restore focus only after a dismissal the user performed. A
             // programmatic close (route entry, first-visit auto-close) leaves
             // focus alone: the page is about to be used, so stealing focus to
             // the menu button both strands a keyboard user mid-page and yanks
             // focus out of any overlay that is opening at the same time.
-            if (closedByUser.current) {
-                closedByUser.current = false
+            if (restoreFocus) {
                 document.querySelector('.header-menu-btn')?.focus?.()
             }
         }
@@ -512,28 +491,36 @@ function Sidebar({ isOpen, toggleSidebar }) {
         const onKeyDown = (event) => {
             if (event.key !== 'Escape' || !isMobile()) return
             if (!isOpen) return
+            // Respect an Escape another layer already handled. Game overlays
+            // (slots' bet and info sheets, the shortcuts panel, poker's exit
+            // guard) call `preventDefault()` when they consume the key, and
+            // their listeners are registered on the same node as this one, so
+            // without this check one Escape would dismiss the overlay *and* the
+            // drawer beneath it.
+            if (event.defaultPrevented) return
             // Only claim Escape when focus is actually inside the drawer; page
             // dialogs (odds/fairness) own their own Escape handling.
             const active = document.activeElement
             if (!sidebarRef.current?.contains(active)) return
-            // Defer to any overlay stacked above the drawer. Some of these
-            // overlays (the shortcuts panel, slots' bet and info sheets) open
+            // Defer to an overlay that has claimed Escape. Some overlays open
             // without moving focus, so focus stays inside the drawer while they
-            // are up; claiming Escape here would consume the key before that
-            // overlay's own `window` handler saw it, closing the drawer and
-            // leaving the overlay stranded over the page.
+            // are up; consuming the key here would close the drawer and leave
+            // the overlay stranded over the page.
             //
-            // This is detected structurally rather than from a list of class
-            // names. A hardcoded list was tried and immediately missed the
-            // slots bet sheet, which uses `role="dialog"` without `aria-modal`
-            // and none of the listed classes. Any overlay qualifies if it is
-            // rendered, painted and sits above the drawer.
-            if (overlayIsAboveDrawer()) return
+            // The claim is declared by the overlay, not inferred here. Two
+            // inference attempts failed: matching mounted nodes broke on a
+            // closed-but-portaled BetPanel, and comparing z-index or paint
+            // order broke because a computed z-index inside a stacking context
+            // says nothing about the real stacking order (slots' sheet computes
+            // 1500 inside a z-index:1 ancestor, so it is painted *below* the
+            // drawer). The layer that knows it owns the screen declares it.
+            //
+            // This returns without touching the event: the overlay above still
+            // needs to receive it.
+            if (overlayOwnsEscape()) return
+            // Mark the key handled. ChatDock's listener runs on `window` and
+            // skips handled Escape, so this keeps one Escape to one interface.
             event.preventDefault()
-            // ChatDock listens for Escape on `window` without checking
-            // `defaultPrevented`, so an unstopped event would also minimize an
-            // open chat. One key must dismiss one interface: consume it here.
-            event.stopPropagation()
             closedByUser.current = true
             toggleSidebar()
         }
@@ -572,7 +559,11 @@ function Sidebar({ isOpen, toggleSidebar }) {
                 ref={sidebarRef}
             >
             <div className="sidebar-header">
-                <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
+                {/* The in-drawer toggle is an ordinary user dismissal, so it
+                    must record intent like Escape and the backdrop — otherwise
+                    closing the drawer from its own button drops focus to the
+                    body while other dismissal paths restore it. */}
+                <button className="icon-btn sidebar-toggle" onClick={dismissDrawer} aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"></path></svg>
                 </button>
                 <div className="sidebar-switcher">

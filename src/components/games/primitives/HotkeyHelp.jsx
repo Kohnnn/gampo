@@ -2,6 +2,7 @@
 // Wave 17: also accepts external control via `controlledOpen` + `onOpenChange`.
 
 import { useEffect, useState } from 'react'
+import { claimEscape } from '../../../utils/escapeClaims'
 import { Keyboard, X } from 'lucide-react'
 
 const SHORTCUTS = [
@@ -38,12 +39,23 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
                 e.preventDefault()
                 requestOpen(!isOpen)
             } else if (e.key === 'Escape' && isOpen) {
+                // Mark handled so ChatDock's window listener (which runs after
+                // this one and skips handled events) does not also dismiss the
+                // chat: one Escape dismisses one interface.
+                e.preventDefault()
                 requestOpen(false)
             }
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
     }, [isOpen, controlledOpen, onOpenChange])
+
+    // While this panel is up it owns Escape, so the mobile drawer beneath it
+    // defers instead of consuming the key and stranding this panel open.
+    useEffect(() => {
+        if (!isOpen) return undefined
+        return claimEscape()
+    }, [isOpen])
 
     const dismiss = () => requestOpen(false)
 

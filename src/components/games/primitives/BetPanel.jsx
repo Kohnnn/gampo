@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import { Play, Pause, ChevronsRight, Settings, Sliders, RotateCcw } from 'lucide-react'
 import { formatCredits } from '../../../utils/simulationMath'
 import { withTimeout } from '../../../utils/scheduling'
+import { claimEscape } from '../../../utils/escapeClaims'
 
 const TABS = ['manual', 'auto', 'strategy']
 
@@ -323,6 +324,13 @@ export default function BetPanel({
 
     const sheetRef = useRef(null)
     const sheetTriggerRef = useRef(null)
+
+    // While the mobile sheet is open it owns Escape, so the mobile drawer
+    // beneath it defers rather than consuming the key and stranding the sheet.
+    useEffect(() => {
+        if (!isMobile || !mobileControlsOpen) return undefined
+        return claimEscape()
+    }, [isMobile, mobileControlsOpen])
 
     // Accessibility for the portaled mobile sheet: trap Tab focus inside the
     // open sheet, close on Escape, move focus into the sheet on open, and

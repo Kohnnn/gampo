@@ -4,6 +4,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useGameBgm } from '../../../audio/useBgm'
 import { formatCredits } from '../../../utils/simulationMath'
+import { claimEscape } from '../../../utils/escapeClaims'
 import { applyAction, createInitialState, dealNext, legalActions, startHand } from '../../../poker/engine/Game'
 import { icmEquity } from '../../../poker/icm'
 import HeuristicBot from '../../../poker/bots/HeuristicBot'
@@ -179,6 +180,14 @@ export default function PokerGame() {
     const [bubbles, setBubbles] = useState({})
     const [confirmCashout, setConfirmCashout] = useState(false)
     const [pendingExit, setPendingExit] = useState(null)
+    // While the exit guard is up it owns Escape, so the mobile drawer beneath
+    // it defers rather than consuming the key and leaving this guard stranded
+    // over the table.
+    useEffect(() => {
+        if (!pendingExit) return undefined
+        return claimEscape()
+    }, [pendingExit])
+
     const [rotationLog, setRotationLog] = useState([])
     const [rebuyPrompt, setRebuyPrompt] = useState(false)
     const [chipMotions, setChipMotions] = useState([])
