@@ -823,6 +823,64 @@ try {
     record(nestedPost.coach === false, 'one Escape closes the nested coach', nestedPost)
     record(nestedPost.slip === true, 'that Escape leaves the outer slip open (one layer per press)', nestedPost)
 
+    // --- 17. Escape from a slip CHILD with chat open. The earlier nested case
+    //         only checked slip/coach, not chat, which is how the 9233ebc guard
+    //         shipped a defect: a child-target Escape was not marked handled,
+    //         so it reached ChatDock and minimized the chat as well.
+    await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  document.dispatchEvent(new CustomEvent('gampo:open-chat', { detail: { tab: 'chat' } }));
+  await sleep(900);
+  const pill = document.querySelector('.sb-mobile-slip-pill');
+  pill?.click();
+  for (let i = 0; i < 20; i += 1) { await sleep(90); if (document.querySelector('.sb-mobile-slip')?.open) break; }
+  const input = document.querySelector('.sb-mobile-slip input[type="number"]');
+  if (input) {
+    input.focus();
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(input, '15');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  await sleep(400);
+  return { focused: document.activeElement?.tagName };
+})()
+`)
+    const slipChat = `(() => {
+      const dock = document.querySelector('.chat-dock');
+      return {
+        slip: !!document.querySelector('.sb-mobile-slip')?.open,
+        coach: !!document.querySelector('.sb-mobile-slip .sb-coach-backdrop')?.open,
+        chat: !!dock && String(dock.className).includes('w-locked'),
+      };
+    })()`
+    const childPre = await evalExpr(slipChat)
+    record(childPre.slip === true && childPre.chat === true, 'slip and chat are both open with focus in the slip stake input', childPre)
+    await pressEscape()
+    const childPost = await evalExpr(slipChat)
+    record(childPost.slip === false, 'one Escape closes the slip from a focused child', childPost)
+    record(childPost.chat === true, 'that Escape does NOT also minimize the chat', childPost)
+
+    // Nesting plus chat: Escape inside the coach must close only the coach.
+    await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const pill = document.querySelector('.sb-mobile-slip-pill');
+  pill?.click();
+  for (let i = 0; i < 20; i += 1) { await sleep(90); if (document.querySelector('.sb-mobile-slip')?.open) break; }
+  const trigger = document.querySelector('.sb-mobile-slip .sb-coach-trigger');
+  trigger?.click();
+  for (let i = 0; i < 25; i += 1) { await sleep(90); if (document.querySelector('.sb-mobile-slip .sb-coach-backdrop')?.open) break; }
+  return true;
+})()
+`)
+    const nestChatPre = await evalExpr(slipChat)
+    record(nestChatPre.slip === true && nestChatPre.coach === true && nestChatPre.chat === true, 'slip, nested coach and chat are all open', nestChatPre)
+    await pressEscape()
+    const nestChatPost = await evalExpr(slipChat)
+    record(nestChatPost.coach === false, 'one Escape closes the nested coach', nestChatPost)
+    record(nestChatPost.slip === true && nestChatPost.chat === true, 'that Escape leaves the slip and chat intact', nestChatPost)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1

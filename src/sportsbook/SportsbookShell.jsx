@@ -270,20 +270,30 @@ function SportsbookShell() {
     useEffect(() => {
         const dialog = mobileSlipRef.current
         if (!dialog || !mobileSlipOpen) return undefined
+        // Escape anywhere inside this dialog - including from its children -
+        // must be marked handled here, because window-level owners (ChatDock)
+        // listen in the bubble phase on `window` and would otherwise minimize
+        // the chat while the slip closes: two layers for one press.
+        //
+        // Marking it handled suppresses the native `cancel`, so the close is
+        // done explicitly. A nested dialog (the odds coach) raises its own
+        // Escape; that press belongs to the coach, so the slip must not also
+        // close - otherwise one press collapses both layers.
         const onKeyDown = (event) => {
             if (event.key !== 'Escape') return
-            // The odds coach nests inside this dialog in the DOM, so its
-            // Escape keydown bubbles here too. Without this guard one press
-            // would collapse both layers. Only close the slip when the key
-            // came from the slip itself, not from a nested dialog.
-            if (event.target !== dialog) return
-            // Prevent the native <dialog> cancel and close explicitly instead;
-            // see SearchOverlay.
+            if (event.defaultPrevented) return
+            // The odds coach nests inside this dialog: a press raised within it
+            // belongs to the coach, which closes itself. Closing the slip too
+            // would collapse two layers on one press. Anything else inside the
+            // slip - its inputs, its close button, its coach *trigger* - is a
+            // slip control, so the slip owns that press and closes.
+            const coach = dialog.querySelector('.sb-coach-backdrop')
+            if (coach && coach.open && coach.contains(event.target)) return
             event.preventDefault()
             setMobileSlipOpen(false)
         }
-        dialog.addEventListener('keydown', onKeyDown)
-        return () => dialog.removeEventListener('keydown', onKeyDown)
+        dialog.addEventListener('keydown', onKeyDown, true)
+        return () => dialog.removeEventListener('keydown', onKeyDown, true)
     }, [mobileSlipOpen])
 
     const navigateSportsbook = (next) => {
