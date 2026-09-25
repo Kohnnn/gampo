@@ -28,10 +28,10 @@ function pct(v) { return v === null ? 'Unavailable' : `${(v * 100).toFixed(2)}%`
 // `winChance = rtp / 2`, which displayed numbers that did not correspond to the
 // player's actual selection or balance. Inventing a hit chance from RTP is not a
 // derivation — it is a different quantity.
-export default function OddsPopup({ open, onClose, definition, odds, betAmount, balance, recentProfit = 0 }) {
+export default function OddsPopup({ open, onClose, definition, odds, betAmount, balance, recentProfit = 0, openerRef }) {
     // Native <dialog> owns focus entry, containment and Escape; the hook
     // restores focus to the control that opened us on close.
-    const dialogRef = useNativeDialog(open, onClose)
+    const dialogRef = useNativeDialog(open, onClose, openerRef)
 
     if (!open) return null
     const rtp = numOrNull(definition?.rtp)

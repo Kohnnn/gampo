@@ -216,9 +216,9 @@ export default function GameToolbar({ helpHref, definition, balance, odds, betAm
                 </div>
             </div>
             {popover}
-            <FairnessDrawer open={fairOpen} onClose={() => setFairOpen(false)} />
+            <FairnessDrawer open={fairOpen} onClose={() => setFairOpen(false)} openerRef={triggerRef} />
             <HotkeyHelp controlledOpen={hotkeyOpen} onOpenChange={setHotkeyOpen} />
-            <OddsPopup open={oddsOpen} onClose={() => setOddsOpen(false)} definition={definition} odds={odds} betAmount={betAmount} balance={balance} />
+            <OddsPopup open={oddsOpen} onClose={() => setOddsOpen(false)} definition={definition} odds={odds} betAmount={betAmount} balance={balance} openerRef={triggerRef} />
         </>
     )
 }

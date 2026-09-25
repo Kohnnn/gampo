@@ -744,6 +744,50 @@ try {
     record(sbPost.dialogOpen === false, 'one Escape closes the sportsbook dialog', sbPost)
     record(sbPost.chatOpen === true, 'that Escape does not also minimize the chat', sbPost)
 
+    // --- 15. Modal return (AC14). The fairness dialog opens from a popover
+    //         item that unmounts, so the naive return target was detached and
+    //         focus fell to <body>. It must land on the persistent trigger.
+    await go('/dice')
+    const focusTarget = `(() => {
+      const a = document.activeElement;
+      return { tag: a?.tagName, label: a?.getAttribute('aria-label') || '', cls: String(a?.className || '').slice(0, 40) };
+    })()`
+    const openFairness = `
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const tools = document.querySelector('button[aria-label="Game tools"]');
+  if (!tools) return { ok: false, reason: 'no Game tools button' };
+  tools.focus(); tools.click(); await sleep(700);
+  const item = [...document.querySelectorAll('.gt-popover-item')].find(x => /provably fair/i.test(x.textContent));
+  if (!item) return { ok: false, reason: 'no fairness item' };
+  item.click();
+  for (let i = 0; i < 20; i += 1) { await sleep(90); if (document.querySelector('dialog[open]')) return { ok: true }; }
+  return { ok: false, reason: 'dialog did not open' };
+})()
+`
+    await evalExpr(openFairness)
+    await pressEscape()
+    const afterEsc = await evalExpr(focusTarget)
+    record(afterEsc.label === 'Game tools', 'focus returns to the trigger after Escape closes the fairness dialog', afterEsc)
+
+    await evalExpr(openFairness)
+    await evalExpr(`(async () => { const sleep = ms => new Promise(r => setTimeout(r, ms)); document.querySelector('.fair-close')?.click(); await sleep(700); return true; })()`)
+    const afterBtn = await evalExpr(focusTarget)
+    record(afterBtn.label === 'Game tools', 'focus returns to the trigger after the close button', afterBtn)
+
+    await evalExpr(openFairness)
+    await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const d = document.querySelector('dialog[open]');
+  const r = d.getBoundingClientRect();
+  d.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: r.left + 2, clientY: r.top + 2 }));
+  await sleep(700); return true;
+})()
+`)
+    const afterBackdrop = await evalExpr(focusTarget)
+    record(afterBackdrop.label === 'Game tools', 'focus returns to the trigger after a backdrop click', afterBackdrop)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1
