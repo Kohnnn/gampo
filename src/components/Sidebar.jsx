@@ -489,38 +489,38 @@ function Sidebar({ isOpen, toggleSidebar }) {
         }
 
         const onKeyDown = (event) => {
-            if (event.key !== 'Escape' || !isMobile()) return
-            if (!isOpen) return
-            // Respect an Escape another layer already handled. Game overlays
-            // (slots' bet and info sheets, the shortcuts panel, poker's exit
-            // guard) call `preventDefault()` when they consume the key, and
-            // their listeners are registered on the same node as this one, so
-            // without this check one Escape would dismiss the overlay *and* the
-            // drawer beneath it.
+            if (event.key !== 'Escape') return
+            // Respect an Escape another layer already handled. The welcome
+            // modal binds in the capture phase and the native <dialog> overlays
+            // (fairness, odds) own the key in the top layer; both call
+            // `preventDefault()`, and neither registers a handler here.
             if (event.defaultPrevented) return
-            // Only claim Escape when focus is actually inside the drawer; page
-            // dialogs (odds/fairness) own their own Escape handling.
-            const active = document.activeElement
-            if (!sidebarRef.current?.contains(active)) return
-            // Route the key to exactly one layer. Registered overlays get first
-            // refusal, most recent first, and a handler that declines yields to
-            // the next — so a layer that is open without handling Escape never
-            // traps the key.
+            // Route Escape to a registered overlay FIRST, on every viewport and
+            // whether or not the drawer is open. Registered overlays no longer
+            // keep their own listeners, so gating this behind the drawer's
+            // mobile/open/focus checks left Escape doing nothing for them: the
+            // shortcuts panel could not be closed on desktop, and a focused
+            // BetPanel sheet could not be closed with the drawer shut.
             //
-            // Ownership is declared, not inferred here. Three inference
-            // attempts failed: matching mounted nodes broke on a
-            // closed-but-portaled BetPanel, matching class names missed the
-            // slots bet sheet, and comparing z-index or paint order is invalid
-            // because a computed z-index inside a stacking context says nothing
-            // about real stacking (slots' sheet computes 1500 inside a
-            // z-index:1 ancestor, so it paints *below* the drawer).
-            // The layer that acts calls `preventDefault()`, so ChatDock (and
-            // anything else on `window`) can see the key was already consumed.
+            // Ownership is declared, not inferred. Three inference attempts
+            // failed: matching mounted nodes broke on a closed-but-portaled
+            // BetPanel, matching class names missed the slots bet sheet, and
+            // comparing z-index or paint order is invalid because a computed
+            // z-index inside a stacking context says nothing about real
+            // stacking (slots' sheet computes 1500 inside a z-index:1
+            // ancestor, so it paints *below* the drawer).
             if (dispatchEscape(event)) {
                 event.preventDefault()
                 return
             }
-            // No overlay took it, so the drawer does.
+            // No overlay took it. Only now does the drawer's own Escape contract
+            // apply, and only in the states it governs: below 769px the drawer
+            // is an off-canvas overlay, so Escape dismisses it, and only when
+            // focus is actually inside it.
+            if (!isMobile()) return
+            if (!isOpen) return
+            const active = document.activeElement
+            if (!sidebarRef.current?.contains(active)) return
             event.preventDefault()
             closedByUser.current = true
             toggleSidebar()

@@ -189,9 +189,17 @@ try {
         width: 375, height: 667, deviceScaleFactor: 1, mobile: true,
     })
 
+    // Wait for the app shell rather than a fixed delay, then dismiss the
+    // welcome modal. A fixed sleep makes this flaky under load, and the early
+    // scenarios are the ones that suffer.
     const go = async (path) => {
         await send('Page.navigate', { url: BASE + path })
-        await sleep(3200)
+        for (let i = 0; i < 60; i += 1) {
+            await sleep(200)
+            const ready = await evalExpr(`!!document.querySelector('.app-sidebar')`)
+            if (ready) break
+        }
+        await sleep(600)
         await evalExpr(dismissWelcomeExpr)
         await sleep(400)
     }
@@ -341,6 +349,105 @@ try {
     await pressEscape()
     const tEnd = await evalExpr(toolsStateExpr)
     record(tEnd.drawerOpen === false, 'second Escape closes the drawer once the popover is gone', tEnd)
+
+    // --- 6. Overlay open with focus inside the OVERLAY, not the drawer. The
+    //        drawer's listener used to return early unless focus was inside it,
+    //        which ran before routing, so Escape reached nothing and both layers
+    //        stayed open. Routing must not depend on where focus happens to be.
+    await go('/dice')
+    const reopenTools = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const btn = document.querySelector('button[aria-label="Game tools"]');
+  if (!btn) return { ok: false, reason: 'no game tools button' };
+  btn.click();
+  for (let i = 0; i < 20; i++) {
+    await sleep(100);
+    if (document.querySelector('.gt-popover-portal')) return { ok: true };
+  }
+  return { ok: false, reason: 'popover did not open' };
+})()
+`)
+    record(reopenTools.ok === true, 'game tools popover opens for the focus case', reopenTools)
+    await evalExpr(openDrawerExpr)
+    // Move focus into the overlay, away from the drawer.
+    await evalExpr(`(() => { const b = document.querySelector('.gt-popover-portal button'); if (b) b.focus(); return { moved: !!b }; })()`)
+    const fPre = await evalExpr(`
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return {
+    drawerOpen: !!sb && Math.round(sb.getBoundingClientRect().x) === 0,
+    popoverOpen: !!document.querySelector('.gt-popover-portal'),
+    focusInDrawer: !!sb && sb.contains(document.activeElement),
+  };
+})()
+`)
+    record(fPre.popoverOpen === true && fPre.focusInDrawer === false, 'overlay is open with focus outside the drawer', fPre)
+    await pressEscape()
+    const fPost = await evalExpr(`
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return {
+    drawerOpen: !!sb && Math.round(sb.getBoundingClientRect().x) === 0,
+    popoverOpen: !!document.querySelector('.gt-popover-portal'),
+  };
+})()
+`)
+    record(fPost.popoverOpen === false, 'Escape still reaches the overlay when focus is outside the drawer', fPost)
+    await pressEscape()
+    const fEnd = await evalExpr(`
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return { drawerOpen: !!sb && Math.round(sb.getBoundingClientRect().x) === 0 };
+})()
+`)
+    record(fEnd.drawerOpen === true, 'the drawer is not closed underneath by that Escape', fEnd)
+
+    // --- 7. Overlay open with the DRAWER CLOSED. Registered overlays no longer
+    //        keep their own Escape listeners, so routing must not be gated
+    //        behind the drawer being open, or Escape does nothing for them.
+    await send('Emulation.setDeviceMetricsOverride', {
+        width: 1610, height: 870, deviceScaleFactor: 1, mobile: false,
+    })
+    await go('/dice')
+    const closedDrawerQuestion = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const keyEv = (type) => new KeyboardEvent(type, { key: '?', code: 'Slash', bubbles: true });
+  window.dispatchEvent(keyEv('keydown'));
+  for (let i = 0; i < 20; i++) {
+    await sleep(100);
+    if (document.querySelector('.hotkey-card')) return { ok: true };
+  }
+  return { ok: false, reason: 'shortcuts did not open' };
+})()
+`)
+    record(closedDrawerQuestion.ok === true, 'shortcuts panel opens with the drawer closed', closedDrawerQuestion)
+    // At desktop width the sidebar is ordinary page furniture and may be open;
+    // close it so this case really exercises "drawer not open".
+    await evalExpr(`(() => {
+      const btn = document.querySelector('.header-menu-btn');
+      if (btn) btn.click();
+      return { clicked: !!btn };
+    })()`)
+    await sleep(700)
+    const cdPre = await evalExpr(`
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return {
+    shortcutsOpen: !!document.querySelector('.hotkey-card'),
+    // At this width the sidebar is the desktop rail, not the off-canvas drawer,
+    // so assert the mobile-drawer concept instead of x-position.
+    mobileDrawerOpen: window.matchMedia('(max-width: 768px)').matches
+      && !!sb && Math.round(sb.getBoundingClientRect().x) === 0,
+    desktopWidth: !window.matchMedia('(max-width: 768px)').matches,
+  };
+})()
+`)
+    record(cdPre.desktopWidth === true && cdPre.mobileDrawerOpen === false, 'no mobile drawer is open for this case', cdPre)
+    await pressEscape()
+    const cdPost = await evalExpr(`({ shortcutsOpen: !!document.querySelector('.hotkey-card') })`)
+    record(cdPost.shortcutsOpen === false, 'Escape closes the panel even with the drawer closed', cdPost)
 
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
