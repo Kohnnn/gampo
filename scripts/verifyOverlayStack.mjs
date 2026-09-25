@@ -788,6 +788,41 @@ try {
     const afterBackdrop = await evalExpr(focusTarget)
     record(afterBackdrop.label === 'Game tools', 'focus returns to the trigger after a backdrop click', afterBackdrop)
 
+    // --- 16. Nested dialog: the odds coach lives INSIDE the mobile slip. A
+    //         keydown from the inner dialog bubbles to the outer one, so an
+    //         unscoped handler closes both with one Escape. Guarded in
+    //         SportsbookShell; asserted here on mobile.
+    // The mobile slip only exists at mobile width; earlier cases leave the
+    // browser at 1610x870.
+    await send('Emulation.setDeviceMetricsOverride', {
+        width: 375, height: 667, deviceScaleFactor: 1, mobile: true,
+    })
+    await go('/sportsbook')
+    await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const pill = document.querySelector('.sb-mobile-slip-pill');
+  if (!pill) return { ok: false, reason: 'no slip pill' };
+  pill.click();
+  for (let i = 0; i < 20; i += 1) { await sleep(90); if (document.querySelector('.sb-mobile-slip')?.open) break; }
+  const trigger = document.querySelector('.sb-mobile-slip .sb-coach-trigger');
+  if (!trigger) return { ok: false, reason: 'no coach trigger' };
+  trigger.click();
+  for (let i = 0; i < 20; i += 1) { await sleep(90); if (document.querySelector('.sb-mobile-slip .sb-coach-backdrop')?.open) break; }
+  return { ok: true };
+})()
+`)
+    const nestedLayers = `(() => ({
+      slip: !!document.querySelector('.sb-mobile-slip')?.open,
+      coach: !!document.querySelector('.sb-mobile-slip .sb-coach-backdrop')?.open,
+    }))()`
+    const nestedPre = await evalExpr(nestedLayers)
+    record(nestedPre.slip === true && nestedPre.coach === true, 'the nested coach and its slip are both open', nestedPre)
+    await pressEscape()
+    const nestedPost = await evalExpr(nestedLayers)
+    record(nestedPost.coach === false, 'one Escape closes the nested coach', nestedPost)
+    record(nestedPost.slip === true, 'that Escape leaves the outer slip open (one layer per press)', nestedPost)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1

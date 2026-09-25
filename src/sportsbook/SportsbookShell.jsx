@@ -272,6 +272,11 @@ function SportsbookShell() {
         if (!dialog || !mobileSlipOpen) return undefined
         const onKeyDown = (event) => {
             if (event.key !== 'Escape') return
+            // The odds coach nests inside this dialog in the DOM, so its
+            // Escape keydown bubbles here too. Without this guard one press
+            // would collapse both layers. Only close the slip when the key
+            // came from the slip itself, not from a nested dialog.
+            if (event.target !== dialog) return
             // Prevent the native <dialog> cancel and close explicitly instead;
             // see SearchOverlay.
             event.preventDefault()
@@ -501,7 +506,13 @@ function SportsbookShell() {
                     event.preventDefault()
                     setMobileSlipOpen(false)
                 }}
-                onClose={() => {
+                onClose={(event) => {
+                    // A nested <dialog> (the odds coach) bubbles its own `close`
+                    // event up to this one. React's onClose therefore fires for
+                    // the child too, and a single Escape would collapse both the
+                    // coach and the slip - two layers for one press. Only this
+                    // dialog's own close should dismiss it.
+                    if (event.target !== event.currentTarget) return
                     setMobileSlipOpen(false)
                     mobileSlipOpenerRef.current?.focus()
                 }}
