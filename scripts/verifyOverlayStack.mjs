@@ -449,6 +449,81 @@ try {
     const cdPost = await evalExpr(`({ shortcutsOpen: !!document.querySelector('.hotkey-card') })`)
     record(cdPost.shortcutsOpen === false, 'Escape closes the panel even with the drawer closed', cdPost)
 
+    // --- 8. Native <dialog> keeps ownership at the new gate order. This overlay
+    //        is deliberately NOT registered: showModal() puts it in the top
+    //        layer, which owns Escape natively. With routing now unconditional,
+    //        confirm the drawer still does not consume the key first.
+    await send('Emulation.setDeviceMetricsOverride', {
+        width: 375, height: 667, deviceScaleFactor: 1, mobile: true,
+    })
+    await go('/dice')
+    const dialogOpened = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const tools = document.querySelector('button[aria-label="Game tools"]');
+  if (!tools) return { ok: false, reason: 'no game tools button' };
+  tools.click();
+  await sleep(600);
+  const odds = [...document.querySelectorAll('button')].find(b => /Odds/i.test(b.textContent));
+  if (!odds) return { ok: false, reason: 'no odds control' };
+  odds.click();
+  for (let i = 0; i < 20; i++) {
+    await sleep(100);
+    if (document.querySelector('dialog[open]')) return { ok: true };
+  }
+  return { ok: false, reason: 'dialog did not open' };
+})()
+`)
+    record(dialogOpened.ok === true, 'native dialog opens (odds)', dialogOpened)
+    await evalExpr(openDrawerExpr)
+    const nPre = await evalExpr(`
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return {
+    dialogOpen: !!document.querySelector('dialog[open]'),
+    drawerOpen: !!sb && Math.round(sb.getBoundingClientRect().x) === 0,
+  };
+})()
+`)
+    record(nPre.dialogOpen === true && nPre.drawerOpen === true, 'drawer open over the native dialog', nPre)
+    await pressEscape()
+    const nPost = await evalExpr(`
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return {
+    dialogOpen: !!document.querySelector('dialog[open]'),
+    drawerOpen: !!sb && Math.round(sb.getBoundingClientRect().x) === 0,
+  };
+})()
+`)
+    record(nPost.dialogOpen === false, 'one Escape closes the native dialog', nPost)
+    record(nPost.drawerOpen === true, 'that Escape does not also close the drawer', nPost)
+
+    // --- 9. Repeated open/close must not accumulate drawer listeners. A leaked
+    //        listener would make one Escape toggle more than one layer.
+    await go('/dice')
+    await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const btn = document.querySelector('.header-menu-btn');
+  if (!btn) return { ok: false };
+  for (let i = 0; i < 8; i += 1) {
+    btn.click(); await sleep(320);
+    btn.click(); await sleep(320);
+  }
+  return { ok: true };
+})()
+`)
+    await evalExpr(openDrawerExpr)
+    await pressQuestion()
+    await evalExpr(focusDrawerLinkExpr)
+    const cycPre = await evalExpr(stateExpr)
+    record(cycPre.shortcutsOpen === true && cycPre.drawerOpen === true, 'after 8 open/close cycles both layers are open', cycPre)
+    await pressEscape()
+    const cycPost = await evalExpr(stateExpr)
+    record(cycPost.shortcutsOpen === false, 'one Escape still closes exactly the shortcuts panel', cycPost)
+    record(cycPost.drawerOpen === true, 'no duplicate listener double-toggles the drawer', cycPost)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1
