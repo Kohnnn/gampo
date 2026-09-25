@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, Info, X } from 'lucide-react'
 import { EDUCATION_SECTIONS } from '../sportsbookEducation'
+import { containTab } from '../../components/games/primitives/focusContainment'
 
 function toneClass(tone) {
     return tone ? `sb-tone-${tone}` : ''
@@ -28,12 +29,22 @@ function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
         const dialog = dialogRef.current
         if (!dialog || !open) return undefined
         const onKeyDown = (event) => {
-            if (event.key !== 'Escape') return
-            // Prevent the native <dialog> cancel and close explicitly instead.
-            // Marking the key handled stops window-level owners (ChatDock) from
-            // also dismissing; closing here keeps the dialog's own behaviour.
-            event.preventDefault()
-            setOpen(false)
+            if (event.key === 'Escape') {
+                // Prevent the native <dialog> cancel and close explicitly
+                // instead. Marking the key handled stops window-level owners
+                // (ChatDock) from also dismissing; closing here keeps the
+                // dialog's own behaviour.
+                event.preventDefault()
+                setOpen(false)
+                return
+            }
+            // This dialog nests inside the mobile bet slip, itself a modal
+            // <dialog>. Chromium's native focus containment does not apply to a
+            // dialog nested in another modal dialog, so reverse Tab from the
+            // first control reached <body>. Escape then owned no handler and
+            // native cancel closed every open layer at once. Reuse the shared
+            // rule rather than adding a second one.
+            containTab(event, dialog)
         }
         dialog.addEventListener('keydown', onKeyDown)
         return () => dialog.removeEventListener('keydown', onKeyDown)

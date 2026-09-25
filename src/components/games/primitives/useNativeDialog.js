@@ -19,44 +19,11 @@
 // modal path.
 
 import { useEffect, useRef } from 'react'
+import { containTab, focusableWithin } from './focusContainment'
 
-const FOCUSABLE = [
-    'a[href]',
-    'button:not([disabled])',
-    'input:not([disabled])',
-    'select:not([disabled])',
-    'textarea:not([disabled])',
-    '[tabindex]:not([tabindex="-1"])',
-].join(',')
-
-function focusableWithin(dialog) {
-    if (!dialog) return []
-    return [...dialog.querySelectorAll(FOCUSABLE)].filter(
-        (el) => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement,
-    )
-}
-
-/**
- * Forward/reverse Tab containment for a container.
- *
- * Exported and unit-tested. The modal path relies on `showModal()` instead;
- * this is the explicit boundary rule the AC5 contract names.
- */
-export function containTab(event, dialog) {
-    if (!dialog || event.key !== 'Tab') return
-    const items = focusableWithin(dialog)
-    if (!items.length) return
-    const first = items[0]
-    const last = items[items.length - 1]
-    const active = document.activeElement
-    if (event.shiftKey && (active === first || !dialog.contains(active))) {
-        event.preventDefault()
-        last.focus()
-    } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-        event.preventDefault()
-        first.focus()
-    }
-}
+// Re-exported so existing importers (the AC5 contract test, and any overlay
+// that needs the rule without the hook) keep a single canonical source.
+export { containTab, focusableWithin }
 
 /**
  * Bind a native <dialog> element to an `open` flag.

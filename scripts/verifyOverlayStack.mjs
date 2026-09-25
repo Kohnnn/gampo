@@ -881,6 +881,44 @@ try {
     record(nestChatPost.coach === false, 'one Escape closes the nested coach', nestChatPost)
     record(nestChatPost.slip === true && nestChatPost.chat === true, 'that Escape leaves the slip and chat intact', nestChatPost)
 
+    // --- 18. Focus containment for a dialog nested in another modal dialog.
+    //         Chromium's native containment does not apply to a nested
+    //         <dialog>, so reverse Tab from the coach's first control reached
+    //         <body>; Escape then owned no handler and native cancel closed
+    //         every open layer at once. The shared containment rule is now
+    //         wired into the nested coach.
+    await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const pill = document.querySelector('.sb-mobile-slip-pill');
+  pill?.click();
+  for (let i = 0; i < 20; i += 1) { await sleep(90); if (document.querySelector('.sb-mobile-slip')?.open) break; }
+  const trigger = document.querySelector('.sb-mobile-slip .sb-coach-trigger');
+  trigger?.click();
+  for (let i = 0; i < 25; i += 1) { await sleep(90); if (document.querySelector('.sb-mobile-slip .sb-coach-backdrop')?.open) break; }
+  return { coach: !!document.querySelector('.sb-mobile-slip .sb-coach-backdrop')?.open };
+})()
+`)
+    const coachOpen = await evalExpr(`(() => ({ coach: !!document.querySelector('.sb-mobile-slip .sb-coach-backdrop')?.open }))()`)
+    record(coachOpen.coach === true, 'nested coach is open for the containment check', coachOpen)
+    const reverseTab = async () => {
+      for (const type of ['keyDown', 'keyUp']) {
+        await send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9, modifiers: 8 })
+      }
+      await sleep(600)
+    }
+    let leakedToBody = false
+    for (let i = 0; i < 5; i += 1) {
+      await reverseTab()
+      const active = await evalExpr(`document.activeElement?.tagName || ''`)
+      if (active === 'BODY') leakedToBody = true
+    }
+    record(leakedToBody === false, 'reverse Tab stays inside the nested coach (never reaches BODY)', { leakedToBody })
+    await pressEscape()
+    const afterContain = await evalExpr(slipChat)
+    record(afterContain.coach === false, 'one Escape still closes the coach after reverse tabbing', afterContain)
+    record(afterContain.slip === true && afterContain.chat === true, 'the slip and chat survive that Escape', afterContain)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1
