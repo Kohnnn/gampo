@@ -18,6 +18,7 @@ import HotkeyHelp from './HotkeyHelp'
 import OddsPopup from './OddsPopup'
 import { recordLearningEvent } from '../../../hooks/useProgress'
 import VolumeMixer from './VolumeMixer'
+import { claimEscape } from '../../../utils/escapeClaims'
 
 export default function GameToolbar({ helpHref, definition, balance, odds, betAmount }) {
     const { muted, toggle: toggleMute } = useAudio()
@@ -75,15 +76,23 @@ export default function GameToolbar({ helpHref, definition, balance, odds, betAm
             if (trigger && trigger.contains(e.target)) return
             setPopoverOpen(false)
         }
-        const onKey = (e) => {
-            if (e.key === 'Escape') setPopoverOpen(false)
-        }
         window.addEventListener('mousedown', onDown)
-        window.addEventListener('keydown', onKey)
         return () => {
             window.removeEventListener('mousedown', onDown)
-            window.removeEventListener('keydown', onKey)
         }
+    }, [popoverOpen])
+
+    // Escape-to-close is registered with the Escape-claim registry rather than
+    // handled by a second window listener. As a bare listener it dismissed at
+    // the same time as the mobile drawer, so one Escape closed both the popover
+    // and the drawer; registering a handler makes it the single owner when it is
+    // the topmost layer.
+    useEffect(() => {
+        if (!popoverOpen) return undefined
+        return claimEscape(() => {
+            setPopoverOpen(false)
+            return true
+        })
     }, [popoverOpen])
 
     const toggleFullscreen = useCallback(() => {

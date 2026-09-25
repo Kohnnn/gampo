@@ -107,6 +107,16 @@ const stateExpr = `
 })()
 `
 
+const toolsStateExpr = `
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return {
+    drawerOpen: !!sb && Math.round(sb.getBoundingClientRect().x) === 0,
+    popoverOpen: !!document.querySelector('.gt-popover-portal'),
+  };
+})()
+`
+
 const dismissWelcomeExpr = `
 (async () => {
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -301,6 +311,36 @@ try {
         cEnd,
     )
     record(cEnd.drawerOpen === true, 'the drawer survives both overlay Escapes', cEnd)
+
+    // --- 5. Game tools popover over the drawer. This overlay keeps its own
+    //        window Escape listener; when it was unregistered, one Escape
+    //        closed the popover AND the drawer.
+    await go('/dice')
+    const toolsOpened = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const btn = document.querySelector('button[aria-label="Game tools"]');
+  if (!btn) return { ok: false, reason: 'no game tools button' };
+  btn.click();
+  for (let i = 0; i < 20; i++) {
+    await sleep(100);
+    if (document.querySelector('.gt-popover-portal')) return { ok: true };
+  }
+  return { ok: false, reason: 'popover did not open' };
+})()
+`)
+    record(toolsOpened.ok === true, 'game tools popover opens', toolsOpened)
+    await evalExpr(openDrawerExpr)
+    await evalExpr(focusDrawerLinkExpr)
+    const tPre = await evalExpr(toolsStateExpr)
+    record(tPre.popoverOpen === true && tPre.drawerOpen === true, 'popover and drawer are both open', tPre)
+    await pressEscape()
+    const tMid = await evalExpr(toolsStateExpr)
+    record(tMid.popoverOpen === false, 'first Escape closes the popover', tMid)
+    record(tMid.drawerOpen === true, 'first Escape does not close the drawer under the popover', tMid)
+    await pressEscape()
+    const tEnd = await evalExpr(toolsStateExpr)
+    record(tEnd.drawerOpen === false, 'second Escape closes the drawer once the popover is gone', tEnd)
 
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)

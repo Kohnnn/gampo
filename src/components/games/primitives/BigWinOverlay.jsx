@@ -8,6 +8,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { formatCredits } from '../../../utils/simulationMath'
+import { claimEscape } from '../../../utils/escapeClaims'
 
 const RAMP_DURATION_MS = 900
 const HOLD_DURATION_MS = 1800
@@ -45,10 +46,23 @@ export default function BigWinOverlay({ profit, multiplier, trigger, threshold =
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [trigger])
 
+    // Dismissal keys are registered with the Escape-claim registry rather than
+    // handled by a bare window listener, so this overlay owns the key while it
+    // is the topmost layer instead of dismissing alongside the mobile drawer.
+    useEffect(() => {
+        if (!visible) return undefined
+        return claimEscape(() => {
+            setVisible(false)
+            return true
+        })
+    }, [visible])
+
     useEffect(() => {
         if (!visible) return
         const onKey = (e) => {
-            if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') setVisible(false)
+            // Escape is routed through the registry above; this listener keeps
+            // only the confirm keys so it cannot double-dismiss with it.
+            if (e.key === 'Enter' || e.key === ' ') setVisible(false)
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
