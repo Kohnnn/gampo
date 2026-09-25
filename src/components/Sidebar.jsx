@@ -440,6 +440,35 @@ function SportsbookSidebar() {
     )
 }
 
+// True when some overlay is actually painted above the mobile drawer, so the
+// drawer must not consume Escape. Detected from real geometry and paint rather
+// than a list of class names: the overlays in this app do not share a class, a
+// role or an `aria-modal` convention, so any list goes stale on the next
+// overlay added. A hardcoded list was tried and immediately missed the slots
+// bet sheet, which uses `role="dialog"` without `aria-modal` and none of the
+// listed classes. An overlay qualifies when it is rendered, has area, is not
+// display/visibility suppressed, and is stacked at or above the drawer.
+function overlayIsAboveDrawer() {
+    if (typeof document === 'undefined') return false
+    const drawer = document.querySelector('.app-sidebar')
+    if (!drawer) return false
+    const drawerZ = Number(getComputedStyle(drawer).zIndex) || 0
+    const candidates = document.querySelectorAll(
+        '[role="dialog"], [aria-modal="true"], [class*="backdrop"], [class*="overlay"], [class*="sheet"]',
+    )
+    for (const el of candidates) {
+        if (drawer.contains(el)) continue
+        const cs = getComputedStyle(el)
+        if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue
+        const rect = el.getBoundingClientRect()
+        if (rect.width === 0 || rect.height === 0) continue
+        // Only an overlay stacked at or above the drawer competes for Escape.
+        if ((Number(cs.zIndex) || 0) >= drawerZ) return true
+    }
+    return false
+}
+
+
 function Sidebar({ isOpen, toggleSidebar }) {
     const [gameSearch, setGameSearch] = useState('')
     const location = useLocation()
@@ -487,14 +516,19 @@ function Sidebar({ isOpen, toggleSidebar }) {
             // dialogs (odds/fairness) own their own Escape handling.
             const active = document.activeElement
             if (!sidebarRef.current?.contains(active)) return
-            // Defer to an overlay stacked above the drawer. The shortcuts panel
-            // opens on `?` without moving focus, so focus stays in the drawer
-            // while it is up; claiming Escape here would consume the key before
-            // that panel's own `window` handler saw it, closing the drawer and
-            // leaving the panel open over the page. A backdrop is the reliable
-            // marker that something is stacked above, because these overlays do
-            // not all use `aria-modal`.
-            if (document.querySelector('.hotkey-backdrop, [role="dialog"][aria-modal="true"]')) return
+            // Defer to any overlay stacked above the drawer. Some of these
+            // overlays (the shortcuts panel, slots' bet and info sheets) open
+            // without moving focus, so focus stays inside the drawer while they
+            // are up; claiming Escape here would consume the key before that
+            // overlay's own `window` handler saw it, closing the drawer and
+            // leaving the overlay stranded over the page.
+            //
+            // This is detected structurally rather than from a list of class
+            // names. A hardcoded list was tried and immediately missed the
+            // slots bet sheet, which uses `role="dialog"` without `aria-modal`
+            // and none of the listed classes. Any overlay qualifies if it is
+            // rendered, painted and sits above the drawer.
+            if (overlayIsAboveDrawer()) return
             event.preventDefault()
             // ChatDock listens for Escape on `window` without checking
             // `defaultPrevented`, so an unstopped event would also minimize an
