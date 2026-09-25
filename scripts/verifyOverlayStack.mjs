@@ -565,6 +565,40 @@ try {
     const umPost = await evalExpr(stateExpr)
     record(umPost.drawerOpen === false, 'Escape still closes the drawer: the unmounted overlay released its claim', umPost)
 
+    // --- 11. Desktop width with an overlay open. The sidebar is an ordinary
+    //         rail here, not the off-canvas drawer, so the drawer's own Escape
+    //         contract must not apply -- but the registered overlay must still
+    //         receive the key.
+    await send('Emulation.setDeviceMetricsOverride', {
+        width: 1610, height: 870, deviceScaleFactor: 1, mobile: false,
+    })
+    await go('/dice')
+    await pressQuestion()
+    const dkPre = await evalExpr(`
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return {
+    shortcutsOpen: !!document.querySelector('.hotkey-card'),
+    sidebarVisible: !!sb && getComputedStyle(sb).display !== 'none',
+    isMobile: window.matchMedia('(max-width: 768px)').matches,
+  };
+})()
+`)
+    record(dkPre.shortcutsOpen === true && dkPre.isMobile === false, 'shortcuts open at desktop width', dkPre)
+    await evalExpr(`(() => { const a = document.querySelector('.app-sidebar a'); if (a) a.focus(); return { ok: !!a }; })()`)
+    await pressEscape()
+    const dkPost = await evalExpr(`
+(() => {
+  const sb = document.querySelector('.app-sidebar');
+  return {
+    shortcutsOpen: !!document.querySelector('.hotkey-card'),
+    sidebarVisible: !!sb && getComputedStyle(sb).display !== 'none',
+  };
+})()
+`)
+    record(dkPost.shortcutsOpen === false, 'one Escape closes the panel at desktop width', dkPost)
+    record(dkPost.sidebarVisible === true, 'the desktop rail is untouched by that Escape', dkPost)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1
