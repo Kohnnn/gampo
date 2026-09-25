@@ -524,6 +524,47 @@ try {
     record(cycPost.shortcutsOpen === false, 'one Escape still closes exactly the shortcuts panel', cycPost)
     record(cycPost.drawerOpen === true, 'no duplicate listener double-toggles the drawer', cycPost)
 
+    // --- 10. A registered overlay that UNMOUNTS while holding its claim must
+    //         release it. The game-tools popover lives in GameToolbar, which
+    //         unmounts on route change; a leaked claim would permanently stop
+    //         the drawer from responding to Escape.
+    await go('/dice')
+    const popoverBeforeNav = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const btn = document.querySelector('button[aria-label="Game tools"]');
+  if (!btn) return { ok: false, reason: 'no game tools button' };
+  btn.click();
+  for (let i = 0; i < 20; i += 1) {
+    await sleep(100)
+    if (document.querySelector('.gt-popover-portal')) return { ok: true }
+  }
+  return { ok: false, reason: 'popover did not open' }
+})()
+`)
+    record(popoverBeforeNav.ok === true, 'popover opens before the route change', popoverBeforeNav)
+    // Navigate away with the popover open, unmounting GameToolbar.
+    await evalExpr(openDrawerExpr)
+    await evalExpr(`(() => {
+      const link = document.querySelector('aside.app-sidebar nav a[href="/originals"]');
+      if (link) link.click();
+      return { clicked: !!link };
+    })()`)
+    await sleep(1600)
+    const afterNav = await evalExpr(`(() => ({
+      route: location.pathname,
+      popoverOpen: !!document.querySelector('.gt-popover-portal'),
+    }))()`)
+    record(afterNav.popoverOpen === false && afterNav.route === '/originals', 'popover is gone after navigating away', afterNav)
+    // The claim must have been released: Escape must still close the drawer here.
+    await evalExpr(openDrawerExpr)
+    await evalExpr(focusDrawerLinkExpr)
+    const umPre = await evalExpr(stateExpr)
+    record(umPre.drawerOpen === true, 'drawer opens on the new route', umPre)
+    await pressEscape()
+    const umPost = await evalExpr(stateExpr)
+    record(umPost.drawerOpen === false, 'Escape still closes the drawer: the unmounted overlay released its claim', umPost)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1
