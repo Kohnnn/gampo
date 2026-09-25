@@ -599,6 +599,60 @@ try {
     record(dkPost.shortcutsOpen === false, 'one Escape closes the panel at desktop width', dkPost)
     record(dkPost.sidebarVisible === true, 'the desktop rail is untouched by that Escape', dkPost)
 
+    // --- 12. Header search suggestions + an open overlay. The search input's
+    //         own keydown closes the suggestion list; it must mark the key
+    //         handled so the registry router does not close the overlay too,
+    //         because the router now runs on every viewport.
+    await go('/dice')
+    const typedSearch = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const input = document.querySelector('input[type="search"], .header-search input, header input');
+  if (!input) return { ok: false, reason: 'no search input' };
+  input.focus();
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  setter.call(input, 'dice');
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  for (let i = 0; i < 20; i += 1) {
+    await sleep(100);
+    if (document.querySelector('[role="listbox"], .header-search-results')) return { ok: true };
+  }
+  return { ok: false, reason: 'suggestions did not open' };
+})()
+`)
+    record(typedSearch.ok === true, 'search suggestions open', typedSearch)
+    // Blur the input first: HotkeyHelp deliberately ignores `?` typed into an
+    // editable target, so the panel must be opened with focus elsewhere.
+    await evalExpr(`(() => {
+      const input = document.querySelector('input[type="search"], .header-search input, header input');
+      if (input) input.blur();
+      document.body.focus();
+      return { blurred: true };
+    })()`)
+    await pressQuestion()
+    const sqPre = await evalExpr(`
+(() => ({
+  suggestions: !!document.querySelector('[role="listbox"], .header-search-results'),
+  shortcutsOpen: !!document.querySelector('.hotkey-card'),
+}))()
+`)
+    record(sqPre.suggestions === true && sqPre.shortcutsOpen === true, 'suggestions and shortcuts are both open', sqPre)
+    // Focus the input so its own handler sees the key.
+    await evalExpr(`(() => {
+      const input = document.querySelector('input[type="search"], .header-search input, header input');
+      if (input) input.focus();
+      return { focused: !!input };
+    })()`)
+    await pressEscape()
+    const sqPost = await evalExpr(`
+(() => ({
+  suggestions: !!document.querySelector('[role="listbox"], .header-search-results'),
+  shortcutsOpen: !!document.querySelector('.hotkey-card'),
+}))()
+`)
+    record(sqPost.suggestions === false, 'one Escape closes the search suggestions', sqPost)
+    record(sqPost.shortcutsOpen === true, 'that same Escape leaves the shortcuts panel open', sqPost)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1

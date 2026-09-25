@@ -110,6 +110,13 @@ function Header() {
 
     const handleSearchKeyDown = (event) => {
         if (event.key === 'Escape') {
+            // The suggestions list only owns Escape while it is actually open.
+            // Mark the key handled when it is, so the drawer's registry router
+            // (which now runs on every viewport) does not also dismiss an open
+            // overlay: one Escape dismisses one layer. When there are no
+            // suggestions this declines, and Escape falls through normally.
+            if (!searchOpen) return
+            event.preventDefault()
             setSearchOpen(false)
             setActiveSearchIndex(0)
             return
