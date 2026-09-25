@@ -265,6 +265,22 @@ function SportsbookShell() {
         if (!mobileSlipOpen && dialog.open) dialog.close()
     }, [mobileSlipOpen])
 
+    // Mark Escape handled on the dialog element itself; see SearchOverlay for
+    // why `onCancel` alone is too late to stop window-level Escape owners.
+    useEffect(() => {
+        const dialog = mobileSlipRef.current
+        if (!dialog || !mobileSlipOpen) return undefined
+        const onKeyDown = (event) => {
+            if (event.key !== 'Escape') return
+            // Prevent the native <dialog> cancel and close explicitly instead;
+            // see SearchOverlay.
+            event.preventDefault()
+            setMobileSlipOpen(false)
+        }
+        dialog.addEventListener('keydown', onKeyDown)
+        return () => dialog.removeEventListener('keydown', onKeyDown)
+    }, [mobileSlipOpen])
+
     const navigateSportsbook = (next) => {
         const nextState = {
             view: next.view || 'home',
@@ -479,7 +495,12 @@ function SportsbookShell() {
                 ref={mobileSlipRef}
                 className="sb-mobile-slip"
                 aria-labelledby="mobile-bet-slip-heading"
-                onCancel={() => setMobileSlipOpen(false)}
+                onCancel={(event) => {
+                    // Mark the key handled so app-level Escape owners (ChatDock)
+                    // do not also dismiss on the same press; see SearchOverlay.
+                    event.preventDefault()
+                    setMobileSlipOpen(false)
+                }}
                 onClose={() => {
                     setMobileSlipOpen(false)
                     mobileSlipOpenerRef.current?.focus()

@@ -698,6 +698,52 @@ try {
     const emptyPost = await evalExpr(`({ shortcutsOpen: !!document.querySelector('.hotkey-card') })`)
     record(emptyPost.shortcutsOpen === false, 'Escape reaches the panel even with the input focused and no list', emptyPost)
 
+    // --- 14. Sportsbook native dialogs. These use `onCancel` on a <dialog>
+    //         rather than the shared `useNativeDialog`, and previously did not
+    //         mark the key handled: one Escape closed the dialog AND minimized
+    //         the chat. Predates the drawer work, same class of defect.
+    await go('/sportsbook')
+    const sbChat = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const mini = document.querySelector('.chat-dock-mini');
+  if (mini) { mini.click(); await sleep(900); }
+  const cd = document.querySelector('.chat-dock');
+  return { chatOpen: !!cd && String(cd.className).includes('w-locked') };
+})()
+`)
+    record(sbChat.chatOpen === true, 'chat is open on /sportsbook', sbChat)
+    const sbDialog = await evalExpr(`
+(async () => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const btn = [...document.querySelectorAll('button')].find(b => /search/i.test(b.getAttribute('aria-label') || b.textContent));
+  if (!btn) return { ok: false, reason: 'no search control' };
+  btn.click();
+  for (let i = 0; i < 20; i += 1) {
+    await sleep(100);
+    if (document.querySelector('dialog[open]')) return { ok: true };
+  }
+  return { ok: false, reason: 'dialog did not open' };
+})()
+`)
+    record(sbDialog.ok === true, 'sportsbook search dialog opens', sbDialog)
+    const sbPre = await evalExpr(`
+(() => {
+  const cd = document.querySelector('.chat-dock');
+  return { dialogOpen: !!document.querySelector('dialog[open]'), chatOpen: !!cd && String(cd.className).includes('w-locked') };
+})()
+`)
+    record(sbPre.dialogOpen === true && sbPre.chatOpen === true, 'sportsbook dialog and chat are both open', sbPre)
+    await pressEscape()
+    const sbPost = await evalExpr(`
+(() => {
+  const cd = document.querySelector('.chat-dock');
+  return { dialogOpen: !!document.querySelector('dialog[open]'), chatOpen: !!cd && String(cd.className).includes('w-locked') };
+})()
+`)
+    record(sbPost.dialogOpen === false, 'one Escape closes the sportsbook dialog', sbPost)
+    record(sbPost.chatOpen === true, 'that Escape does not also minimize the chat', sbPost)
+
     if (failures.length) {
         console.log(`\nOVERLAY STACK FAILED (${failures.length}): ${failures.join('; ')}`)
         process.exitCode = 1

@@ -22,6 +22,23 @@ function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
         if (!open && dialog.open) dialog.close()
     }, [open])
 
+    // Mark Escape handled on the dialog element itself; see SearchOverlay for
+    // why `onCancel` alone is too late to stop window-level Escape owners.
+    useEffect(() => {
+        const dialog = dialogRef.current
+        if (!dialog || !open) return undefined
+        const onKeyDown = (event) => {
+            if (event.key !== 'Escape') return
+            // Prevent the native <dialog> cancel and close explicitly instead.
+            // Marking the key handled stops window-level owners (ChatDock) from
+            // also dismissing; closing here keeps the dialog's own behaviour.
+            event.preventDefault()
+            setOpen(false)
+        }
+        dialog.addEventListener('keydown', onKeyDown)
+        return () => dialog.removeEventListener('keydown', onKeyDown)
+    }, [open])
+
     if (!analysis) return null
 
     const sections = EDUCATION_SECTIONS.map(section => ({
@@ -57,7 +74,12 @@ function OddsCoach({ analysis, variant = 'icon', label = 'Analyze' }) {
                 ref={dialogRef}
                 className="sb-coach-backdrop"
                 aria-labelledby={`odds-coach-${analysis.id || 'heading'}`}
-                onCancel={() => setOpen(false)}
+                onCancel={(event) => {
+                    // Mark the key handled so app-level Escape owners (ChatDock)
+                    // do not also dismiss on the same press; see SearchOverlay.
+                    event.preventDefault()
+                    setOpen(false)
+                }}
                 onClose={() => {
                     setOpen(false)
                     openerRef.current?.isConnected && openerRef.current.focus()
