@@ -421,6 +421,13 @@ async function j1Search(vp, mode = 'N', method = 'ptr') {
       return document.querySelectorAll('#root a[href^="/"]').length;
     `)
     if (!precondition(caseId, allRows >= 0, 'no casino-filters All control to restore the grid', { allRows })) return
+    // Assert the filter actually applies: Slots narrows the grid and All
+    // restores it. A control that did nothing would leave the row count equal
+    // and fail here, rather than passing on the precondition alone.
+    recordCase(caseId,
+        filter.ok && filter.slotsRows !== allRows && allRows > 0,
+        'J1 Slots provider filter actually narrows the grid and All restores it',
+        { slotsRows: filter.slotsRows, allRows, slotsHasDice: filter.slotsHasDice, allHasDice: filter.allHasDice })
 }
 
 // J2 / J2a drive the real pin control through BOTH input methods per cell. The
