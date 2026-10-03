@@ -2372,6 +2372,15 @@ dialog.odds-popup-backdrop::backdrop {
     .gampo-reduce-motion .bp-mobile-setup-hint {
         animation: none;
     }
+
+/* P1: the Rebet disabled reason must be visible and programmatically
+   associated with the disabled control, not carried only in `title`. */
+.bp-disabled-reason {
+    margin: 6px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-secondary, #b1bad3);
+}
     .bp-mobile-summary {
         min-width: 0;
         display: flex;

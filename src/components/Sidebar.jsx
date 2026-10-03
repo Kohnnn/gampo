@@ -244,6 +244,7 @@ function GameRow({ item, isPinned, onPinToggle }) {
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPinToggle(item.path) }}
                 title={isPinned ? 'Unpin from sidebar' : 'Pin to sidebar'}
                 aria-label={isPinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+                aria-pressed={isPinned}
             >
                 {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
             </button>

@@ -53,6 +53,7 @@ export default function BetPanel({
     playButtonProps = {},
 }) {
     const panelId = useId()
+    const rebetReasonId = `${panelId}-rebet-reason`
     const [tab, setTab] = useState('manual')
     const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
     // Tracks whether the mobile betting sheet has been opened at least once so
@@ -428,10 +429,16 @@ export default function BetPanel({
                         disabled={hasFixedBet || !lastBet}
                         title={!lastBet ? 'Place your first bet to enable Rebet' : hasFixedBet ? 'Rebet is locked during this round' : 'Repeat last bet amount'}
                         data-disabled-reason={!lastBet ? 'Place your first bet to enable Rebet' : hasFixedBet ? 'Rebet is locked during this round' : undefined}
+                        aria-describedby={!lastBet || hasFixedBet ? rebetReasonId : undefined}
                     >
                         <RotateCcw size={11} style={{ marginRight: 3 }} />Rebet
                     </button>
                 </div>
+                {(!lastBet || hasFixedBet) && (
+                    <p className="bp-disabled-reason" id={rebetReasonId} role="note">
+                        {!lastBet ? 'Place your first bet to enable Rebet' : 'Rebet is locked during this round'}
+                    </p>
+                )}
                 <div className="bp-bal-line">
                     <span>Balance</span>
                     <strong>{formatCredits(balance || 0)}</strong>

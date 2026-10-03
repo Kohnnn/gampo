@@ -1192,7 +1192,15 @@ body {
     transition: opacity 0.15s, color 0.15s, background 0.15s;
 }
 .nav-row:hover .nav-pin { opacity: 1; }
+/* Reveal on keyboard focus too: `.nav-row:hover` alone leaves a focused pin
+   invisible, which fails WCAG 2.4.11/1.4.11 (focus not visible). */
+.nav-row:focus-within .nav-pin,
+.nav-pin:focus-visible { opacity: 1; }
 .nav-pin.is-pinned {
+    opacity: 1;
+    color: var(--accent-yellow, #ffcf5a);
+}
+.nav-pin[aria-pressed='true'] {
     opacity: 1;
     color: var(--accent-yellow, #ffcf5a);
 }

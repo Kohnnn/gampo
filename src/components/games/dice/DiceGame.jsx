@@ -280,7 +280,7 @@ export default function DiceGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('dice')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={winChance / 100} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} betAmount={stake} winProbability={winChance / 100} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

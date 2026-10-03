@@ -72,23 +72,26 @@ export default function WelcomeModal() {
                 >
                     <X size={16} />
                 </button>
-                <span className="welcome-kicker"><GraduationCap size={16} /> Welcome to GamPo</span>
-                <h2 id="welcome-title">Premium casino experience</h2>
-                <p className="welcome-lead">
-                    GamPo is a probability simulator. It looks like a casino, plays like a casino,
-                    and runs the same odds — all in pure entertainment mode.
-                </p>
-                <ul className="welcome-points">
-                    {POINTS.map(p => (
-                        <li key={p.title}>
-                            <span className="welcome-point-icon">{p.icon}</span>
-                            <div>
-                                <strong>{p.title}</strong>
-                                <span>{p.text}</span>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
+                <div className="welcome-content" role="region" aria-label="Welcome details" tabIndex={0}>
+                    <span className="welcome-kicker"><GraduationCap size={16} /> Welcome to GamPo</span>
+                    <h2 id="welcome-title">Premium casino experience</h2>
+                    <p className="welcome-lead">
+                        GamPo is a probability simulator. It looks like a casino, plays like a casino,
+                        and runs the same odds — all in pure entertainment mode.
+                    </p>
+                    <ul className="welcome-points">
+                        {POINTS.map(p => (
+                            <li key={p.title}>
+                                <span className="welcome-point-icon">{p.icon}</span>
+                                <div>
+                                    <strong>{p.title}</strong>
+                                    <span>{p.text}</span>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="welcome-fineprint">You can replay this intro anytime from Settings.</p>
+                </div>
                 <button
                     type="button"
                     className="welcome-cta"
@@ -97,7 +100,6 @@ export default function WelcomeModal() {
                 >
                     Start exploring
                 </button>
-                <p className="welcome-fineprint">You can replay this intro anytime from Settings.</p>
             </div>
         </div>
     )
