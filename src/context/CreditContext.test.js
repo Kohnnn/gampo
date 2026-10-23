@@ -1,5 +1,7 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, beforeEach } from 'vitest'
-import { INITIAL_CREDITS, commitPreparedCreditTransactions, prepareCreditTransactions, readNumber } from './CreditContext'
+import { CreditProvider, CREDIT_STORAGE_KEY, HISTORY_STORAGE_KEY, INITIAL_CREDITS, commitPreparedCreditTransactions, prepareCreditTransactions, readNumber, useCredits } from './CreditContext'
 
 beforeEach(() => {
     const store = new Map()
@@ -8,6 +10,97 @@ beforeEach(() => {
         setItem: (key, value) => { store.set(key, String(value)) },
         removeItem: (key) => { store.delete(key) },
     }
+})
+
+function creditConsumer(initialBalance) {
+    localStorage.setItem(CREDIT_STORAGE_KEY, initialBalance)
+    let credits
+    function Consumer() {
+        credits = useCredits()
+        return null
+    }
+    renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+    return credits
+}
+
+const storedBalance = () => Number(localStorage.getItem(CREDIT_STORAGE_KEY))
+const storedHistory = () => JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]')
+
+describe('CreditProvider retained consumer callbacks', () => {
+    it('charges one five-credit drop and every quick drop around interleaved returns', () => {
+        const { placeBet, addWinnings } = creditConsumer(1165.65)
+        expect(placeBet(5, 'Plinko')).toBe(true)
+        expect(placeBet(1, 'Plinko')).toBe(true)
+        expect(placeBet(1, 'Plinko')).toBe(true)
+        addWinnings(3, 'Plinko return')
+        expect(placeBet(1, 'Plinko')).toBe(true)
+        addWinnings(4, 'Plinko return')
+        expect(placeBet(1, 'Plinko')).toBe(true)
+        expect(placeBet(1, 'Plinko')).toBe(true)
+        addWinnings(2, 'Plinko return')
+
+        expect(storedBalance()).toBe(1164.65)
+        const history = storedHistory()
+        expect(history.filter(entry => entry.type === 'bet').map(entry => entry.amount)).toEqual([-1, -1, -1, -1, -1, -5])
+        expect(history.filter(entry => entry.type === 'win').map(entry => entry.amount)).toEqual([2, 4, 3])
+        expect(history.map(entry => entry.balance)).toEqual([1164.65, 1162.65, 1163.65, 1164.65, 1160.65, 1161.65, 1158.65, 1159.65, 1160.65])
+    })
+
+    it('declines a later retained debit after earlier accepted stakes consume the balance', () => {
+        const { placeBet } = creditConsumer(6)
+        expect(placeBet(5, 'Plinko')).toBe(true)
+        expect(placeBet(1, 'Plinko')).toBe(true)
+        const before = localStorage.getItem(HISTORY_STORAGE_KEY)
+        expect(placeBet(1, 'Plinko')).toBe(false)
+        expect(storedBalance()).toBe(0)
+        expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBe(before)
+    })
+
+    it('shares latest adjustments, grants, resets, wins and committed transaction state', () => {
+        const credits = creditConsumer(10)
+        credits.updateBalance(4.5)
+        expect(credits.placeBet(5)).toBe(false)
+        credits.grantPracticeCredits(0.5)
+        expect(credits.placeBet(5)).toBe(true)
+        credits.addWinnings(2)
+        const commits = []
+        const commit = next => {
+            commits.push(next)
+            expect(storedBalance()).toBe(2)
+            localStorage.setItem(CREDIT_STORAGE_KEY, next.nextBalance)
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(next.nextTransactions))
+            return { ok: true }
+        }
+        expect(credits.placeBetTransactional(1, 'Ticket', 'ticket:debit', commit)).toEqual({ ok: true, code: null })
+        expect(commits[0].nextBalance).toBe(1)
+        expect(commits[0].nextTransactions.map(entry => entry.type)).toEqual(['bet', 'win', 'bet', 'grant', 'adjustment'])
+        expect(credits.placeBet(2)).toBe(false)
+        expect(credits.addWinningsTransactional(3, 'Ticket return', 'ticket:credit', next => {
+            expect(next.nextBalance).toBe(4)
+            return { ok: true }
+        })).toEqual({ ok: true, code: null })
+        expect(credits.placeBet(4)).toBe(true)
+        expect(storedBalance()).toBe(0)
+        expect(credits.addWinningsTransactional(3, 'Ticket return', 'ticket:credit', () => ({ ok: true })).code).toBe('duplicate-transaction')
+        credits.resetBalance()
+        expect(credits.placeBet(INITIAL_CREDITS)).toBe(true)
+        expect(storedBalance()).toBe(0)
+        expect(storedHistory().map(entry => entry.type)).toEqual(['bet', 'reset'])
+    })
+
+    it('leaves authoritative state unchanged until a synchronous transaction commit succeeds', () => {
+        const credits = creditConsumer(5)
+        const before = localStorage.getItem(HISTORY_STORAGE_KEY)
+        expect(credits.placeBetTransactional(4, 'Ticket', 'failed:debit', next => {
+            expect(next.nextBalance).toBe(1)
+            expect(storedBalance()).toBe(5)
+            expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBe(before)
+            return { ok: false, code: 'rolled-back' }
+        })).toEqual({ ok: false, code: 'rolled-back' })
+        expect(credits.placeBet(5)).toBe(true)
+        expect(storedBalance()).toBe(0)
+        expect(storedHistory().map(entry => entry.type)).toEqual(['bet'])
+    })
 })
 
 describe('CreditContext transactional preparation', () => {

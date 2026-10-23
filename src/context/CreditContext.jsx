@@ -94,18 +94,21 @@ export function CreditProvider({ children }) {
     const [currency, setCurrency] = useState('GC')
     const [transactions, setTransactions] = useState(readHistory)
     const [toasts, setToasts] = useState([])
+    // Accepted mutations advance immediately, even when a timer retains an
+    // earlier consumer callback and React has not rendered the next balance.
+    const balanceRef = useRef(balance)
+    const transactionsRef = useRef(transactions)
     const toastIdRef = useRef(0)
 
     const recordTransaction = useCallback((entry) => {
-        setTransactions(prev => {
-            const next = [{
-                id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                timestamp: new Date(),
-                ...entry,
-            }, ...prev].slice(0, 100)
-            persistHistory(next)
-            return next
-        })
+        const next = [{
+            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            timestamp: new Date(),
+            ...entry,
+        }, ...transactionsRef.current].slice(0, 100)
+        transactionsRef.current = next
+        setTransactions(next)
+        persistHistory(next)
     }, [])
 
     const showToast = useCallback((type, title, description, duration = 3000) => {
@@ -124,6 +127,7 @@ export function CreditProvider({ children }) {
 
     const updateBalance = useCallback((newBalance, reason = 'adjustment') => {
         const rounded = roundCredits(Number(newBalance) || 0)
+        balanceRef.current = rounded
         setBalance(rounded)
         persistCredits(rounded)
         recordTransaction({ type: reason, amount: 0, balance: rounded })
@@ -131,11 +135,12 @@ export function CreditProvider({ children }) {
 
     const placeBet = useCallback((amount, label = 'Practice bet') => {
         const amt = Number(amount)
-        if (!Number.isFinite(amt) || amt <= 0 || amt > balance) {
+        if (!Number.isFinite(amt) || amt <= 0 || amt > balanceRef.current) {
             return false
         }
 
-        const nextBalance = roundCredits(balance - amt)
+        const nextBalance = roundCredits(balanceRef.current - amt)
+        balanceRef.current = nextBalance
         setBalance(nextBalance)
         persistCredits(nextBalance)
         recordTransaction({
@@ -145,32 +150,35 @@ export function CreditProvider({ children }) {
             balance: nextBalance,
         })
         return true
-    }, [balance, recordTransaction])
+    }, [recordTransaction])
 
     const addWinnings = useCallback((amount, label = 'Simulation return') => {
         const amt = Number(amount)
         if (!Number.isFinite(amt) || amt <= 0) return
 
-        setBalance(prev => {
-            const nextBalance = roundCredits(prev + amt)
-            persistCredits(nextBalance)
-            recordTransaction({
-                type: 'win',
-                label,
-                amount: roundCredits(amt),
-                balance: nextBalance,
-            })
-            return nextBalance
+        const nextBalance = roundCredits(balanceRef.current + amt)
+        balanceRef.current = nextBalance
+        setBalance(nextBalance)
+        persistCredits(nextBalance)
+        recordTransaction({
+            type: 'win',
+            label,
+            amount: roundCredits(amt),
+            balance: nextBalance,
         })
     }, [recordTransaction])
 
     const runCreditTransactionsTransactional = useCallback((entries, commit) => {
-        const prepared = prepareCreditTransactions(balance, transactions, entries)
+        const prepared = prepareCreditTransactions(balanceRef.current, transactionsRef.current, entries)
         return commitPreparedCreditTransactions(prepared, commit, (nextBalance, nextTransactions) => {
+            // The durable commit/readback has succeeded before either the
+            // authoritative refs or React consumers see the prepared state.
+            balanceRef.current = nextBalance
+            transactionsRef.current = nextTransactions
             setBalance(nextBalance)
             setTransactions(nextTransactions)
         })
-    }, [balance, transactions])
+    }, [])
 
     const placeBetTransactional = useCallback((amount, label, transactionId, commit) => (
         runCreditTransactionsTransactional([{ type: 'bet', label, amount, transactionId }], commit)
@@ -184,20 +192,20 @@ export function CreditProvider({ children }) {
         const amt = Number(amount)
         if (!Number.isFinite(amt) || amt <= 0) return
 
-        setBalance(prev => {
-            const nextBalance = roundCredits(prev + amt)
-            persistCredits(nextBalance)
-            recordTransaction({
-                type: 'grant',
-                label: 'Practice credit top-up',
-                amount: roundCredits(amt),
-                balance: nextBalance,
-            })
-            return nextBalance
+        const nextBalance = roundCredits(balanceRef.current + amt)
+        balanceRef.current = nextBalance
+        setBalance(nextBalance)
+        persistCredits(nextBalance)
+        recordTransaction({
+            type: 'grant',
+            label: 'Practice credit top-up',
+            amount: roundCredits(amt),
+            balance: nextBalance,
         })
     }, [recordTransaction])
 
     const resetBalance = useCallback(() => {
+        balanceRef.current = INITIAL_CREDITS
         setBalance(INITIAL_CREDITS)
         persistCredits(INITIAL_CREDITS)
         const entry = {
@@ -208,6 +216,7 @@ export function CreditProvider({ children }) {
             balance: INITIAL_CREDITS,
             timestamp: new Date(),
         }
+        transactionsRef.current = [entry]
         setTransactions([entry])
         persistHistory([entry])
     }, [])

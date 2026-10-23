@@ -98,8 +98,8 @@ export default function MinesGame() {
 
     const picks = revealed.length
     const currentMult = useMemo(() => multiplierFor(picks, bombs), [picks, bombs])
-    const nextMult = useMemo(() => multiplierFor(picks + 1, bombs), [picks, bombs])
     const inRound = phase === 'playing'
+    const nextMult = inRound && picks < GRID - bombs ? multiplierFor(picks + 1, bombs) : null
     const minesBgmMode = inRound && currentMult >= 3 ? 'bonus' : 'idle'
     useGameBgm('mines', minesBgmMode)
 
@@ -317,7 +317,7 @@ export default function MinesGame() {
                     </div>
                     <div className="bp-bal-line">
                         <span>Next pick</span>
-                        <strong>{nextMult.toFixed(2)}×</strong>
+                        <strong>{nextMult === null ? '—' : `${nextMult.toFixed(2)}×`}</strong>
                     </div>
                 </BetPanel>
             }
@@ -334,7 +334,7 @@ export default function MinesGame() {
                     <SimBetStrip rows={simFeed} title="Sim mines" />
                     <div className="mines-multiplier-row">
                         <MultiplierBadge label="Current" value={currentMult} state={inRound ? 'active' : phase === 'cashed' ? 'win' : phase === 'busted' ? 'bust' : 'idle'} size="sm" />
-                        <MultiplierBadge label="Next pick" value={nextMult} size="sm" />
+                        {nextMult !== null && <MultiplierBadge label="Next pick" value={nextMult} size="sm" />}
                     </div>
                     <div className="mines-grid" data-mobile-critical-surface ref={stageRef}>
                         {Array.from({ length: GRID }, (_, i) => {

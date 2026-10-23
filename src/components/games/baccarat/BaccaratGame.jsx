@@ -24,7 +24,7 @@ import { getBigWinThreshold,
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
 import { buildBigEyeBoy, buildBigRoad, buildCockroachPig, buildSmallRoad, latestBigRoadPosition, tailRoadColumns, tailRoadDots } from './roads'
-import { deriveBaccaratAutoBets } from './autoBets'
+import { resolveBaccaratTicket } from './autoBets'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import EducationPanel from '../../EducationPanel'
 import './baccarat.css'
@@ -151,21 +151,8 @@ export default function BaccaratGame() {
     }
 
     const performPlay = ({ mode, betAmount } = {}) => new Promise(resolve => {
-        let activeBets = bets
-        let stake = totalStake
-        let source = 'manual'
-        if (mode === 'auto' && stake <= 0) {
-            const derived = deriveBaccaratAutoBets({ currentBets: bets, lastChips, outcomes, betAmount })
-            activeBets = derived.bets
-            source = derived.source === 'none' ? 'manual' : derived.source
-            stake = Object.values(activeBets).reduce((s, v) => s + (v || 0), 0)
-            if (stake > 0) setBets(activeBets)
-        } else if (stake <= 0 && Object.keys(lastChips).length && (mode === 'manual' || mode === 'strategy')) {
-            activeBets = { ...lastChips }
-            source = 'last-manual'
-            stake = Object.values(activeBets).reduce((s, v) => s + (v || 0), 0)
-            setBets(activeBets)
-        }
+        const { bets: activeBets, stake, source } = resolveBaccaratTicket({ currentBets: bets, lastChips, outcomes, mode, betAmount })
+        if (activeBets !== bets && stake > 0) setBets({ ...activeBets })
         setAutoBetSource(source)
         if (stake <= 0) {
             showToast('error', 'No bets', mode === 'auto' ? 'Select Banker or Player to seed Auto' : 'Place chips first')
@@ -271,9 +258,10 @@ export default function BaccaratGame() {
                 <BetPanel
                     balance={balance}
                     initialBet={5}
+                    ticketStake={({ mode, betAmount }) => resolveBaccaratTicket({ currentBets: bets, lastChips, outcomes, mode, betAmount }).stake}
                     runningRound={running}
-                    actionLabel={`Deal Baccarat (${formatCredits(totalStake)})`}
-                    mobilePlayLabel={totalStake > 0 ? `Deal ${formatCredits(totalStake)}` : 'Deal'}
+                    actionLabel="Deal Baccarat"
+                    mobilePlayLabel="Deal"
                     onPlay={performPlay}
                     lastBet={lastTotal}
                 >

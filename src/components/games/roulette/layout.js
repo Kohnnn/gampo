@@ -1,6 +1,11 @@
 // Roulette layout helpers and bet definitions.
 // European single-zero wheel.
 
+export function resolveRouletteTicket(bets = [], lastChips = [], mode) {
+    const activeBets = !bets.length && (mode === 'manual' || mode === 'auto') ? lastChips : bets
+    return { bets: activeBets, stake: activeBets.reduce((sum, bet) => sum + bet.amount, 0) }
+}
+
 export const WHEEL_ORDER = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26]
 
 export const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36])
@@ -92,16 +97,3 @@ export function buildRouletteCoverage(bets = []) {
     }
     return map
 }
-
-// Standard 12x3 board number ordering
-export const BOARD_NUMBERS = (() => {
-    const rows = []
-    for (let r = 3; r >= 1; r--) {
-        const row = []
-        for (let c = 0; c < 12; c++) {
-            row.push(c * 3 + r)
-        }
-        rows.push(row)
-    }
-    return rows
-})()

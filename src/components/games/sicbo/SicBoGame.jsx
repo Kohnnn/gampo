@@ -9,14 +9,18 @@ import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { useSfx } from '../../../audio/useSfx'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
-import { evaluate, rollDice } from './bets'
+import { evaluate, rollDice, resolveSicBoTicket } from './bets'
 import SicBoDie from './SicBoDie'
 import EducationPanel from '../../EducationPanel'
 import './SicBoDie.css'
 import './sicbo.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
-export const canAddSicBoBet = (running, totalStake, chip, balance) => !running && Number.isInteger(balance) && totalStake + chip <= balance
+export const canAddSicBoBet = (running, totalStake, chip, balance) => !running
+    && Number.isFinite(balance) && balance >= 0
+    && Number.isFinite(totalStake) && totalStake >= 0
+    && Number.isFinite(chip) && chip > 0
+    && totalStake + chip <= balance
 
 export default function SicBoGame() {
     useGameBgm('sicbo', 'idle')
@@ -76,13 +80,8 @@ export default function SicBoGame() {
     }
 
     const performPlay = ({ mode } = {}) => new Promise(resolve => {
-        let activeBets = bets
-        let stake = totalStake
-        if (stake <= 0 && Object.keys(lastChips).length && (mode === 'auto' || mode === 'manual')) {
-            activeBets = { ...lastChips }
-            stake = Object.values(activeBets).reduce((s, v) => s + v, 0)
-            setBets(activeBets)
-        }
+        const { bets: activeBets, stake } = resolveSicBoTicket(bets, lastChips, mode)
+        if (activeBets !== bets) setBets({ ...activeBets })
         if (stake <= 0) { showToast('error', 'No bets', 'Place chips first'); resolve({ profit: 0 }); return }
         if (!placeBet(stake, 'Sic Bo')) { showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`); resolve({ profit: 0 }); return }
         cancelAll()
@@ -155,9 +154,10 @@ export default function SicBoGame() {
                 <BetPanel
                     balance={balance}
                     initialBet={5}
+                    ticketStake={({ mode }) => resolveSicBoTicket(bets, lastChips, mode).stake}
                     runningRound={running}
-                    actionLabel={`Roll Dice (${formatCredits(totalStake)})`}
-                    mobilePlayLabel={totalStake > 0 ? `Roll ${formatCredits(totalStake)}` : 'Roll'}
+                    actionLabel="Roll Dice"
+                    mobilePlayLabel="Roll"
                     onPlay={performPlay}
                     lastBet={lastTotal}
                 >

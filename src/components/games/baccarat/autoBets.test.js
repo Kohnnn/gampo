@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deriveBaccaratAutoBets, latestNonTieSide } from './autoBets'
+import { deriveBaccaratAutoBets, latestNonTieSide, resolveBaccaratTicket } from './autoBets'
 
 describe('baccarat auto bets', () => {
     it('uses current chips before any inferred auto side', () => {
@@ -33,5 +33,29 @@ describe('baccarat auto bets', () => {
             outcomes: ['T', 'T'],
             betAmount: 20,
         })).toEqual({ bets: {}, source: 'none', side: null })
+    })
+})
+
+describe('baccarat charged ticket', () => {
+    it('keeps accumulated chips ahead of the selection amount in every mode', () => {
+        const currentBets = { banker: 5, tie: 25 }
+        for (const mode of ['manual', 'auto', 'strategy']) {
+            expect(resolveBaccaratTicket({ currentBets, mode, betAmount: 100 })).toEqual({ bets: currentBets, stake: 30, source: 'manual' })
+        }
+    })
+
+    it('quotes the complete manual repeat ticket', () => {
+        const lastChips = { banker: 5, tie: 10 }
+        for (const mode of ['manual', 'strategy']) {
+            expect(resolveBaccaratTicket({ lastChips, mode, betAmount: 100 })).toEqual({ bets: lastChips, stake: 15, source: 'last-manual' })
+        }
+    })
+
+    it('quotes the actual Auto side amount instead of the manual repeat ticket', () => {
+        expect(resolveBaccaratTicket({
+            lastChips: { banker: 5, tie: 10 }, outcomes: ['B', 'P'], mode: 'auto', betAmount: 25,
+        })).toEqual({ bets: { player: 25 }, stake: 25, source: 'latest-road' })
+        expect(resolveBaccaratTicket({ mode: 'auto', betAmount: 25 })).toEqual({ bets: {}, stake: 0, source: 'manual' })
+        expect(resolveBaccaratTicket({ mode: 'manual', betAmount: 25 })).toEqual({ bets: {}, stake: 0, source: 'manual' })
     })
 })

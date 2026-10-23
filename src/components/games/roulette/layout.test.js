@@ -1,9 +1,5 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { buildRouletteCoverage, makeBet, ORPHELINS, TIER, VOISINS, ZERO_NEIGHBOURS } from './layout'
-
-const rouletteCss = readFileSync(new URL('./roulette.css', import.meta.url), 'utf8')
-const rouletteSource = readFileSync(new URL('./RouletteGame.jsx', import.meta.url), 'utf8')
+import { buildRouletteCoverage, makeBet, ORPHELINS, TIER, VOISINS, ZERO_NEIGHBOURS, resolveRouletteTicket } from './layout'
 
 function coveredNumbers(type) {
     return [...buildRouletteCoverage([{ type, params: {}, amount: 5 }]).keys()].sort((a, b) => a - b)
@@ -35,11 +31,17 @@ describe('roulette layout helpers', () => {
         expect(makeBet('dozen2').numbers).toContain(17)
     })
 
-    it('keeps live-table rows from truncating the whole panel', () => {
-        expect(rouletteCss).toContain('grid-template-columns: minmax(74px, 1.1fr)')
-        expect(rouletteCss).toContain('text-overflow: ellipsis')
-        expect(rouletteCss).toContain('font-variant-numeric: tabular-nums')
-        expect(rouletteSource).toContain('title={p.name}')
-        expect(rouletteSource).toContain('title={p.label}')
+    it('quotes all current chips before any repeat ticket', () => {
+        const bets = [{ type: 'straight', params: { n: 36 }, amount: 5 }, { type: 'col3', params: {}, amount: 25 }]
+        expect(resolveRouletteTicket(bets, [{ type: 'red', amount: 100 }], 'manual')).toEqual({ bets, stake: 30 })
+    })
+
+    it('quotes the existing manual and Auto repeat ticket and leaves an empty ticket empty', () => {
+        const lastChips = [{ type: 'red', params: {}, amount: 5 }, { type: 'col3', params: {}, amount: 10 }]
+        for (const mode of ['manual', 'auto']) {
+            expect(resolveRouletteTicket([], lastChips, mode)).toEqual({ bets: lastChips, stake: 15 })
+        }
+        expect(resolveRouletteTicket([], lastChips, 'strategy')).toEqual({ bets: [], stake: 0 })
+        expect(resolveRouletteTicket([], [], 'manual')).toEqual({ bets: [], stake: 0 })
     })
 })

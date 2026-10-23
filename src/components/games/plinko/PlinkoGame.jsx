@@ -64,13 +64,18 @@ const BALL_TYPES = {
     sapphire: { id: 'sapphire', name: 'Sapphire', color: '#3498db', image: '/images/coins/coin_sapphire.svg', cost: 20, bonus: 20 },
 }
 
-function expectedReturn(payouts) {
+export function expectedReturn(payouts) {
     const n = payouts.length - 1
     return payouts.reduce((acc, m, k) => {
         let coeff = 1
         for (let j = 1; j <= k; j++) coeff *= (n - j + 1) / j
         return acc + (coeff / Math.pow(2, n)) * m
     }, 0)
+}
+
+export function plinkoReturn(betAmount, multiplier, cost) {
+    const returnAmount = round2(betAmount * multiplier)
+    return { returnAmount, profit: round2(returnAmount - cost) }
 }
 
 
@@ -84,8 +89,9 @@ export default function PlinkoGame() {
     const preloader = useOriginalsPreloader('plinko')
 
     const canvasRef = useRef(null)
+    const mountedRef = useRef(false)
     const engineRef = useRef(null)
-    // Map of ballId -> settle fn so concurrent drops resolve their own promise.
+    // Each ball keeps its resolver and selected outcome until it settles.
     const settleByIdRef = useRef(new Map())
     const lastBigWinAtRef = useRef(0)
     const simSeqRef = useRef(0)
@@ -98,6 +104,7 @@ export default function PlinkoGame() {
     // Bring the board into view when balls are in flight (mobile reachability).
     useScrollActionIntoView(boardRef, activeDrops > 0, [activeDrops > 0], { block: 'nearest' })
     const [lastBet, setLastBet] = useState(null)
+    const [selectedBet, setSelectedBet] = useState(5)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [highlightBin, setHighlightBin] = useState(null)
     const [payouts, setPayouts] = useState(null)
@@ -134,19 +141,22 @@ export default function PlinkoGame() {
     useEffect(() => {
         if (!canvasRef.current) return
         let cancelled = false
+        mountedRef.current = true
         loadEngine().then(async ({ PlinkoEngine, constants }) => {
             if (cancelled) return
             const { BIN_PAYOUTS, getBinColors } = await constants
+            if (cancelled) return
             const engine = new PlinkoEngine(canvasRef.current, {
                 rowCount: rows,
                 riskLevel: risk,
                 betAmount: 1,
                 onBallEnterBin: ({ ballId, binIndex, payout }) => {
-                    const settle = settleByIdRef.current.get(ballId)
-                    if (settle) {
+                    const pending = settleByIdRef.current.get(ballId)
+                    if (pending) {
                         settleByIdRef.current.delete(ballId)
-                        settle({ binIndex, multiplier: payout.multiplier })
+                        pending.settle({ binIndex, multiplier: payout.multiplier })
                     }
+                    if (!mountedRef.current) return
                     setHighlightBin(binIndex)
                     schedule(() => setHighlightBin(null), 800)
                 },
@@ -160,8 +170,15 @@ export default function PlinkoGame() {
         })
         return () => {
             cancelled = true
+            mountedRef.current = false
             if (engineRef.current) engineRef.current.stop()
             engineRef.current = null
+            // Each accepted drop already has its fair bin. Finish its accounting
+            // on navigation rather than abandoning the return with the canvas.
+            for (const [ballId, pending] of settleByIdRef.current) {
+                settleByIdRef.current.delete(ballId)
+                pending.settle({ binIndex: pending.binIndex, multiplier: pending.multiplier, background: true })
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
@@ -235,7 +252,7 @@ export default function PlinkoGame() {
             resolve({ profit: 0 })
         }
 
-        settleByIdRef.current.set(ballId, ({ binIndex: bi, multiplier: rawMult, cancelled }) => {
+        const settle = ({ binIndex: bi, multiplier: rawMult, cancelled, background = false }) => {
             // Engine emits cancelled events when row count changes mid-flight.
             if (cancelled) {
                 setActiveDrops(n => Math.max(0, n - 1))
@@ -244,8 +261,7 @@ export default function PlinkoGame() {
             }
             const mult = Number((rawMult * ball.bonus).toFixed(4))
 
-            const returnAmount = round2(betAmount * mult)
-            const profit = round2(returnAmount - cost)
+            const { returnAmount, profit } = plinkoReturn(betAmount, mult, cost)
             if (returnAmount > 0) addWinnings(returnAmount, 'Plinko return')
             session.record({
                 id: crypto.randomUUID(),
@@ -253,6 +269,10 @@ export default function PlinkoGame() {
                 profit, betAmount: cost, multiplier: mult,
                 meta: { rows, risk, ballType, binIndex: bi },
             })
+            if (background) {
+                if (mode !== 'auto') resolve({ profit })
+                return
+            }
             const now = Date.now()
             if (mult >= 15 && now - lastBigWinAtRef.current > 4500) {
                 lastBigWinAtRef.current = now
@@ -276,7 +296,8 @@ export default function PlinkoGame() {
             }), 14))
             setActiveDrops(n => Math.max(0, n - 1))
             if (mode !== 'auto') resolve({ profit })
-        })
+        }
+        settleByIdRef.current.set(ballId, { settle, binIndex, multiplier: payouts[binIndex] })
     }), [payouts, ballType, rows, risk, placeBet, addWinnings, playSound, sfx, showToast, session, machine])
 
     // Quick-drop button — schedules N drops at 500ms each, regardless of the
@@ -298,6 +319,7 @@ export default function PlinkoGame() {
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
     const expected = useMemo(() => payouts ? expectedReturn(payouts) : 0, [payouts])
     const ball = BALL_TYPES[ballType]
+    const expectedGrossMultiplier = payouts ? expected * ball.bonus / ball.cost : undefined
 
     return (
         <GameShell
@@ -314,6 +336,7 @@ export default function PlinkoGame() {
                     actionLabel={engineReady ? 'Drop Ball' : 'Loading…'}
                     onPlay={performPlay}
                     lastBet={lastBet}
+                    onStakeChange={setSelectedBet}
                     autoIntervalMs={500}
                     autoTimeoutMs={6000}
                 >
@@ -398,7 +421,7 @@ export default function PlinkoGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('plinko')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={0.5} payoutMultiplier={expected} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} betAmount={selectedBet * ball.cost} expectedGrossMultiplier={expectedGrossMultiplier} effectiveRtp={expectedGrossMultiplier} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

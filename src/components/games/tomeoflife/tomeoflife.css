@@ -63,6 +63,10 @@
 }
 .tome-mult {
     margin-top: 2px;
+    max-width: 100%;
+    padding: 0 4px;
+    text-align: center;
+    overflow-wrap: anywhere;
     font-size: 13px;
     font-weight: 900;
     color: var(--accent, #ffd166);
@@ -108,6 +112,6 @@
         justify-content: center;
         text-align: center;
         font-size: 10.5px;
-        white-space: nowrap;
+        white-space: normal;
     }
 }

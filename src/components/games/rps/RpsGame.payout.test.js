@@ -1,92 +1,67 @@
-// Generated guard for RPS: pins the settle arithmetic against float drift.
-// The component is read as source text where the settle body cannot be imported
-// in isolation; the mirrors below are kept identical to the real expressions.
-import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { round2 } from '../../../utils/simulationMath'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const RPS_RTP = 0.97
-const payout = round2(RPS_RTP * 3 - 1)
+const fixture = vi.hoisted(() => ({ play: null, settle: null, roll: 0, credit: vi.fn(), record: vi.fn(), toast: vi.fn() }))
+vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 100, placeBet: () => true, addWinnings: fixture.credit, showToast: fixture.toast }) }))
+vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: () => {} }) }))
+vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: () => {} }) }))
+vi.mock('../../../audio/useBgm', () => ({ useGameBgm: () => {} }))
+vi.mock('../../../utils/fairRng', () => ({ nextRoll: () => ({ roll: fixture.roll }) }))
+vi.mock('../../../utils/funMode', () => ({ funBoostedRtp: rtp => rtp }))
+vi.mock('../../../utils/scheduling', () => ({ useCancellableTimeouts: () => ({ schedule: callback => { fixture.settle = callback } }) }))
+vi.mock('../../EducationPanel', () => ({ default: () => null }))
+vi.mock('../primitives', () => {
+    const Empty = () => null
+    return {
+        getBigWinThreshold: () => 5,
+        useGameSession: () => ({ record: fixture.record, history: [], stats: { lastResults: [] } }),
+        GameShell: ({ panel, children }) => React.createElement(React.Fragment, null, panel, children),
+        BetPanel: props => { fixture.play = props.onPlay; return props.children },
+        CoreStageFrame: ({ children }) => children,
+        BigWinOverlay: Empty, HistoryDrawer: Empty, RecentResultsStrip: Empty, StatsOverlay: Empty, ResultToast: Empty, ActionLockOverlay: Empty,
+    }
+})
+import RpsGame from './RpsGame'
 
-// Mirror of the settle body in RpsGame.jsx.
-const settle = (betAmount, { won, push }) => {
-    const returnAmount = push ? betAmount : won ? round2(betAmount * payout) : 0
-    const profit = round2(returnAmount - betAmount)
-    return { returnAmount, profit }
+beforeEach(() => { vi.clearAllMocks(); fixture.roll = 0; fixture.settle = null })
+
+async function play(roll, betAmount = 7) {
+    fixture.roll = roll
+    renderToStaticMarkup(React.createElement(RpsGame))
+    const round = fixture.play({ betAmount })
+    fixture.settle()
+    return round
 }
 
-describe('RPS payout rounding', () => {
-    it('locks the payout to the target RTP', () => {
-        expect(payout).toBe(1.91)
-        expect(round2(payout / 3 + 1 / 3)).toBe(0.97)
+describe('RPS public settlement receipts', () => {
+    it('returns the stake on a push and records its gross 1x multiplier', async () => {
+        expect(await play(0)).toEqual({ profit: 0 })
+        expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(7, 'RPS return')
+        expect(fixture.record).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ label: 'Push', profit: 0, betAmount: 7, multiplier: 1 }))
     })
 
-    it('books a 2dp return and profit for every stake', () => {
-        for (const stake of [0.01,0.1,0.25,0.5,1,2.5,5,7,12.5,25,33,100,140]) {
-            for (const outcome of [{ won: true }, { push: true }, {}]) {
-                const { returnAmount, profit } = settle(stake, outcome)
-                expect(returnAmount).toBe(round2(returnAmount))
-                expect(profit).toBe(round2(profit))
-                expect(round2(profit + stake)).toBe(returnAmount)
-            }
-        }
+    it('keeps the existing win and loss payouts and gross multipliers', async () => {
+        expect(await play(0.9)).toEqual({ profit: 6.37 })
+        expect(fixture.credit).toHaveBeenLastCalledWith(13.37, 'RPS return')
+        expect(fixture.record).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'Win', multiplier: 1.91, profit: 6.37 }))
+        fixture.credit.mockClear()
+        expect(await play(0.5)).toEqual({ profit: -7 })
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(fixture.record).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'Miss', multiplier: 0, profit: -7 }))
     })
 
-    it('corrects a stake that drifts without rounding', () => {
-        const stake = 0.01
-        const raw = stake * payout
-        expect(raw).not.toBe(round2(raw))
-        expect(settle(stake, { won: true }).returnAmount).toBe(0.02)
+    it('rounds the production payout for a fractional stake', async () => {
+        expect(await play(0.9, 0.01)).toEqual({ profit: 0.01 })
+        expect(fixture.credit).toHaveBeenCalledWith(0.02, 'RPS return')
     })
 
-    it('refunds the stake on a push and books no profit', () => {
-        const { returnAmount, profit } = settle(7, { push: true })
-        expect(returnAmount).toBe(7)
-        expect(profit).toBe(0)
-    })
-
-    it('books the full stake as the loss', () => {
-        expect(settle(7, {}).profit).toBe(-7)
-    })
-})
-
-describe('RpsGame settle source', () => {
-    const src = readFileSync(new URL('./RpsGame.jsx', import.meta.url), 'utf8')
-
-    it('rounds the win return', () => {
-        expect(src).toContain("won ? round2(betAmount * payout) : 0")
-    })
-
-    it('rounds the profit', () => {
-        expect(src).toContain("const profit = round2(returnAmount - betAmount)")
-    })
-
-    it('pins the RTP constant in source', () => {
-        expect(src).toContain("const RPS_RTP = 0.97")
-    })
-
-    it('derives the payout from the RTP', () => {
-        expect(src).toContain("const effectiveRtp = funBoostedRtp(RPS_RTP)")
-        expect(src).toContain("const payout = round2(effectiveRtp * 3 - 1)")
-    })
-
-    it('refunds the stake on a push', () => {
-        expect(src).toContain("const returnAmount = push ? betAmount :")
-    })
-
-    it('settles through the cancellable scheduler', () => {
-        expect(src).toContain("const { schedule } = useCancellableTimeouts()")
-    })
-
-    it('leaves no unguarded timer behind', () => {
-        expect(src).not.toContain('window.setTimeout')
-        expect(src).not.toMatch(/(?<!\w)setTimeout\(/)
-    })
-})
-
-describe('RpsGame component parses', () => {
-    it('imports without a syntax error', async () => {
-        const mod = await import('./RpsGame.jsx')
-        expect(typeof mod.default).toBe('function')
+    it('renders actual transparent hand glyphs instead of the baked checkerboard images', () => {
+        const html = renderToStaticMarkup(React.createElement(RpsGame))
+        expect(html).toContain('✊')
+        expect(html).toContain('✋')
+        expect(html).toContain('✌️')
+        expect(html).not.toContain('<img')
+        expect(html).toContain('aria-label="Rock"')
     })
 })

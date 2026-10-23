@@ -66,7 +66,9 @@
     display: block;
     width: 100%;
     max-width: 760px;
-    height: clamp(280px, 46dvh, 500px);
+    height: auto;
+    aspect-ratio: 760 / 570;
+    flex: none;
     background: transparent;
 }
 
@@ -76,7 +78,7 @@
     gap: 4px;
     width: 100%;
     max-width: 760px;
-    padding: 0 52px;
+    padding: 0 min(6.842105%, 52px);
 }
 
 .plinko-bin-chip {
@@ -161,17 +163,7 @@
         padding: 5px 8px;
     }
     .plinko-canvas-wrap { padding: 8px 6px; gap: 5px; }
-    .plinko-bins {
-        position: absolute;
-        left: 8px;
-        right: 8px;
-        bottom: 8px;
-        width: auto;
-        padding: 0 10px;
-        gap: 2px;
-        z-index: 2;
-        pointer-events: none;
-    }
+    .plinko-bins { gap: 2px; }
     .plinko-bin-chip {
         min-width: 0;
         font-size: 8px;
@@ -184,6 +176,5 @@
     .plinko-ball-grid { grid-template-columns: repeat(6, 1fr); }
     .plinko-ball-chip img { height: 20px; }
     .plinko-stage .sim-bet-strip { display: none; }
-    .plinko-canvas { height: clamp(170px, 30dvh, 240px); }
     .plinko-meta { padding: 8px 10px; font-size: 10px; }
 }

@@ -760,6 +760,65 @@
     text-transform: uppercase;
 }
 
+.slot-bar-token {
+    display: grid;
+    align-content: center;
+    gap: 3px;
+    width: 78%;
+    height: 90%;
+    max-width: 110px;
+    min-height: 0;
+}
+
+.slot-bar-token > span {
+    display: block;
+    border: 2px solid #f3deb4;
+    border-radius: 3px;
+    background: #261e18;
+    color: #fff3ce;
+    font: 950 clamp(12px, 2vw, 26px)/1.05 Georgia, serif;
+    letter-spacing: 0.1em;
+    text-align: center;
+}
+
+.slot-symbol-token {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    padding: 2px 4px;
+    border: 1px solid #f3deb4;
+    border-radius: 3px;
+    background: #241c10;
+    color: #fff3ce;
+    font-size: clamp(8px, 1.2vw, 12px);
+    font-weight: 950;
+    line-height: 1.1;
+}
+
+.slot-cell.symbol-egg .slot-symbol-token {
+    border-color: #8be1af;
+    background: #123e2b;
+    color: #c7ffe0;
+}
+
+.slot-paytable-sym .slot-bar-token {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    gap: 1px;
+}
+
+.slot-paytable-sym .slot-bar-token > span {
+    border-width: 1px;
+    font-size: 8px;
+}
+
+.slot-paytable-sym .slot-symbol-token {
+    position: static;
+    flex-shrink: 0;
+    font-size: 9px;
+}
+
 .slot-cell.type-scatter {
     border-color: rgba(255, 207, 90, 0.62);
     background:
@@ -914,8 +973,8 @@
 }
 
 @keyframes slotWinPulse {
-    0%, 100% { transform: translateY(0) scale(1); }
-    50% { transform: translateY(-2px) scale(1.05); }
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.2); }
 }
 
 @keyframes slotWinBurst {
@@ -1496,6 +1555,33 @@
     color: var(--slot-text);
     padding: 18px;
     box-shadow: 0 24px 56px rgba(0, 0, 0, 0.5);
+}
+
+.slot-autoplay-modal {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    width: min(440px, calc(100vw - 24px));
+    max-width: none;
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+}
+
+.slot-autoplay-modal::backdrop {
+    background: rgba(0, 0, 0, 0.65);
+}
+
+.slot-autoplay-modal .slot-autoplay-drawer {
+    position: relative;
+    inset: auto;
+    transform: none;
+    width: 100%;
+    max-height: none;
+    margin: 0;
 }
 
 .slot-autoplay-drawer header,
@@ -4063,8 +4149,8 @@
     animation: slotWildColumn 0.9s ease-in-out;
 }
 @keyframes slotWildColumn {
-    0% { filter: brightness(1.6) saturate(1.4); transform: scaleY(1.06); }
-    100% { filter: brightness(1) saturate(1); transform: scaleY(1); }
+    0% { filter: brightness(1.6) saturate(1.4); }
+    100% { filter: brightness(1) saturate(1); }
 }
 
 /* Persistent-multiplier ramp badge in the pill row. */

@@ -2,6 +2,14 @@
 
 Card and table simulators. All settle locally against fake credits.
 
+## Chip tickets and phone controls
+
+- Baccarat, Roulette, and Sic Bo show the next ticket's total charge in the phone action dock. The selected chip denomination only controls newly placed chips.
+- Repeating the previous ticket and Baccarat Auto use the same ticket calculation for the quote, balance check, and charge.
+- Baccarat Auto rechecks the current ticket, callback, and balance each round. After a placed ticket clears, later rounds use the current Auto side and adjusted amount; the dock quotes that next obligation.
+- Fractional fake-credit balances are valid when they cover the ticket; an additional chip must fit alongside chips already placed.
+- Roulette uses keyboard-operable buttons and a three-column number grid on phones, with column and outside bets below the numbers.
+
 ## Blackjack Trainer (`/blackjack`)
 
 - Single-deck shuffle per hand for simplicity.

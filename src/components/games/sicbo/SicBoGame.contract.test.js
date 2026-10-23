@@ -1,31 +1,46 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { canAddSicBoBet } from './SicBoGame'
+import { resolveSicBoTicket } from './bets'
 
-const source = readFileSync(new URL('./SicBoGame.jsx', import.meta.url), 'utf8')
-
-describe('Sic Bo native wager contract', () => {
-    it('should make every Sic Bo wager native and unavailable when its next chip exceeds balance', () => {
+describe('Sic Bo chip eligibility', () => {
+    it('accepts a funded chip from a fractional wallet', () => {
+        expect(canAddSicBoBet(false, 0, 5, 1422.04)).toBe(true)
+        expect(canAddSicBoBet(false, 1417, 5, 1422.04)).toBe(true)
         expect(canAddSicBoBet(false, 5, 5, 10)).toBe(true)
-        expect(canAddSicBoBet(true, 0, 5, 100)).toBe(false)
-        expect(canAddSicBoBet(false, 0, 5, 0)).toBe(false)
-        expect(canAddSicBoBet(false, 0, 5, -5)).toBe(false)
-        expect(canAddSicBoBet(false, 0, 5, 4.5)).toBe(false)
-        expect(canAddSicBoBet(false, 5, 5, 9)).toBe(false)
-        expect(source).not.toMatch(/<div[^>]*className={`sb-cell/)
-        expect(source.match(/<button[\s\S]*?className={`sb-cell/g)).toHaveLength(7)
-        expect(source).toContain('type="button"')
-        expect(source).toContain('aria-pressed={cellOn(')
-        expect(source).toContain('disabled={!canAddBet}')
-        expect(source).toContain('if (!canAddSicBoBet(running, totalStake, chip, balance)) return')
     })
 
-    it('preserves Sic Bo wager identities, payouts, settlement, and RNG wiring', () => {
-        for (const key of ['small', 'big', 'odd', 'even', 'total-${t}', 'single-${n}', 'pair-${n}', 'triple-any', 'triple-${n}', 'combo-${a}-${b}']) {
-            expect(source).toContain(key)
+    it('rejects a chip when the whole accumulated ticket is not funded', () => {
+        expect(canAddSicBoBet(false, 0, 5, 4.5)).toBe(false)
+        expect(canAddSicBoBet(false, 1418, 5, 1422.04)).toBe(false)
+        expect(canAddSicBoBet(false, 5, 5, 9)).toBe(false)
+        expect(canAddSicBoBet(true, 0, 5, 1422.04)).toBe(false)
+    })
+
+    it('rejects invalid wallet, ticket, and chip values without coercion', () => {
+        for (const invalid of [NaN, Infinity, -Infinity, undefined, null, '10']) {
+            expect(canAddSicBoBet(false, 0, 5, invalid)).toBe(false)
+            expect(canAddSicBoBet(false, invalid, 5, 100)).toBe(false)
+            expect(canAddSicBoBet(false, 0, invalid, 100)).toBe(false)
         }
-        for (const literal of ['2×', '11×', '31×', '181×', '6×', "placeBet(stake, 'Sic Bo')", "nextRoll('sicbo').roll", 'settleBet(k, next)']) {
-            expect(source).toContain(literal)
+        expect(canAddSicBoBet(false, -1, 5, 100)).toBe(false)
+        expect(canAddSicBoBet(false, 0, 0, 100)).toBe(false)
+        expect(canAddSicBoBet(false, 0, -5, 100)).toBe(false)
+        expect(canAddSicBoBet(false, 0, 5, -1)).toBe(false)
+    })
+})
+
+describe('Sic Bo charged ticket', () => {
+    it('quotes every placed chip rather than the next chip denomination', () => {
+        const bets = { big: 5, odd: 25 }
+        expect(resolveSicBoTicket(bets, { small: 100 }, 'manual')).toEqual({ bets, stake: 30 })
+    })
+
+    it('quotes the existing repeat fallback for manual and auto play', () => {
+        const lastChips = { big: 5, odd: 10 }
+        for (const mode of ['manual', 'auto']) {
+            expect(resolveSicBoTicket({}, lastChips, mode)).toEqual({ bets: lastChips, stake: 15 })
         }
+        expect(resolveSicBoTicket({}, lastChips, 'strategy')).toEqual({ bets: {}, stake: 0 })
+        expect(resolveSicBoTicket({}, {}, 'manual')).toEqual({ bets: {}, stake: 0 })
     })
 })

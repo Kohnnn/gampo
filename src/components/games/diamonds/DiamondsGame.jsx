@@ -122,6 +122,7 @@ export default function DiamondsGame() {
     const [running, setRunning] = useState(false)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [selectedStake, setSelectedStake] = useState(5)
     const [toast, setToast] = useState(null)
     const [lastMultiplier, setLastMultiplier] = useState(0)
     const funBoost = funBoostFactor(DIAMONDS_RTP)
@@ -244,6 +245,7 @@ export default function DiamondsGame() {
                     actionLabel="Reveal Gems"
                     onPlay={performPlay}
                     lastBet={lastBet}
+                    onStakeChange={setSelectedStake}
                 >
                     <p className="bp-hint">Best match across 5 gems pays. Diamond is rarest.</p>
                     {Number.isFinite(lastMultiplier) && lastMultiplier > 0 && (
@@ -273,18 +275,20 @@ export default function DiamondsGame() {
                             )
                         })}
                     </div>
-                    <div className="diamonds-paytable">
-                        <span>5x <strong>80×</strong></span>
-                        <span>4x <strong>12×</strong></span>
-                        <span>3x <strong>2.2×</strong></span>
-                        <span>2x <strong>1.1×</strong></span>
-                    </div>
+                    <table className="diamonds-paytable" aria-label="Gross payout multipliers by gem and match count">
+                        <caption>Best match pays · gross return{funBoost !== 1 ? ' · Fun Mode applied' : ''}</caption>
+                        <thead><tr><th scope="col">Gem</th>{[2, 3, 4, 5].map(count => <th key={count} scope="col">{count} match</th>)}</tr></thead>
+                        <tbody>{GEMS.map((gem, gemIndex) => <tr key={gem.label}>
+                            <th scope="row">{gem.sym} {gem.label}</th>
+                            {[2, 3, 4, 5].map(count => <td key={count} data-gem-index={gemIndex} data-match-count={count}>{`${payoutFor(count, gemIndex, funBoost).toFixed(2)}×`}</td>)}
+                        </tr>)}</tbody>
+                    </table>
                     <ActionLockOverlay active={running} label="Revealing..." />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('diamonds')} />
-            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={selectedStake} expectedGrossMultiplier={effectiveRtp} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

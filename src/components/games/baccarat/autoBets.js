@@ -35,3 +35,20 @@ export function deriveBaccaratAutoBets({
 
     return { bets: {}, source: 'none', side: null }
 }
+
+export function resolveBaccaratTicket({ currentBets = {}, lastChips = {}, outcomes = [], mode, betAmount } = {}) {
+    let bets = currentBets
+    let stake = Object.values(bets).reduce((sum, amount) => sum + (amount || 0), 0)
+    let source = 'manual'
+    if (stake <= 0 && mode === 'auto') {
+        const derived = deriveBaccaratAutoBets({ currentBets, lastChips, outcomes, betAmount })
+        bets = derived.bets
+        source = derived.source === 'none' ? 'manual' : derived.source
+        stake = Object.values(bets).reduce((sum, amount) => sum + (amount || 0), 0)
+    } else if (stake <= 0 && Object.keys(lastChips).length && (mode === 'manual' || mode === 'strategy')) {
+        bets = lastChips
+        source = 'last-manual'
+        stake = Object.values(bets).reduce((sum, amount) => sum + (amount || 0), 0)
+    }
+    return { bets, stake, source }
+}

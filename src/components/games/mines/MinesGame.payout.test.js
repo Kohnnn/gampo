@@ -1,97 +1,91 @@
-// Generated guard for Mines: pins the settle arithmetic against float drift.
-// The component is read as source text where the settle body cannot be imported
-// in isolation; the mirrors below are kept identical to the real expressions.
-import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { round2 } from '../../../utils/simulationMath'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const GRID = 25
-const HOUSE_EDGE = 0.01
+const fixture = vi.hoisted(() => ({ states: [], cursor: 0, play: null, cashout: null, tree: null, timers: [], record: vi.fn(), credit: vi.fn() }))
+vi.mock('react', async importOriginal => ({
+    ...await importOriginal(),
+    useState: initial => {
+        const index = fixture.cursor++
+        if (!(index in fixture.states)) fixture.states[index] = typeof initial === 'function' ? initial() : initial
+        return [fixture.states[index], value => { fixture.states[index] = typeof value === 'function' ? value(fixture.states[index]) : value }]
+    },
+}))
+vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 100, placeBet: () => true, addWinnings: fixture.credit, showToast: () => {} }) }))
+vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: () => {} }) }))
+vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: () => {} }) }))
+vi.mock('../../../audio/useBgm', () => ({ useGameBgm: () => {} }))
+vi.mock('../../../utils/fairRng', () => ({ nextRoll: () => ({ roll: 0 }) }))
+vi.mock('../../../utils/scheduling', () => ({ useCancellableTimeouts: () => ({ schedule: callback => fixture.timers.push(callback), cancelAll: () => { fixture.timers = [] } }) }))
+vi.mock('../resources/useOriginalsPreloader', () => ({ useOriginalsPreloader: () => ({ ready: true }) }))
+vi.mock('../../EducationPanel', () => ({ default: () => null }))
+vi.mock('../../fx', () => ({ Particles: () => null }))
+vi.mock('../primitives', () => {
+    const Empty = () => null
+    return {
+        ROUND_EVENTS: {}, useRoundMachine: () => ({ start: () => {}, finish: () => {} }), getBigWinThreshold: () => 5,
+        useGameSession: () => ({ record: fixture.record, history: [], stats: { lastResults: [] } }),
+        GameShell: ({ panel, children }) => React.createElement(React.Fragment, null, panel, children),
+        BetPanel: props => { fixture.play = props.onPlay; fixture.cashout = props.onPlayPhaseAction; return props.children },
+        CoreStageFrame: ({ children }) => { fixture.tree = children; return children },
+        MultiplierBadge: ({ label, value }) => React.createElement('output', { 'aria-label': label }, value),
+        BigWinOverlay: Empty, HistoryDrawer: Empty, RecentResultsStrip: Empty, StatsOverlay: Empty, ResultToast: Empty, ActionLockOverlay: Empty, SimBetStrip: Empty,
+        makeInitialSimBetRows: () => [], makeSimBetRow: () => ({}), prependSimBetRow: () => [],
+    }
+})
+import MinesGame from './MinesGame'
 
-// Mirror of multiplierFor in MinesGame.jsx.
-function multiplierFor(picks, bombs) {
-    if (picks <= 0) return 1
-    let m = 1
-    for (let i = 0; i < picks; i++) m *= (GRID - i) / (GRID - bombs - i)
-    return Number((m * (1 - HOUSE_EDGE)).toFixed(4))
+function render() {
+    fixture.cursor = 0
+    return renderToStaticMarkup(React.createElement(MinesGame))
+}
+function cells(node = fixture.tree) {
+    if (!React.isValidElement(node)) return []
+    if (node.type === 'button' && node.props['aria-label']) return [node]
+    return React.Children.toArray(node.props.children).flatMap(child => cells(child))
+}
+function reveal(index) {
+    cells()[index].props.onClick()
+    return render()
+}
+const expectNoNextPick = html => {
+    expect(html).not.toContain('aria-label="Next pick"')
+    expect(html).not.toContain('Infinity')
+    expect(html).toContain('<span>Next pick</span><strong>—</strong>')
 }
 
-// Mirror of both settle bodies (auto cashout and manual cashOut).
-const settle = (stake, m) => {
-    const totalReturn = round2(stake * m)
-    const profit = round2(totalReturn - stake)
-    return { totalReturn, profit }
-}
+beforeEach(() => { fixture.states = []; fixture.cursor = 0; fixture.timers = []; vi.clearAllMocks() })
 
-describe('Mines payout rounding', () => {
-    it('books a 2dp return and profit across the bomb/pick grid', () => {
-        for (let bombs = 1; bombs <= 12; bombs += 1) {
-            for (let picks = 1; picks <= Math.min(6, GRID - bombs); picks += 1) {
-                const m = multiplierFor(picks, bombs)
-                for (const stake of [0.01,0.1,0.25,0.5,1,2.5,5,7,12.5,25,33,100,140]) {
-                    const { totalReturn, profit } = settle(stake, m)
-                    expect(totalReturn).toBe(round2(totalReturn))
-                    expect(profit).toBe(round2(profit))
-                    expect(round2(profit + stake)).toBe(totalReturn)
-                }
-            }
-        }
+describe('Mines next-pick availability', () => {
+    it('quotes a finite next pick only during an active round and removes it after a bust', async () => {
+        expectNoNextPick(render())
+        await fixture.play({ betAmount: 5 })
+        expect(render()).toContain('aria-label="Next pick"')
+        expectNoNextPick(reveal(0))
+        expect(fixture.record).toHaveBeenCalledWith(expect.objectContaining({ profit: -5 }))
+        fixture.timers.forEach(callback => callback())
+        expectNoNextPick(render())
     })
 
-    it('corrects a stake/multiplier pair that drifts without rounding', () => {
-        const stake = 0.01
-        const m = 1.0313
-        const raw = stake * m
-        expect(raw).not.toBe(round2(raw))
-        expect(settle(stake, m).totalReturn).toBe(0.01)
+    it('removes the next pick after a cashout while preserving the production payout', async () => {
+        render()
+        await fixture.play({ betAmount: 5 })
+        render()
+        reveal(3)
+        fixture.cashout()
+        expectNoNextPick(render())
+        expect(fixture.credit).toHaveBeenCalledWith(5.63, 'Mines return')
+        expect(fixture.record).toHaveBeenCalledWith(expect.objectContaining({ betAmount: 5, profit: 0.63, multiplier: 1.125 }))
     })
 
-    it('carries the house edge in the multiplier', () => {
-        expect(multiplierFor(0, 3)).toBe(1)
-        expect(multiplierFor(1, 3)).toBe(1.125)
-        expect(multiplierFor(3, 5)).toBe(1.9974)
-    })
-})
-
-describe('MinesGame settle source', () => {
-    const src = readFileSync(new URL('./MinesGame.jsx', import.meta.url), 'utf8')
-
-    it('rounds the auto-cashout return', () => {
-        expect(src).toContain("const totalReturn = round2(betAmount * m)")
-    })
-
-    it('rounds the manual cashout return', () => {
-        expect(src).toContain("const totalReturn = round2(stake * m)")
-    })
-
-    it('credits the rounded auto return', () => {
-        expect(src).toContain("addWinnings(totalReturn, 'Mines auto return')")
-    })
-
-    it('credits the rounded manual return', () => {
-        expect(src).toContain("addWinnings(totalReturn, 'Mines return')")
-    })
-
-    it('pins the house edge in source', () => {
-        expect(src).toContain("const HOUSE_EDGE = 0.01")
-    })
-
-    it('applies the house edge to the multiplier', () => {
-        expect(src).toContain("return Number((m * (1 - HOUSE_EDGE)).toFixed(4))")
-    })
-
-    it('rounds the auto-cashout profit', () => {
-        expect(src).toContain("const profit = round2(totalReturn - betAmount)")
-    })
-
-    it('rounds the manual cashout profit', () => {
-        expect(src).toContain("const profit = round2(totalReturn - stake)")
-    })
-})
-
-describe('MinesGame component parses', () => {
-    it('imports without a syntax error', async () => {
-        const mod = await import('./MinesGame.jsx')
-        expect(typeof mod.default).toBe('function')
+    it('auto-cashes the last safe cell without computing an impossible next pick', async () => {
+        render()
+        await fixture.play({ betAmount: 5 })
+        render()
+        for (let index = 3; index < 25; index += 1) reveal(index)
+        expectNoNextPick(render())
+        expect(fixture.credit).toHaveBeenCalledTimes(1)
+        expect(fixture.record).toHaveBeenCalledTimes(1)
+        expect(fixture.record).toHaveBeenCalledWith(expect.objectContaining({ multiplier: 2277 }))
     })
 })

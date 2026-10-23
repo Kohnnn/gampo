@@ -553,12 +553,15 @@
     border-radius: 16px;
     padding: 9px;
     display: grid;
-    grid-template-columns: 44px repeat(13, 1fr);
+    grid-template-columns: 44px minmax(0, 1fr);
     gap: 3px;
     box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 .rou-cell {
+    min-width: 0;
+    padding: 0;
+    font-family: inherit;
     aspect-ratio: 1;
     min-height: 26px;
     border: 1px solid rgba(255, 255, 255, 0.18);
@@ -572,6 +575,8 @@
     transition: transform 0.15s, filter 0.15s, box-shadow 0.15s;
     position: relative;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    grid-column: var(--rou-column, auto);
+    grid-row: var(--rou-row, auto);
 }
 
 .rou-cell.winner {
@@ -594,8 +599,23 @@
 }
 
 .rou-cell.zero {
-    grid-row: 1 / span 3;
+    grid-row: 1;
+    aspect-ratio: auto;
     background: linear-gradient(135deg, #14a050, #0a6633);
+}
+
+.rou-cell:focus-visible,
+.rou-extra-cell:focus-visible,
+.rou-track-cell:focus-visible {
+    outline: 3px solid #ffe6a8;
+    outline-offset: 2px;
+    z-index: 3;
+}
+
+.rou-cell:disabled,
+.rou-extra-cell:disabled,
+.rou-track-cell:disabled {
+    cursor: not-allowed;
 }
 
 .rou-cell.red { background: linear-gradient(135deg, #c93237, #8a1f23); }
@@ -703,6 +723,7 @@
     padding: 12px 6px;
     border-radius: 8px;
     cursor: pointer;
+    font-family: inherit;
     font-weight: 900;
     text-transform: uppercase;
     font-size: 12px;
@@ -739,6 +760,7 @@
     padding: 14px 8px;
     border-radius: 8px;
     font-weight: 900;
+    font-family: inherit;
     font-size: 12px;
     text-align: center;
     text-transform: uppercase;
@@ -801,7 +823,7 @@
         grid-template-columns: 1fr;
     }
     .rou-board {
-        grid-template-columns: 34px repeat(13, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
         padding: 6px;
     }
     .rou-extra-row,
@@ -909,14 +931,31 @@
     }
 
     .rou-board {
-        grid-template-columns: 30px repeat(13, minmax(18px, 1fr));
-        gap: 2px;
-        padding: 5px;
+        gap: 6px;
+        padding: 6px;
+    }
+
+    .rou-bottom {
+        grid-column: 1;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
     }
 
     .rou-cell {
-        min-height: 32px;
-        font-size: 10px;
+        grid-column: auto;
+        grid-row: auto;
+        min-height: 52px;
+        aspect-ratio: auto;
+        font-size: 16px;
+    }
+
+    .rou-cell.has-bet {
+        padding-bottom: 22px;
+    }
+
+    .rou-cell.zero {
+        grid-column: 1 / -1;
+        grid-row: auto;
     }
 
     .rou-extra-row,
@@ -925,11 +964,13 @@
         gap: 4px;
     }
 
-    .rou-outside,
-    .rou-race-btn {
-        min-height: 38px;
-        padding: 5px;
-        font-size: 10px;
+    .rou-extra-cell,
+    .rou-track-cell {
+        min-height: 44px;
+        padding: 10px 6px;
+        font-family: inherit;
+        font-size: 13px;
+        overflow-wrap: anywhere;
     }
 }
 
@@ -959,7 +1000,7 @@
     }
 
     .rou-cell {
-        min-height: 32px;
+        min-height: 52px;
     }
 }
 

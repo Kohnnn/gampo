@@ -22,6 +22,9 @@ export default function BetPanel({
     maxBet = 10000,
     initialBet = 5,
     fixedBetAmount = null,
+    // Table games quote the complete next ticket; the amount input remains the
+    // independent selection/Auto amount. A resolver preserves repeat semantics.
+    ticketStake = null,
     betLabel = 'Bet Amount',
     onPlay,
     onStop,
@@ -74,6 +77,7 @@ export default function BetPanel({
     // Auto state
     const [autoCount, setAutoCount] = useState(10)
     const [autoInfinite, setAutoInfinite] = useState(false)
+    const [autoBetAmount, setAutoBetAmount] = useState(null)
     const [stopProfit, setStopProfit] = useState('')
     const [stopLoss, setStopLoss] = useState('')
     const [stopBigWin, setStopBigWin] = useState('')
@@ -85,6 +89,13 @@ export default function BetPanel({
     const [strategy, setStrategy] = useState('flat')
     const hasFixedBet = Number.isFinite(Number(fixedBetAmount)) && Number(fixedBetAmount) > 0
     const effectiveBetAmount = hasFixedBet ? Number(fixedBetAmount) : betAmount
+    const quotedBetAmount = tab === 'auto' && autoBetAmount !== null ? autoBetAmount : effectiveBetAmount
+    const hasTicketStake = ticketStake !== null
+    const quotedTicketStake = typeof ticketStake === 'function'
+        ? ticketStake({ mode: tab, betAmount: quotedBetAmount })
+        : ticketStake
+    const ticketIsFunded = Number.isFinite(quotedTicketStake) && quotedTicketStake > 0
+        && Number.isFinite(balance) && quotedTicketStake <= balance
 
     // Publish the live selection so the shell can describe the *current* bet.
     useEffect(() => {
@@ -95,6 +106,11 @@ export default function BetPanel({
     const autoLeft = useRef(0)
     const autoBaseBet = useRef(initialBet)
     const sessionProfit = useRef(0)
+    // The retained Auto loop must quote and play the same current table ticket.
+    const latestAutoPlay = useRef({ onPlay, ticketStake, balance })
+    latestAutoPlay.current.onPlay = onPlay
+    latestAutoPlay.current.ticketStake = ticketStake
+    latestAutoPlay.current.balance = balance
 
     const half = useCallback(() => setBetAmount(v => Math.max(minBet, Number((v / 2).toFixed(2)))), [minBet])
     const double = useCallback(() => setBetAmount(v => Math.min(maxBet, Number((v * 2).toFixed(2)))), [maxBet])
@@ -113,6 +129,7 @@ export default function BetPanel({
         autoRunning.current = false
         autoLeft.current = 0
         sessionProfit.current = 0
+        setAutoBetAmount(null)
         if (onStop) onStop()
     }, [onStop])
 
@@ -121,6 +138,7 @@ export default function BetPanel({
             if (onPlayPhaseAction) await onPlayPhaseAction()
             return
         }
+        if (hasTicketStake && !(tab === 'auto' && autoRunning.current) && (!ticketIsFunded || runningRound)) return
         if (tab === 'manual') {
             if (!onPlay) return
             await onPlay({ betAmount: effectiveBetAmount, mode: 'manual' })
@@ -140,13 +158,20 @@ export default function BetPanel({
         autoLeft.current = autoInfinite ? Infinity : Math.max(1, Number(autoCount) || 1)
         autoBaseBet.current = effectiveBetAmount
         sessionProfit.current = 0
+        if (hasTicketStake) setAutoBetAmount(effectiveBetAmount)
         let currentBet = effectiveBetAmount
         const limitProfit = Number(stopProfit)
         const limitLoss = Number(stopLoss)
         const limitBigWin = Number(stopBigWin)
         while (autoRunning.current && autoLeft.current > 0) {
-            // safety: stop if balance can't cover bet
-            if ((balance || 0) < currentBet) {
+            // Table eligibility follows the same complete ticket as its quote.
+            const livePlay = hasTicketStake ? latestAutoPlay.current.onPlay : onPlay
+            const liveTicketStake = hasTicketStake ? latestAutoPlay.current.ticketStake : ticketStake
+            const liveBalance = hasTicketStake ? latestAutoPlay.current.balance : balance
+            const charge = typeof liveTicketStake === 'function'
+                ? liveTicketStake({ mode: 'auto', betAmount: currentBet })
+                : hasTicketStake ? liveTicketStake : currentBet
+            if ((hasTicketStake && (!Number.isFinite(charge) || charge <= 0 || !Number.isFinite(liveBalance))) || (liveBalance || 0) < charge) {
                 stopAuto()
                 break
             }
@@ -154,7 +179,7 @@ export default function BetPanel({
             // can't hang the autoplay loop. The game's own state should
             // recover on its next render; we just unblock the loop.
             const raced = await withTimeout(
-                Promise.resolve(onPlay({ betAmount: currentBet, mode: 'auto' })),
+                Promise.resolve(livePlay({ betAmount: currentBet, mode: 'auto' })),
                 autoTimeoutMs,
             )
             if (raced.timedOut) {
@@ -179,6 +204,7 @@ export default function BetPanel({
                 else if (onLossPct) currentBet = Math.max(minBet, Number((currentBet * (1 + onLossPct / 100)).toFixed(2)))
             }
             currentBet = Math.min(maxBet, currentBet)
+            if (hasTicketStake) setAutoBetAmount(currentBet)
             if (autoLeft.current !== Infinity) autoLeft.current -= 1
             // Configurable cadence between rounds. Plinko uses 500 so balls
             // drop in a continuous shower. Default 120 keeps every other game
@@ -186,7 +212,8 @@ export default function BetPanel({
             await new Promise(res => setTimeout(res, autoIntervalMs))
         }
         autoRunning.current = false
-    }, [tab, onPlay, effectiveBetAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs])
+        if (hasTicketStake) setAutoBetAmount(null)
+    }, [tab, onPlay, effectiveBetAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs, ticketStake, hasTicketStake, ticketIsFunded, runningRound])
 
     useEffect(() => () => { autoRunning.current = false }, [])
 
@@ -243,7 +270,7 @@ export default function BetPanel({
         const onKey = (e) => {
             if (e.ctrlKey || e.metaKey || e.altKey) return
             const tag = (e.target?.tagName || '').toLowerCase()
-            if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a') return
             if (e.target?.isContentEditable) return
             switch (e.key) {
                 case ' ': // Space: play / stop autobet / in-round CTA
@@ -301,13 +328,15 @@ export default function BetPanel({
     })()
     const dockSummary = inRound
         ? 'Round action'
-        : hasFixedBet
-            ? 'Fixed stake'
-            : `${tab.charAt(0).toUpperCase()}${tab.slice(1)} stake`
+        : hasTicketStake
+            ? 'Ticket stake'
+            : hasFixedBet
+                ? 'Fixed stake'
+                : `${tab.charAt(0).toUpperCase()}${tab.slice(1)} stake`
     const dockValue = inRound
         ? playButtonLabel
-        : formatCredits(effectiveBetAmount)
-    const playDisabled = runningRound && !isAutoLive && !inRound
+        : formatCredits(hasTicketStake ? quotedTicketStake : effectiveBetAmount)
+    const playDisabled = !isAutoLive && !inRound && (runningRound || (hasTicketStake && !ticketIsFunded))
     const mobileButtonLabel = mobilePlayLabel || playButtonLabel
     const playContent = isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>
     const mobilePlayContent = isAutoLive ? <><Pause size={16} /> Stop</> : <><Play size={16} /> {mobileButtonLabel}</>

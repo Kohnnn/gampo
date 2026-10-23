@@ -41,7 +41,7 @@
     transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.4s ease, opacity 0.4s ease, border-color 0.4s;
 }
 
-.rps-side span:first-child {
+.rps-side > span:first-child {
     color: var(--text-secondary);
     font-weight: 900;
     text-transform: uppercase;
@@ -49,11 +49,17 @@
     font-size: 14px;
 }
 
-.rps-side img {
+.rps-hand {
+    display: inline-grid;
+    place-items: center;
+    line-height: 1;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+}
+
+.rps-side .rps-hand {
     width: min(180px, 32vw);
     aspect-ratio: 1;
-    object-fit: contain;
-    filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
+    font-size: clamp(60px, 11vw, 140px);
 }
 
 .rps-side.winner {
@@ -107,7 +113,7 @@
     transition: all 0.15s;
 }
 
-.rps-choice img { width: 56px; height: 56px; object-fit: contain; }
+.rps-choice .rps-hand { width: 56px; height: 56px; font-size: 42px; }
 
 .rps-choice:hover {
     color: var(--text-primary);
@@ -160,10 +166,10 @@
         box-shadow: 0 0 16px rgba(239, 71, 111, 0.3);
     }
 
-    .rps-stage-choices img {
+    .rps-stage-choices .rps-hand {
         width: 30px;
         height: 30px;
-        object-fit: contain;
+        font-size: 26px;
     }
 
     .rps-stage-choices strong {
@@ -182,12 +188,13 @@
         border-radius: 12px;
     }
 
-    .rps-side span:first-child {
+    .rps-side > span:first-child {
         font-size: 11px;
     }
 
-    .rps-side img {
+    .rps-side .rps-hand {
         width: min(96px, 28vw);
+        font-size: 70px;
     }
 
     .rps-vs {

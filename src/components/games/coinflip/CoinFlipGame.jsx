@@ -26,6 +26,7 @@ export default function CoinFlipGame() {
 
     const [choice, setChoice] = useState('head')
     const [flipping, setFlipping] = useState(false)
+    const [landedSide, setLandedSide] = useState(null)
     const [lastWon, setLastWon] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
     const [lastBet, setLastBet] = useState(null)
@@ -47,6 +48,7 @@ export default function CoinFlipGame() {
         schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Coin Flip return')
             setLastWon(won)
+            setLandedSide(next)
             setBurstKey(k => k + 1)
             setFlipping(false)
             playSound(won ? 'win' : 'loss')
@@ -101,8 +103,8 @@ export default function CoinFlipGame() {
                         Tails
                     </button>
                 </div>
-                <div className={`coin3d-stage ${flipping ? 'flipping' : ''}`}>
-                    <div className="coin3d">
+                <div className={`coin3d-stage ${flipping ? 'flipping' : ''}`} data-landed-side={landedSide} role="img" aria-label={flipping ? 'Coin flipping' : landedSide ? `Landed ${landedSide === 'head' ? 'Heads' : 'Tails'}` : 'Coin ready'}>
+                    <div className="coin3d" style={{ '--coin-landing': landedSide === 'tail' ? '180deg' : '0deg' }}>
                         <div className="coin3d-face front"><Asset src={HEAD} fallback={<span style={{ fontSize: 48 }}>👑</span>} /></div>
                         <div className="coin3d-face back"><Asset src={TAIL} fallback={<span style={{ fontSize: 48 }}>✦</span>} /></div>
                         <div className="coin3d-edge" />
