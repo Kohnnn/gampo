@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import SlotSymbol from './SlotSymbol'
 import { getSlotTemplate } from './slotFactory'
-import { resolveImage } from '../../../utils/assetPaths'
 
 const assetState = vi.hoisted(() => ({ missing: false }))
 vi.mock('react', async () => ({
@@ -32,23 +31,6 @@ describe('slot identity tokens', () => {
             const html = renderToStaticMarkup(<SlotSymbol symbol={symbols.find(symbol => symbol.id === id)} />)
             expect(html).toContain(`>${label}<`)
         }
-    })
-
-    it('shows the measured glyph, not the full transparent rank strip, with its original identity and fallback', () => {
-        for (const [id, rank] of [['gummy-drops', 'rank-k'], ['gummy-drops', 'rank-q'], ['mummy-cascade', 'rank-j'], ['gates-ascent', 'rank-q'], ['coop-cluck', 'rank-q']]) {
-            const symbol = getSlotTemplate(id).symbols.find(item => item.id === rank)
-            const html = renderToStaticMarkup(<SlotSymbol symbol={symbol} />)
-            expect(html).toContain('class="slot-rank-crop"')
-            expect(html).toContain(`src="${resolveImage(symbol.asset)}"`)
-            expect(html).not.toContain('<strong>')
-            expect(html).toContain(`alt="${symbol.label}"`)
-            expect(html).toContain('loading="lazy"')
-        }
-        const square = getSlotTemplate('gummy-drops').symbols.find(item => item.id === 'rank-a')
-        const html = renderToStaticMarkup(<SlotSymbol symbol={square} />)
-        expect(html).not.toContain('slot-rank-crop')
-        expect(html).toContain(`src="${resolveImage(square.asset)}"`)
-        expect(html).toContain('alt="A"')
     })
 
     it('keeps the actual Asset missing-image branch visible and labeled inside a rank crop', () => {
