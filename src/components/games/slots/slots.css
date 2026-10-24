@@ -4920,22 +4920,85 @@
 /* Landscape phone: reels go wide and short, controls hug the bottom, so the
    playable grid uses the limited height without the dock crowding it. */
 @media (max-height: 520px) and (orientation: landscape) {
-    /* Landscape can introduce transformed ancestors that re-base position:fixed;
-       force the slot dock to the real viewport bottom and above the stage so the
-       Spin target is never covered (fixes the landscape hit-test block). */
-    .slot-mobile-dock {
-        position: fixed;
-        left: 6px;
-        right: 6px;
-        bottom: max(6px, env(safe-area-inset-bottom));
-        z-index: var(--z-mobile-action, 1400);
-        min-height: 56px;
+    .slot-stage-v2,
+    .slot-stage-v2:fullscreen {
+        padding: 3px;
+        gap: 3px;
     }
+
     .slot-stage-header {
-        padding-top: 4px;
-        padding-bottom: 4px;
+        gap: 3px 6px;
+        padding: 0;
+        align-items: center;
     }
-    .slot-stage-meta { font-size: 10px; }
+
+    .slot-stage-title {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 3px 7px;
+    }
+
+    .slot-stage-title h2 {
+        margin: 0;
+        font-size: 14px;
+    }
+
+    .slot-fullscreen-toggle {
+        width: 32px;
+        min-height: 32px;
+        padding: 5px;
+    }
+
+    .slot-stage-pills {
+        gap: 3px;
+    }
+
+    .slot-pill {
+        height: 22px;
+        padding: 0 6px;
+        gap: 4px;
+    }
+
+    .slot-reel-frame-v2,
+    .slot-stage-v2:fullscreen .slot-reel-frame-v2 {
+        min-height: 0;
+        padding: 3px;
+    }
+
+    .slot-col-locks {
+        padding: 0 2px 2px;
+    }
+
+    .slot-col-lock {
+        height: 16px;
+    }
+
+    .slot-reel-grid,
+    .slot-megaways-grid {
+        gap: 2px;
+        padding: 2px;
+    }
+
+    .slot-cell {
+        padding: 1px;
+    }
+
+    .slot-stage-v2:fullscreen .slot-controls-v2 {
+        padding: 2px 4px;
+        gap: 4px;
+    }
+
+    .slot-stage-v2:fullscreen .slot-control-readout,
+    .slot-stage-v2:fullscreen .slot-control-readout.right {
+        min-height: 36px;
+        padding: 3px 7px;
+    }
+
+    .slot-stage-v2:fullscreen .slot-control-spin {
+        width: 40px;
+        height: 40px;
+    }
     /* Keep cinematics compact so they fit the short viewport. */
     .slot-bonus-cine {
         max-height: calc(100dvh - 40px);
