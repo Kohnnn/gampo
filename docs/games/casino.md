@@ -8,6 +8,7 @@ Card and table simulators. All settle locally against fake credits.
 - Repeating the previous ticket and Baccarat Auto use the same ticket calculation for the quote, balance check, and charge.
 - Baccarat Auto rechecks the current ticket, callback, and balance each round. After a placed ticket clears, later rounds use the current Auto side and adjusted amount; the dock quotes that next obligation.
 - Fractional fake-credit balances are valid when they cover the ticket; an additional chip must fit alongside chips already placed.
+- Phone controls retain the labeled `Bet & options` / `Bet settings` button and settings sheet; the redundant floating `Set bet & options` hint is removed.
 - Roulette uses keyboard-operable buttons and a three-column number grid on phones, with column and outside bets below the numbers.
 
 ## Blackjack Trainer (`/blackjack`)

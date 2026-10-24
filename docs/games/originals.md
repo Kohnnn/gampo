@@ -2,6 +2,8 @@
 
 GamPo originals are arcade-style simulators with transparent math. Every game shows its expected value via the shared `EducationPanel`. RTPs noted below are targets, not guarantees; observed values drift in small samples.
 
+Dice, Limbo, Plinko, Wheel, and Rock Paper Scissors use a viewport-bounded primary stage with space reserved for fixed controls and navigation. Supporting results, simulated-player feeds, and education remain secondary rather than expanding that stage.
+
 ## Crash
 
 - Multiplier curve climbs from 1.00x with a hidden bust point.
@@ -38,6 +40,7 @@ GamPo originals are arcade-style simulators with transparent math. Every game sh
 - Pick a target multiplier `m`; simulate a multiplier with hit probability `rtp / m`.
 - Strategy lesson: target compresses the entire risk choice into one slider.
 - Only the decorative ring rotates; the primary result stays upright.
+- Target, hit chance, gauge, and the full result ring come before recent results, simulated bets, and education. The ring scales to the available primary-stage height.
 
 ## Keno
 
