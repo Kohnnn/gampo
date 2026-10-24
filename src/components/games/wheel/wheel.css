@@ -1,11 +1,13 @@
 .wheel-stage {
     position: relative;
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
-    align-items: center;
-    padding: 32px 8px;
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 16px;
+    justify-items: center;
+    padding: 16px 8px;
     border-radius: 16px;
     transition: box-shadow 0.4s ease;
 }
@@ -21,8 +23,17 @@
     margin-bottom: -16px;
 }
 
+.wheel-disc-row {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    container-type: size;
+}
+
 .wheel-disc {
-    width: min(440px, 78vw);
+    width: min(440px, 100cqw, 100cqh);
     aspect-ratio: 1;
     border-radius: 50%;
     position: relative;
@@ -95,9 +106,6 @@
         padding: 12px 6px;
     }
 
-    .wheel-stage .sim-bet-strip {
-        max-height: 72px;
-    }
 
     .wheel-pointer {
         border-left-width: 14px;
@@ -107,7 +115,7 @@
     }
 
     .wheel-disc {
-        width: min(152px, 42vw);
+        width: min(152px, 100cqw, 100cqh);
         border-width: 8px;
     }
 
@@ -120,4 +128,15 @@
         padding: 6px 12px;
         font-size: 13px;
     }
+}
+
+@media (max-height: 520px) {
+    .wheel-stage { gap: 4px; padding: 4px 6px; }
+    .wheel-pointer {
+        border-left-width: 10px;
+        border-right-width: 10px;
+        border-top-width: 16px;
+        margin-bottom: -4px;
+    }
+    .wheel-last { padding: 4px 8px; }
 }
