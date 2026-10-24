@@ -100,13 +100,13 @@ describe('settled slot presentation', () => {
                 doc.dispatchEvent(new Event('fullscreenchange'))
             }),
         }
-        stage.props.ref.current = stageNode
-        const cleanup = fixture.effects.find(entry => entry.dependencies?.includes(stage.props.ref)).effect()
+        stage.ref.current = stageNode
+        const cleanup = fixture.effects.find(entry => entry.dependencies?.includes(stage.ref)).effect()
         const review = find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Enter reel fullscreen')
         await review.props.onClick()
         tree = render('gummy-drops')
         expect(stageNode.requestFullscreen).toHaveBeenCalledOnce()
-        expect(find(tree, node => node.props?.className?.startsWith('slot-stage-v2')).props.ref.current).toBe(stageNode)
+        expect(find(tree, node => node.props?.className?.startsWith('slot-stage-v2')).ref.current).toBe(stageNode)
         expect(find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Exit reel fullscreen')).not.toBeNull()
         expect(find(tree, node => node.props?.className === 'slot-mobile-dock')).toBeNull()
         await doc.exitFullscreen()
