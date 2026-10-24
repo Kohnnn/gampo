@@ -13,6 +13,7 @@ Production: [https://gampo-educational-simulator.netlify.app](https://gampo-educ
 - The sportsbook uses synthetic fixtures by default. Optional provider reads stay server-side through `server/sportsbookProviderProxy.js`; ticket acceptance and settlement remain local fake-credit simulation.
 - Dice records every accepted roll, including overlapping keyboard plays and rounds interrupted by navigation, without announcing a superseded result.
 - Cases loads its catalogue without the unused market-price dataset; practice-credit prices and item values remain unchanged. The full skin collection loads when Inventory opens.
+- Crash stops decorative canvas loops and animated effects under app or OS reduced motion and when animations are off, while preserving the chart, live results, and round timing.
 
 ## Run Locally
 
