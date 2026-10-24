@@ -2704,6 +2704,12 @@
     width: min(94%, 620px);
 }
 
+.slot-secondary .slot-feature-callouts {
+    position: static;
+    width: 100%;
+    transform: none;
+}
+
 .slot-feature-callout {
     min-width: 138px;
     padding: 9px 14px;
@@ -3652,6 +3658,44 @@
 .slot-stage-v2 .slot-cell.type-mystery img {
     --slot-effective-symbol-scale: calc(var(--slot-symbol-scale) * var(--slot-feature-symbol-scale));
     transform: translateZ(0) scale(calc(var(--slot-symbol-scale) * var(--slot-feature-symbol-scale)));
+}
+
+.slot-cell:has(.slot-rank-crop) { container-type: size; }
+.slot-rank-crop {
+    position: relative;
+    display: block;
+    width: min(90cqw, calc(90cqh * var(--slot-crop-ratio)));
+    height: min(90cqh, calc(90cqw / var(--slot-crop-ratio)));
+    overflow: hidden;
+}
+.slot-stage-v2 .slot-cell .slot-rank-crop > img,
+.slot-paytable-sym .slot-rank-crop > img {
+    position: absolute;
+    left: var(--slot-crop-left);
+    top: var(--slot-crop-top);
+    width: var(--slot-crop-width);
+    height: var(--slot-crop-height);
+    max-width: none;
+    max-height: none;
+    object-fit: fill;
+    transform: none;
+    filter: none;
+    animation: none;
+}
+.slot-paytable-sym .slot-rank-crop {
+    flex: 0 0 auto;
+    width: calc(18px * var(--slot-crop-ratio));
+    height: 18px;
+}
+.slot-rank-crop > strong { display: grid; height: 100%; place-items: center; }
+.slot-rank-crop:has(> strong) { min-width: 1em; overflow: visible; }
+.slot-cell.winning .slot-rank-crop {
+    --slot-effective-symbol-scale: 1;
+    animation: slotWinSymbol 0.82s ease-in-out infinite;
+}
+.gampo-reduce-motion .slot-cell.winning .slot-rank-crop { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+    .slot-cell.winning .slot-rank-crop { animation: none; }
 }
 
 .slot-stage-v2 .slot-cell.symbol-rank-a,
