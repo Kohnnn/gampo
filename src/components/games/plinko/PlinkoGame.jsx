@@ -328,6 +328,14 @@ export default function PlinkoGame() {
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             variant="stake"
+            primaryStage
+            secondary={
+                <>
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <SimBetStrip rows={simFeed} title="Sim drops" />
+                    <EducationPanel definition={definition} betAmount={selectedBet * ball.cost} expectedGrossMultiplier={expectedGrossMultiplier} effectiveRtp={expectedGrossMultiplier} balance={balance} recentProfit={recentProfit} />
+                </>
+            }
             panel={
                 <BetPanel
                     balance={balance}
@@ -390,25 +398,25 @@ export default function PlinkoGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={580} maxWidth={920} loading={!preloader.ready || !engineReady} className="plinko-stage-frame">
+            <CoreStageFrame maxWidth={920} loading={!preloader.ready || !engineReady} className="plinko-stage-frame gs-primary-stage">
                 <div className="plinko-stage" ref={boardRef}>
-                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <SimBetStrip rows={simFeed} title="Sim drops" />
-                    <div className="plinko-canvas-wrap" data-mobile-critical-surface>
-                        <canvas ref={canvasRef} className="plinko-canvas" />
-                        {payouts && binColors && (
-                            <div className="plinko-bins" style={{ '--bins': payouts.length }}>
-                                {payouts.map((m, i) => (
-                                    <div
-                                        key={i}
-                                        className={`plinko-bin-chip ${i === highlightBin ? 'hit' : ''}`}
-                                        style={{ background: binColors.background[i], boxShadow: `0 4px 0 ${binColors.shadow[i]}` }}
-                                    >
-                                        {m}{m < 100 ? '×' : ''}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                    <div className="plinko-board-viewport">
+                        <div className="plinko-canvas-wrap" data-mobile-critical-surface>
+                            <canvas ref={canvasRef} className="plinko-canvas" />
+                            {payouts && binColors && (
+                                <div className="plinko-bins" style={{ '--bins': payouts.length }}>
+                                    {payouts.map((m, i) => (
+                                        <div
+                                            key={i}
+                                            className={`plinko-bin-chip ${i === highlightBin ? 'hit' : ''}`}
+                                            style={{ background: binColors.background[i], boxShadow: `0 4px 0 ${binColors.shadow[i]}` }}
+                                        >
+                                            {m}{m < 100 ? '×' : ''}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div className="plinko-meta">
                         <MultiplierBadge label="Last" value={Number(lastMultiplier) || 0} state={lastMultiplier && lastMultiplier > 1 ? 'win' : 'idle'} size="sm" />
@@ -421,7 +429,6 @@ export default function PlinkoGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('plinko')} />
-            <EducationPanel definition={definition} betAmount={selectedBet * ball.cost} expectedGrossMultiplier={expectedGrossMultiplier} effectiveRtp={expectedGrossMultiplier} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

@@ -191,6 +191,14 @@ export default function WheelGame() {
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             variant="stake"
+            primaryStage
+            secondary={
+                <>
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <SimBetStrip rows={simFeed} title="Sim wheel" />
+                    <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={hitChance} payoutMultiplier={avgMultiplier} balance={balance} recentProfit={recentProfit} />
+                </>
+            }
             panel={
                 <BetPanel
                     balance={balance}
@@ -222,17 +230,17 @@ export default function WheelGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="wheel-stage-frame" mobileScrollable>
+            <CoreStageFrame maxWidth={920} loading={!preloader.ready} className="wheel-stage-frame gs-primary-stage">
                 <div className={`wheel-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
-                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <SimBetStrip rows={simFeed} title="Sim wheel" />
                     <div className="wheel-pointer" />
-                    <div data-mobile-critical-surface className={`wheel-disc ${spinning ? 'spinning' : ''}`} style={{ transform: `rotate(${rotation}deg)` }}>
-                        {segments.map((segment, i) => (
-                            <span key={`${segment}-${i}`} className={segment > 0 ? 'paying' : 'blank'} style={{ transform: `rotate(${i * (360 / segments.length)}deg)` }}>
-                                {segment}×
-                            </span>
-                        ))}
+                    <div className="wheel-disc-row">
+                        <div data-mobile-critical-surface className={`wheel-disc ${spinning ? 'spinning' : ''}`} style={{ transform: `rotate(${rotation}deg)` }}>
+                            {segments.map((segment, i) => (
+                                <span key={`${segment}-${i}`} className={segment > 0 ? 'paying' : 'blank'} style={{ transform: `rotate(${i * (360 / segments.length)}deg)` }}>
+                                    {segment}×
+                                </span>
+                            ))}
+                        </div>
                     </div>
                     <div className="wheel-last">
                         <MultiplierBadge label="Last" value={last === null ? 0 : last} state={lastWon === true ? 'win' : lastWon === false ? 'bust' : 'idle'} size="sm" />
@@ -243,7 +251,6 @@ export default function WheelGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('wheel')} />
-            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={hitChance} payoutMultiplier={avgMultiplier} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

@@ -171,6 +171,14 @@ export default function LimboGame() {
             accent="#41d6ff"
             backdrop="/assets/games/backdrops/backdrop-stars.png"
             variant="stake"
+            primaryStage
+            secondary={
+                <>
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <SimBetStrip rows={simFeed} title="Sim limbo" />
+                    <EducationPanel definition={definition} betAmount={5} winProbability={chance} payoutMultiplier={target} balance={balance} recentProfit={recentProfit} />
+                </>
+            }
             panel={
                 <BetPanel
                     balance={balance}
@@ -203,10 +211,8 @@ export default function LimboGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={520} maxWidth={920} loading={!preloader.ready} className="limbo-stage-frame">
+            <CoreStageFrame maxWidth={920} loading={!preloader.ready} className="limbo-stage-frame gs-primary-stage">
                 <div className={`limbo-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
-                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <SimBetStrip rows={simFeed} title="Sim limbo" />
                     <div className="limbo-stars-bg" />
                     <div className="limbo-target-label">
                         <MultiplierBadge label="Target" value={target} state={running ? 'active' : lastWon === true ? 'win' : lastWon === false ? 'bust' : 'idle'} size="sm" />
@@ -227,7 +233,6 @@ export default function LimboGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('limbo')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={chance} payoutMultiplier={target} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }
