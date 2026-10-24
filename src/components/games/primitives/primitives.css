@@ -2563,6 +2563,7 @@ dialog.odds-popup-backdrop::backdrop {
     .game-shell[data-primary-stage] {
         display: grid;
         grid-template-columns: minmax(0, min(38%, 280px)) minmax(0, 1fr);
+        grid-template-rows: minmax(var(--gs-primary-height, 0px), auto) auto;
         align-content: start;
         align-items: start;
         gap: 8px;
@@ -2587,7 +2588,10 @@ dialog.odds-popup-backdrop::backdrop {
     }
     .game-shell[data-primary-stage] .gs-panel::before { content: none; }
     .game-shell[data-primary-stage] .gs-aside > * { min-width: 0; }
-    .game-shell[data-primary-stage] .gs-secondary { grid-column: 1 / -1; }
+    .game-shell[data-primary-stage] .gs-secondary {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
 
     [data-primary-landscape-dock][data-mobile-action-dock],
     [data-primary-landscape-dock][data-slot-mobile-dock] {
