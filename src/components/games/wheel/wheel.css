@@ -60,6 +60,7 @@
 @media (prefers-reduced-motion: reduce) {
     .wheel-disc { animation: none; }
 }
+.gampo-reduce-motion .wheel-disc { animation: none; }
 
 .wheel-disc::before {
     content: '';
