@@ -99,7 +99,7 @@
     line-height: 1;
     font-size: 11px;
     font-weight: 950;
-    color: #1a1a1a;
+    color: #161616;
     transition: transform 0.2s, box-shadow 0.2s;
     will-change: transform;
 }

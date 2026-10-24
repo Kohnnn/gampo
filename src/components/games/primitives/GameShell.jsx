@@ -115,11 +115,25 @@ export default function GameShell({
         observer.observe(shell)
         observer.observe(titlebarRef.current)
         observer.observe(shell.parentElement)
+        // Fullscreen removes and recreates the slot portal without resizing
+        // the shell. Observe only body-level portal identity changes.
+        const portals = new MutationObserver(records => {
+            for (const record of records) {
+                for (const node of [...record.addedNodes, ...record.removedNodes]) {
+                    if (node.nodeType === 1 && (node.matches(dockSelector) || node.querySelector(dockSelector))) {
+                        schedule()
+                        return
+                    }
+                }
+            }
+        })
+        portals.observe(document.body, { childList: true })
         window.addEventListener('resize', schedule)
         window.visualViewport?.addEventListener('resize', schedule)
         schedule()
         return () => {
             observer.disconnect()
+            portals.disconnect()
             window.removeEventListener('resize', schedule)
             window.visualViewport?.removeEventListener('resize', schedule)
             if (frame) cancelAnimationFrame(frame)
