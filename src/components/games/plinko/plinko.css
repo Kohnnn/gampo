@@ -1,13 +1,27 @@
 .plinko-stage {
-    display: flex;
-    flex-direction: column;
+    height: 100%;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 10px;
     color: var(--text-primary);
     min-height: 0;
 }
 
+.plinko-board-viewport {
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    container-type: size;
+}
+
 .plinko-canvas-wrap {
     position: relative;
+    --plinko-bin-height: 28px;
+    /* Board padding, bin row, gap and border; the canvas keeps its native 4:3 ratio. */
+    width: min(100cqw, calc((100cqh - 70px) * 4 / 3 + 34px));
+    max-width: 100%;
+    flex: 0 0 auto;
     background: linear-gradient(180deg, rgba(15, 33, 46, 0.85), rgba(20, 39, 51, 0.7));
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 14px;
@@ -19,13 +33,6 @@
     gap: 8px;
 }
 
-.plinko-stage .sim-bet-strip {
-    max-height: 88px;
-}
-
-.plinko-stage .rrs-strip {
-    margin-bottom: 0;
-}
 
 .plinko-live-rail {
     width: 100%;
@@ -78,6 +85,7 @@
     gap: 4px;
     width: 100%;
     max-width: 760px;
+    height: var(--plinko-bin-height);
     padding: 0 min(6.842105%, 52px);
 }
 
@@ -85,6 +93,10 @@
     border-radius: 6px;
     padding: 6px 0;
     text-align: center;
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    line-height: 1;
     font-size: 11px;
     font-weight: 950;
     color: #1a1a1a;
@@ -158,11 +170,12 @@
 
 @media (max-width: 768px) {
     .plinko-stage { gap: 6px; }
-    .plinko-stage .rrs-strip {
-        min-height: 30px;
-        padding: 5px 8px;
+    .plinko-canvas-wrap {
+        --plinko-bin-height: 20px;
+        width: min(100cqw, calc((100cqh - 43px) * 4 / 3 + 14px));
+        padding: 8px 6px;
+        gap: 5px;
     }
-    .plinko-canvas-wrap { padding: 8px 6px; gap: 5px; }
     .plinko-bins { gap: 2px; }
     .plinko-bin-chip {
         min-width: 0;
@@ -175,6 +188,5 @@
     }
     .plinko-ball-grid { grid-template-columns: repeat(6, 1fr); }
     .plinko-ball-chip img { height: 20px; }
-    .plinko-stage .sim-bet-strip { display: none; }
     .plinko-meta { padding: 8px 10px; font-size: 10px; }
 }

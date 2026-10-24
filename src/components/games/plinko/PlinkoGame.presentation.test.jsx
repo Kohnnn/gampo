@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ state: [], refs: [], stateCursor: 0, refCursor: 0, effects: [], engine: null, credit: vi.fn(), debit: vi.fn(), record: vi.fn(), toast: vi.fn(), sound: vi.fn() }))
+const fixture = vi.hoisted(() => ({ state: [], refs: [], stateCursor: 0, refCursor: 0, effects: [], history: [], engine: null, credit: vi.fn(), debit: vi.fn(), record: vi.fn(), toast: vi.fn(), sound: vi.fn() }))
 vi.mock('react', async () => ({
     ...await vi.importActual('react'),
     useState(initial) {
@@ -27,7 +27,7 @@ vi.mock('../primitives', () => {
         GameShell: Empty, BetPanel: Empty, CoreStageFrame: Empty, BigWinOverlay: Empty, HistoryDrawer: Empty,
         RecentResultsStrip: Empty, StatsOverlay: Empty, MultiplierBadge: Empty, ResultToast: Empty, ActionLockOverlay: Empty, SimBetStrip: Empty,
         getBigWinThreshold: () => 15,
-        useGameSession: () => ({ history: [], stats: { lastResults: [] }, record: fixture.record, clear: () => {} }),
+        useGameSession: () => ({ history: fixture.history, stats: { lastResults: [] }, record: fixture.record, clear: () => {} }),
         makeInitialSimBetRows: () => [], makeSimBetRow: () => ({}), prependSimBetRow: () => [],
         ROUND_EVENTS: {}, useRoundMachine: () => ({ start: () => {}, finish: () => {} }),
     }
@@ -57,7 +57,7 @@ function render() {
 function find(node, predicate) {
     if (!node || typeof node !== 'object') return null
     if (predicate(node)) return node
-    for (const child of [node.props?.panel, ...[node.props?.children].flat(Infinity)]) {
+    for (const child of [node.props?.panel, node.props?.secondary, ...[node.props?.children].flat(Infinity)]) {
         const match = find(child, predicate)
         if (match) return match
     }
@@ -78,6 +78,7 @@ beforeEach(() => {
     fixture.state = []
     fixture.refs = []
     fixture.engine = null
+    fixture.history = []
     fixture.debit.mockReturnValue(true)
 })
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
@@ -93,6 +94,21 @@ describe('Plinko current stake and accepted outcomes', () => {
         expect(props.effectiveRtp).toBe(props.expectedGrossMultiplier)
         expect(props.winProbability).toBeUndefined()
         expect(props.payoutMultiplier).toBeUndefined()
+        mounted.unmount()
+    })
+
+    it('keeps the settled multiplier and hit bin in the primary board after a drop', async () => {
+        const mounted = await mount()
+        fixture.record.mockImplementation(entry => fixture.history.unshift(entry))
+        const round = find(mounted.tree, node => typeof node.props?.onPlay === 'function').props.onPlay({ betAmount: 5, mode: 'manual' })
+        fixture.engine.options.onBallEnterBin({ ballId: 'ball-1', binIndex: 0, payout: { multiplier: 33 } })
+        await expect(round).resolves.toEqual({ profit: 160 })
+
+        const primary = find(render(), node => node.props?.className === 'plinko-stage')
+        expect(find(primary, node => node.props?.label === 'Last').props.value).toBe(33)
+        expect(find(primary, node => node.props?.className === 'plinko-bin-chip hit').props.children).toEqual([33, '×'])
+        expect(find(primary, node => node.props?.title === 'Sim drops')).toBeNull()
+        expect(fixture.record).toHaveBeenCalledTimes(1)
         mounted.unmount()
     })
 

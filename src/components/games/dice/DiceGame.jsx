@@ -201,6 +201,28 @@ export default function DiceGame() {
             accent="#00e701"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             variant="stake"
+            primaryStage
+            secondary={
+                <>
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <div className="dice-pips" aria-label="Last 4 rolls">
+                        {Array.from({ length: 4 }, (_, i) => {
+                            const item = session.history[i]
+                            const empty = !item
+                            const won = !empty && (item.profit || 0) >= 0
+                            const label = empty ? '?' : (item.label || '—')
+                            return (
+                                <div key={i} className={`dice-pip ${empty ? 'empty' : won ? 'won' : 'lost'}`}>
+                                    <span className="dice-pip-label">{label}</span>
+                                    <span className="dice-pip-tag">{empty ? 'roll' : won ? 'win' : 'loss'}</span>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    <SimBetStrip rows={simFeed} title="Sim dice" />
+                    <EducationPanel definition={definition} betAmount={stake} winProbability={winChance / 100} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
+                </>
+            }
             // Dice owns the authoritative under/over + win chance, so it states
             // them explicitly. Without this the odds popup would fall back to a
             // fabricated hit chance instead of the player's actual selection.
@@ -248,24 +270,8 @@ export default function DiceGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={460} maxWidth={920} loading={!preloader.ready} className="dice-stage-frame">
+            <CoreStageFrame maxWidth={920} loading={!preloader.ready} className="dice-stage-frame gs-primary-stage">
                 <div className={`dice-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
-                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <SimBetStrip rows={simFeed} title="Sim dice" />
-                    <div className="dice-pips" aria-label="Last 4 rolls">
-                        {Array.from({ length: 4 }, (_, i) => {
-                            const item = session.history[i]
-                            const empty = !item
-                            const won = !empty && (item.profit || 0) >= 0
-                            const label = empty ? '?' : (item.label || '—')
-                            return (
-                                <div key={i} className={`dice-pip ${empty ? 'empty' : won ? 'won' : 'lost'}`}>
-                                    <span className="dice-pip-label">{label}</span>
-                                    <span className="dice-pip-tag">{empty ? 'roll' : won ? 'win' : 'loss'}</span>
-                                </div>
-                            )
-                        })}
-                    </div>
                     <div className="dice-outcome-wrap">
                         <div className={`dice-big ${lastWon === true ? 'win' : lastWon === false ? 'loss' : ''}`}>
                             <NumberRoll value={lastRoll === null ? 0 : Number(lastRoll.toFixed(2))} format={v => lastRoll === null ? '--.--' : v.toFixed(2)} />
@@ -295,7 +301,6 @@ export default function DiceGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('dice')} />
-            <EducationPanel definition={definition} betAmount={stake} winProbability={winChance / 100} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }
