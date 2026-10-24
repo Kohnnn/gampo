@@ -45,20 +45,32 @@ export default function GameShell({
         let height = ''
         let reserve = ''
         const observedDocks = new Set()
+        const landscape = window.matchMedia('(min-width: 561px) and (max-width: 768px) and (max-height: 520px) and (orientation: landscape)')
+        const clearDockRail = dock => {
+            dock.removeAttribute('data-primary-landscape-dock')
+            for (const name of ['left', 'width', 'bottom']) dock.style.removeProperty(`--gs-controls-${name}`)
+        }
         const dockSelector = '[data-mobile-action-dock], [data-slot-mobile-dock], .mobile-bottom-nav'
         const measure = () => {
             frame = 0
             const shellRect = shell.getBoundingClientRect()
             // Scroll position must not change the primary stage's own budget.
-            const top = playfield.getBoundingClientRect().top + shell.scrollTop
+            const fieldRect = playfield.getBoundingClientRect()
+            const top = fieldRect.top + shell.scrollTop
             const viewportBottom = window.visualViewport
                 ? window.visualViewport.offsetTop + window.visualViewport.height
                 : window.innerHeight
             let bottom = Math.min(shellRect.bottom, viewportBottom)
+            const shellStyle = getComputedStyle(shell)
+            const gap = parseFloat(shellStyle.rowGap) || 0
+            const nav = document.querySelector('.mobile-bottom-nav')?.getBoundingClientRect()
+            const rail = titlebarRef.current.getBoundingClientRect()
+            const railBottom = nav?.width > 0 && nav?.height > 0 ? nav.top : viewportBottom
             const docks = new Set(document.querySelectorAll(dockSelector))
             observedDocks.forEach(dock => {
                 if (!docks.has(dock)) {
                     observer.unobserve(dock)
+                    clearDockRail(dock)
                     observedDocks.delete(dock)
                 }
             })
@@ -67,12 +79,26 @@ export default function GameShell({
                     observer.observe(dock)
                     observedDocks.add(dock)
                 }
+                if (landscape.matches && !dock.matches('.mobile-bottom-nav')) {
+                    dock.setAttribute('data-primary-landscape-dock', '')
+                    const values = {
+                        left: rail.left,
+                        width: rail.width,
+                        bottom: Math.max(0, viewportBottom - railBottom + gap),
+                    }
+                    for (const [name, value] of Object.entries(values)) {
+                        const property = `--gs-controls-${name}`
+                        if (dock.style.getPropertyValue(property) !== `${value}px`) dock.style.setProperty(property, `${value}px`)
+                    }
+                } else {
+                    clearDockRail(dock)
+                }
                 const rect = dock.getBoundingClientRect()
-                if (rect.width > 0 && rect.height > 0 && rect.top < bottom && rect.bottom > shellRect.top) {
+                const crossesPlayer = rect.right > fieldRect.left && rect.left < fieldRect.right
+                if (crossesPlayer && rect.width > 0 && rect.height > 0 && rect.top < bottom && rect.bottom > shellRect.top) {
                     bottom = rect.top
                 }
             })
-            const gap = parseFloat(getComputedStyle(shell).rowGap) || 0
             const nextHeight = `${Math.max(0, bottom - top - gap)}px`
             const nextReserve = `${Math.max(0, shellRect.bottom - bottom)}px`
             if (height !== nextHeight) {
@@ -99,6 +125,7 @@ export default function GameShell({
             if (frame) cancelAnimationFrame(frame)
             shell.style.removeProperty('--gs-primary-height')
             shell.style.removeProperty('--gs-bottom-reserve')
+            observedDocks.forEach(clearDockRail)
         }
     }, [primaryStage])
 
