@@ -2163,6 +2163,35 @@ body {
 }
 
 @media (max-width: 560px) {
+    .header.header-play-surface {
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+        height: auto;
+        min-height: 52px;
+        padding: 4px 8px;
+        gap: 8px;
+    }
+
+    .header.header-play-surface .live-wins-badge {
+        display: none;
+    }
+
+    .header.header-play-surface .header-menu-btn,
+    .header.header-play-surface .header-toggle,
+    .header.header-play-surface .credit-pill {
+        min-height: 44px;
+    }
+
+    .header.header-play-surface .header-menu-btn,
+    .header.header-play-surface .header-toggle {
+        width: 44px;
+    }
+
+    .header.header-play-surface .header-left { gap: 6px; }
+    .header.header-play-surface .header-right { gap: 6px; }
+    .header.header-play-surface .header-toggles { margin-right: 0; }
+    .header.header-play-surface .logo { font-size: 26px; }
+
     .header.header-play-surface .header-mode,
     .header.header-play-surface .header-center {
         display: none;

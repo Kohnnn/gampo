@@ -50,3 +50,20 @@ describe('BetPanel ticket quote', () => {
         expect(renderPanel({ balance: 10, ticketStake })).toMatch(/class="bp-mobile-play[^"]*" disabled=""/)
     })
 })
+
+describe('BetPanel mobile options', () => {
+    it('keeps the labeled options opener and all setup controls without a floating prompt', () => {
+        const html = renderPanel({ children: <label>Risk<select defaultValue="low"><option value="low">Low</option></select></label> })
+        expect(html).toContain('aria-label="Bet &amp; options"')
+        expect(html).toContain('data-mobile-settings-toggle="true"')
+        expect(html).toContain('aria-expanded="false"')
+        expect(html).toContain('>Risk<select')
+        expect(html).not.toContain('Set bet &amp; options')
+        expect(html).not.toContain('bp-mobile-setup-hint')
+        expect(html).not.toContain('bp-mobile-settings nudge')
+    })
+
+    it('keeps the bet settings label when there are no game-specific options', () => {
+        expect(renderPanel()).toContain('aria-label="Bet settings"')
+    })
+})
