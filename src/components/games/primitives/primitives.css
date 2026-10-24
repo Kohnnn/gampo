@@ -190,6 +190,60 @@
     flex: 0 0 auto;
 }
 
+/* Repaired games opt into one measured primary player; secondary content
+   remains in the shell's scroll flow rather than expanding the stage. */
+.game-shell[data-primary-stage] {
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: calc(var(--gs-bottom-reserve, 0px) + 8px);
+}
+
+.game-shell[data-primary-stage] .gs-layout {
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.game-shell[data-primary-stage] .gs-playfield {
+    height: var(--gs-primary-height, 100%);
+    min-height: 0;
+    flex: 0 0 auto;
+}
+
+.game-shell[data-primary-stage] .gs-playfield > .gs-primary-stage {
+    flex: 1 1 0;
+    height: 100%;
+    min-height: 0 !important;
+}
+
+.game-shell[data-primary-stage] .gs-primary-stage > .core-stage-body {
+    height: 100%;
+    min-height: 0;
+}
+
+.gs-secondary {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 1480px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+@media (min-width: 769px) {
+    .game-shell[data-primary-stage] .gs-layout {
+        grid-template-rows: var(--gs-primary-height, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1419px) {
+    .game-shell[data-primary-stage] .gs-layout {
+        grid-template-rows: var(--gs-primary-height, minmax(0, 1fr)) auto;
+    }
+}
+
 .gs-aside {
     padding: 10px;
     display: flex;
@@ -2140,13 +2194,28 @@ dialog.odds-popup-backdrop::backdrop {
         scrollbar-width: thin;
     }
     .gs-titlebar {
-        grid-template-columns: 1fr auto;
-        gap: 10px;
-        padding: 8px 10px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 8px;
+        padding: 5px 8px;
     }
     .gs-titlebar small { display: none; }
     .gs-titlebar h1 { font-size: 16px; line-height: 1.1; }
-    .gs-titlebar-extras { grid-row: 2; grid-column: 1 / -1; justify-content: flex-start; display: flex; }
+    .gs-titlebar-extras {
+        grid-row: 2;
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 6px;
+        display: flex;
+    }
+    .gs-titlebar-extras .gt-group { padding: 0; }
+    .gs-titlebar-extras .gt-toolbar { gap: 4px; }
+    .gs-titlebar-extras .gt-btn,
+    .gs-titlebar-extras .audio-toggle {
+        width: 44px;
+        height: 44px;
+    }
     .gs-balance { grid-row: 1; grid-column: 2; }
     .gs-layout {
         display: flex !important;
@@ -2331,46 +2400,6 @@ dialog.odds-popup-backdrop::backdrop {
         max-width: 72px;
         text-align: center;
         white-space: normal;
-    }
-    .bp-mobile-settings.nudge {
-        color: var(--text-primary);
-        border-color: color-mix(in srgb, var(--accent), transparent 35%);
-        background: color-mix(in srgb, var(--accent), transparent 86%);
-        animation: bpSettingsNudge 1.7s ease-in-out infinite;
-    }
-    @keyframes bpSettingsNudge {
-        0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent), transparent 70%); }
-        50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent), transparent 88%); }
-    }
-    .bp-mobile-setup-hint {
-        position: fixed;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: calc(var(--mobile-nav-height, 0px) + var(--mobile-action-height, 74px) + max(8px, env(safe-area-inset-bottom)) + 14px);
-        z-index: calc(var(--z-mobile-action, 1400) + 1);
-        appearance: none;
-        padding: 7px 14px;
-        border: 1px solid color-mix(in srgb, var(--accent), transparent 40%);
-        border-radius: 999px;
-        background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(20, 39, 51, 0.98));
-        color: #ffe6a8;
-        font-size: 10px;
-        font-weight: 950;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
-        pointer-events: auto;
-        animation: bpSetupHintRise 1.9s ease-in-out infinite;
-    }
-    @keyframes bpSetupHintRise {
-        0%, 100% { transform: translate(-50%, 0); }
-        50% { transform: translate(-50%, -3px); }
-    }
-    :root.gampo-reduce-motion .bp-mobile-settings.nudge,
-    :root.gampo-reduce-motion .bp-mobile-setup-hint,
-    .gampo-reduce-motion .bp-mobile-settings.nudge,
-    .gampo-reduce-motion .bp-mobile-setup-hint {
-        animation: none;
     }
 
 /* P1: the Rebet disabled reason must be visible and programmatically
