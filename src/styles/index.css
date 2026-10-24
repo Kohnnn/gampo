@@ -2162,7 +2162,7 @@ body {
     }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 560px), (min-width: 561px) and (max-width: 768px) and (max-height: 520px) and (orientation: landscape) {
     .header.header-play-surface {
         flex: 0 0 auto;
         flex-wrap: nowrap;
