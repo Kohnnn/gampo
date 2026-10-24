@@ -131,17 +131,21 @@ describe('settled slot presentation', () => {
     })
 
     it('retains settled free-spin, cascade and coin-meter information in secondary content, never over the board', async () => {
-        fixture.outcome = outcome('gummy-drops', { featureEvents: [
-            { type: 'free-spins', label: '6 free spins' },
-            { type: 'cascade', label: '3 cascades' },
-            { type: 'coin-meter', label: '4 coins collected' },
+        fixture.outcome = outcome('gummy-drops', { triggeredFreeSpins: 6, featureEvents: [
+            { type: 'free-spins', freeSpins: 6, indexes: [0, 8, 16] },
+            { type: 'cascade', steps: 2, label: '3x cascade chain' },
+            { type: 'coin-meter', coinHits: 4, label: 'Collected 4' },
         ] })
         const tree = await spin('gummy-drops')
         const notices = node => node.props?.className === 'slot-feature-callouts'
         const secondary = find(tree.props.secondary, notices)
-        expect(text(secondary)).toContain('6 free spins')
-        expect(text(secondary)).toContain('3 cascades')
-        expect(text(secondary)).toContain('4 coins collected')
+        expect(secondary).not.toBeNull()
+        expect(find(secondary, node => node.props?.className?.includes('type-free-spins'))).not.toBeNull()
+        expect(find(secondary, node => node.props?.className?.includes('type-cascade'))).not.toBeNull()
+        expect(find(secondary, node => node.props?.className?.includes('type-coin-meter'))).not.toBeNull()
+        const counter = find(tree.props.secondary, node => node.props?.totalAwarded > 0)
+        expect(counter.props.totalAwarded).toBe(6)
+        expect(counter.props.remaining).toBe(6)
         expect(find(tree.props.children, notices)).toBeNull()
     })
 
