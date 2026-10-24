@@ -226,3 +226,20 @@
         justify-content: center;
     }
 }
+
+@media (min-width: 561px) and (max-width: 768px) and (max-height: 520px) and (orientation: landscape) {
+    .limbo-stage {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+        grid-template-rows: minmax(0, 1fr);
+        gap: 8px;
+        padding: 4px 6px;
+    }
+
+    .limbo-target-label {
+        align-self: center;
+        flex-direction: column;
+        text-align: center;
+        border-radius: 14px;
+        padding: 8px;
+    }
+}
