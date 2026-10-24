@@ -2,7 +2,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ play: null, settle: null, roll: 0, credit: vi.fn(), record: vi.fn(), toast: vi.fn() }))
+const fixture = vi.hoisted(() => ({ play: null, settle: null, shell: null, roll: 0, credit: vi.fn(), record: vi.fn(), toast: vi.fn() }))
 vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 100, placeBet: () => true, addWinnings: fixture.credit, showToast: fixture.toast }) }))
 vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: () => {} }) }))
 vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: () => {} }) }))
@@ -16,7 +16,7 @@ vi.mock('../primitives', () => {
     return {
         getBigWinThreshold: () => 5,
         useGameSession: () => ({ record: fixture.record, history: [], stats: { lastResults: [] } }),
-        GameShell: ({ panel, children }) => React.createElement(React.Fragment, null, panel, children),
+        GameShell: props => { fixture.shell = props; return React.createElement(React.Fragment, null, props.panel, props.children, props.secondary) },
         BetPanel: props => { fixture.play = props.onPlay; return props.children },
         CoreStageFrame: ({ children }) => children,
         BigWinOverlay: Empty, HistoryDrawer: Empty, RecentResultsStrip: Empty, StatsOverlay: Empty, ResultToast: Empty, ActionLockOverlay: Empty,
@@ -63,5 +63,17 @@ describe('RPS public settlement receipts', () => {
         expect(html).toContain('✌️')
         expect(html).not.toContain('<img')
         expect(html).toContain('aria-label="Rock"')
+    })
+
+    it('keeps labeled gestures and the versus outcome ahead of secondary activity', () => {
+        renderToStaticMarkup(React.createElement(RpsGame))
+        expect(fixture.shell.primaryStage).toBe(true)
+        const primary = renderToStaticMarkup(React.createElement(React.Fragment, null, fixture.shell.children))
+        expect(primary).toContain('rps-versus phase-idle')
+        for (const label of ['Rock', 'Paper', 'Scissors']) expect(primary).toContain(`<strong>${label}</strong>`)
+        const nodes = React.Children.toArray(fixture.shell.children)
+        expect(nodes[0].props.className).toContain('gs-primary-stage')
+        expect(nodes[0].props.minHeight).toBeUndefined()
+        expect(fixture.shell.secondary.props.children).toHaveLength(2)
     })
 })

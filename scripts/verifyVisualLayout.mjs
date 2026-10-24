@@ -251,6 +251,21 @@ async function fullscreen(row, config) {
         await until('!document.fullscreenElement', 'native fullscreen Escape')
         const returned = await evaluate(`document.activeElement === document.querySelector('[data-slot-fullscreen]')`)
         check(full, returned, 'native Escape exits fullscreen and restores opener focus', { returned })
+        const restored = { route: row.route, viewport: row.viewport, mode: 'fullscreen-return', checks: [], screenshots: [] }
+        report.rows.push(restored)
+        await stable('.slot-stage-v2')
+        await geometry(restored, config)
+        const rail = await evaluate(`(() => {
+            if (!matchMedia('(min-width: 561px) and (max-width: 768px) and (max-height: 520px) and (orientation: landscape)').matches) return null;
+            const dock = document.querySelector('[data-slot-mobile-dock]'), title = document.querySelector('.gs-titlebar');
+            const field = document.querySelector('.gs-playfield'), nav = document.querySelector('.mobile-bottom-nav');
+            if (!dock || !title || !field || !nav) return { matches: false };
+            const d = dock.getBoundingClientRect(), t = title.getBoundingClientRect(), p = field.getBoundingClientRect(), n = nav.getBoundingClientRect();
+            return { matches: dock.hasAttribute('data-primary-landscape-dock') && Math.abs(d.left - t.left) < 0.5 && Math.abs(d.width - t.width) < 0.5 && d.right <= p.left && d.bottom <= n.top,
+                dock: { left: d.left, top: d.top, width: d.width, bottom: d.bottom }, rail: { left: t.left, width: t.width }, playerLeft: p.left, navTop: n.top,
+                leftVariable: dock.style.getPropertyValue('--gs-controls-left'), widthVariable: dock.style.getPropertyValue('--gs-controls-width') };
+        })()`)
+        if (rail) check(restored, rail.matches && rail.leftVariable && rail.widthVariable, 'recreated dock returns to measured landscape controls rail', rail)
     } catch (error) {
         check(full, false, 'native dense fullscreen path', error.message)
         await screenshot(full, '-failure')

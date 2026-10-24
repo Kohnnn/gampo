@@ -95,6 +95,11 @@ export default function RpsGame() {
             balance={balance}
             accent="#ef476f"
             backdrop="/assets/games/backdrops/backdrop-neon-grid.png"
+            primaryStage
+            secondary={<>
+                <RecentResultsStrip results={session.stats.lastResults} />
+                <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={1 / 3} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
+            </>}
             panel={
                 <BetPanel balance={balance} initialBet={5} runningRound={phase === 'slamming'} actionLabel="Play Round" mobilePlayLabel="Play" onPlay={performPlay} lastBet={lastBet}>
                     <div className="bp-section">
@@ -113,9 +118,8 @@ export default function RpsGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} effectiveRtp={effectiveRtp} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <CoreStageFrame minHeight={520} maxWidth={780} mobileScrollable className="rps-stage-frame">
+            <CoreStageFrame maxWidth={780} className="rps-stage-frame gs-primary-stage">
             <div className={`rps-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
-                <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="rps-stage-choices" data-mobile-critical-surface>
                     {OPTIONS.map(o => (
                         <button
@@ -147,7 +151,6 @@ export default function RpsGame() {
             </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('rps')} />
-            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={1 / 3} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

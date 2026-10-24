@@ -1130,6 +1130,14 @@
         animation: none;
     }
 }
+.gampo-reduce-motion .slot-cell.winning,
+.gampo-reduce-motion .slot-cell.winning::before,
+.gampo-reduce-motion .slot-cell.winning::after,
+.gampo-reduce-motion .slot-cell.winning img,
+.gampo-reduce-motion .slot-cell.winning strong,
+.gampo-reduce-motion .slot-cell.orb-active {
+    animation: none;
+}
 
 
 .is-anticipating .slot-reel-frame-v2 {
@@ -2176,6 +2184,7 @@
     .slot-cell::before,
     .slot-cell.spinning,
     .slot-cell.winning,
+    .slot-cell.winning::after,
     .slot-cell.winning img,
     .slot-cell.winning strong,
     .slot-cell.anticipating,
@@ -4924,6 +4933,9 @@
     .slot-stage-v2:fullscreen {
         padding: 3px;
         gap: 3px;
+    }
+    .slot-stage-v2:fullscreen {
+        padding: max(3px, env(safe-area-inset-top)) max(3px, env(safe-area-inset-right)) max(3px, env(safe-area-inset-bottom)) max(3px, env(safe-area-inset-left));
     }
 
     .slot-stage-header {

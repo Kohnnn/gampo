@@ -33,7 +33,7 @@
 }
 
 .wheel-disc {
-    width: min(440px, 100cqw, 100cqh);
+    width: min(440px, 70.710678cqw, 70.710678cqh);
     aspect-ratio: 1;
     border-radius: 50%;
     position: relative;
@@ -115,7 +115,7 @@
     }
 
     .wheel-disc {
-        width: min(152px, 100cqw, 100cqh);
+        width: min(152px, 70.710678cqw, 70.710678cqh);
         border-width: 8px;
     }
 
