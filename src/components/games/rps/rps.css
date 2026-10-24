@@ -233,6 +233,8 @@
     }
     .rps-stage-choices {
         grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: repeat(3, minmax(44px, 1fr));
+        min-height: 0;
         height: 100%;
         gap: 4px;
     }

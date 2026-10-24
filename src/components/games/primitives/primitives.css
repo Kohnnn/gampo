@@ -217,6 +217,10 @@
     min-height: 0 !important;
 }
 
+.game-shell[data-primary-stage] .gs-primary-stage.core-stage {
+    padding-bottom: 0;
+}
+
 .game-shell[data-primary-stage] .gs-primary-stage > .core-stage-body {
     height: 100%;
     min-height: 0;

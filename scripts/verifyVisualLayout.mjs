@@ -11,7 +11,8 @@ const arg = (name, fallback) => process.argv.find(value => value.startsWith(`--$
 const base = arg('baseUrl', 'http://127.0.0.1:4173').replace(/\/$/, '')
 const out = resolve(arg('out', 'output/visual-layout'))
 const browser = arg('browser', ['/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].find(existsSync))
-const defaults = ['/limbo', ...SLOT_TEMPLATE_ROUTES.map(route => route.path), '/slots']
+const originalRoutes = ['/limbo', '/plinko', '/wheel', '/rps']
+const defaults = [...originalRoutes, ...SLOT_TEMPLATE_ROUTES.map(route => route.path), '/slots']
 const routes = arg('routes', defaults.join(',')).split(',').map(value => value.trim())
 const viewportArgs = arg('viewports', '375x667,1610x870').split(',')
 const viewports = viewportArgs.map(value => {
@@ -90,7 +91,7 @@ async function screenshot(row, suffix = '') {
 }
 
 // Runs in the page, without installing globals or changing application geometry.
-function measurePage(expected, fullscreen = false) {
+function measurePage(expected, fullscreen = false, original = 'limbo') {
     const rect = element => {
         if (!element) return null
         const r = element.getBoundingClientRect()
@@ -136,9 +137,29 @@ function measurePage(expected, fullscreen = false) {
     }
     const targets = []
     let topology = null
+    let artwork = null
     if (!expected) {
-        const ring = document.querySelector('.limbo-ring')
-        targets.push(inspect(ring, 'full Limbo ring'), inspect(ring?.querySelector('span'), 'Limbo result'))
+        if (original === 'plinko') {
+            const canvas = document.querySelector('.plinko-canvas'), bins = document.querySelector('.plinko-bins')
+            targets.push(inspect(canvas, 'Plinko board canvas'), inspect(bins, 'complete Plinko bins'))
+            for (const bin of bins?.children || []) targets.push(inspect(bin, 'Plinko bin ' + bin.textContent.trim()))
+            artwork = { canvas: rect(canvas), bins: rect(bins), binCount: bins?.children.length || 0 }
+        } else if (original === 'wheel') {
+            const disc = document.querySelector('.wheel-disc')
+            targets.push(inspect(disc, 'whole Wheel disc'))
+            const labels = [...disc?.querySelectorAll('span') || []].map(label => {
+                const range = document.createRange(); range.selectNodeContents(label)
+                return { text: label.textContent.trim(), rect: rect(range), fontSize: parseFloat(getComputedStyle(label).fontSize) }
+            })
+            artwork = { disc: rect(disc), labels, overlaps: labels.flatMap((label, index) => labels.slice(index + 1).filter(other => intersection(label.rect, other.rect) > 0.5).map(other => [label.text, other.text])) }
+        } else if (original === 'rps') {
+            const choices = [...document.querySelectorAll('.rps-stage-choices button')]
+            for (const choice of choices) targets.push(inspect(choice, 'RPS ' + choice.textContent.trim(), true, true))
+            artwork = { choiceCount: choices.length }
+        } else {
+            const ring = document.querySelector('.limbo-ring')
+            targets.push(inspect(ring, 'full Limbo ring'), inspect(ring?.querySelector('span'), 'Limbo result'))
+        }
     } else {
         const stage = document.querySelector('.slot-stage-v2'), frame = stage?.querySelector('.slot-reel-frame-v2')
         const grid = frame?.querySelector('.slot-megaways-grid, .slot-reel-grid')
@@ -150,6 +171,8 @@ function measurePage(expected, fullscreen = false) {
             empty: cells.filter(cell => !cell.textContent.trim() && !cell.querySelector('img[alt], [role="img"][aria-label]')).map(cell => cell.dataset.slotCellIndex),
             brokenImages: [...(grid?.querySelectorAll('img') || [])].filter(img => !img.complete || !img.naturalWidth).map(img => img.currentSrc || img.src),
             positions: cells.map(cell => ({ index: Number(cell.dataset.slotCellIndex), rect: rect(cell) })),
+            croppedRanks: [...(grid?.querySelectorAll('.slot-rank-crop') || [])].map(crop => ({ rect: rect(crop), cell: rect(crop.closest('[data-slot-cell-index]')), alt: crop.querySelector('img')?.alt, loaded: !!crop.querySelector('img')?.naturalWidth })),
+            persistentBoardNotices: [...(frame?.querySelectorAll('.slot-feature-callouts, .slot-cascade-overlay, .slot-collect-overlay, .slot-bonus-banner-strip, .slot-free-spin-counter') || [])].filter(shown).map(element => String(element.className)),
         }
         targets.push(inspect(frame, 'complete reel frame'), inspect(grid, 'complete advertised grid'))
         for (const cell of cells) targets.push(inspect(cell, 'cell ' + cell.dataset.slotCellIndex))
@@ -161,24 +184,35 @@ function measurePage(expected, fullscreen = false) {
             targets.push(inspect(controls?.querySelector('.slot-control-readout:not(.right)'), 'Bet'), inspect(controls?.querySelector('.slot-control-readout.right'), 'Win'), inspect(controls?.querySelector('[data-slot-action="spin"]'), 'Spin', true, true))
         }
     }
-    return { path: location.pathname, viewport: [innerWidth, innerHeight], dpr: devicePixelRatio, fullscreen: !!document.fullscreenElement, normal: !document.documentElement.classList.contains('gampo-reduce-motion') && !document.documentElement.classList.contains('gampo-no-animations') && document.documentElement.dataset.quickSpin !== 'on' && !matchMedia('(prefers-reduced-motion: reduce)').matches, fun: localStorage.getItem('gampo_fun_mode'), player: rect(player), blockers: blockers.map(element => ({ name: String(element.className), rect: rect(element) })), targets, topology, js: [...document.scripts].map(script => script.src).filter(Boolean), css: [...document.styleSheets].map(sheet => sheet.href).filter(Boolean) }
+    return { path: location.pathname, viewport: [innerWidth, innerHeight], dpr: devicePixelRatio, fullscreen: !!document.fullscreenElement, normal: !document.documentElement.classList.contains('gampo-reduce-motion') && !document.documentElement.classList.contains('gampo-no-animations') && document.documentElement.dataset.quickSpin !== 'on' && !matchMedia('(prefers-reduced-motion: reduce)').matches, fun: localStorage.getItem('gampo_fun_mode'), player: rect(player), blockers: blockers.map(element => ({ name: String(element.className), rect: rect(element) })), targets, topology, artwork, js: [...document.scripts].map(script => script.src).filter(Boolean), css: [...document.styleSheets].map(sheet => sheet.href).filter(Boolean) }
 }
 
 async function geometry(row, config, fullscreen = false) {
     const expected = config ? { id: config.id } : null
-    const result = await evaluate(`(${measurePage.toString()})(${JSON.stringify(expected)}, ${fullscreen})`)
+    const result = await evaluate(`(${measurePage.toString()})(${JSON.stringify(expected)}, ${fullscreen}, ${JSON.stringify(row.route.slice(1))})`)
     row.geometry = result
     row.observedAt = new Date().toISOString()
     check(row, result.path === row.route, 'requested route rendered', result.path)
     check(row, result.normal && result.fun === 'serious', 'normal motion/speed and Fun off applied', { normal: result.normal, fun: result.fun })
     check(row, result.targets.length > 0 && result.targets.every(item => item.shown && item.viewportContained && item.playerContained && item.clippingContained && item.collisions.length === 0 && (!item.actionable || item.hit && item.enabled)), 'whole essentials contained, unclipped and clear of dock/nav', result.targets.filter(item => !item.shown || !item.viewportContained || !item.playerContained || !item.clippingContained || item.collisions.length || item.actionable && (!item.hit || !item.enabled)))
     if (!config) {
-        check(row, result.targets.length === 2 && result.targets[1].text.length > 0, 'Limbo ring and nonempty result target present', result.targets.map(item => ({ name: item.name, text: item.text })))
+        if (row.route === '/limbo') check(row, result.targets.length === 2 && result.targets[1].text.length > 0, 'Limbo ring and nonempty result target present', result.targets.map(item => ({ name: item.name, text: item.text })))
+        if (row.route === '/plinko') {
+            const { canvas, bins, binCount } = result.artwork
+            check(row, canvas?.width >= 160 && canvas?.height >= 120 && Math.abs(canvas.width / canvas.height - 4 / 3) < 0.02 && bins?.width >= canvas.width - 1 && binCount >= 9, 'Plinko native canvas and every payout bin retain usable board geometry', result.artwork)
+        }
+        if (row.route === '/wheel') {
+            const { disc, labels, overlaps } = result.artwork
+            check(row, disc?.width >= 110 && disc?.height >= 110 && labels.length === 12 && labels.every(label => label.text && label.fontSize >= 10 && label.rect.width >= 8 && label.rect.height >= 8) && overlaps.length === 0, 'Wheel disc and all twelve readable labels remain distinct', result.artwork)
+        }
+        if (row.route === '/rps') check(row, result.artwork.choiceCount === 3 && result.targets.every(target => target.rect.width >= 44 && target.rect.height >= 44), 'all three RPS choices retain native reachable touch targets', result.artwork)
     } else {
         const positions = getCellPositions(config), topology = result.topology
         const indexes = [...topology.indexes].sort((a, b) => a - b)
         const columnCounts = config.layout.columnRows || []
         check(row, topology.templateMatches && topology.advertised === `Slot reels, ${config.layout.cols} by ${config.layout.rows}` && topology.count === positions.length && indexes.every((value, index) => value === index) && topology.empty.length === 0 && topology.brokenImages.length === 0 && (config.layout.evaluation !== 'megaways' || JSON.stringify(topology.columns) === JSON.stringify(columnCounts)), 'canonical advertised topology, every cell and symbol present', { expected: { ...config.layout, count: positions.length }, actual: topology })
+        check(row, topology.persistentBoardNotices.length === 0, 'persistent feature information stays outside the settled board', topology.persistentBoardNotices)
+        if (fullscreen) check(row, topology.croppedRanks.every(crop => crop.loaded && crop.alt && crop.rect.width >= 10 && crop.rect.height >= 24 && crop.rect.width >= crop.cell.width * 0.24 && crop.rect.height >= crop.cell.height * 0.45), 'rank glyph crops retain readable native fullscreen area', topology.croppedRanks)
         const cells = new Map(topology.positions.map(cell => [cell.index, cell.rect]))
         const gaps = positions.flatMap((position, index) => {
             const current = cells.get(index)
@@ -331,7 +365,7 @@ try {
     if (typeof WebSocket === 'undefined') throw new Error('Node native WebSocket required; use --experimental-websocket')
     if (!/^https?:$/.test(new URL(base).protocol)) throw new Error('Pass HTTP(S) --baseUrl=')
     if (!viewports.length || viewports.some(viewport => !viewport || viewport.width < 200 || viewport.height < 200) || new Set(viewportArgs).size !== viewports.length) throw new Error('Pass unique --viewports=WIDTHxHEIGHT values of at least 200px')
-    if (routes.length === 0 || new Set(routes).size !== routes.length || routes.some(route => !defaults.includes(route))) throw new Error('Routes must be nonempty, unique canonical slot routes, /slots or /limbo')
+    if (routes.length === 0 || new Set(routes).size !== routes.length || routes.some(route => !defaults.includes(route))) throw new Error('Routes must be nonempty, unique canonical slot or admitted Original routes')
     if (!report.scopeComplete) fail('incomplete acceptance scope', { omittedRoutes: defaults.filter(route => !routes.includes(route)), omittedCoreViewports: ['375x667', '1610x870'].filter(viewport => !viewportArgs.includes(viewport)), note: 'Scoped flags are diagnostic only; omissions cannot produce acceptance PASS' })
     if (SLOT_TEMPLATE_ROUTES.length !== SLOT_TEMPLATES.length || SLOT_TEMPLATES.some(config => !SLOT_TEMPLATE_ROUTES.some(route => route.id === config.id))) throw new Error('Canonical slot route/catalog mismatch; refusing incomplete census')
     const reachable = await fetch(base, { signal: AbortSignal.timeout(10000) })
@@ -344,11 +378,11 @@ try {
             report.rows.push(row)
             const errorOffset = runtimeErrors.length
             try {
-                const config = route === '/limbo' ? null : SLOT_TEMPLATES.find(template => template.id === (SLOT_TEMPLATE_ROUTES.find(item => item.path === route)?.id || SLOT_TEMPLATES[0].id))
+                const config = originalRoutes.includes(route) ? null : SLOT_TEMPLATES.find(template => template.id === (SLOT_TEMPLATE_ROUTES.find(item => item.path === route)?.id || SLOT_TEMPLATES[0].id))
                 if (interrupted) throw new Error('Probe interrupted')
                 const navigation = await send('Page.navigate', { url: base + route })
                 if (navigation.errorText) throw new Error(navigation.errorText)
-                await stable(config ? '.slot-stage-v2' : '.limbo-ring')
+                await stable(config ? '.slot-stage-v2' : route === '/limbo' ? '.limbo-ring' : `.${route.slice(1)}-stage`)
                 if (await evaluate(`!!document.querySelector('.slot-intro-overlay')`)) {
                     await screenshot(row, '-intro')
                     await click('.slot-intro-overlay button')
@@ -356,7 +390,7 @@ try {
                 }
                 await geometry(row, config)
                 check(row, viewport.width > 768 || row.geometry.blockers.some(blocker => blocker.name.includes('mobile-bottom-nav')) && row.geometry.blockers.some(blocker => blocker.name.includes(config ? 'slot-mobile-dock' : 'bp-mobile-dock')), 'phone dock and navigation are rendered, not omitted', row.geometry.blockers)
-                if (!config && viewport.width <= 768) await options(row)
+                if (route === '/limbo' && viewport.width <= 768) await options(row)
                 if (config && config.layout.rows >= 6) await fullscreen(row, config)
             } catch (error) {
                 check(row, false, 'scenario completed', error.message)

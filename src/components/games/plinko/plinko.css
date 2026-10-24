@@ -190,3 +190,22 @@
     .plinko-ball-chip img { height: 20px; }
     .plinko-meta { padding: 8px 10px; font-size: 10px; }
 }
+
+@media (min-width: 561px) and (max-width: 768px) and (max-height: 520px) and (orientation: landscape) {
+    .plinko-stage {
+        grid-template-columns: minmax(0, 1fr) 90px;
+        grid-template-rows: minmax(0, 1fr);
+        gap: 6px;
+    }
+    .plinko-canvas-wrap {
+        width: min(100cqw, calc((100cqh - 32px) * 4 / 3 + 6px));
+        padding: 3px 2px;
+        gap: 4px;
+    }
+    .plinko-meta {
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+        padding: 6px;
+    }
+}

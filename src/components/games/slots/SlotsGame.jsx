@@ -1847,6 +1847,16 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                     )
                 })()}
+                {visibleFeatureEvents.length > 0 && (
+                    <div className="slot-feature-callouts" aria-live="polite">
+                        {visibleFeatureEvents.map((event, index) => (
+                            <span key={`${event.type}-${index}`} className={`slot-feature-callout type-${event.type}`}>
+                                <em>{FEATURE_LABELS[event.type] || event.type}</em>
+                                <strong>{event.label || (event.freeSpins ? `+${event.freeSpins} spins` : 'Feature hit')}</strong>
+                            </span>
+                        ))}
+                    </div>
+                )}
 
                 {lastResult?.featureEvents?.length > 0 && !running && (
                     <div className="slot-feature-events">
@@ -2307,16 +2317,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 ) : (
                                     <strong>reels slowing</strong>
                                 )}
-                            </div>
-                        )}
-                        {visibleFeatureEvents.length > 0 && (
-                            <div className="slot-feature-callouts" aria-live="polite">
-                                {visibleFeatureEvents.map((event, index) => (
-                                    <span key={`${event.type}-${index}`} className={`slot-feature-callout type-${event.type}`}>
-                                        <em>{FEATURE_LABELS[event.type] || event.type}</em>
-                                        <strong>{event.label || (event.freeSpins ? `+${event.freeSpins} spins` : 'Feature hit')}</strong>
-                                    </span>
-                                ))}
                             </div>
                         )}
                     </div>

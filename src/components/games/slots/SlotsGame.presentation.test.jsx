@@ -130,6 +130,21 @@ describe('settled slot presentation', () => {
         cleanup()
     })
 
+    it('retains settled free-spin, cascade and coin-meter information in secondary content, never over the board', async () => {
+        fixture.outcome = outcome('gummy-drops', { featureEvents: [
+            { type: 'free-spins', label: '6 free spins' },
+            { type: 'cascade', label: '3 cascades' },
+            { type: 'coin-meter', label: '4 coins collected' },
+        ] })
+        const tree = await spin('gummy-drops')
+        const notices = node => node.props?.className === 'slot-feature-callouts'
+        const secondary = find(tree.props.secondary, notices)
+        expect(text(secondary)).toContain('6 free spins')
+        expect(text(secondary)).toContain('3 cascades')
+        expect(text(secondary)).toContain('4 coins collected')
+        expect(find(tree.props.children, notices)).toBeNull()
+    })
+
     for (const [mode, reduced, animations, duration] of [['normal', false, true, 1500], ['reduced', true, true, 450], ['off', false, false, 450]]) {
         it(`unmounts the Wanted mystery reveal in ${mode} motion`, async () => {
             fixture.reduceMotion = reduced; fixture.animations = animations
