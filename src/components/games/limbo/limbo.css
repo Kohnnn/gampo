@@ -111,12 +111,14 @@
 }
 
 .gampo-reduce-motion .limbo-ring::before,
+.gampo-reduce-motion .limbo-stars-bg,
 .gampo-no-animations .limbo-ring::before {
     animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
     .limbo-ring::before { animation: none; }
+    .limbo-stars-bg { animation: none; }
 }
 
 .limbo-ring.won {
