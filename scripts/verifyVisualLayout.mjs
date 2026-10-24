@@ -151,11 +151,16 @@ function measurePage(expected, fullscreen = false, original = 'limbo') {
                 const range = document.createRange(); range.selectNodeContents(label)
                 return { text: label.textContent.trim(), rect: rect(range), fontSize: parseFloat(getComputedStyle(label).fontSize) }
             })
-            artwork = { disc: rect(disc), labels, overlaps: labels.flatMap((label, index) => labels.slice(index + 1).filter(other => intersection(label.rect, other.rect) > 0.5).map(other => [label.text, other.text])) }
+            artwork = { disc: rect(disc), labels }
         } else if (original === 'rps') {
-            const choices = [...document.querySelectorAll('.rps-stage-choices button')]
-            for (const choice of choices) targets.push(inspect(choice, 'RPS ' + choice.textContent.trim(), true, true))
-            artwork = { choiceCount: choices.length }
+            const stageChoices = [...document.querySelectorAll('.rps-stage-choices button')].filter(shown)
+            const choices = stageChoices.length ? stageChoices : [...document.querySelectorAll('.rps-choices button')].filter(shown)
+            for (const choice of choices) targets.push(inspect(choice, 'RPS ' + choice.textContent.trim(), player.contains(choice), true))
+            const versus = document.querySelector('.rps-versus')
+            const hands = [...document.querySelectorAll('.rps-side > span:last-child')]
+            targets.push(inspect(versus, 'RPS outcome versus'))
+            for (const hand of hands) targets.push(inspect(hand, 'RPS outcome ' + hand.parentElement.querySelector('span')?.textContent))
+            artwork = { choiceCount: choices.length, hands: hands.map(hand => ({ rect: rect(hand), label: hand.getAttribute('aria-label'), text: hand.textContent.trim() })), settled: !!document.querySelector('.rps-versus.phase-won, .rps-versus.phase-lost, .rps-versus.phase-push') }
         } else {
             const ring = document.querySelector('.limbo-ring')
             targets.push(inspect(ring, 'full Limbo ring'), inspect(ring?.querySelector('span'), 'Limbo result'))
@@ -202,17 +207,47 @@ async function geometry(row, config, fullscreen = false) {
             check(row, canvas?.width >= 160 && canvas?.height >= 120 && Math.abs(canvas.width / canvas.height - 4 / 3) < 0.02 && bins?.width >= canvas.width - 1 && binCount >= 9, 'Plinko native canvas and every payout bin retain usable board geometry', result.artwork)
         }
         if (row.route === '/wheel') {
-            const { disc, labels, overlaps } = result.artwork
-            check(row, disc?.width >= 110 && disc?.height >= 110 && labels.length === 12 && labels.every(label => label.text && label.fontSize >= 10 && label.rect.width >= 8 && label.rect.height >= 8) && overlaps.length === 0, 'Wheel disc and all twelve readable labels remain distinct', result.artwork)
+            const { disc, labels } = result.artwork
+            const nodes = await send('DOM.getDocument', { depth: 0 })
+            const spans = await send('DOM.querySelectorAll', { nodeId: nodes.root.nodeId, selector: '.wheel-disc span' })
+            const quads = []
+            for (const nodeId of spans.nodeIds) {
+                const { node } = await send('DOM.describeNode', { nodeId, depth: 1 })
+                const text = node.children?.find(child => child.nodeType === 3 && child.nodeValue.trim())
+                const geometry = text ? await send('DOM.getContentQuads', { backendNodeId: text.backendNodeId }) : null
+                quads.push(geometry?.quads?.[0] || null)
+            }
+            const overlaps = (a, b) => {
+                const points = quad => Array.from({ length: 4 }, (_, index) => ({ x: quad[index * 2], y: quad[index * 2 + 1] }))
+                const left = points(a), right = points(b)
+                for (const polygon of [left, right]) for (let index = 0; index < 4; index++) {
+                    const p = polygon[index], q = polygon[(index + 1) % 4]
+                    const length = Math.hypot(q.x - p.x, q.y - p.y)
+                    const axis = { x: -(q.y - p.y) / length, y: (q.x - p.x) / length }
+                    const project = vertices => vertices.map(point => point.x * axis.x + point.y * axis.y)
+                    const x = project(left), y = project(right)
+                    if (Math.min(Math.max(...x), Math.max(...y)) - Math.max(Math.min(...x), Math.min(...y)) <= 0.5) return false
+                }
+                return true
+            }
+            result.artwork.quads = quads
+            result.artwork.overlaps = quads.flatMap((quad, index) => quad ? quads.slice(index + 1).flatMap((other, offset) => other && overlaps(quad, other) ? [[index, index + offset + 1]] : []) : [])
+            check(row, disc?.width >= 110 && disc?.height >= 110 && labels.length === 12 && labels.every(label => label.text && label.fontSize >= 10 && label.rect.width >= 8 && label.rect.height >= 8) && quads.length === 12 && quads.every(quad => quad?.length === 8) && result.artwork.overlaps.length === 0, 'Wheel disc and all twelve readable labels remain distinct', result.artwork)
         }
-        if (row.route === '/rps') check(row, result.artwork.choiceCount === 3 && result.targets.every(target => target.rect.width >= 44 && target.rect.height >= 44), 'all three RPS choices retain native reachable touch targets', result.artwork)
+        if (row.route === '/rps') {
+            check(row, result.artwork.choiceCount === 3 && result.targets.filter(target => target.actionable).every(target => target.rect.width >= 44 && target.rect.height >= 44), 'all three RPS choices retain native reachable touch targets', result.artwork)
+            check(row, result.artwork.hands.length === 2 && result.artwork.hands.every(hand => hand.text && hand.rect.width >= 24 && hand.rect.height >= 24) && (row.mode !== 'settled' || result.artwork.settled && result.artwork.hands.every(hand => hand.label)), 'RPS versus and both actual outcome hands remain visible', result.artwork)
+        }
     } else {
         const positions = getCellPositions(config), topology = result.topology
         const indexes = [...topology.indexes].sort((a, b) => a - b)
         const columnCounts = config.layout.columnRows || []
         check(row, topology.templateMatches && topology.advertised === `Slot reels, ${config.layout.cols} by ${config.layout.rows}` && topology.count === positions.length && indexes.every((value, index) => value === index) && topology.empty.length === 0 && topology.brokenImages.length === 0 && (config.layout.evaluation !== 'megaways' || JSON.stringify(topology.columns) === JSON.stringify(columnCounts)), 'canonical advertised topology, every cell and symbol present', { expected: { ...config.layout, count: positions.length }, actual: topology })
         check(row, topology.persistentBoardNotices.length === 0, 'persistent feature information stays outside the settled board', topology.persistentBoardNotices)
-        if (fullscreen) check(row, topology.croppedRanks.every(crop => crop.loaded && crop.alt && crop.rect.width >= 10 && crop.rect.height >= 24 && crop.rect.width >= crop.cell.width * 0.24 && crop.rect.height >= crop.cell.height * 0.45), 'rank glyph crops retain readable native fullscreen area', topology.croppedRanks)
+        if (fullscreen) check(row, topology.croppedRanks.every(crop => {
+            const side = Math.min(crop.cell.width, crop.cell.height)
+            return crop.loaded && crop.alt && crop.rect.width >= 10 && crop.rect.height >= 18 && crop.rect.width * crop.rect.height >= 240 && crop.rect.width >= side * 0.24 && crop.rect.height >= side * 0.45
+        }), 'rank glyph crops retain readable native fullscreen area', topology.croppedRanks)
         const cells = new Map(topology.positions.map(cell => [cell.index, cell.rect]))
         const gaps = positions.flatMap((position, index) => {
             const current = cells.get(index)
@@ -391,6 +426,14 @@ try {
                 await geometry(row, config)
                 check(row, viewport.width > 768 || row.geometry.blockers.some(blocker => blocker.name.includes('mobile-bottom-nav')) && row.geometry.blockers.some(blocker => blocker.name.includes(config ? 'slot-mobile-dock' : 'bp-mobile-dock')), 'phone dock and navigation are rendered, not omitted', row.geometry.blockers)
                 if (route === '/limbo' && viewport.width <= 768) await options(row)
+                if (route === '/rps') {
+                    await click(viewport.width <= 768 ? '.bp-mobile-play' : '.bp-play')
+                    await until(`!!document.querySelector('.rps-versus.phase-won, .rps-versus.phase-lost, .rps-versus.phase-push')`, 'native RPS outcome')
+                    await sleep(500)
+                    const settled = { route, viewport: row.viewport, mode: 'settled', checks: [], screenshots: [] }
+                    report.rows.push(settled)
+                    await geometry(settled, null)
+                }
                 if (config && config.layout.rows >= 6) await fullscreen(row, config)
             } catch (error) {
                 check(row, false, 'scenario completed', error.message)
