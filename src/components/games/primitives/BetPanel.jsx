@@ -59,9 +59,6 @@ export default function BetPanel({
     const rebetReasonId = `${panelId}-rebet-reason`
     const [tab, setTab] = useState('manual')
     const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
-    // Tracks whether the mobile betting sheet has been opened at least once so
-    // we can nudge first-time users toward game setup (chips, decks, rules).
-    const [mobileOpenedOnce, setMobileOpenedOnce] = useState(false)
     const [portalRoot, setPortalRoot] = useState(null)
     // Canonical mobile breakpoint (matches index.css nav metrics + browserSmoke
     // + SportsbookShell). On mobile the betting sheet must be portaled to <body>
@@ -341,16 +338,10 @@ export default function BetPanel({
     const playContent = isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>
     const mobilePlayContent = isAutoLive ? <><Pause size={16} /> Stop</> : <><Play size={16} /> {mobileButtonLabel}</>
 
-    // Game-specific setup controls (chips, decks, rules) live in the manual tab
-    // body. When they exist we surface a clearer "Bet & options" affordance and
-    // a one-time hint so mobile users discover the settings sheet.
+    // The dock's labeled opener exposes every game-specific setup control.
     const hasSetupControls = Boolean(children)
     const settingsLabel = hasSetupControls ? 'Bet & options' : 'Bet settings'
-    const showSetupNudge = hasSetupControls && !mobileControlsOpen && !mobileOpenedOnce && !inRound
-    const openMobileControls = () => {
-        setMobileControlsOpen(true)
-        setMobileOpenedOnce(true)
-    }
+    const openMobileControls = () => setMobileControlsOpen(true)
 
     const sheetRef = useRef(null)
     const sheetTriggerRef = useRef(null)
@@ -549,7 +540,7 @@ export default function BetPanel({
             <div className="bp-mobile-dock" data-mobile-action-dock data-ux-surface="dock">
                 <button
                     type="button"
-                    className={`bp-mobile-settings ${showSetupNudge ? 'nudge' : ''}`}
+                    className="bp-mobile-settings"
                     onClick={openMobileControls}
                     ref={sheetTriggerRef}
                     aria-expanded={mobileControlsOpen}
@@ -582,17 +573,6 @@ export default function BetPanel({
                     </div>
                 )}
             </div>
-
-            {showSetupNudge && (
-                <button
-                    type="button"
-                    className="bp-mobile-setup-hint"
-                    onClick={openMobileControls}
-                    data-mobile-setup-hint
-                >
-                    Set bet &amp; options ↑
-                </button>
-            )}
 
             {mobileControlsOpen && (
                 <button

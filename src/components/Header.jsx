@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Settings as SettingsIcon, Menu } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { fullGameCatalog } from '../data/casinoCatalog'
+import { SLOT_TEMPLATE_ROUTES } from '../data/slotRoutes'
 import { useSidebarUI } from '../context/SidebarUIContext'
 import { searchGames } from '../utils/gameSearch'
 
@@ -63,6 +64,7 @@ function Header() {
     const searchRef = useRef(null)
 
     const isPlaySurface = GAME_PATHS.some(path => location.pathname.startsWith(path))
+        || SLOT_TEMPLATE_ROUTES.some(route => location.pathname === route.path)
     const searchResults = useMemo(() => searchGames(fullGameCatalog, searchQuery, 8), [searchQuery])
     const formattedBalance = balance.toLocaleString('en-US', {
         minimumFractionDigits: 2,
