@@ -11,6 +11,8 @@ Production: [https://gampo-educational-simulator.netlify.app](https://gampo-educ
 - Slots include the Slots Lobby plus template routes such as `/vault-rush`, `/bars`, `/scarab-spin`, `/miko-spirit`, and `/ghostblade-strike`.
 - Sportsbook is canonical at `/sportsbook`; `/sports` remains a compatibility alias. Supported views include `/sportsbook/live`, `/sportsbook/starting`, `/sportsbook/all`, `/sportsbook/my-bets`, and `/sportsbook/:sportId`.
 - The sportsbook uses synthetic fixtures by default. Optional provider reads stay server-side through `server/sportsbookProviderProxy.js`; ticket acceptance and settlement remain local fake-credit simulation.
+- Dice records every accepted roll, including overlapping keyboard plays and rounds interrupted by navigation, without announcing a superseded result.
+- Cases loads its catalogue without the unused market-price dataset; practice-credit prices and item values remain unchanged. The full skin collection loads when Inventory opens.
 
 ## Run Locally
 

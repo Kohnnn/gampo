@@ -66,19 +66,17 @@ export default function DiceGame() {
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('dice', { count: 9, cap: 10 }))
     const { schedule } = useCancellableTimeouts()
     const simSeqRef = useRef(0)
-    const pendingRoundRef = useRef(null)
+    const pendingRoundsRef = useRef(new Map())
+    const currentRoundIdRef = useRef(null)
 
     useEffect(() => () => {
-        const pending = pendingRoundRef.current
-        if (!pending) return
-        pendingRoundRef.current = null
-        if (!pending.recorded) pending.record()
-        pending.resolve({ profit: pending.profit })
+        currentRoundIdRef.current = null
+        for (const pending of pendingRoundsRef.current.values()) pending.finish()
     }, [])
     const payout = dicePayout(winChance / 100)
 
     const handleEvent = useCallback((ev) => {
-        if (!ev) return
+        if (!ev || ev.payload?.roundId !== currentRoundIdRef.current) return
         switch (ev.type) {
             case ROUND_EVENTS.INPUT_LOCK:
                 setRunning(true)
@@ -94,10 +92,6 @@ export default function DiceGame() {
                 break
             case ROUND_EVENTS.ROUND_RESULT: {
                 const { roll, won, profit, multiplier } = ev.payload || {}
-                const pending = pendingRoundRef.current
-                if (!pending || pending.recorded) break
-                pending.recorded = true
-                pending.record()
                 if (Number.isFinite(roll)) setLastRoll(roll)
                 setLastWon(!!won)
                 setBurstKey(k => k + 1)
@@ -150,20 +144,38 @@ export default function DiceGame() {
         const profit = round2(returnAmount - betAmount)
         if (won) addWinnings(returnAmount, 'Dice return')
         const entry = { id: crypto.randomUUID(), label: roll.toFixed(2), profit, betAmount, multiplier: won ? payout : 0, meta: { winChance, rollMode } }
-        pendingRoundRef.current = { recorded: false, record: () => session.record(entry), resolve, profit }
+        let recorded = false
+        const pending = {
+            record: () => {
+                if (recorded) return
+                recorded = true
+                session.record(entry)
+            },
+            finish: () => {
+                if (!pendingRoundsRef.current.delete(entry.id)) return
+                if (currentRoundIdRef.current === entry.id) currentRoundIdRef.current = null
+                pending.record()
+                resolve({ profit })
+            },
+        }
+        pendingRoundsRef.current.set(entry.id, pending)
+        currentRoundIdRef.current = entry.id
+        // Accepted receipts outlive replacement of the presentation machine.
+        schedule(pending.record, DICE_ROLL_DURATION_MS)
 
         // Pre-roll ticks -> reveal -> result. Drives both visuals and SFX
         // from a single deterministic event list.
         const events = buildEvents(api => {
             api.push(ROUND_EVENTS.ROUND_START, { seed: rng.seed }, 0)
-            api.push(ROUND_EVENTS.INPUT_LOCK, {}, 0)
+            api.push(ROUND_EVENTS.INPUT_LOCK, { roundId: entry.id }, 0)
             api.push(ROUND_EVENTS.BET_ACCEPTED, { betAmount, mode: rollMode, target: winChance }, 16)
             const ticks = 6
             for (let i = 1; i <= ticks; i += 1) {
-                api.push(ROUND_EVENTS.ANIMATION_CHECKPOINT, { tick: i }, Math.round(DICE_ROLL_DURATION_MS * (i / (ticks + 1))))
+                api.push(ROUND_EVENTS.ANIMATION_CHECKPOINT, { roundId: entry.id, tick: i }, Math.round(DICE_ROLL_DURATION_MS * (i / (ticks + 1))))
             }
-            api.push(ROUND_EVENTS.RNG_REVEAL, { roll }, DICE_ROLL_DURATION_MS - 80)
+            api.push(ROUND_EVENTS.RNG_REVEAL, { roundId: entry.id, roll }, DICE_ROLL_DURATION_MS - 80)
             api.push(ROUND_EVENTS.ROUND_RESULT, {
+                roundId: entry.id,
                 roll,
                 won,
                 profit,
@@ -172,14 +184,11 @@ export default function DiceGame() {
                 rollMode,
             }, DICE_ROLL_DURATION_MS)
             api.push(ROUND_EVENTS.PAYOUT_PREVIEW, { amount: returnAmount }, DICE_ROLL_DURATION_MS + 16)
-            api.push(ROUND_EVENTS.INPUT_UNLOCK, {}, DICE_ROLL_DURATION_MS + 240)
+            api.push(ROUND_EVENTS.INPUT_UNLOCK, { roundId: entry.id }, DICE_ROLL_DURATION_MS + 240)
         })
         machine.start(events, { autoFinish: false })
 
-        schedule(() => {
-            pendingRoundRef.current = null
-            resolve({ profit })
-        }, DICE_ROLL_DURATION_MS + 260)
+        schedule(pending.finish, DICE_ROLL_DURATION_MS + 260)
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)

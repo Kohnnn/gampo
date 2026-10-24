@@ -680,14 +680,9 @@ export default function CasesGame() {
 
     useEffect(() => {
         let cancelled = false
-        Promise.all([
-            fetch('/data/cs-cases.json').then(r => r.json()),
-            fetch('/data/cs-prices.json')
-                .then(r => r.ok ? r.json() : {})
-                .catch(() => ({})),
-        ]).then(([data, priceMap]) => {
+        fetch('/data/cs-cases.json').then(r => r.json()).then(data => {
             if (cancelled) return
-            const normalized = data.map(c => normalizeCaseForRuntime(c, priceMap))
+            const normalized = data.map(c => normalizeCaseForRuntime(c))
             setAllCases(normalized)
             const requestedCaseId = initialCaseIdRef.current
             const first = normalized.find(c => c.id === requestedCaseId) || filterCasesByCategory(normalized, 'popular')[0] || normalized[0]
