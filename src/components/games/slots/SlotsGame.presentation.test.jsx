@@ -38,6 +38,7 @@ import EducationPanel from '../../EducationPanel'
 import { getSlotTemplate } from './slotFactory'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { buildCascadeTimeline, cascadeTimelineDurationMs } from './slotsMotion'
+import { claimEscape } from '../../../utils/escapeClaims'
 
 function render(id = 'wanted-revelation') {
     fixture.stateCursor = 0; fixture.refCursor = 0; fixture.effects = []
@@ -109,7 +110,21 @@ describe('settled slot presentation', () => {
         expect(find(tree, node => node.props?.className?.startsWith('slot-stage-v2')).ref.current).toBe(stageNode)
         expect(find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Exit reel fullscreen')).not.toBeNull()
         expect(find(tree, node => node.props?.className === 'slot-mobile-dock')).toBeNull()
-        await doc.exitFullscreen()
+        const exit = find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Exit reel fullscreen')
+        const cleanupKey = fixture.effects.find(entry => entry.dependencies?.[0] === true && entry.dependencies?.includes(exit.props.onClick)).effect()
+        const releaseOverlay = claimEscape(() => true)
+        const blockedEscape = new Event('keydown', { cancelable: true })
+        Object.defineProperty(blockedEscape, 'key', { value: 'Escape' })
+        doc.dispatchEvent(blockedEscape)
+        expect(doc.exitFullscreen).not.toHaveBeenCalled()
+        releaseOverlay()
+        const escape = new Event('keydown', { cancelable: true })
+        Object.defineProperty(escape, 'key', { value: 'Escape' })
+        doc.dispatchEvent(escape)
+        await Promise.resolve()
+        expect(doc.exitFullscreen).toHaveBeenCalledOnce()
+        expect(escape.defaultPrevented).toBe(true)
+        cleanupKey()
         expect(opener.focus).toHaveBeenCalledWith({ preventScroll: true })
         expect(find(render('gummy-drops'), node => node.type === 'button' && node.props?.['aria-label'] === 'Enter reel fullscreen')).not.toBeNull()
         cleanup()

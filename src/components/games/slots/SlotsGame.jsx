@@ -16,7 +16,7 @@ import {
     useGameSession,
 } from '../primitives'
 import EducationPanel from '../../EducationPanel'
-import { claimEscape } from '../../../utils/escapeClaims'
+import { claimEscape, overlayOwnsEscape } from '../../../utils/escapeClaims'
 import { useIsMobileViewport } from '../../../hooks/useIsMobileViewport'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import useNativeDialog from '../primitives/useNativeDialog'
@@ -497,7 +497,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         return () => document.removeEventListener('fullscreenchange', syncFullscreen)
     }, [stageRef])
 
-    const toggleStageFullscreen = async () => {
+    const toggleStageFullscreen = useCallback(async () => {
         try {
             if (document.fullscreenElement === stageRef.current) await document.exitFullscreen()
             else {
@@ -508,7 +508,20 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             fullscreenReturnRef.current = null
             showToast('error', 'Fullscreen unavailable', 'Use your browser fullscreen permission to enlarge the reels.')
         }
-    }
+    }, [showToast])
+
+    useEffect(() => {
+        if (!stageFullscreen) return undefined
+        const onKeyDown = event => {
+            if (event.key !== 'Escape' || event.defaultPrevented || document.fullscreenElement !== stageRef.current) return
+            if (overlayOwnsEscape() || showAutoplayDrawer || showBuyModal || event.target.closest?.('dialog, [role="dialog"]')) return
+            event.preventDefault()
+            event.stopPropagation()
+            void toggleStageFullscreen()
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+    }, [stageFullscreen, showAutoplayDrawer, showBuyModal, toggleStageFullscreen])
     const templateResetRef = useRef(startTemplate.id)
     // Mirror turbo into a ref so finishRound (a stable callback) can read the
     // current spin speed when building the cascade tumble timeline.
@@ -2083,7 +2096,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             className="slot-fullscreen-toggle"
                             data-slot-fullscreen
                             onClick={toggleStageFullscreen}
-                            onKeyDown={event => event.stopPropagation()}
+                            onKeyDown={event => { if (event.key === ' ') event.stopPropagation() }}
                             aria-label={stageFullscreen ? 'Exit reel fullscreen' : 'Enter reel fullscreen'}
                             aria-pressed={stageFullscreen}
                         >
