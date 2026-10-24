@@ -213,9 +213,13 @@ async function geometry(row, config, fullscreen = false) {
             const quads = []
             for (const nodeId of spans.nodeIds) {
                 const { node } = await send('DOM.describeNode', { nodeId, depth: 1 })
-                const text = node.children?.find(child => child.nodeType === 3 && child.nodeValue.trim())
-                const geometry = text ? await send('DOM.getContentQuads', { backendNodeId: text.backendNodeId }) : null
-                quads.push(geometry?.quads?.[0] || null)
+                const fragments = node.children?.filter(child => child.nodeType === 3 && child.nodeValue.trim()) || []
+                const labelQuads = []
+                for (const text of fragments) {
+                    const geometry = await send('DOM.getContentQuads', { backendNodeId: text.backendNodeId })
+                    labelQuads.push(...(geometry.quads?.length ? geometry.quads : [null]))
+                }
+                quads.push(labelQuads)
             }
             const overlaps = (a, b) => {
                 const points = quad => Array.from({ length: 4 }, (_, index) => ({ x: quad[index * 2], y: quad[index * 2 + 1] }))
@@ -231,8 +235,8 @@ async function geometry(row, config, fullscreen = false) {
                 return true
             }
             result.artwork.quads = quads
-            result.artwork.overlaps = quads.flatMap((quad, index) => quad ? quads.slice(index + 1).flatMap((other, offset) => other && overlaps(quad, other) ? [[index, index + offset + 1]] : []) : [])
-            check(row, disc?.width >= 110 && disc?.height >= 110 && labels.length === 12 && labels.every(label => label.text && label.fontSize >= 10 && label.rect.width >= 8 && label.rect.height >= 8) && quads.length === 12 && quads.every(quad => quad?.length === 8) && result.artwork.overlaps.length === 0, 'Wheel disc and all twelve readable labels remain distinct', result.artwork)
+            result.artwork.overlaps = quads.flatMap((label, index) => quads.slice(index + 1).flatMap((other, offset) => label.some(quad => quad && other.some(candidate => candidate && overlaps(quad, candidate))) ? [[index, index + offset + 1]] : []))
+            check(row, disc?.width >= 110 && disc?.height >= 110 && labels.length === 12 && labels.every(label => label.text && label.fontSize >= 10 && label.rect.width >= 8 && label.rect.height >= 8) && quads.length === 12 && quads.every(label => label.length > 0 && label.every(quad => quad?.length === 8)) && result.artwork.overlaps.length === 0, 'Wheel disc and all twelve readable labels remain distinct', result.artwork)
         }
         if (row.route === '/rps') {
             check(row, result.artwork.choiceCount === 3 && result.targets.filter(target => target.actionable).every(target => target.rect.width >= 44 && target.rect.height >= 44), 'all three RPS choices retain native reachable touch targets', result.artwork)
