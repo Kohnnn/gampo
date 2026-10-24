@@ -46,7 +46,7 @@ function render(id = 'wanted-revelation') {
 function find(node, predicate) {
     if (!node || typeof node !== 'object') return null
     if (predicate(node)) return node
-    for (const child of [node.props?.panel, ...[node.props?.children].flat(Infinity)]) {
+    for (const child of [node.props?.panel, node.props?.secondary, ...[node.props?.children].flat(Infinity)]) {
         const match = find(child, predicate)
         if (match) return match
     }
@@ -80,6 +80,41 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('settled slot presentation', () => {
+    it('reviews the same mounted board in native fullscreen and returns focus on exit', async () => {
+        const doc = new EventTarget()
+        doc.fullscreenElement = null
+        doc.fullscreenEnabled = true
+        const opener = { focus: vi.fn(), isConnected: true }
+        doc.activeElement = opener
+        doc.exitFullscreen = vi.fn(async () => {
+            doc.fullscreenElement = null
+            doc.dispatchEvent(new Event('fullscreenchange'))
+        })
+        vi.stubGlobal('document', doc)
+        let tree = render('gummy-drops')
+        const stage = find(tree, node => node.props?.className?.startsWith('slot-stage-v2'))
+        const stageNode = {
+            querySelector: () => opener,
+            requestFullscreen: vi.fn(async () => {
+                doc.fullscreenElement = stageNode
+                doc.dispatchEvent(new Event('fullscreenchange'))
+            }),
+        }
+        stage.props.ref.current = stageNode
+        const cleanup = fixture.effects.find(entry => entry.dependencies?.includes(stage.props.ref)).effect()
+        const review = find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Enter reel fullscreen')
+        await review.props.onClick()
+        tree = render('gummy-drops')
+        expect(stageNode.requestFullscreen).toHaveBeenCalledOnce()
+        expect(find(tree, node => node.props?.className?.startsWith('slot-stage-v2')).props.ref.current).toBe(stageNode)
+        expect(find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Exit reel fullscreen')).not.toBeNull()
+        expect(find(tree, node => node.props?.className === 'slot-mobile-dock')).toBeNull()
+        await doc.exitFullscreen()
+        expect(opener.focus).toHaveBeenCalledWith({ preventScroll: true })
+        expect(find(render('gummy-drops'), node => node.type === 'button' && node.props?.['aria-label'] === 'Enter reel fullscreen')).not.toBeNull()
+        cleanup()
+    })
+
     for (const [mode, reduced, animations, duration] of [['normal', false, true, 1500], ['reduced', true, true, 450], ['off', false, false, 450]]) {
         it(`unmounts the Wanted mystery reveal in ${mode} motion`, async () => {
             fixture.reduceMotion = reduced; fixture.animations = animations
@@ -104,6 +139,10 @@ describe('settled slot presentation', () => {
         expect(result).toContain('GC 3.00')
         expect(result).not.toContain('GC 6.00')
         expect(fixture.credit).toHaveBeenCalledWith(3, 'Bass Bayou Collect return')
+        const stage = find(tree, node => node.props?.className?.startsWith('slot-stage-v2'))
+        expect(find(stage, node => node.props?.className?.startsWith('slot-result-banner'))).toBeNull()
+        expect(find(stage, node => node.props?.className === 'slot-collect-overlay')).toBeNull()
+        expect(find(tree.props.secondary, node => node.props?.className === 'slot-collect-overlay')).not.toBeNull()
     })
 
     it('closes the native autoplay modal from its cancel event', () => {

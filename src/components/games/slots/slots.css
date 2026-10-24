@@ -324,9 +324,10 @@
     position: relative;
     width: 100%;
     min-width: 0;
-    min-height: min(560px, calc(100dvh - 176px));
+    height: 100%;
+    min-height: 0;
     display: grid;
-    grid-template-rows: auto minmax(220px, 1fr) auto auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 12px;
     padding: 14px;
     border-radius: 16px;
@@ -462,11 +463,54 @@
 /* ---------- Header ---------- */
 
 .slot-stage-header {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    align-items: flex-start;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: start;
+}
+
+.slot-stage-title {
+    min-width: 0;
+}
+
+.slot-stage-pills {
+    grid-column: 1 / -1;
+    grid-row: 2;
+}
+
+.slot-stage-pills:empty {
+    display: none;
+}
+
+.slot-fullscreen-toggle {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--slot-rail-strong);
+    border-radius: 10px;
+    background: #0f1c2c;
+    color: var(--slot-text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.slot-fullscreen-toggle:focus-visible {
+    outline: 2px solid var(--slot-accent);
+    outline-offset: 3px;
+}
+
+.slot-secondary {
+    display: grid;
+    min-width: 0;
+    gap: 12px;
+    color: var(--slot-text);
 }
 
 .slot-benchmark-badge {
@@ -621,15 +665,18 @@
 
 .slot-reel-wrap {
     min-height: 0;
+    min-width: 0;
     display: grid;
-    place-items: center;
+    grid-template-rows: minmax(0, 1fr);
 }
 
 .slot-reel-frame-v2 {
     width: 100%;
     height: 100%;
-    min-height: clamp(220px, calc(var(--slot-rows, 4) * 76px), 320px);
+    min-height: 0;
+    min-width: 0;
     display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
     border-radius: 16px;
     padding: 12px;
     background:
@@ -652,7 +699,9 @@
 .slot-reel-grid,
 .slot-megaways-grid {
     width: 100%;
-    height: 100%;
+    height: auto;
+    min-height: 0;
+    min-width: 0;
     display: grid;
     gap: 6px;
     border-radius: 10px;
@@ -704,21 +753,6 @@
     transition: transform 0.18s ease, border-color 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
 }
 
-.slot-cell::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(120deg, transparent 28%, rgba(255, 255, 255, 0.08) 50%, transparent 72%);
-    transform: translateX(-110%);
-    animation: slotCellShine 5s linear infinite;
-    pointer-events: none;
-}
-
-@keyframes slotCellShine {
-    0% { transform: translateX(-120%); }
-    65% { transform: translateX(120%); }
-    100% { transform: translateX(120%); }
-}
 
 .slot-cell img {
     width: min(96%, 118px);
@@ -1026,24 +1060,6 @@
 }
 
 
-/* Idle parallax bob applies a subtle motion to non-spinning, non-winning cells. */
-.slot-cell:not(.spinning):not(.winning) img,
-.slot-cell:not(.spinning):not(.winning) strong {
-    animation: slotIdleBob 4.5s ease-in-out infinite;
-    will-change: transform;
-}
-
-.slot-cell:nth-child(2n) img,
-.slot-cell:nth-child(2n) strong { animation-delay: 0.3s; }
-.slot-cell:nth-child(3n) img,
-.slot-cell:nth-child(3n) strong { animation-delay: 0.6s; }
-.slot-cell:nth-child(5n) img,
-.slot-cell:nth-child(5n) strong { animation-delay: 0.9s; }
-
-@keyframes slotIdleBob {
-    0%, 100% { transform: translateY(0) scale(var(--slot-effective-symbol-scale, 1)); }
-    50% { transform: translateY(-2px) scale(var(--slot-effective-symbol-scale, 1)); }
-}
 
 .slot-cell.winning img,
 .slot-cell.winning strong {
@@ -1323,12 +1339,9 @@
 }
 
 .slot-result-banner {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 4;
-    min-width: min(440px, calc(100% - 40px));
+    position: relative;
+    width: 100%;
+    min-width: 0;
     display: grid;
     place-items: center;
     gap: 4px;
@@ -1340,7 +1353,6 @@
     padding: 18px 26px;
     text-align: center;
     box-shadow: 0 18px 54px rgba(0, 0, 0, 0.5), 0 0 36px rgba(255, 207, 90, 0.32);
-    animation: slotResultIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
     pointer-events: none;
 }
 
@@ -1402,17 +1414,9 @@
     text-shadow: 0 0 14px rgba(255, 230, 128, 0.5);
 }
 
-@keyframes slotResultIn {
-    from { opacity: 0; transform: translate(-50%, -42%) scale(0.88); }
-    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
 
 .slot-feature-events {
-    position: absolute;
-    z-index: 4;
-    left: 18px;
-    right: 18px;
-    bottom: 132px;
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
@@ -1872,10 +1876,7 @@
 /* ---- Wheel + Hold-and-respin cinematic overlays (Wave 9) ---- */
 
 .slot-wheel-overlay {
-    position: absolute;
-    left: 50%;
-    top: 38%;
-    transform: translate(-50%, -50%);
+    position: relative;
     z-index: 5;
     display: grid;
     place-items: center;
@@ -1917,17 +1918,13 @@
 }
 
 @keyframes slotWheelReveal {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6) rotate(-12deg); }
-    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.12) rotate(0deg); }
-    80% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95) rotate(0deg); }
+    0% { opacity: 0; transform: scale(0.6) rotate(-12deg); }
+    20% { opacity: 1; transform: scale(1.12) rotate(0deg); }
+    80%, 100% { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 
 .slot-hold-overlay {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
+    position: relative;
     z-index: 6;
     width: min(360px, calc(100% - 32px));
     border-radius: 14px;
@@ -2001,17 +1998,14 @@
 }
 
 @keyframes slotHoldIn {
-    0% { opacity: 0; transform: translate(-50%, -52%) scale(0.96); }
-    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    0% { opacity: 0; transform: scale(0.96); }
+    100% { opacity: 1; transform: scale(1); }
 }
 
 /* ---- Free-spin session banner + end banner (Wave 10) ---- */
 
 .slot-bonus-banner-strip {
-    position: absolute;
-    top: 76px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
     z-index: 4;
     display: inline-flex;
     align-items: center;
@@ -2057,8 +2051,8 @@
 }
 
 @keyframes slotBonusStripIn {
-    from { opacity: 0; transform: translate(-50%, -8px); }
-    to   { opacity: 1; transform: translate(-50%, 0); }
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .slot-bonus-end-banner {
@@ -2200,9 +2194,6 @@
 /* ---------- Responsive ---------- */
 
 @media (max-width: 1120px) {
-    .slot-stage-v2 {
-        min-height: auto;
-    }
     .slot-feature-switches {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -2232,14 +2223,6 @@
         /* The fixed slot-mobile-dock owns the primary Spin on phones.
            Hiding this in-flow duplicate keeps a single, unambiguous CTA. */
         display: none;
-    }
-    .slot-stage-v2 {
-        padding: 10px;
-        gap: 8px;
-        min-height: 480px;
-    }
-    .slot-stage-header {
-        flex-direction: column;
     }
     .slot-stage-pills {
         gap: 6px;
@@ -2281,10 +2264,6 @@
         padding: 8px;
         gap: 6px;
         border-radius: 12px;
-        min-height: 440px;
-    }
-    .slot-stage-header h2 {
-        font-size: 18px;
     }
     .slot-benchmark-badge {
         font-size: 9px;
@@ -2304,7 +2283,6 @@
     .slot-pill small { font-size: 9px; }
     .slot-reel-frame-v2 {
         padding: 6px;
-        min-height: 220px;
     }
     .slot-reel-grid,
     .slot-megaways-grid {
@@ -2355,23 +2333,6 @@
     }
 }
 
-/* Wave 16: sticky bottom action bar on mobile/touch viewports.
-   The slot bottom controls dock to the playfield bottom so the spin button
-   stays visible while reels and overlays scroll above it. iOS safe-area
-   inset is honored. */
-
-@media (max-width: 768px) {
-    .slot-controls-v2 {
-        position: sticky;
-        bottom: 0;
-        z-index: 5;
-        backdrop-filter: blur(10px);
-        background:
-            linear-gradient(180deg, rgba(20, 32, 50, 0.78), rgba(8, 16, 28, 0.94)),
-            rgba(8, 16, 28, 0.6);
-        padding-bottom: max(8px, env(safe-area-inset-bottom));
-    }
-}
 
 /* === Wave 20: Per-template slot bonus cosmetics =========================
    Math is unchanged; these add per-mechanic cinematics on top of the
@@ -2798,10 +2759,7 @@
 /* ---- Bayou money-collect ribbon (Wave 20) ---- */
 
 .slot-collect-overlay {
-    position: absolute;
-    left: 50%;
-    top: 30%;
-    transform: translate(-50%, -50%);
+    position: relative;
     z-index: 6;
     display: grid;
     place-items: center;
@@ -2838,17 +2796,15 @@
     letter-spacing: 0.04em;
 }
 @keyframes slotCollectIn {
-    0% { opacity: 0; transform: translate(-50%, -60%) scale(0.7); }
-    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    0% { opacity: 0; transform: translateY(-10px) scale(0.7); }
+    100% { opacity: 1; transform: scale(1); }
 }
 @keyframes slotCollectOut { to { opacity: 1; } }
 
 /* ---- Cascade chain ribbon (Wave 20) ---- */
 
 .slot-cascade-overlay {
-    position: absolute;
-    right: 14px;
-    top: 76px;
+    position: relative;
     z-index: 5;
     display: grid;
     gap: 2px;
@@ -3084,18 +3040,9 @@
 
 /* Wave 24: 1610x870 sweet spot — tighten stage so reels + controls fit. */
 @media (min-width: 1500px) and (max-height: 920px) {
-    .slot-stage-v2 {
-        min-height: 500px;
-        grid-template-rows: auto minmax(240px, 1fr) auto auto;
-        padding: 8px;
-        gap: 6px;
-    }
     .slot-stage-header { gap: 6px; }
     .slot-stage-header h2 { font-size: 20px; }
     .slot-stage-header .slot-stage-meta span { font-size: 10px; }
-    .slot-reel-frame-v2 { min-height: 280px; padding: 8px; }
-    .slot-reel-grid,
-    .slot-megaways-grid { gap: 5px; padding: 6px; }
     .slot-controls-v2 { padding: 7px; gap: 6px; }
     .slot-control-spin { width: 52px; height: 52px; }
     .slot-control-readout strong { font-size: 14px; }
@@ -3415,9 +3362,6 @@
 /* Wave 37: phone-safe bonus overlays after later cosmetic layers. */
 @media (max-width: 480px) {
     .slot-wheel-overlay {
-        top: 44%;
-        max-width: calc(100% - 16px);
-        max-height: calc(100% - 16px);
         padding: 10px 14px 9px;
         gap: 2px;
         border-radius: 12px;
@@ -3448,7 +3392,6 @@
 
     .slot-hold-overlay {
         width: min(260px, calc(100% - 14px));
-        max-height: calc(100% - 14px);
         padding: 8px 10px;
         border-radius: 12px;
         overflow: hidden;
@@ -3488,12 +3431,6 @@
 }
 
 /* Wave 42: larger premium reel area and final themed symbol normalization. */
-.slot-stage-v2 {
-    min-height: min(620px, calc(100dvh - 176px));
-    grid-template-rows: auto minmax(clamp(220px, calc(var(--slot-rows, 4) * 76px), 360px), 1fr) auto auto;
-    gap: 12px;
-    padding: 16px;
-}
 
 .slot-stage-v2.skin-bank {
     --slot-accent: #f5c84b;
@@ -3617,10 +3554,6 @@
     }
 }
 
-.slot-reel-frame-v2 {
-    min-height: clamp(220px, calc(var(--slot-rows, 4) * 78px), 390px);
-    padding: 16px;
-}
 
 .slot-reel-grid,
 .slot-megaways-grid {
@@ -3655,44 +3588,10 @@
     z-index: 1;
 }
 
-@media (min-width: 1500px) and (max-height: 920px) {
-    .slot-stage-v2 {
-        min-height: 590px;
-        grid-template-rows: auto minmax(360px, 1fr) auto auto;
-        padding: 10px;
-        gap: 8px;
-    }
-
-    .slot-reel-frame-v2 {
-        min-height: 380px;
-        padding: 10px;
-    }
-
-    .slot-reel-grid,
-    .slot-megaways-grid {
-        gap: 7px;
-        padding: 8px;
-    }
-
-    .slot-cell img {
-        width: min(98%, 142px);
-        height: min(calc(100% - 4px), 126px);
-        max-height: 126px;
-    }
-}
 
 @media (max-width: 480px) {
-    .slot-stage-v2 {
-        min-height: 0;
-        height: clamp(334px, calc(100dvh - 214px), 430px);
-        grid-template-rows: auto minmax(154px, 1fr) auto;
-        padding: 8px;
-        gap: 6px;
-    }
 
     .slot-reel-frame-v2 {
-        min-height: 0;
-        height: 100%;
         padding: 6px;
     }
 
@@ -3900,14 +3799,6 @@
 }
 
 @media (max-width: 768px) {
-    .slot-stage-v2 {
-        min-height: 0;
-        height: auto;
-        max-height: none;
-        grid-template-rows: auto minmax(240px, 1fr);
-        padding-bottom: 8px;
-        overflow: visible;
-    }
 
     /* Slots panel reflows as a normal scrollable card below the reels on
        mobile (it is not a portaled BetPanel dock). The fixed slot-mobile-dock
@@ -3927,27 +3818,15 @@
         box-sizing: border-box;
     }
 
-    .slot-reel-wrap {
-        min-height: clamp(220px, calc(100dvh - var(--mobile-safe-bottom, 138px) - 200px), 340px);
-    }
-
-    .slot-reel-wrap,
-    .slot-reel-frame-v2,
-    .slot-reel-grid,
-    .slot-megaways-grid {
-        min-height: 0;
-    }
 
     .slot-controls-v2 {
         display: none;
     }
 
-    /* T3: keep a slimmed recent-results strip on mobile so the last spins stay
-       visible. The bankroll sparkline is dropped to save vertical space; the
-       strip itself is compact and clears the fixed dock + mobile nav. */
+    /* Session history stays in secondary flow, clear of the fixed actions. */
     .slot-stage-foot {
         display: block;
-        margin: 4px 0 calc(var(--mobile-action-height, 74px) + var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)) + 16px);
+        margin: 4px 0;
     }
 
     .slot-stage-foot .slot-bankroll-spark {
@@ -4056,13 +3935,7 @@
     }
 
     .slot-result-banner {
-        left: 12px;
-        right: 12px;
-        top: auto;
-        bottom: 10px;
-        transform: none;
-        min-width: 0;
-        width: auto;
+        width: 100%;
         display: grid;
         grid-template-columns: auto 1fr auto;
         place-items: center;
@@ -4114,6 +3987,112 @@
         cursor: not-allowed;
         box-shadow: none;
     }
+}
+
+/* One bounded board; secondary details never cover the settled symbols. */
+@media (max-width: 768px) {
+    .slot-stage-v2 {
+        padding: 6px;
+        gap: 5px;
+        grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .slot-benchmark-badge {
+        display: none;
+    }
+
+    .slot-stage-title h2 {
+        margin-bottom: 4px;
+        font-size: 18px;
+    }
+
+    .slot-stage-meta {
+        gap: 3px;
+    }
+
+    .slot-stage-meta span {
+        padding: 2px 5px;
+        font-size: 10px;
+    }
+
+    .slot-stage-meta span:first-child {
+        display: none;
+    }
+
+    .slot-fullscreen-toggle {
+        width: 40px;
+        padding: 7px;
+    }
+
+    .slot-fullscreen-toggle span {
+        display: none;
+    }
+
+    .slot-template-gummy-drops .slot-reel-frame-v2 {
+        padding: 3px;
+    }
+
+    .slot-template-gummy-drops .slot-reel-grid {
+        gap: 2px;
+        padding: 2px;
+    }
+
+    .slot-template-gummy-drops .slot-cell {
+        padding: 1px;
+        border-radius: 5px;
+    }
+}
+
+.slot-stage-v2:fullscreen .slot-reel-wrap:focus-visible {
+    outline: 2px solid var(--slot-accent);
+    outline-offset: -2px;
+}
+
+.slot-stage-v2:fullscreen {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    border-radius: 0;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.slot-stage-v2:fullscreen .slot-controls-v2 {
+    display: grid;
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: auto;
+    padding: 5px;
+    gap: 6px;
+}
+
+.slot-stage-v2:fullscreen .slot-control-readout,
+.slot-stage-v2:fullscreen .slot-control-readout.right {
+    grid-column: auto;
+    grid-row: 1;
+    min-height: 44px;
+    padding: 5px 8px;
+}
+
+.slot-stage-v2:fullscreen .slot-control-spin {
+    grid-column: 2;
+    grid-row: 1;
+    width: 48px;
+    height: 48px;
+}
+
+.slot-stage-v2:fullscreen .slot-control-bet-stepper,
+.slot-stage-v2:fullscreen .slot-control-quick {
+    display: none;
+}
+
+.slot-stage-v2:fullscreen .slot-reel-wrap {
+    overflow: auto;
+}
+
+.slot-stage-v2:fullscreen .slot-reel-frame-v2 {
+    min-height: calc(var(--slot-rows, 4) * 44px + 64px);
 }
 
 @media (max-width: 420px) {
@@ -4922,11 +4901,6 @@
    stage overlays must clear it (and the bottom nav) and never exceed the
    reduced vertical space, so they don't collide with the dock or overflow. */
 @media (max-width: 768px) {
-    .slot-wheel-overlay,
-    .slot-hold-overlay,
-    .slot-collect-overlay,
-    .slot-cascade-overlay,
-    .slot-result-banner,
     .slot-bonus-end-banner,
     .slot-mystery-reveal,
     .slot-buy-modal,
@@ -4941,20 +4915,11 @@
         bottom: calc(var(--mobile-nav-height, 64px) + var(--mobile-action-height, 74px) + max(8px, env(safe-area-inset-bottom)) + 10px);
     }
 
-    /* Center-anchored cinematics nudge up so the dock never overlaps them. */
-    .slot-wheel-overlay,
-    .slot-hold-overlay {
-        top: calc(50% - (var(--mobile-action-height, 74px) / 2));
-    }
 }
 
 /* Landscape phone: reels go wide and short, controls hug the bottom, so the
    playable grid uses the limited height without the dock crowding it. */
 @media (max-height: 520px) and (orientation: landscape) {
-    .slot-stage-v2 {
-        grid-template-rows: auto minmax(150px, 1fr);
-        padding-bottom: 4px;
-    }
     /* Landscape can introduce transformed ancestors that re-base position:fixed;
        force the slot dock to the real viewport bottom and above the stage so the
        Spin target is never covered (fixes the landscape hit-test block). */
@@ -4966,33 +4931,21 @@
         z-index: var(--z-mobile-action, 1400);
         min-height: 56px;
     }
-    .slot-reel-frame,
-    .slot-reels-v2 {
-        max-height: calc(100dvh - 120px);
-    }
     .slot-stage-header {
         padding-top: 4px;
         padding-bottom: 4px;
     }
     .slot-stage-meta { font-size: 10px; }
     /* Keep cinematics compact so they fit the short viewport. */
-    .slot-wheel-overlay,
-    .slot-hold-overlay,
     .slot-bonus-cine {
         max-height: calc(100dvh - 40px);
         transform: scale(0.86);
     }
 }
 
-/* Free-spin HUD counter (Wave 2 brainstorm S2)
-   Top-center persistent chip during a free-spin session.
-   Ring drains from 100% to 0% across the awarded count.
-   ============================================================== */
+/* Secondary free-spin session detail; the stage header keeps the live count. */
 .slot-free-spin-counter {
-    position: absolute;
-    top: 14px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
     z-index: 8;
     display: flex;
     align-items: center;
@@ -5079,7 +5032,6 @@
 }
 @media (max-width: 768px) {
     .slot-free-spin-counter {
-        top: 8px;
         padding: 6px 12px;
         gap: 8px;
     }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, Flame, Gauge, Info, Play, RotateCcw, Sparkles, Square, Ticket, TrendingUp, X } from 'lucide-react'
+import { ChevronDown, Flame, Gauge, Info, Maximize2, Minimize2, Play, RotateCcw, Sparkles, Square, Ticket, TrendingUp, X } from 'lucide-react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useBgm } from '../../../audio/useBgm'
@@ -478,6 +478,37 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const buyTierIdRef = useRef(null)
     const persistentMultiplierRef = useRef(0)
     const reelFrameRef = useRef(null)
+    const stageRef = useRef(null)
+    const fullscreenReturnRef = useRef(null)
+    const [stageFullscreen, setStageFullscreen] = useState(false)
+    const fullscreenAvailable = typeof document !== 'undefined' && document.fullscreenEnabled
+
+    useEffect(() => {
+        const syncFullscreen = () => {
+            const active = document.fullscreenElement === stageRef.current
+            setStageFullscreen(active)
+            if (active) stageRef.current?.querySelector('[data-slot-fullscreen]')?.focus({ preventScroll: true })
+            else if (fullscreenReturnRef.current) {
+                fullscreenReturnRef.current.focus({ preventScroll: true })
+                fullscreenReturnRef.current = null
+            }
+        }
+        document.addEventListener('fullscreenchange', syncFullscreen)
+        return () => document.removeEventListener('fullscreenchange', syncFullscreen)
+    }, [stageRef])
+
+    const toggleStageFullscreen = async () => {
+        try {
+            if (document.fullscreenElement === stageRef.current) await document.exitFullscreen()
+            else {
+                fullscreenReturnRef.current = document.activeElement
+                await stageRef.current.requestFullscreen()
+            }
+        } catch {
+            fullscreenReturnRef.current = null
+            showToast('error', 'Fullscreen unavailable', 'Use your browser fullscreen permission to enlarge the reels.')
+        }
+    }
     const templateResetRef = useRef(startTemplate.id)
     // Mirror turbo into a ref so finishRound (a stable callback) can read the
     // current spin speed when building the cascade tumble timeline.
@@ -1602,6 +1633,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             title="Gampo Slot Factory"
             accent={config.accent}
             backdrop={config.backdrop}
+            primaryStage
             panel={
                 <div className="slot-panel-v2" style={{ '--slot-accent': config.accent }}>
                     <div className="slot-panel-card slot-panel-template">
@@ -1703,9 +1735,284 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     <HistoryDrawer history={session.history} onClear={session.clear} />
                 </>
             }
+            secondary={
+                <div className="slot-secondary" style={{ '--slot-accent': config.accent }}>
+                <FreeSpinCounter
+                    totalAwarded={freeSpinSession?.totalAwarded || 0}
+                    remaining={freeSpins}
+                    onComplete={() => slotSfx?.play?.('slots-bonus')}
+                />
+                {wheelReveal && !running && (
+                    <div className="slot-wheel-overlay" key={`wheel-${wheelReveal.trigger}`}>
+                        <span>Multiplier wheel</span>
+                        <div className="slot-wheel-disc" aria-hidden>
+                            <i className="slot-wheel-pointer" />
+                            <strong>{wheelReveal.value}×</strong>
+                        </div>
+                        <em>added to spin</em>
+                    </div>
+                )}
+                {freeSpinSession && (
+                    <div className="slot-bonus-banner-strip" aria-label="Free spin session">
+                        <span>FREE SPINS</span>
+                        <strong>{freeSpinSession.totalAwarded - freeSpins}/{freeSpinSession.totalAwarded}</strong>
+                        <em>WON {formatCredits(freeSpinSession.totalWin)}</em>
+                        {freeSpinSession.retriggers > 0 && <i>+{freeSpinSession.retriggers} retrigger</i>}
+                        {freeSpinSession.trail?.length > 0 && (
+                            <div className="slot-fs-trail" aria-hidden>
+                                {freeSpinSession.trail.map((step, i) => (
+                                    <span
+                                        key={i}
+                                        className={`slot-fs-trail-step ${step.win > 0 ? 'hit' : 'miss'}`}
+                                        title={step.win > 0 ? `${formatCredits(step.win)} (${step.mult.toFixed(1)}×)` : 'no win'}
+                                        style={{ '--bar': `${Math.min(100, Math.max(8, (step.mult || 0) * 8))}%` }}
+                                    />
+                                ))}
+                                {persistentMultiplier > 0 && (
+                                    <em className="slot-fs-trail-persist">×{persistentMultiplier}</em>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {holdReveal && !running && (
+                    <div className="slot-hold-overlay" key={`hold-${holdReveal.trigger}`}>
+                        <header>
+                            <span>Hold &amp; Respin</span>
+                            <strong>{holdReveal.award.name}</strong>
+                            <em>{holdReveal.award.multiplier}×</em>
+                        </header>
+                        <div className="slot-hold-board">
+                            {holdTiles.map(tile => (
+                                <div
+                                    key={tile.index}
+                                    className={`slot-hold-slot ${tile.filled ? 'filled' : ''} ${tile.fresh ? 'new-fill' : ''}`}
+                                    style={{ animationDelay: `${tile.delayMs}ms` }}
+                                />
+                            ))}
+                        </div>
+                        <div className="slot-hold-meta">
+                            <span>{holdReveal.board.startFilled} → {holdReveal.board.finalFilled} / {holdReveal.board.size}</span>
+                            <span>{holdReveal.board.respins} respins</span>
+                        </div>
+                    </div>
+                )}
+
+                {/* Raw money-symbol values are pre-scalar multipliers, not
+                    independently credited GC. The result banner owns paid GC. */}
+                {moneyTotal > 0 && !running && (config.id === 'bass-bayou' || config.skin === 'bayou') && (
+                    <div className="slot-collect-overlay" key={`collect-${lastResult?.multiplier ?? 0}`}>
+                        <span>Raw collection</span>
+                        <strong>{moneyTotal.toFixed(2)}×</strong>
+                        <em>{lastResult?.moneyValues?.length || 0} prize symbols · before payout scaling</em>
+                    </div>
+                )}
+
+                {/* Wave 20: gummy/bassline cluster cascade ladder — show the
+                    cascade ladder on the side when at least 2 cascades happen. */}
+                {cascadeSteps >= 2 && !running && (
+                    <div className="slot-cascade-overlay" key={`cascade-${cascadeSteps}`}>
+                        <span>Cascade chain</span>
+                        <strong>×{cascadeSteps + 1}</strong>
+                        <em>tumbles paid</em>
+                    </div>
+                )}
+                {lastResult?.multiplier > 0 && !running && (() => {
+                    // Use the live rollup amount only while it's tracking THIS
+                    // result (matched by target); otherwise show the final total.
+                    const rollupActive = winRollup.target === lastResult.returnAmount && winRollup.amount < winRollup.target
+                    const shownWin = rollupActive ? winRollup.amount : lastResult.returnAmount
+                    return (
+                    <div className={`slot-result-banner ${config.features?.darkWinOverlay ? 'dark' : ''} tier-${winTier(lastResult.multiplier).id} ${rollupActive ? 'is-rolling' : ''}`}>
+                        {winTier(lastResult.multiplier).label && (
+                            <i className="slot-win-tier">{winTier(lastResult.multiplier).label}</i>
+                        )}
+                        <span>Total paid return</span>
+                        <strong>{formatCredits(shownWin)}</strong>
+                        <em>{lastResult.multiplier.toFixed(2)}×</em>
+                        {moneyTotal > 0 && <i className="result-money">Raw collection {moneyTotal.toFixed(2)}× · included in total paid above</i>}
+                    </div>
+                    )
+                })()}
+
+                {lastResult?.featureEvents?.length > 0 && !running && (
+                    <div className="slot-feature-events">
+                        {lastResult.featureEvents.map((event, index) => (
+                            <span key={`${event.type}-${index}`}>
+                                <strong>{FEATURE_LABELS[event.type] || event.type}</strong>
+                                {event.label}
+                            </span>
+                        ))}
+                    </div>
+                )}
+                <div className="slot-stage-foot">
+                    {sparkline.points.length > 1 && (
+                        <div className={`slot-bankroll-spark ${sparkline.net >= 0 ? 'pos' : 'neg'}`} title="Session net profit trail">
+                            <svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden>
+                                <line x1="0" y1={sparkline.zeroY} x2="120" y2={sparkline.zeroY} className="slot-spark-zero" />
+                                <path d={sparkline.path} className="slot-spark-line" fill="none" />
+                            </svg>
+                            <div className="slot-bankroll-spark-meta">
+                                <small>Session</small>
+                                <strong>{sparkline.net >= 0 ? '+' : ''}{formatCredits(sparkline.net)}</strong>
+                            </div>
+                        </div>
+                    )}
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                </div>
+            {!stageFullscreen && (() => {
+              const dock = (
+                <div
+                    className="slot-mobile-dock"
+                    style={{ '--slot-accent': config.accent }}
+                    data-slot-mobile-dock
+                    data-mobile-critical-surface
+                    data-ux-surface="dock"
+                >
+                <button
+                    type="button"
+                    className="slot-mobile-readout slot-mobile-bet"
+                    onClick={() => setShowMobileBet(true)}
+                    disabled={running || autoplayActive || canUseFreeSpin}
+                    aria-label="Edit bet"
+                    aria-haspopup="dialog"
+                >
+                    <span>{canUseFreeSpin ? 'Free' : 'Bet'}</span>
+                    <strong>{formatCredits(effectiveStake)}</strong>
+                </button>
+                <div className="slot-mobile-readout">
+                    <span>Win</span>
+                    <strong>{formatCredits(lastResult?.returnAmount || 0)}</strong>
+                </div>
+                <button
+                    type="button"
+                    className="slot-mobile-icon"
+                    onClick={() => setShowMobileInfo(true)}
+                    aria-label="View paytable and rules"
+                    aria-haspopup="dialog"
+                >
+                    <Info size={16} />
+                    <span>Info</span>
+                </button>
+                <button
+                    type="button"
+                    className={autoplayActive || showAutoplayDrawer ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
+                    onClick={() => setShowAutoplayDrawer(v => !v)}
+                    disabled={running}
+                    aria-label="Autoplay"
+                >
+                    <RotateCcw size={16} />
+                    <span>Auto</span>
+                </button>
+                <button
+                    type="button"
+                    className="slot-mobile-spin"
+                    onClick={triggerStageSpin}
+                    disabled={autoplayActive}
+                    data-slot-action="spin"
+                    data-mobile-hit-target="primary"
+                    data-ux-primary-action
+                >
+                    <Play size={18} />
+                    {running ? 'Skip' : slotSpinLabel}
+                </button>
+              </div>
+              )
+              return dockPortal ? createPortal(dock, dockPortal) : dock
+            })()}
+
+            {showMobileBet && (
+                <div
+                    className="slot-mobile-bet-sheet-backdrop"
+                    onClick={() => setShowMobileBet(false)}
+                    role="dialog"
+                    aria-label="Adjust bet"
+                >
+                    <div className="slot-mobile-bet-sheet" onClick={e => e.stopPropagation()}>
+                        <header>
+                            <strong>Bet amount</strong>
+                            <button type="button" onClick={() => setShowMobileBet(false)} aria-label="Close"><X size={16} /></button>
+                        </header>
+                        <div className="slot-mobile-bet-value">{formatCredits(betAmount)}</div>
+                        <div className="slot-mobile-bet-steppers">
+                            <button type="button" className="stepper-minus" onClick={() => setBet(betAmount / 2)} disabled={running || autoplayActive} aria-label="Decrease bet">−</button>
+                            <button type="button" onClick={() => setBet(0.1)} disabled={running || autoplayActive}>Min</button>
+                            <button type="button" onClick={() => setBet(betAmount * 2)} disabled={running || autoplayActive}>2×</button>
+                            <button type="button" className="stepper-plus" onClick={() => setBet(Math.min(10000, balance || 10000))} disabled={running || autoplayActive} aria-label="Max bet">+</button>
+                        </div>
+                        <input
+                            type="number"
+                            className="slot-mobile-bet-input"
+                            min="0.1"
+                            max="10000"
+                            step="0.5"
+                            value={betAmount}
+                            onChange={e => setBet(e.target.value)}
+                            disabled={running || autoplayActive}
+                            aria-label="Bet amount"
+                        />
+                        <div className="slot-mobile-bet-speed">
+                            <span className="slot-mobile-bet-speed-label">Spin speed</span>
+                            <SpinModeControl
+                                value={spinMode}
+                                onChange={setSpinMode}
+                                disabled={running}
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            className="slot-mobile-bet-info"
+                            onClick={() => { setShowMobileBet(false); setShowMobileInfo(true) }}
+                        >
+                            <Info size={14} /> View paytable &amp; rules
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {showMobileInfo && (
+                <div
+                    className="slot-mobile-info-backdrop"
+                    onClick={() => setShowMobileInfo(false)}
+                >
+                    <div
+                        className="slot-mobile-info-sheet"
+                        ref={mobileInfoSheetRef}
+                        onClick={e => e.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={`${config.title} paytable and rules`}
+                        tabIndex={-1}
+                        style={{ '--slot-accent': config.accent }}
+                    >
+                        <header className="slot-mobile-info-head">
+                            <strong>Paytable &amp; rules</strong>
+                            <button type="button" onClick={() => setShowMobileInfo(false)} aria-label="Close"><X size={16} /></button>
+                        </header>
+                        <div className="slot-mobile-info-body">
+                            <FeatureContractBody config={config} paylineMode={paylineMode} rtpDisclosure={rtpDisclosure} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={SLOT_BIG_WIN_THRESHOLD} />
+            <EducationPanel
+                definition={educationDefinition}
+                betAmount={betAmount}
+                effectiveRtp={rtpDisclosure.rtp}
+                expectedGrossMultiplier={rtpDisclosure.rtp}
+                rtpLabel={rtpDisclosure.label}
+                rtpNote={`${rtpDisclosure.note} EV is the nominal base-spin model at the selected base bet, not a bonus-buy or free-spin quote.`}
+                balance={balance}
+                recentProfit={recentProfit}
+            />
+                </div>
+            }
         >
             <div
-                className={`slot-stage-v2 slot-template-${config.id} skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''} ${freeSpinSession || freeSpins > 0 ? 'is-bonus-active' : ''} ${lastResult?.featureEvents?.length ? 'has-feature-event' : ''} ${slotAssetsReady ? '' : 'is-loading'}`}
+                className={`slot-stage-v2 gs-primary-stage slot-template-${config.id} skin-${config.skin} phase-${spinPhase} ${anticipating ? 'is-anticipating' : ''} ${freeSpinSession || freeSpins > 0 ? 'is-bonus-active' : ''} ${lastResult?.featureEvents?.length ? 'has-feature-event' : ''} ${slotAssetsReady ? '' : 'is-loading'}`}
+                ref={stageRef}
                 data-slot-spinning={running ? 'true' : undefined}
                 style={{
                     '--slot-accent': config.accent,
@@ -1721,11 +2028,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <span>Loading lab...</span>
                     </div>
                 )}
-                <FreeSpinCounter
-                    totalAwarded={freeSpinSession?.totalAwarded || 0}
-                    remaining={freeSpins}
-                    onComplete={() => slotSfx?.play?.('slots-bonus')}
-                />
                 <header className="slot-stage-header">
                     <div className="slot-stage-title">
                         <span className="slot-benchmark-badge">Benchmark · {config.benchmark}</span>
@@ -1775,9 +2077,28 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             </div>
                         )}
                     </div>
+                    {fullscreenAvailable && (
+                        <button
+                            type="button"
+                            className="slot-fullscreen-toggle"
+                            data-slot-fullscreen
+                            onClick={toggleStageFullscreen}
+                            onKeyDown={event => event.stopPropagation()}
+                            aria-label={stageFullscreen ? 'Exit reel fullscreen' : 'Enter reel fullscreen'}
+                            aria-pressed={stageFullscreen}
+                        >
+                            {stageFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                            <span>{stageFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
+                        </button>
+                    )}
                 </header>
 
-                <div className="slot-reel-wrap">
+                <div
+                    className="slot-reel-wrap"
+                    tabIndex={stageFullscreen ? 0 : undefined}
+                    role={stageFullscreen ? 'region' : undefined}
+                    aria-label={stageFullscreen ? 'Scrollable reel board' : undefined}
+                >
                     <div
                         className="slot-reel-frame-v2"
                         ref={reelFrameRef}
@@ -2128,16 +2449,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                 )}
 
-                {wheelReveal && !running && (
-                    <div className="slot-wheel-overlay" key={`wheel-${wheelReveal.trigger}`}>
-                        <span>Multiplier wheel</span>
-                        <div className="slot-wheel-disc" aria-hidden>
-                            <i className="slot-wheel-pointer" />
-                            <strong>{wheelReveal.value}×</strong>
-                        </div>
-                        <em>added to spin</em>
-                    </div>
-                )}
 
                 {bonusEndBanner && (
                     <div
@@ -2161,72 +2472,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                 )}
 
-                {freeSpinSession && (
-                    <div className="slot-bonus-banner-strip" aria-label="Free spin session">
-                        <span>FREE SPINS</span>
-                        <strong>{freeSpinSession.totalAwarded - freeSpins}/{freeSpinSession.totalAwarded}</strong>
-                        <em>WON {formatCredits(freeSpinSession.totalWin)}</em>
-                        {freeSpinSession.retriggers > 0 && <i>+{freeSpinSession.retriggers} retrigger</i>}
-                        {freeSpinSession.trail?.length > 0 && (
-                            <div className="slot-fs-trail" aria-hidden>
-                                {freeSpinSession.trail.map((step, i) => (
-                                    <span
-                                        key={i}
-                                        className={`slot-fs-trail-step ${step.win > 0 ? 'hit' : 'miss'}`}
-                                        title={step.win > 0 ? `${formatCredits(step.win)} (${step.mult.toFixed(1)}×)` : 'no win'}
-                                        style={{ '--bar': `${Math.min(100, Math.max(8, (step.mult || 0) * 8))}%` }}
-                                    />
-                                ))}
-                                {persistentMultiplier > 0 && (
-                                    <em className="slot-fs-trail-persist">×{persistentMultiplier}</em>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
 
-                {holdReveal && !running && (
-                    <div className="slot-hold-overlay" key={`hold-${holdReveal.trigger}`}>
-                        <header>
-                            <span>Hold &amp; Respin</span>
-                            <strong>{holdReveal.award.name}</strong>
-                            <em>{holdReveal.award.multiplier}×</em>
-                        </header>
-                        <div className="slot-hold-board">
-                            {holdTiles.map(tile => (
-                                <div
-                                    key={tile.index}
-                                    className={`slot-hold-slot ${tile.filled ? 'filled' : ''} ${tile.fresh ? 'new-fill' : ''}`}
-                                    style={{ animationDelay: `${tile.delayMs}ms` }}
-                                />
-                            ))}
-                        </div>
-                        <div className="slot-hold-meta">
-                            <span>{holdReveal.board.startFilled} → {holdReveal.board.finalFilled} / {holdReveal.board.size}</span>
-                            <span>{holdReveal.board.respins} respins</span>
-                        </div>
-                    </div>
-                )}
-
-                {/* Raw money-symbol values are pre-scalar multipliers, not
-                    independently credited GC. The result banner owns paid GC. */}
-                {moneyTotal > 0 && !running && (config.id === 'bass-bayou' || config.skin === 'bayou') && (
-                    <div className="slot-collect-overlay" key={`collect-${lastResult?.multiplier ?? 0}`}>
-                        <span>Raw collection</span>
-                        <strong>{moneyTotal.toFixed(2)}×</strong>
-                        <em>{lastResult?.moneyValues?.length || 0} prize symbols · before payout scaling</em>
-                    </div>
-                )}
-
-                {/* Wave 20: gummy/bassline cluster cascade ladder — show the
-                    cascade ladder on the side when at least 2 cascades happen. */}
-                {cascadeSteps >= 2 && !running && (
-                    <div className="slot-cascade-overlay" key={`cascade-${cascadeSteps}`}>
-                        <span>Cascade chain</span>
-                        <strong>×{cascadeSteps + 1}</strong>
-                        <em>tumbles paid</em>
-                    </div>
-                )}
 
                 {/* S1 cascade half: per-step multiplier pulse + per-step payout
                     running total. Renders while the cascade timeline is mid-replay
@@ -2262,34 +2508,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                 )}
 
-                {lastResult?.multiplier > 0 && !running && (() => {
-                    // Use the live rollup amount only while it's tracking THIS
-                    // result (matched by target); otherwise show the final total.
-                    const rollupActive = winRollup.target === lastResult.returnAmount && winRollup.amount < winRollup.target
-                    const shownWin = rollupActive ? winRollup.amount : lastResult.returnAmount
-                    return (
-                    <div className={`slot-result-banner ${config.features?.darkWinOverlay ? 'dark' : ''} tier-${winTier(lastResult.multiplier).id} ${rollupActive ? 'is-rolling' : ''}`}>
-                        {winTier(lastResult.multiplier).label && (
-                            <i className="slot-win-tier">{winTier(lastResult.multiplier).label}</i>
-                        )}
-                        <span>Total paid return</span>
-                        <strong>{formatCredits(shownWin)}</strong>
-                        <em>{lastResult.multiplier.toFixed(2)}×</em>
-                        {moneyTotal > 0 && <i className="result-money">Raw collection {moneyTotal.toFixed(2)}× · included in total paid above</i>}
-                    </div>
-                    )
-                })()}
-
-                {lastResult?.featureEvents?.length > 0 && !running && (
-                    <div className="slot-feature-events">
-                        {lastResult.featureEvents.map((event, index) => (
-                            <span key={`${event.type}-${index}`}>
-                                <strong>{FEATURE_LABELS[event.type] || event.type}</strong>
-                                {event.label}
-                            </span>
-                        ))}
-                    </div>
-                )}
 
                 {showAutoplayDrawer && !running && (
                     <dialog
@@ -2493,170 +2711,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     </div>
                 )}
 
-                <div className="slot-stage-foot">
-                    {sparkline.points.length > 1 && (
-                        <div className={`slot-bankroll-spark ${sparkline.net >= 0 ? 'pos' : 'neg'}`} title="Session net profit trail">
-                            <svg viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden>
-                                <line x1="0" y1={sparkline.zeroY} x2="120" y2={sparkline.zeroY} className="slot-spark-zero" />
-                                <path d={sparkline.path} className="slot-spark-line" fill="none" />
-                            </svg>
-                            <div className="slot-bankroll-spark-meta">
-                                <small>Session</small>
-                                <strong>{sparkline.net >= 0 ? '+' : ''}{formatCredits(sparkline.net)}</strong>
-                            </div>
-                        </div>
-                    )}
-                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                </div>
             </div>
 
-            {(() => {
-              const dock = (
-                <div
-                    className="slot-mobile-dock"
-                    style={{ '--slot-accent': config.accent }}
-                    data-slot-mobile-dock
-                    data-mobile-critical-surface
-                    data-ux-surface="dock"
-                >
-                <button
-                    type="button"
-                    className="slot-mobile-readout slot-mobile-bet"
-                    onClick={() => setShowMobileBet(true)}
-                    disabled={running || autoplayActive || canUseFreeSpin}
-                    aria-label="Edit bet"
-                    aria-haspopup="dialog"
-                >
-                    <span>{canUseFreeSpin ? 'Free' : 'Bet'}</span>
-                    <strong>{formatCredits(effectiveStake)}</strong>
-                </button>
-                <div className="slot-mobile-readout">
-                    <span>Win</span>
-                    <strong>{formatCredits(lastResult?.returnAmount || 0)}</strong>
-                </div>
-                <button
-                    type="button"
-                    className="slot-mobile-icon"
-                    onClick={() => setShowMobileInfo(true)}
-                    aria-label="View paytable and rules"
-                    aria-haspopup="dialog"
-                >
-                    <Info size={16} />
-                    <span>Info</span>
-                </button>
-                <button
-                    type="button"
-                    className={autoplayActive || showAutoplayDrawer ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
-                    onClick={() => setShowAutoplayDrawer(v => !v)}
-                    disabled={running}
-                    aria-label="Autoplay"
-                >
-                    <RotateCcw size={16} />
-                    <span>Auto</span>
-                </button>
-                <button
-                    type="button"
-                    className="slot-mobile-spin"
-                    onClick={triggerStageSpin}
-                    disabled={autoplayActive}
-                    data-slot-action="spin"
-                    data-mobile-hit-target="primary"
-                    data-ux-primary-action
-                >
-                    <Play size={18} />
-                    {running ? 'Skip' : slotSpinLabel}
-                </button>
-              </div>
-              )
-              return dockPortal ? createPortal(dock, dockPortal) : dock
-            })()}
-
-            {showMobileBet && (
-                <div
-                    className="slot-mobile-bet-sheet-backdrop"
-                    onClick={() => setShowMobileBet(false)}
-                    role="dialog"
-                    aria-label="Adjust bet"
-                >
-                    <div className="slot-mobile-bet-sheet" onClick={e => e.stopPropagation()}>
-                        <header>
-                            <strong>Bet amount</strong>
-                            <button type="button" onClick={() => setShowMobileBet(false)} aria-label="Close"><X size={16} /></button>
-                        </header>
-                        <div className="slot-mobile-bet-value">{formatCredits(betAmount)}</div>
-                        <div className="slot-mobile-bet-steppers">
-                            <button type="button" className="stepper-minus" onClick={() => setBet(betAmount / 2)} disabled={running || autoplayActive} aria-label="Decrease bet">−</button>
-                            <button type="button" onClick={() => setBet(0.1)} disabled={running || autoplayActive}>Min</button>
-                            <button type="button" onClick={() => setBet(betAmount * 2)} disabled={running || autoplayActive}>2×</button>
-                            <button type="button" className="stepper-plus" onClick={() => setBet(Math.min(10000, balance || 10000))} disabled={running || autoplayActive} aria-label="Max bet">+</button>
-                        </div>
-                        <input
-                            type="number"
-                            className="slot-mobile-bet-input"
-                            min="0.1"
-                            max="10000"
-                            step="0.5"
-                            value={betAmount}
-                            onChange={e => setBet(e.target.value)}
-                            disabled={running || autoplayActive}
-                            aria-label="Bet amount"
-                        />
-                        <div className="slot-mobile-bet-speed">
-                            <span className="slot-mobile-bet-speed-label">Spin speed</span>
-                            <SpinModeControl
-                                value={spinMode}
-                                onChange={setSpinMode}
-                                disabled={running}
-                            />
-                        </div>
-                        <button
-                            type="button"
-                            className="slot-mobile-bet-info"
-                            onClick={() => { setShowMobileBet(false); setShowMobileInfo(true) }}
-                        >
-                            <Info size={14} /> View paytable &amp; rules
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {showMobileInfo && (
-                <div
-                    className="slot-mobile-info-backdrop"
-                    onClick={() => setShowMobileInfo(false)}
-                >
-                    <div
-                        className="slot-mobile-info-sheet"
-                        ref={mobileInfoSheetRef}
-                        onClick={e => e.stopPropagation()}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label={`${config.title} paytable and rules`}
-                        tabIndex={-1}
-                        style={{ '--slot-accent': config.accent }}
-                    >
-                        <header className="slot-mobile-info-head">
-                            <strong>Paytable &amp; rules</strong>
-                            <button type="button" onClick={() => setShowMobileInfo(false)} aria-label="Close"><X size={16} /></button>
-                        </header>
-                        <div className="slot-mobile-info-body">
-                            <FeatureContractBody config={config} paylineMode={paylineMode} rtpDisclosure={rtpDisclosure} />
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={SLOT_BIG_WIN_THRESHOLD} />
-            <EducationPanel
-                definition={educationDefinition}
-                betAmount={betAmount}
-                effectiveRtp={rtpDisclosure.rtp}
-                expectedGrossMultiplier={rtpDisclosure.rtp}
-                rtpLabel={rtpDisclosure.label}
-                rtpNote={`${rtpDisclosure.note} EV is the nominal base-spin model at the selected base bet, not a bonus-buy or free-spin quote.`}
-                balance={balance}
-                recentProfit={recentProfit}
-            />
         </GameShell>
     )
 }
