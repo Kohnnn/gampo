@@ -1750,6 +1750,37 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             }
             secondary={
                 <div className="slot-secondary" style={{ '--slot-accent': config.accent }}>
+                    <div className="slot-stage-pills">
+                        {freeSpins > 0 && (
+                            <div className={`slot-pill slot-pill-fs ${retriggerFlyers.length ? 'is-retriggering' : ''}`}>
+                                <Ticket size={14} />
+                                <strong>{freeSpins}</strong>
+                                <small>free spins</small>
+                            </div>
+                        )}
+                        {persistentMultiplier > 0 && (
+                            <div className={`slot-pill slot-pill-mult slot-pill-persist ${persistRamp ? 'is-ramping' : ''}`}>
+                                <TrendingUp size={14} />
+                                <strong>{persistentMultiplier}×</strong>
+                                <small>persistent</small>
+                            </div>
+                        )}
+                        {meterTarget > 0 && (
+                            <div className={`slot-pill slot-pill-meter ${meterPercent >= 80 && meterPercent < 100 ? 'is-near-full' : ''} ${meterPercent >= 100 ? 'is-full' : ''}`}>
+                                <Sparkles size={14} />
+                                <strong>{coinMeter}/{meterTarget}</strong>
+                                <small>coins</small>
+                                <span className="slot-pill-fill" style={{ width: `${meterPercent}%` }} />
+                            </div>
+                        )}
+                        {cascadeSteps > 0 && (
+                            <div className="slot-pill slot-pill-cascade">
+                                <Flame size={14} />
+                                <strong>×{cascadeSteps + 1}</strong>
+                                <small>cascade</small>
+                            </div>
+                        )}
+                    </div>
                 <FreeSpinCounter
                     totalAwarded={freeSpinSession?.totalAwarded || 0}
                     remaining={freeSpins}
@@ -2068,37 +2099,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 <Info size={11} /> How it pays
                             </button>
                         </div>
-                    </div>
-                    <div className="slot-stage-pills">
-                        {freeSpins > 0 && (
-                            <div className={`slot-pill slot-pill-fs ${retriggerFlyers.length ? 'is-retriggering' : ''}`}>
-                                <Ticket size={14} />
-                                <strong>{freeSpins}</strong>
-                                <small>free spins</small>
-                            </div>
-                        )}
-                        {persistentMultiplier > 0 && (
-                            <div className={`slot-pill slot-pill-mult slot-pill-persist ${persistRamp ? 'is-ramping' : ''}`}>
-                                <TrendingUp size={14} />
-                                <strong>{persistentMultiplier}×</strong>
-                                <small>persistent</small>
-                            </div>
-                        )}
-                        {meterTarget > 0 && (
-                            <div className={`slot-pill slot-pill-meter ${meterPercent >= 80 && meterPercent < 100 ? 'is-near-full' : ''} ${meterPercent >= 100 ? 'is-full' : ''}`}>
-                                <Sparkles size={14} />
-                                <strong>{coinMeter}/{meterTarget}</strong>
-                                <small>coins</small>
-                                <span className="slot-pill-fill" style={{ width: `${meterPercent}%` }} />
-                            </div>
-                        )}
-                        {cascadeSteps > 0 && (
-                            <div className="slot-pill slot-pill-cascade">
-                                <Flame size={14} />
-                                <strong>×{cascadeSteps + 1}</strong>
-                                <small>cascade</small>
-                            </div>
-                        )}
                     </div>
                     {fullscreenAvailable && (
                         <button
