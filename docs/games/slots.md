@@ -26,6 +26,8 @@
 ## Motion and controls
 
 - Normal, reduced-motion, and animation-off preferences preserve a readable final result. Slot speed is a separate setting.
+- A visible Skip / Skip animation control slam-stops the existing accepted round; it does not place another wager.
+- Reduced-motion and animation-off completion is verified statically without requiring an intermediate paint; normal-motion verification requires native active pixels.
 - Animation-count measurements prompted removal of per-cell idle shine/bob loops. Static cell backgrounds, borders, and shadows retain symbol framing; stage atmosphere and gameplay, win, and bonus motion remain.
 - Autoplay configuration uses a native modal dialog: Escape closes it, background interaction is blocked, and focus returns to the opener.
 - Existing spin eligibility, free-spin caps, bonus rules, and autoplay stop policy remain unchanged.
