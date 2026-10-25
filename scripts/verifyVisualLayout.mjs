@@ -268,7 +268,7 @@ async function geometry(row, config, fullscreen = false) {
 }
 
 async function stable(selector) {
-    await until(`document.readyState === 'complete' && document.querySelector(${JSON.stringify(selector)}) && !document.querySelector('.slot-stage-v2.is-loading, .core-stage.is-loading, .core-stage-body[aria-busy="true"]')`, 'rendered assets and stage')
+    await until(`document.readyState === 'complete' && document.querySelector(${JSON.stringify(selector)}) && !document.querySelector('[data-route-fallback="loading"], .slot-stage-v2.is-loading, .core-stage.is-loading, .core-stage-body[aria-busy="true"]')`, 'rendered assets and stage')
     await evaluate(`(async () => {
         await document.fonts.ready;
         for (const img of document.querySelectorAll('.slot-stage-v2 img, .limbo-stage-frame img')) { if (!img.complete) await new Promise(resolve => { img.addEventListener('load', resolve, { once:true }); img.addEventListener('error', resolve, { once:true }); }); }
