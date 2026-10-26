@@ -71,6 +71,7 @@ import {
     shouldPlayRarityStinger,
 } from './casesAnimation'
 import { createCaseOpeningRound } from './caseOpening'
+import { useCasesManifest } from './useCasesManifest'
 import {
     CASE_CATEGORIES,
     caseCategoryCounts,
@@ -78,7 +79,6 @@ import {
     caseDropOdds,
     casePriceBand,
     filterCasesByCategory,
-    normalizeCaseForRuntime,
     rarityDropWeight,
     roundGc,
     roundSignedGc,
@@ -271,6 +271,8 @@ function CaseBetRail({ activeCase, balance, casePrice, rows, totalStake }) {
 
 function CaseRightPanel({
     activeCase,
+    casesReady,
+    openButtonRef,
     allCases,
     autoOpen,
     autoPanelOpen,
@@ -385,6 +387,7 @@ function CaseRightPanel({
                     <span className={autoSessionProfit >= 0 ? 'pos' : 'neg'}><small>Auto P/L</small><strong>{autoSessionProfit >= 0 ? '+' : ''}{formatCredits(autoSessionProfit)}</strong></span>
                 </div>
                 <button
+                    ref={openButtonRef}
                     type="button"
                     className={`cases-right-cta ${isHolding ? 'is-auto-arming' : ''}`}
                     data-game-action={results.length > 0 ? 'case-open-again' : 'case-open'}
@@ -395,12 +398,12 @@ function CaseRightPanel({
                     onMouseLeave={handleOpenMouseUp}
                     onTouchStart={handleOpenMouseDown}
                     onTouchEnd={handleOpenMouseUp}
-                    disabled={running || !activeCase || balance < totalStake}
+                    disabled={running || !casesReady || balance < totalStake}
                 >
                     {results.length > 0 ? `Open again (${formatCredits(totalStake)})` : `Open ×${rows} (${formatCredits(totalStake)})`}
                 </button>
                 <div className="cases-side-actions">
-                    <button type="button" data-case-action={autoOpen ? 'auto-stop' : 'auto-start'} onClick={autoOpen ? stopCaseAuto : startCaseAuto} disabled={running && !autoOpen}>
+                    <button type="button" data-case-action={autoOpen ? 'auto-stop' : 'auto-start'} onClick={autoOpen ? stopCaseAuto : startCaseAuto} disabled={!casesReady || (running && !autoOpen)}>
                         {autoOpen ? 'Stop auto' : 'Start auto'}
                     </button>
                     <button type="button" onClick={skipCaseAnimation} disabled={!running}>
@@ -607,7 +610,7 @@ export default function CasesGame() {
     const collection = useCaseCollection({ catalogTotal: csCatalog.catalog?.totalSkins || 0 })
     const [searchParams, setSearchParams] = useSearchParams()
 
-    const [allCases, setAllCases] = useState(null)
+    const { cases: allCases, status: manifestStatus, retry: retryManifest } = useCasesManifest()
     const [category, setCategory] = useState('popular')
     const [caseId, setCaseId] = useState(null)
     const [rows, setRows] = useState(1)
@@ -668,6 +671,10 @@ export default function CasesGame() {
     const resultsPanelRef = useRef(null)
     const reelAreaRef = useRef(null)
     const stageRef = useRef(null)
+    const manifestFocusRef = useRef(null)
+    const manifestRetriedRef = useRef(false)
+    const openButtonRef = useRef(null)
+    const mobileOpenButtonRef = useRef(null)
     const initialCaseIdRef = useRef(searchParams.get('caseId'))
     const [dockPortal, setDockPortal] = useState(null)
     useEffect(() => { setDockPortal(document.body) }, [])
@@ -679,20 +686,11 @@ export default function CasesGame() {
     }, [view, csCatalog.load])
 
     useEffect(() => {
-        let cancelled = false
-        fetch('/data/cs-cases.json').then(r => r.json()).then(data => {
-            if (cancelled) return
-            const normalized = data.map(c => normalizeCaseForRuntime(c))
-            setAllCases(normalized)
-            const requestedCaseId = initialCaseIdRef.current
-            const first = normalized.find(c => c.id === requestedCaseId) || filterCasesByCategory(normalized, 'popular')[0] || normalized[0]
-            if (first) setCaseId(first.id)
-        }).catch(err => {
-            // eslint-disable-next-line no-console
-            console.warn('[cases] manifest load failed', err)
-        })
-        return () => { cancelled = true }
-    }, [])
+        if (!allCases) return
+        const requestedCaseId = initialCaseIdRef.current
+        const first = allCases.find(c => c.id === requestedCaseId) || filterCasesByCategory(allCases, 'popular')[0] || allCases[0]
+        if (first) setCaseId(first.id)
+    }, [allCases])
 
     useEffect(() => {
         if (!allCases?.length) return
@@ -709,6 +707,17 @@ export default function CasesGame() {
     }, [allCases, category, caseGridSearch])
 
     const activeCase = useMemo(() => (allCases || []).find(c => c.id === caseId) || categoryCases[0], [allCases, caseId, categoryCases])
+    const casesReady = manifestStatus === 'ready' && Boolean(activeCase) && preloader.ready
+    useEffect(() => {
+        const priorFocus = manifestFocusRef.current
+        if (!casesReady || !priorFocus) return
+        manifestFocusRef.current = null
+        if (priorFocus.isConnected) return
+        if (document.activeElement && document.activeElement !== document.body) return
+        const mobileOpen = mobileOpenButtonRef.current
+        const open = mobileOpen?.getClientRects().length ? mobileOpen : openButtonRef.current
+        open?.focus()
+    }, [casesReady])
     const casePrice = activeCase ? Math.max(1, roundGc(activeCase.openPriceGc, 1)) : 5
     const totalStake = roundGc(casePrice * rows, casePrice)
 
@@ -908,8 +917,7 @@ export default function CasesGame() {
     }, [finishPendingRound])
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (running) { resolve({ profit: 0 }); return }
-        if (!activeCase) { showToast('error', 'Loading cases', 'Try again'); resolve({ profit: 0 }); return }
+        if (running || !casesReady) { resolve({ profit: 0 }); return }
         const unitPrice = Math.max(1, roundGc(activeCase.openPriceGc || betAmount || 1, 1))
         const stake = roundGc(unitPrice * rows, unitPrice)
         if (!placeBet(stake, 'Cases')) {
@@ -1063,7 +1071,7 @@ export default function CasesGame() {
             window.clearTimeout(autoTimerRef.current)
             autoTimerRef.current = null
         }
-        if (!autoOpen || running || !activeCase) return undefined
+        if (!autoOpen || running || !casesReady) return undefined
         if (casePhase !== 'idle' && casePhase !== 'settled') return undefined
         if (autoRoundsLeft !== Infinity && Number(autoRoundsLeft || 0) <= 0) {
             setAutoOpen(false)
@@ -1085,10 +1093,38 @@ export default function CasesGame() {
                 autoTimerRef.current = null
             }
         }
-    }, [activeCase, autoOpen, autoRoundsLeft, autoSpeed, balance, casePhase, casePrice, quickOpen, running, showToast, totalStake])
+    }, [activeCase, autoOpen, autoRoundsLeft, autoSpeed, balance, casePhase, casePrice, casesReady, quickOpen, running, showToast, totalStake])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
-    const stageLoading = !preloader.ready || !allCases
+    const stageLoading = !casesReady
+    const manifestLoadingNode = (
+        <div
+            className="cases-manifest-status"
+            role="status"
+            aria-live="polite"
+            aria-busy={manifestStatus === 'loading' || undefined}
+            onFocusCapture={event => { manifestFocusRef.current = event.target }}
+            onBlurCapture={event => {
+                if (!event.currentTarget.contains(event.relatedTarget) && (event.relatedTarget || !event.target.disabled)) manifestFocusRef.current = null
+            }}
+        >
+            <p>{manifestStatus === 'error' ? 'Cases are unavailable. Try again.' : manifestStatus === 'loading' ? 'Loading cases…' : 'Loading stage…'}</p>
+            {(manifestStatus === 'error' || manifestRetriedRef.current) && (
+                <button
+                    type="button"
+                    className="cases-manifest-retry"
+                    aria-label="Retry loading cases"
+                    disabled={manifestStatus !== 'error'}
+                    onClick={() => {
+                        manifestRetriedRef.current = true
+                        retryManifest()
+                    }}
+                >
+                    Retry
+                </button>
+            )}
+        </div>
+    )
 
     const pokedexList = useMemo(() => Object.values(collection.pokedex), [collection.pokedex])
     const caseUxStats = useMemo(() => {
@@ -1329,10 +1365,10 @@ export default function CasesGame() {
 
     // P4: long-press the Open button to auto-roll until cancel
     const handleOpenMouseDown = useCallback(() => {
-        if (running || !activeCase || balance < totalStake) return
+        if (running || !casesReady || balance < totalStake) return
         setIsHolding(true)
         const id = window.setTimeout(() => {
-            if (!activeCase || balance < totalStake) { setIsHolding(false); return }
+            if (!casesReady || balance < totalStake) { setIsHolding(false); return }
             const nextLeft = autoPreset === 'infinite' ? Infinity : Math.max(1, Number(autoPreset) || 10)
             setAutoRoundsLeft(nextLeft)
             setAutoSessionProfit(0)
@@ -1342,7 +1378,7 @@ export default function CasesGame() {
             sfx.play('click', { volume: 0.4 })
         }, 500)
         autoRollTimerRef.current = id
-    }, [activeCase, autoPreset, balance, running, sfx, totalStake])
+    }, [activeCase, autoPreset, balance, casesReady, running, sfx, totalStake])
 
     const handleOpenMouseUp = useCallback(() => {
         if (autoRollTimerRef.current) {
@@ -1350,22 +1386,23 @@ export default function CasesGame() {
             autoRollTimerRef.current = null
         }
         setIsHolding(false)
+        if (!casesReady) return
         if (autoRollArmed) {
             // Short press: do a single open
             setAutoRollArmed(false)
             performPlay({ betAmount: casePrice })
         }
-    }, [autoRollArmed, casePrice, performPlay])
+    }, [autoRollArmed, casePrice, casesReady, performPlay])
 
     const startCaseAuto = useCallback(() => {
-        if (running || autoOpen) return
+        if (!casesReady || running || autoOpen) return
         const nextLeft = autoPreset === 'infinite' ? Infinity : Math.max(1, Number(autoPreset) || 10)
         setAutoRoundsLeft(nextLeft)
         setAutoSessionProfit(0)
         setAutoOpen(true)
         setAutoPanelOpen(false)
         sfx.play('click', { volume: 0.32 })
-    }, [autoOpen, autoPreset, running, sfx])
+    }, [autoOpen, autoPreset, casesReady, running, sfx])
 
     const stopCaseAuto = useCallback(() => {
         if (autoTimerRef.current) {
@@ -1454,6 +1491,8 @@ export default function CasesGame() {
             aside={
                 <CaseRightPanel
                     activeCase={activeCase}
+                    casesReady={casesReady}
+                    openButtonRef={openButtonRef}
                     allCases={allCases || []}
                     autoOpen={autoOpen}
                     autoPanelOpen={autoPanelOpen}
@@ -1498,7 +1537,7 @@ export default function CasesGame() {
                 />
             }
         >
-            <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
+            <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} loadingNode={manifestLoadingNode} className="cases-stage-frame">
                 <div
                     ref={stageRef}
                     className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}${nearMiss ? ' case-near-miss' : ''}`}
@@ -2082,6 +2121,7 @@ export default function CasesGame() {
                         </button>
                     ) : (
                         <button
+                            ref={mobileOpenButtonRef}
                             type="button"
                             className={`cases-mobile-open ${isHolding ? 'is-auto-arming' : ''}`}
                             data-cases-mobile-open
@@ -2093,7 +2133,7 @@ export default function CasesGame() {
                             onMouseLeave={handleOpenMouseUp}
                             onTouchStart={handleOpenMouseDown}
                             onTouchEnd={handleOpenMouseUp}
-                            disabled={!activeCase || balance < totalStake}
+                            disabled={!casesReady || balance < totalStake}
                         >
                             {results.length > 0 ? `Open again ×${rows}` : `Open ×${rows}`}
                         </button>

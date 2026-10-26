@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
             // Plinko outcome tables are emitted as static JSON assets rather than
             // transformed JavaScript chunks; keep warnings focused on app chunks.
             chunkSizeWarningLimit: 2100,
-            cssCodeSplit: false,
+            cssCodeSplit: true,
             rollupOptions: {
                 output: {
                     manualChunks: {

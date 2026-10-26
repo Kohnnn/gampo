@@ -3909,6 +3909,43 @@
     }
 }
 
+.cases-manifest-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px;
+    color: var(--text-primary, #e6edf7);
+    text-align: center;
+}
+
+.cases-manifest-status p {
+    margin: 0;
+}
+
+.cases-manifest-retry {
+    min-width: 120px;
+    min-height: 46px;
+    padding: 10px 20px;
+    border: 1px solid #ffe680;
+    border-radius: 12px;
+    background: #ffd166;
+    color: #071018;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.cases-manifest-retry:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.cases-manifest-retry:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+}
+
 /* Touch-target floor: dense inventory/result controls are mouse-sized on
    desktop but must clear 44px on touch devices. */
 @media (pointer: coarse) {
