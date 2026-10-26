@@ -47,7 +47,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'Scatter retrigger keeps the bonus rolling.',
             'Side character animations on big hits.',
         ],
-        volatility: 'High volatility, ~94.5% RTP.',
+        volatility: 'High volatility.',
         buyBonus: 'Buy options: 60x (3 scatters), 120x (super, 4 scatters).',
     },
     'dust-rail': {
@@ -80,7 +80,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'Expanding wilds remain expanded.',
             'Persistent multiplier seeds at 1x.',
         ],
-        volatility: 'High volatility, ~95% RTP.',
+        volatility: 'High volatility.',
         buyBonus: null,
     },
     'bassline-bonus': {
@@ -113,7 +113,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'New scarabs that land also lock until the respin ends.',
             'Total win banner if the respin produces a stake-sized win.',
         ],
-        volatility: 'High volatility, ~94.5% RTP.',
+        volatility: 'High volatility.',
         buyBonus: null,
     },
     'bars': {
@@ -139,7 +139,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'Reel wilds in for the rest of the spin.',
             'Wins that cross the wild reel get a 1.3x boost.',
         ],
-        volatility: 'High volatility, ~94.5% RTP.',
+        volatility: 'High volatility.',
         buyBonus: null,
     },
     'wanted-revelation': {
@@ -154,7 +154,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             '6 free spins.',
             'Wanted reveal still applies during free spins.',
         ],
-        volatility: 'High volatility, ~94.5% RTP.',
+        volatility: 'High volatility.',
         buyBonus: 'Lite (40x), Standard (60x), Super (120x).',
     },
     'gates-ascent': {
@@ -262,7 +262,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'Multiplier applies to all 6 free spins.',
             'Re-triggering during the session re-spins the wheel.',
         ],
-        volatility: 'Very high volatility — the wheel multiplier drives rare but large sessions. RTP locked to 94%.',
+        volatility: 'Very high volatility — the wheel multiplier drives rare but large sessions.',
         buyBonus: 'Bell (70x), Knockout (180x + 3x persistent).',
     },
     'coop-cluck': {
@@ -325,7 +325,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             '12 free spins with a persistent cascade ladder.',
             'Ladder carries across spins for escalating chains.',
         ],
-        volatility: 'Very high volatility — long dry spells then big cascade chains. RTP locked to 94%.',
+        volatility: 'Very high volatility — long dry spells then big cascade chains.',
         buyBonus: 'Sweet (100x), Sugar Rush (250x + 2x persistent).',
     },
 }

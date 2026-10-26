@@ -5,6 +5,7 @@
 ## Return disclosures
 
 - The header, game information, paytable/rules, session target, and education use the selected template's configured nominal RTP and the applied Fun setting.
+- Feature-contract Math notes describe volatility only; nominal RTP comes from the canonical disclosure for the applied mode.
 - Nominal RTP is a model target, not a guarantee or a fresh measurement. Observed session RTP remains separate.
 - A base-spin return target does not establish a bonus purchase's expected return. Bonus-buy quotes identify that limitation.
 - Payout scalars remain generated calibration data; presentation changes do not recalibrate outcomes.
