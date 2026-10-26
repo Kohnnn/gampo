@@ -4,6 +4,12 @@ GamPo originals are arcade-style simulators with transparent math. Every game sh
 
 Dice, Limbo, Plinko, Wheel, and Rock Paper Scissors use a viewport-bounded primary stage with space reserved for fixed controls and navigation. Supporting results, simulated-player feeds, and education remain secondary rather than expanding that stage.
 
+## Cases
+
+- Cases loads its playable roster on each visit. A failed HTTP, JSON or unusable-roster response shows “Cases are unavailable. Try again.” with a keyboard-accessible Retry control; retry stays on the current page and announces loading.
+- Open, Auto and long-press arming remain unavailable until both the roster and existing stage preparation are ready. Loading and retry do not change practice credits, history, drops, Pokedex or Cases statistics.
+- A successful retry retains a valid requested case selection. Inventory/Pokedex still loads the separate collection only when that view is opened; retry does not preload it. Bounded local production replay passed both sizes, including visible Retry, pending-disabled status, unchanged credits/history and return of keyboard focus to Open. The selected reliability report owns exact receipts/limits; this is not a hosted-release claim.
+
 ## Crash
 
 - Multiplier curve climbs from 1.00x with a hidden bust point.
