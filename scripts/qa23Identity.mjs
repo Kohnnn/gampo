@@ -22,7 +22,8 @@
 
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 
 const ROOT = new URL('..', import.meta.url).pathname
 
@@ -177,7 +178,37 @@ export function deriveP1Classifications() {
     }
 }
 
-export function buildIdentityRecord({ deployedIdentity = null } = {}) {
+// --- Local build artefact digest -------------------------------------------
+// `--build` runs the offline local Vite build, captures the pre-build HEAD and
+// hashes every emitted file. The result is a LOCAL artefact identity only: it
+// never claims to be the hosted bytes, and the deployed field stays `unknown`
+// unless an owner attestation is supplied separately.
+export function artefactDigest(dir) {
+    const abs = join(ROOT, dir)
+    const files = []
+    const walk = (rel) => {
+        for (const name of readdirSync(join(abs, rel)).sort()) {
+            const child = rel ? `${rel}/${name}` : name
+            if (statSync(join(abs, child)).isDirectory()) walk(child)
+            else files.push(child)
+        }
+    }
+    walk('')
+    files.sort()
+    const hash = createHash('sha256')
+    const listing = []
+    let totalBytes = 0
+    for (const rel of files) {
+        const bytes = readFileSync(join(abs, rel))
+        const digest = sha256(bytes)
+        totalBytes += bytes.length
+        listing.push(`${digest}  ${bytes.length}  ${rel}\n`)
+        hash.update(`${rel}\0${digest}\0${bytes.length}\n`)
+    }
+    return { digest: hash.digest('hex'), fileCount: files.length, totalBytes, listing }
+}
+
+export function buildIdentityRecord({ deployedIdentity = null, artefact = null, buildPreHead = null } = {}) {
     const head = tryGit(['rev-parse', 'HEAD'])
     const porcelain = tryGit(['status', '--porcelain'])
     const tree = trackedTreeDigest()
@@ -199,8 +230,11 @@ export function buildIdentityRecord({ deployedIdentity = null } = {}) {
         localBuild: {
             kind: 'local-build',
             marker: buildMarker(),
-            artefact: null,
-            note: 'No local bundle bytes are embedded here. This is NOT the deployed artefact.',
+            preBuildHead: buildPreHead,
+            artefact,
+            note: artefact
+                ? 'Local build output digest. This is NOT the deployed artefact.'
+                : 'No local bundle bytes embedded. Run with --build to produce the artefact digest. This is NOT the deployed artefact.',
         },
         // Separate owner-attested deployed bytes. Unknown deployment stays unknown.
         deployedIdentity: attested
@@ -218,8 +252,27 @@ function main() {
     const args = process.argv.slice(2)
     const outIdx = args.indexOf('--out')
     const depIdx = args.indexOf('--deployed')
+    const buildIdx = args.indexOf('--build')
+
+    let artefact = null
+    let buildPreHead = null
+    if (buildIdx >= 0) {
+        // Capture HEAD BEFORE building so the identity names the revision the
+        // artefact was produced from, not whatever HEAD is afterwards.
+        buildPreHead = tryGit(['rev-parse', 'HEAD'])
+        const outDir = args[buildIdx + 1] && !args[buildIdx + 1].startsWith('--')
+            ? args[buildIdx + 1]
+            : 'dist'
+        execFileSync('npx', ['vite', 'build', '--outDir', outDir], {
+            cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32',
+        })
+        artefact = artefactDigest(outDir)
+    }
+
     const record = buildIdentityRecord({
         deployedIdentity: depIdx >= 0 ? args[depIdx + 1] : null,
+        artefact,
+        buildPreHead,
     })
     const json = `${JSON.stringify(record, null, 2)}\n`
     if (outIdx >= 0) {
