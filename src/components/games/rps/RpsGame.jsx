@@ -8,6 +8,7 @@ import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { funBoostedRtp } from '../../../utils/funMode'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
+import { acceptedResult, rejectedResult } from '../primitives/autoAccounting'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './rps.css'
@@ -44,7 +45,10 @@ export default function RpsGame() {
     const payout = round2(effectiveRtp * 3 - 1)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (!placeBet(betAmount, 'RPS')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        // A round is already in flight: the handler-level guard stops the key
+        // path from starting a second paid round that the button already blocks.
+        if (phase === 'slamming') { resolve(rejectedResult('active-obligation')); return }
+        if (!placeBet(betAmount, 'RPS')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve(rejectedResult('insufficient-funds')); return }
         setLastBet(betAmount)
         const player = OPTIONS.find(o => o.id === choice)
         const dealer = OPTIONS[Math.floor(nextRoll('rps').roll * 3)]
@@ -83,7 +87,7 @@ export default function RpsGame() {
                 meta: { player: player.id, dealer: dealer.id },
             })
             showToast(won ? 'win' : push ? 'bet' : 'loss', push ? 'Push' : won ? 'RPS win' : 'RPS miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
-            resolve({ profit })
+            resolve(acceptedResult(profit, { multiplier, outcome: push ? 'push' : won ? 'win' : 'loss' }))
         }, 600)
     })
 

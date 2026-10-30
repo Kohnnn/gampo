@@ -27,6 +27,7 @@ import { getBigWinThreshold,
     buildEvents,
     useRoundMachine,
 } from '../primitives'
+import { acceptedResult, rejectedResult } from '../primitives/autoAccounting'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { createRoundRng } from '../../../utils/roundRng'
 import { NumberRoll, Particles } from '../../fx'
@@ -128,7 +129,7 @@ export default function DiceGame() {
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (!placeBet(betAmount, 'Dice')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`)
-            resolve({ profit: 0 })
+            resolve(rejectedResult('insufficient-funds', { betAmount }))
             return
         }
         setLastBet(betAmount)
@@ -155,7 +156,7 @@ export default function DiceGame() {
                 if (!pendingRoundsRef.current.delete(entry.id)) return
                 if (currentRoundIdRef.current === entry.id) currentRoundIdRef.current = null
                 pending.record()
-                resolve({ profit })
+                resolve(acceptedResult(profit, { id: entry.id, betAmount }))
             },
         }
         pendingRoundsRef.current.set(entry.id, pending)
