@@ -22,8 +22,8 @@
 
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync } from 'node:fs'
+import { join, dirname } from 'node:path'
 
 const ROOT = new URL('..', import.meta.url).pathname
 
@@ -276,6 +276,9 @@ function main() {
     })
     const json = `${JSON.stringify(record, null, 2)}\n`
     if (outIdx >= 0) {
+        // Create the parent so an explicit evidence root (e.g. a task folder that
+        // does not exist yet in this worktree) cannot fail with ENOENT.
+        mkdirSync(dirname(args[outIdx + 1]), { recursive: true })
         writeFileSync(args[outIdx + 1], json)
         process.stdout.write(`wrote ${args[outIdx + 1]}\n`)
     } else {
