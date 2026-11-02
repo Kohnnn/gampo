@@ -4,8 +4,8 @@
 // boilerplate that each hook previously reimplemented, and expose the canonical
 // `gampo_` key prefix + key enumeration used by the local save/restore feature.
 //
-// SSR/safety: every call guards against a missing localStorage (e.g. tests that
-// have not stubbed it, or non-browser environments) and never throws.
+// Ordinary reads preserve fallback behavior for hooks; save operations opt into
+// strict reads so unavailable storage or failed reads cannot look like absence.
 
 export const STORAGE_PREFIX = 'gampo_'
 
@@ -52,16 +52,15 @@ function getStore() {
     return null
 }
 
-/** Read + JSON.parse a key, returning `fallback` on any failure. */
-export function readJson(key, fallback = null) {
-    const store = getStore()
-    if (!store) return fallback
+/** Read JSON, preserving absence/null fallback; strict reads throw on failure. */
+export function readJson(key, fallback = null, { strict = false } = {}) {
     try {
-        const raw = store.getItem(key)
+        const raw = readRaw(key, null, { strict })
         if (raw == null) return fallback
         const parsed = JSON.parse(raw)
         return parsed == null ? fallback : parsed
-    } catch {
+    } catch (error) {
+        if (strict) throw error
         return fallback
     }
 }
@@ -79,14 +78,15 @@ export function writeJson(key, value) {
     }
 }
 
-/** Read a raw string value. */
-export function readRaw(key, fallback = null) {
-    const store = getStore()
+/** Read a raw string; strict reads throw instead of hiding storage failures. */
+export function readRaw(key, fallback = null, { strict = false } = {}) {
+    const store = strict ? strictStore() : getStore()
     if (!store) return fallback
     try {
-        const raw = store.getItem(key)
+        const raw = strict ? strictCall(store, 'getItem', key) : store.getItem(key)
         return raw == null ? fallback : raw
-    } catch {
+    } catch (error) {
+        if (strict) throw error
         return fallback
     }
 }
@@ -116,18 +116,18 @@ export function removeKey(key) {
     }
 }
 
-/** Enumerate all persisted keys under the `gampo_` prefix. */
+/**
+ * Enumerate all persisted keys under the `gampo_` prefix.
+ * A failed enumeration throws: a truncated list would silently under-report
+ * exported state and under-restore it on import.
+ */
 export function listGampoKeys() {
     const store = getStore()
     if (!store) return []
     const keys = []
-    try {
-        for (let i = 0; i < store.length; i += 1) {
-            const key = store.key(i)
-            if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key)
-        }
-    } catch {
-        /* ignore */
+    for (let i = 0; i < store.length; i += 1) {
+        const key = store.key(i)
+        if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key)
     }
     return keys
 }
