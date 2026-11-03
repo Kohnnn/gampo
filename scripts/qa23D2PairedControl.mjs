@@ -227,12 +227,12 @@ report.conclusion = {
     channelDiffers: cdpArm.allVisible !== rendererArm.allVisible || !cachedArm.allVisible,
     interpretation: cdpArm.allVisible && rendererArm.allVisible
         ? crossArm.sawStale
-            ? 'CROSS-DOCUMENT STALENESS OBSERVED: document B wrote, document A read back the old value. This reproduces the S9 import-conflict mechanism and confirms D-2 is a real cross-document behaviour, not a harness artifact.'
+            ? 'CROSS-DOCUMENT STALENESS OBSERVED: document B wrote, document A read back the old value. Observation only: this control does not drive the import dialog, so it neither reproduces S9 nor establishes the cause of D-2.'
             : cachedArm.sawStale
-            ? 'A CDP write to an already-cached key was NOT observed on the next renderer read, while a fresh key and renderer writes were. This is the S9 shape: candidate A survives for cached keys and needs the UI-level trace.'
-            : 'Both channels are visible for fresh AND already-cached keys. The S9 staleness was NOT a CDP seeding artifact; D-2 remains unexplained and needs the UI-level trace.'
+            ? 'A CDP write to an already-cached key was NOT observed on the next renderer read, while a fresh key and renderer writes were. Candidate A (CDP seeding invisible for cached keys) remains possible and needs the UI-level trace.'
+            : 'Both channels are visible for fresh AND already-cached keys in this sample. Observation only: S9 is not explained by this result; D-2 remains open and needs the UI-level trace.'
         : !cdpArm.allVisible && rendererArm.allVisible
-            ? 'CDP writes are not reliably visible to the renderer while renderer writes are. S9 staleness is consistent with a CDP seeding artifact; the hosted defect is still unproven either way.'
+            ? 'CDP writes are not reliably visible to the renderer while renderer writes are. Consistent with a CDP seeding artifact; the hosted defect is still unproven either way.'
             : 'Unexpected: renderer writes also failed to read back. Treat the harness as invalid before drawing any conclusion.',
 }
 
@@ -244,4 +244,8 @@ if (!rendererArm.allVisible) {
     process.exit(2)
 }
 // Exit 1 = at least one CDP visibility arm disagreed with the renderer control.
+// DELIBERATE LIMIT: the exit code does NOT encode the cross-document result.
+// Staleness there is 1-in-60, so wiring it to the exit code would make this
+// flaky; read `conclusion.crossDocumentSawStaleValue` instead. Exit 0 means
+// "harness valid, no disagreement in this sample" — never "D-2 passes".
 process.exit(report.conclusion.channelDiffers ? 1 : 0)
