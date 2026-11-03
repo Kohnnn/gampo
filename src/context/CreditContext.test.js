@@ -267,3 +267,47 @@ describe('D-1 successive writes keep peer reads', () => {
         expect(tab.placeBet(1, 'Plinko')).toBe(false)
     })
 })
+
+describe('D-1 concurrent acceptance (OPEN — expected to fail)', () => {
+    // `it.fails` records a KNOWN OPEN DEFECT: the suite stays green, and the
+    // moment someone serialises the credit path this test starts passing, which
+    // makes `it.fails` report a failure and forces the marker to be flipped to
+    // `it`. It cannot rot silently.
+    //
+    // Why it is open: `placeBet` is synchronous (`CreditContext.jsx:173-181`)
+    // and reads the balance, validates, then writes with no critical section
+    // held across the pair. A synchronous API cannot hold a cross-document mutex
+    // — `navigator.locks.request` is async — so this is an architectural limit,
+    // not a missing `if`. Closing it needs the async lock migration or the
+    // transactional authority cutover; both are unapproved architecture
+    // decisions recorded in the Phase 01 plan.
+    //
+    // A sequential two-document probe cannot detect this: it lets A finish
+    // before B starts, so B always reads the committed value.
+    it.fails('refuses the second of two documents that both read the same balance', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabB = mountConsumer()
+        const tabA = mountConsumer()
+
+        // Force the real interleave: each getItem/setItem is atomic, the pair is
+        // not. While B sits between its read and its write, A's stake completes.
+        let interleaved = false
+        const realGet = localStorage.getItem
+        localStorage.getItem = (key) => {
+            const value = realGet(key)
+            if (key === CREDIT_STORAGE_KEY && !interleaved) {
+                interleaved = true
+                expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+            }
+            return value
+        }
+        const bAccepted = tabB.placeBet(600, 'Plinko')
+        localStorage.getItem = realGet
+
+        expect(interleaved).toBe(true)
+        // The defect: B accepted 600 against a balance of 400 and published 400
+        // over A's committed 400 — 1200 staked from 1000 funded.
+        expect(bAccepted).toBe(false)
+        expect(storedBalance()).toBe(400)
+    })
+})

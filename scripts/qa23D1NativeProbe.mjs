@@ -40,8 +40,13 @@ class Cdp {
 const until = async (fn, label, ms = 30000) => {
     const deadline = Date.now() + ms
     for (;;) {
-        const value = await fn()
-        if (value) return value
+        // Race each attempt against the overall deadline so a stuck CDP call
+        // cannot outlive the wait it belongs to.
+        const attempt = await Promise.race([
+            Promise.resolve().then(fn).catch(() => false),
+            new Promise(resolve => setTimeout(() => resolve(false), Math.max(0, deadline - Date.now()))),
+        ])
+        if (attempt) return attempt
         if (Date.now() > deadline) throw new Error(`timeout waiting for ${label}`)
         await new Promise(done => setTimeout(done, 100))
     }
@@ -62,7 +67,10 @@ const report = { rows: [], cleanup: { vite: false, browser: false, temp: false }
 const cdpErrors = new Map()
 
 try {
-    vite = spawn('npx', ['vite', '--port', '5199', '--strictPort'], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'] })
+    // `detached` gives vite its own process group so cleanup can signal the
+    // whole tree. Killing the `npx` wrapper alone leaves the vite child holding
+    // the port, which is what made a later run fail with EADDRINUSE.
+    vite = spawn('npx', ['vite', '--port', '5199', '--strictPort'], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'], detached: true })
     let viteLog = ''
     vite.stdout.on('data', d => { viteLog += d })
     vite.stderr.on('data', d => { viteLog += d })
@@ -131,6 +139,19 @@ try {
     const aThirdStored = await evaluate(cdp, tabA.sessionId, 'window.__probe.stored()')
     report.rows.push({ step: 'A writes after B; A must see peer balance', aAfterSeed, stored: aSeesPeer, aThirdAccepted: aThird, storedAfterAThird: aThirdStored })
 
+    // Concurrent arm: both documents fire at the same wall-clock instant, so
+    // their read-modify-write windows genuinely overlap. Evaluations are
+    // dispatched without awaiting the first, otherwise the second would start
+    // only after the first settled and this would prove nothing about races.
+    await evaluate(cdp, tabA.sessionId, 'window.__probe.seed(1000)')
+    const fireAt = Date.now() + 400
+    const [aConcurrent, bConcurrent] = await Promise.all([
+        evaluate(cdp, tabA.sessionId, `window.__probe.betAt(${fireAt}, 600, "Plinko")`),
+        evaluate(cdp, tabB.sessionId, `window.__probe.betAt(${fireAt}, 600, "Plinko")`),
+    ])
+    const storedConcurrent = await evaluate(cdp, tabB.sessionId, 'window.__probe.stored()')
+    report.rows.push({ step: 'concurrent: both stake 600 at the same instant', a: aConcurrent, b: bConcurrent, stored: storedConcurrent, doubleSpend: aConcurrent && bConcurrent })
+
     // Ledger must account for every accepted stake across both documents.
     const ledger = await evaluate(cdp, tabB.sessionId, 'window.__probe.history()')
     report.rows.push({ step: 'stored history', raw: ledger })
@@ -142,14 +163,17 @@ try {
 } finally {
     if (cdp) cdp.close()
     if (browser) { browser.kill('SIGKILL'); report.cleanup.browser = true }
-    if (vite) { vite.kill('SIGKILL'); report.cleanup.vite = true }
-    await rm(temp, { recursive: true, force: true })
+    if (vite) {
+        try { process.kill(-vite.pid, 'SIGKILL') } catch { /* group already gone */ }
+        report.cleanup.vite = true
+    }
+    await rm(temp, { recursive: true, force: true }).catch(() => {})
     report.cleanup.temp = true
 }
 
 console.log(JSON.stringify(report, null, 1))
 
-const [aStep, bStep, restStep, afterStep] = report.rows
+const [aStep, bStep, restStep, afterStep, concurrentStep] = report.rows
 assert.equal(aStep.accepted, true, 'A must stake 600 from 1000')
 assert.equal(aStep.stored, '400', 'stored balance after A')
 assert.equal(bStep.accepted, false, 'B must be refused: only 400 remains against a stale ref of 1000')
@@ -158,4 +182,15 @@ assert.equal(restStep.accepted, true, 'B must be able to stake the real remainin
 assert.equal(restStep.stored, '0', 'stored balance after the remaining stake')
 assert.equal(afterStep.stored, '700', 'A must read B\'s committed balance, not its own ref')
 assert.equal(afterStep.aThirdAccepted, false, 'A must refuse 800 against a real 700')
-console.log('D-1 cross-document: PASS')
+console.log('D-1 sequential stale-ref: PASS (stale-ref window only)')
+
+// The concurrent arm is NOT an assertion of correctness. `betAt` synchronises
+// timer deadlines, not the read-modify-write windows, so a non-double-spend
+// result here does NOT prove the race is closed. Report both outcomes
+// explicitly and fail only if the run is inconsistent with the unit-level
+// known-open defect being recorded in CreditContext.test.js.
+if (concurrentStep.doubleSpend) {
+    console.log('D-1 CONCURRENT: defect observed — both documents accepted 600 against 1000')
+} else {
+    console.log('D-1 concurrent: no double-spend observed in THIS run — inconclusive, NOT proof of closure')
+}

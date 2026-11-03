@@ -27,6 +27,13 @@
         addWinnings: (amount, label) => credits.addWinnings(amount, label),
         stored: () => localStorage.getItem('gampo_credits'),
         history: () => localStorage.getItem('gampo_history'),
+        // Fire at an absolute wall-clock instant so two documents really do
+        // overlap their read-modify-write, rather than running one after the
+        // other as separate awaited CDP calls.
+        betAt: (at, amount, label) => new Promise(resolve => {
+            const wait = Math.max(0, at - Date.now())
+            setTimeout(() => resolve(credits.placeBet(amount, label)), wait)
+        }),
         seed: (value) => {
             localStorage.setItem('gampo_credits', String(value))
             localStorage.setItem('gampo_history', '[]')
