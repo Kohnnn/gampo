@@ -192,3 +192,23 @@ describe('D-1 credit lost update', () => {
         expect(storedBalance()).toBe(0)
     })
 })
+
+describe('D-1 cross-document history', () => {
+    it('keeps a peer document committed entry in the stored ledger', () => {
+        // Both documents mount with an empty history. Tab A commits a debit and
+        // its entry reaches storage. Tab B then commits its own debit. Building
+        // the stored list from B's ref would overwrite A's committed entry, so
+        // the ledger no longer accounts for the balance beside it.
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabB = mountConsumer()
+        const tabA = mountConsumer()
+
+        expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+        expect(tabB.placeBet(400, 'Plinko')).toBe(true)
+
+        const ledger = storedHistory()
+        expect(storedBalance()).toBe(0)
+        expect(ledger.reduce((sum, entry) => sum + entry.amount, 0)).toBe(-1000)
+        expect(ledger.map(entry => entry.amount).sort((a, b) => a - b)).toEqual([-600, -400])
+    })
+})

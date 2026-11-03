@@ -46,6 +46,14 @@ function persistHistory(history) {
     }
 }
 
+function readRaw(key) {
+    try {
+        return localStorage.getItem(key)
+    } catch {
+        return null
+    }
+}
+
 function roundCredits(value) {
     return Math.max(0, Number(value.toFixed(2)))
 }
@@ -100,16 +108,29 @@ export function CreditProvider({ children }) {
     const transactionsRef = useRef(transactions)
     const toastIdRef = useRef(0)
 
+    // The ref is this document's view and goes stale the moment a peer writes
+    // (nothing subscribes to the `storage` event for these keys). Both the
+    // durable history we append to and the duplicate-id guard must therefore be
+    // based on what is actually stored, unioned with anything this document has
+    // that storage lost to an earlier failed write. Without this, a second
+    // document's committed entry is silently overwritten and the ledger no
+    // longer accounts for the balance it sits next to.
+    const readMergedHistory = useCallback(() => {
+        const stored = readHistory()
+        const seen = new Set(stored.map(entry => entry.id))
+        return [...transactionsRef.current.filter(entry => !seen.has(entry.id)), ...stored].slice(0, 100)
+    }, [])
+
     const recordTransaction = useCallback((entry) => {
         const next = [{
             id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
             timestamp: new Date(),
             ...entry,
-        }, ...transactionsRef.current].slice(0, 100)
+        }, ...readMergedHistory()].slice(0, 100)
         transactionsRef.current = next
         setTransactions(next)
         persistHistory(next)
-    }, [])
+    }, [readMergedHistory])
 
     const showToast = useCallback((type, title, description, duration = 3000) => {
         const id = ++toastIdRef.current
@@ -182,23 +203,30 @@ export function CreditProvider({ children }) {
     }, [currentBalance, recordTransaction])
 
     const runCreditTransactionsTransactional = useCallback((entries, commit) => {
-        const prepared = prepareCreditTransactions(currentBalance(), transactionsRef.current, entries)
+        const prepared = prepareCreditTransactions(currentBalance(), readMergedHistory(), entries)
         return commitPreparedCreditTransactions(prepared, commit, (nextBalance, nextTransactions) => {
             // The durable commit/readback has succeeded before either the
             // authoritative refs or React consumers see the prepared state.
-            // Publish also persists, so the storage value never lags the ref:
-            // a commit that writes credits elsewhere (the sportsbook ledger and
-            // the IndexedDB authority both do) would otherwise leave
-            // `gampo_credits` holding an older balance, and the next
-            // affordability read would reject a stake the user can afford.
             balanceRef.current = nextBalance
             transactionsRef.current = nextTransactions
             setBalance(nextBalance)
             setTransactions(nextTransactions)
-            persistCredits(nextBalance)
-            persistHistory(nextTransactions)
+            // Repair storage only where it diverges from the committed state.
+            // A caller whose own commit already wrote these keys (the sportsbook
+            // `commitRaw` writes credits and history) would otherwise be written
+            // twice here. Repairing is still needed for a caller that commits
+            // elsewhere: without it `gampo_credits` lags the ref and the next
+            // affordability read rejects a stake the user can afford.
+            // ponytail: like every other local persist this is best-effort.
+            // Making it fail loud belongs with the lock wiring, where a failed
+            // write can be reported as one atomic outcome rather than leaving a
+            // round shown as committed while its balance is not on disk.
+            if (readNumber(CREDIT_STORAGE_KEY, NaN) !== nextBalance) persistCredits(nextBalance)
+            if (readRaw(HISTORY_STORAGE_KEY) !== JSON.stringify(nextTransactions)) {
+                persistHistory(nextTransactions)
+            }
         })
-    }, [currentBalance])
+    }, [currentBalance, readMergedHistory])
 
     const placeBetTransactional = useCallback((amount, label, transactionId, commit) => (
         runCreditTransactionsTransactional([{ type: 'bet', label, amount, transactionId }], commit)
