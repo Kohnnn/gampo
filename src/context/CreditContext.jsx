@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { readRaw, writeJson, writeRaw } from '../utils/storage'
 
 export const INITIAL_CREDITS = 1000
 export const CREDIT_STORAGE_KEY = 'gampo_credits'
@@ -30,29 +31,18 @@ function readHistory() {
     }
 }
 
+// Routed through the shared storage helpers so a quota refusal signals the
+// session-guard banner. Writing `localStorage.setItem` directly here swallowed
+// a full disk with no notice to the player, which is how a committed round
+// could be shown as saved while its balance was never written.
 function persistCredits(value) {
-    try {
-        localStorage.setItem(CREDIT_STORAGE_KEY, String(value))
-    } catch {
-        /* local persistence is optional */
-    }
+    writeRaw(CREDIT_STORAGE_KEY, value)
 }
 
 function persistHistory(history) {
-    try {
-        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history))
-    } catch {
-        /* local persistence is optional */
-    }
+    writeJson(HISTORY_STORAGE_KEY, history)
 }
 
-function readRaw(key) {
-    try {
-        return localStorage.getItem(key)
-    } catch {
-        return null
-    }
-}
 
 function roundCredits(value) {
     return Math.max(0, Number(value.toFixed(2)))
@@ -222,7 +212,7 @@ export function CreditProvider({ children }) {
             // write can be reported as one atomic outcome rather than leaving a
             // round shown as committed while its balance is not on disk.
             if (readNumber(CREDIT_STORAGE_KEY, NaN) !== nextBalance) persistCredits(nextBalance)
-            if (readRaw(HISTORY_STORAGE_KEY) !== JSON.stringify(nextTransactions)) {
+            if (readRaw(HISTORY_STORAGE_KEY, null) !== JSON.stringify(nextTransactions)) {
                 persistHistory(nextTransactions)
             }
         })
