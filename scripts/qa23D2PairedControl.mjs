@@ -169,6 +169,36 @@ try {
     }
     report.arms.push({ arm: 'cdp-over-cached-key', repeats: REPEATS, rows: cachedRows, allVisible: cachedRows.every(row => row.sawNew), sawStale: cachedRows.some(row => row.sawOld) })
 
+    // Arm 4 — THE S9 SHAPE. A second real document writes; this document reads.
+    // Arms 1-3 all wrote and read in ONE document, which is not what the import
+    // conflict did: the observer document wrote and the importer document read.
+    // Cross-document visibility is the actual D-2 question.
+    const crossRows = []
+    {
+        const targetB = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json()
+        const { sessionId: sessionB } = await cdp.send('Target.attachToTarget', { targetId: targetB.id, flatten: true })
+        for (const method of ['Page.enable', 'Runtime.enable']) await cdp.send(method, {}, sessionB)
+        await cdp.send('Page.navigate', { url: `${pageOrigin}/` }, sessionB)
+        await until(async () => {
+            try { return await evaluate(cdp, sessionB, 'location.origin') === pageOrigin } catch { return false }
+        }, 'second document origin')
+        for (let attempt = 1; attempt <= REPEATS; attempt += 1) {
+            const key = `d2_cross_${attempt}`
+            const before = `old${attempt}`
+            const after = `new${attempt}`
+            // Document A owns and reads the key first, so it is genuinely cached.
+            await evaluate(cdp, sessionId, `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(before)})`)
+            const firstRead = await getItem(key)
+            // Document B writes it.
+            await evaluate(cdp, sessionB, `localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(after)})`)
+            // Document A reads it back.
+            const secondRead = await getItem(key)
+            crossRows.push({ attempt, key, firstRead, docBWrote: after, secondRead, sawOld: secondRead === before, sawNew: secondRead === after })
+        }
+        await fetch(`http://127.0.0.1:${port}/json/close/${targetB.id}`).catch(() => {})
+    }
+    report.arms.push({ arm: 'cross-document (B writes, A reads)', repeats: REPEATS, rows: crossRows, allVisible: crossRows.every(row => row.sawNew), sawStale: crossRows.some(row => row.sawOld) })
+
     // Arm 2 — the renderer's own write, the control. Same document, same
     // storage, same instant of reading back; only the writer differs.
     report.arms.push(await arm('renderer', async (key, value) => {
@@ -184,17 +214,21 @@ try {
     report.cleanup.temp = true
 }
 
-const [cdpArm, cachedArm, rendererArm] = report.arms
+const [cdpArm, cachedArm, crossArm, rendererArm] = report.arms
 report.environment.totalMs = Date.now() - startedAt
 report.environment.attemptsRun = report.arms.reduce((sum, a) => sum + a.rows.length, 0)
 report.conclusion = {
     cdpVisible: cdpArm.allVisible,
     cdpOverCachedKeyVisible: cachedArm.allVisible,
     cachedKeySawStaleValue: cachedArm.sawStale,
+    crossDocumentVisible: crossArm.allVisible,
+    crossDocumentSawStaleValue: crossArm.sawStale,
     rendererVisible: rendererArm.allVisible,
     channelDiffers: cdpArm.allVisible !== rendererArm.allVisible || !cachedArm.allVisible,
     interpretation: cdpArm.allVisible && rendererArm.allVisible
-        ? cachedArm.sawStale
+        ? crossArm.sawStale
+            ? 'CROSS-DOCUMENT STALENESS OBSERVED: document B wrote, document A read back the old value. This reproduces the S9 import-conflict mechanism and confirms D-2 is a real cross-document behaviour, not a harness artifact.'
+            : cachedArm.sawStale
             ? 'A CDP write to an already-cached key was NOT observed on the next renderer read, while a fresh key and renderer writes were. This is the S9 shape: candidate A survives for cached keys and needs the UI-level trace.'
             : 'Both channels are visible for fresh AND already-cached keys. The S9 staleness was NOT a CDP seeding artifact; D-2 remains unexplained and needs the UI-level trace.'
         : !cdpArm.allVisible && rendererArm.allVisible
