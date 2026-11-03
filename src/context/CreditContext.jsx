@@ -125,6 +125,18 @@ export function CreditProvider({ children }) {
         }, duration)
     }, [])
 
+    // D-1: affordability and the applied delta are decided against the value
+    // that is actually stored, never against a tab-local ref. A ref is seeded
+    // at mount and only updated by this document's own writes, so in a second
+    // tab it stays stale for the life of the session; publishing from it
+    // overwrites a peer's committed balance (1200 staked against 1000 funded).
+    // Reading first is the whole repair, and it keeps the API synchronous so
+    // the 42 existing call sites are unchanged.
+    const currentBalance = useCallback(() => {
+        const stored = readNumber(CREDIT_STORAGE_KEY, NaN)
+        return Number.isFinite(stored) ? roundCredits(stored) : balanceRef.current
+    }, [])
+
     const updateBalance = useCallback((newBalance, reason = 'adjustment') => {
         const rounded = roundCredits(Number(newBalance) || 0)
         balanceRef.current = rounded
@@ -135,11 +147,12 @@ export function CreditProvider({ children }) {
 
     const placeBet = useCallback((amount, label = 'Practice bet') => {
         const amt = Number(amount)
-        if (!Number.isFinite(amt) || amt <= 0 || amt > balanceRef.current) {
+        const available = currentBalance()
+        if (!Number.isFinite(amt) || amt <= 0 || amt > available) {
             return false
         }
 
-        const nextBalance = roundCredits(balanceRef.current - amt)
+        const nextBalance = roundCredits(available - amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
         persistCredits(nextBalance)
@@ -150,13 +163,13 @@ export function CreditProvider({ children }) {
             balance: nextBalance,
         })
         return true
-    }, [recordTransaction])
+    }, [currentBalance, recordTransaction])
 
     const addWinnings = useCallback((amount, label = 'Simulation return') => {
         const amt = Number(amount)
         if (!Number.isFinite(amt) || amt <= 0) return
 
-        const nextBalance = roundCredits(balanceRef.current + amt)
+        const nextBalance = roundCredits(currentBalance() + amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
         persistCredits(nextBalance)
@@ -166,19 +179,26 @@ export function CreditProvider({ children }) {
             amount: roundCredits(amt),
             balance: nextBalance,
         })
-    }, [recordTransaction])
+    }, [currentBalance, recordTransaction])
 
     const runCreditTransactionsTransactional = useCallback((entries, commit) => {
-        const prepared = prepareCreditTransactions(balanceRef.current, transactionsRef.current, entries)
+        const prepared = prepareCreditTransactions(currentBalance(), transactionsRef.current, entries)
         return commitPreparedCreditTransactions(prepared, commit, (nextBalance, nextTransactions) => {
             // The durable commit/readback has succeeded before either the
             // authoritative refs or React consumers see the prepared state.
+            // Publish also persists, so the storage value never lags the ref:
+            // a commit that writes credits elsewhere (the sportsbook ledger and
+            // the IndexedDB authority both do) would otherwise leave
+            // `gampo_credits` holding an older balance, and the next
+            // affordability read would reject a stake the user can afford.
             balanceRef.current = nextBalance
             transactionsRef.current = nextTransactions
             setBalance(nextBalance)
             setTransactions(nextTransactions)
+            persistCredits(nextBalance)
+            persistHistory(nextTransactions)
         })
-    }, [])
+    }, [currentBalance])
 
     const placeBetTransactional = useCallback((amount, label, transactionId, commit) => (
         runCreditTransactionsTransactional([{ type: 'bet', label, amount, transactionId }], commit)
@@ -192,7 +212,7 @@ export function CreditProvider({ children }) {
         const amt = Number(amount)
         if (!Number.isFinite(amt) || amt <= 0) return
 
-        const nextBalance = roundCredits(balanceRef.current + amt)
+        const nextBalance = roundCredits(currentBalance() + amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
         persistCredits(nextBalance)
@@ -202,7 +222,7 @@ export function CreditProvider({ children }) {
             amount: roundCredits(amt),
             balance: nextBalance,
         })
-    }, [recordTransaction])
+    }, [currentBalance, recordTransaction])
 
     const resetBalance = useCallback(() => {
         balanceRef.current = INITIAL_CREDITS

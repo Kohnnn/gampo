@@ -23,6 +23,19 @@ function creditConsumer(initialBalance) {
     return credits
 }
 
+// Mounts a provider against whatever localStorage currently holds, without
+// seeding. Two calls model two documents that both mounted before either wrote.
+function mountConsumer() {
+    let credits
+    function Consumer() {
+        credits = useCredits()
+        return null
+    }
+    renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+    return credits
+}
+
+
 const storedBalance = () => Number(localStorage.getItem(CREDIT_STORAGE_KEY))
 const storedHistory = () => JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]')
 
@@ -140,5 +153,42 @@ describe('CreditContext storage reads', () => {
     it('preserves a stored zero balance', () => {
         globalThis.localStorage.setItem('stored-zero', '0')
         expect(readNumber('stored-zero', INITIAL_CREDITS)).toBe(0)
+    })
+})
+
+describe('D-1 credit lost update', () => {
+    it('rejects a stake that exceeds the stored balance even when the tab-local ref is stale', () => {
+        // Both documents mount while storage says 1000, so each holds its own
+        // balanceRef of 1000. Tab A commits 600. Tab B's ref is now stale; an
+        // affordability check against the ref would accept a second 600 and
+        // publish 400 over the correct 400 -> 1200 staked against 1000 funded.
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabB = mountConsumer()
+        const tabA = mountConsumer()
+
+        expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(400)
+
+        expect(tabB.placeBet(600, 'Plinko')).toBe(false)
+        expect(storedBalance()).toBe(400)
+    })
+
+    it('applies a win against the stored balance, not a stale tab-local ref', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabB = mountConsumer()
+        const tabA = mountConsumer()
+
+        expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+        tabB.addWinnings(50, 'Plinko')
+        expect(storedBalance()).toBe(450)
+    })
+
+    it('keeps repeated same-tab stakes correct without a second document', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tab = mountConsumer()
+        expect(tab.placeBet(600, 'Plinko')).toBe(true)
+        expect(tab.placeBet(600, 'Plinko')).toBe(false)
+        expect(tab.placeBet(400, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(0)
     })
 })
