@@ -143,7 +143,19 @@ export function CreditProvider({ children }) {
     // overwrites a peer's committed balance (1200 staked against 1000 funded).
     // Reading first is the whole repair, and it keeps the API synchronous so
     // the 42 existing call sites are unchanged.
+    //
+    // `persistFailedRef` handles the one case where the stored value is the
+    // stale one: a refused write (quota, storage unavailable) leaves storage
+    // behind the ref. Continuing to trust storage there would re-offer a
+    // balance already spent and charge the same stake again, so from the first
+    // refused write until a write succeeds, the ref wins. That is the only
+    // state in which the ref is the fresher of the two.
+    const persistFailedRef = useRef(false)
+    const commitBalance = useCallback((nextBalance) => {
+        persistFailedRef.current = !persistCredits(nextBalance)
+    }, [])
     const currentBalance = useCallback(() => {
+        if (persistFailedRef.current) return balanceRef.current
         const stored = readNumber(CREDIT_STORAGE_KEY, NaN)
         return Number.isFinite(stored) ? roundCredits(stored) : balanceRef.current
     }, [])
@@ -152,9 +164,9 @@ export function CreditProvider({ children }) {
         const rounded = roundCredits(Number(newBalance) || 0)
         balanceRef.current = rounded
         setBalance(rounded)
-        persistCredits(rounded)
+        commitBalance(rounded)
         recordTransaction({ type: reason, amount: 0, balance: rounded })
-    }, [recordTransaction])
+    }, [commitBalance, recordTransaction])
 
     const placeBet = useCallback((amount, label = 'Practice bet') => {
         const amt = Number(amount)
@@ -166,7 +178,7 @@ export function CreditProvider({ children }) {
         const nextBalance = roundCredits(available - amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
-        persistCredits(nextBalance)
+        commitBalance(nextBalance)
         recordTransaction({
             type: 'bet',
             label,
@@ -174,7 +186,7 @@ export function CreditProvider({ children }) {
             balance: nextBalance,
         })
         return true
-    }, [currentBalance, recordTransaction])
+    }, [commitBalance, currentBalance, recordTransaction])
 
     const addWinnings = useCallback((amount, label = 'Simulation return') => {
         const amt = Number(amount)
@@ -183,14 +195,14 @@ export function CreditProvider({ children }) {
         const nextBalance = roundCredits(currentBalance() + amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
-        persistCredits(nextBalance)
+        commitBalance(nextBalance)
         recordTransaction({
             type: 'win',
             label,
             amount: roundCredits(amt),
             balance: nextBalance,
         })
-    }, [currentBalance, recordTransaction])
+    }, [commitBalance, currentBalance, recordTransaction])
 
     const runCreditTransactionsTransactional = useCallback((entries, commit) => {
         const prepared = prepareCreditTransactions(currentBalance(), readMergedHistory(), entries)
@@ -211,12 +223,12 @@ export function CreditProvider({ children }) {
             // Making it fail loud belongs with the lock wiring, where a failed
             // write can be reported as one atomic outcome rather than leaving a
             // round shown as committed while its balance is not on disk.
-            if (readNumber(CREDIT_STORAGE_KEY, NaN) !== nextBalance) persistCredits(nextBalance)
+            if (readNumber(CREDIT_STORAGE_KEY, NaN) !== nextBalance) commitBalance(nextBalance)
             if (readRaw(HISTORY_STORAGE_KEY, null) !== JSON.stringify(nextTransactions)) {
                 persistHistory(nextTransactions)
             }
         })
-    }, [currentBalance, readMergedHistory])
+    }, [commitBalance, currentBalance, readMergedHistory])
 
     const placeBetTransactional = useCallback((amount, label, transactionId, commit) => (
         runCreditTransactionsTransactional([{ type: 'bet', label, amount, transactionId }], commit)
@@ -233,19 +245,19 @@ export function CreditProvider({ children }) {
         const nextBalance = roundCredits(currentBalance() + amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
-        persistCredits(nextBalance)
+        commitBalance(nextBalance)
         recordTransaction({
             type: 'grant',
             label: 'Practice credit top-up',
             amount: roundCredits(amt),
             balance: nextBalance,
         })
-    }, [currentBalance, recordTransaction])
+    }, [commitBalance, currentBalance, recordTransaction])
 
     const resetBalance = useCallback(() => {
         balanceRef.current = INITIAL_CREDITS
         setBalance(INITIAL_CREDITS)
-        persistCredits(INITIAL_CREDITS)
+        commitBalance(INITIAL_CREDITS)
         const entry = {
             id: `${Date.now()}-reset`,
             type: 'reset',
@@ -257,7 +269,7 @@ export function CreditProvider({ children }) {
         transactionsRef.current = [entry]
         setTransactions([entry])
         persistHistory([entry])
-    }, [])
+    }, [commitBalance])
 
     const value = {
         balance,

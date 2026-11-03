@@ -212,3 +212,19 @@ describe('D-1 cross-document history', () => {
         expect(ledger.map(entry => entry.amount).sort((a, b) => a - b)).toEqual([-600, -400])
     })
 })
+
+describe('D-1 storage write failure', () => {
+    it('does not resurrect a debit whose credits write was refused', () => {
+        // Storage is full: the credits write is refused, so the stored value
+        // cannot advance. Reading it back on the next stake would re-offer the
+        // balance already spent and charge the stake twice, so a refused write
+        // must fall back to the in-memory ref for the rest of the session.
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tab = mountConsumer()
+        localStorage.setItem = () => { throw new Error('quota exceeded') }
+
+        expect(tab.placeBet(600, 'Plinko')).toBe(true)
+        expect(tab.placeBet(600, 'Plinko')).toBe(false)
+        expect(tab.placeBet(400, 'Plinko')).toBe(true)
+    })
+})
