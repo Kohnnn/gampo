@@ -3,7 +3,10 @@
 //
 // `pre-fix` mirrors the code before the repair (affordability against the
 // tab-local `balanceRef`); `post-fix` mirrors the repaired code (affordability
-// against the stored value). The real repair is covered by the provider tests
+// against the stored value). Both models are SEQUENTIAL: they run one stake to
+// completion before the next. They say nothing about two documents that read
+// the same balance before either commits — that window is open, and is covered
+// by the expected-fail test in src/context/CreditContext.test.js. The real repair is covered by the provider tests
 // in src/context/CreditContext.test.js — this script only documents the shape
 // of the defect and the arithmetic that closes it.
 const KEY = 'gampo_credits'
@@ -35,4 +38,6 @@ console.log(JSON.stringify({ before, after }, null, 1))
 if (!before.lostUpdate) throw new Error('pre-fix model no longer reproduces D-1')
 if (after.lostUpdate) throw new Error('post-fix model still loses an update')
 if (after.staked !== 600 || after.stored !== 400) throw new Error(`post-fix accounting wrong: staked=${after.staked} stored=${after.stored}`)
-console.log('D-1: reproduced pre-fix, closed post-fix')
+console.log('D-1 sequential stale-ref: reproduced pre-fix, mitigated post-fix')
+console.log('D-1 concurrent window: STILL OPEN — see the expected-fail test in')
+console.log('  src/context/CreditContext.test.js (D-1 concurrent acceptance)')
