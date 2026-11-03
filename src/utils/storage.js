@@ -57,7 +57,7 @@ export function readJson(key, fallback = null, { strict = false } = {}) {
     const store = strict ? strictStore() : getStore()
     if (!store) return fallback
     try {
-        const raw = store.getItem(key)
+        const raw = readRaw(key, null, { strict })
         if (raw == null) return fallback
         const parsed = JSON.parse(raw)
         return parsed == null ? fallback : parsed
@@ -85,7 +85,7 @@ export function readRaw(key, fallback = null, { strict = false } = {}) {
     const store = strict ? strictStore() : getStore()
     if (!store) return fallback
     try {
-        const raw = store.getItem(key)
+        const raw = strict ? strictCall(store, 'getItem', key) : store.getItem(key)
         return raw == null ? fallback : raw
     } catch (error) {
         if (strict) throw error
@@ -118,7 +118,11 @@ export function removeKey(key) {
     }
 }
 
-/** Enumerate all persisted keys under the `gampo_` prefix. */
+/**
+ * Enumerate all persisted keys under the `gampo_` prefix.
+ * A failed enumeration throws: a truncated list would silently under-report
+ * exported state and under-restore it on import.
+ */
 export function listGampoKeys() {
     const store = strictStore()
     const keys = []

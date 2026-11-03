@@ -136,6 +136,21 @@ describe('storage util', () => {
         expect(readJson('gampo_bad', null)).toBeNull()
     })
 
+    it('distinguishes strict read failures from absent keys and stored JSON null', () => {
+        installStorage({ gampo_null: 'null', gampo_bad: '{not json' })
+        expect(readRaw('gampo_missing', 'missing', { strict: true })).toBe('missing')
+        expect(readJson('gampo_missing', 'missing', { strict: true })).toBe('missing')
+        expect(readJson('gampo_null', 'empty', { strict: true })).toBe('empty')
+        expect(() => readJson('gampo_bad', null, { strict: true })).toThrow()
+
+        installStorage({}, { getItem: () => true })
+        expect(() => readRaw('gampo_credits', null, { strict: true })).toThrow('get gampo_credits failed')
+        expect(() => readJson('gampo_credits', null, { strict: true })).toThrow('get gampo_credits failed')
+        globalThis.localStorage = undefined
+        expect(() => readRaw('gampo_missing', null, { strict: true })).toThrow()
+        expect(() => readJson('gampo_missing', null, { strict: true })).toThrow()
+    })
+
     it('round-trips raw values and removes keys', () => {
         writeRaw('gampo_raw', '1')
         expect(readRaw('gampo_raw')).toBe('1')
@@ -148,6 +163,18 @@ describe('storage util', () => {
         writeRaw('gampo_b', '2')
         writeRaw('other_key', '3')
         expect(listGampoKeys().sort()).toEqual(['gampo_a', 'gampo_b'])
+    })
+
+    it('signals failed enumeration instead of returning a truncated key list', () => {
+        installStorage({ gampo_a: '1', gampo_b: '2' }, { key: (index) => index === 1 })
+        expect(() => listGampoKeys()).toThrow('key 1 failed')
+        installStorage({ gampo_a: '1' }, { length: () => true })
+        expect(() => listGampoKeys()).toThrow('length failed')
+        // Absent localStorage must not read as an empty profile either, for the
+        // same reason as snapshotM1: `listGampoKeys` feeds the export, so a
+        // silent `[]` would publish a save containing none of the player's keys.
+        globalThis.localStorage = undefined
+        expect(() => listGampoKeys()).toThrow()
     })
 
     it('snapshots and restores all gampo_ state losslessly', () => {
