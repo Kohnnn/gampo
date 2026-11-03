@@ -100,27 +100,30 @@ export function CreditProvider({ children }) {
 
     // The ref is this document's view and goes stale the moment a peer writes
     // (nothing subscribes to the `storage` event for these keys). Both the
-    // durable history we append to and the duplicate-id guard must therefore be
-    // based on what is actually stored, unioned with anything this document has
-    // that storage lost to an earlier failed write. Without this, a second
-    // document's committed entry is silently overwritten and the ledger no
-    // longer accounts for the balance it sits next to.
-    const readMergedHistory = useCallback(() => {
-        const stored = readHistory()
-        const seen = new Set(stored.map(entry => entry.id))
-        return [...transactionsRef.current.filter(entry => !seen.has(entry.id)), ...stored].slice(0, 100)
-    }, [])
+    // durable history we append to and the duplicate-id guard therefore read
+    // what is actually stored, so a peer's committed entry is never
+    // overwritten.
+    //
+    // Deliberately NOT unioned with `transactionsRef`. An unconditional union
+    // also re-adds entries that were retired on purpose: `resetBalance` and an
+    // import both replace the list wholesale, and the stale ref would prepend
+    // the old entries straight back (proved: ['bet','bet','reset']). Telling
+    // "storage lost this entry" from "storage dropped it deliberately" needs a
+    // reset epoch, which belongs with the lock wiring. Meanwhile the entry was
+    // never durable, so dropping it is the honest outcome — a refused history
+    // write is already reported by `persistFailedRef` for the balance.
+    const readStoredHistory = useCallback(() => readHistory(), [])
 
     const recordTransaction = useCallback((entry) => {
         const next = [{
             id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
             timestamp: new Date(),
             ...entry,
-        }, ...readMergedHistory()].slice(0, 100)
+        }, ...readStoredHistory()].slice(0, 100)
         transactionsRef.current = next
         setTransactions(next)
         persistHistory(next)
-    }, [readMergedHistory])
+    }, [readStoredHistory])
 
     const showToast = useCallback((type, title, description, duration = 3000) => {
         const id = ++toastIdRef.current
@@ -205,7 +208,7 @@ export function CreditProvider({ children }) {
     }, [commitBalance, currentBalance, recordTransaction])
 
     const runCreditTransactionsTransactional = useCallback((entries, commit) => {
-        const prepared = prepareCreditTransactions(currentBalance(), readMergedHistory(), entries)
+        const prepared = prepareCreditTransactions(currentBalance(), readStoredHistory(), entries)
         return commitPreparedCreditTransactions(prepared, commit, (nextBalance, nextTransactions) => {
             // The durable commit/readback has succeeded before either the
             // authoritative refs or React consumers see the prepared state.
@@ -228,7 +231,7 @@ export function CreditProvider({ children }) {
                 persistHistory(nextTransactions)
             }
         })
-    }, [commitBalance, currentBalance, readMergedHistory])
+    }, [commitBalance, currentBalance, readStoredHistory])
 
     const placeBetTransactional = useCallback((amount, label, transactionId, commit) => (
         runCreditTransactionsTransactional([{ type: 'bet', label, amount, transactionId }], commit)

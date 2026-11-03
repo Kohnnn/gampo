@@ -268,6 +268,41 @@ describe('D-1 successive writes keep peer reads', () => {
     })
 })
 
+describe('D-1 ledger resurrection', () => {
+    // Regression guard. An earlier fix for review finding F1 unioned this
+    // document's ref with the stored list so a peer's committed entry was never
+    // overwritten. That union was unconditional, so it also re-added entries
+    // retired on purpose. No refused write was needed: the peer replaces the
+    // list wholesale while this document still holds the old one.
+    //
+    // `resetBalance` is exactly such a replacement (it writes `[resetEntry]`),
+    // and a peer import does the same. Observed before the fix:
+    // `['bet','bet','reset']`.
+    //
+    // FIXED: history is now read from storage only, so this passes. Kept as a
+    // plain `it` so a future re-introduction of the union fails immediately.
+    it('does not resurrect a pre-reset entry after a peer resets', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabA = mountConsumer()
+        const tabB = mountConsumer()
+
+        expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(400)
+        expect(storedHistory().map(entry => entry.type)).toEqual(['bet'])
+
+        // B resets: history becomes exactly the reset entry.
+        tabB.resetBalance()
+        expect(storedHistory().map(entry => entry.type)).toEqual(['reset'])
+
+        // A still holds its pre-reset `bet` entry in its ref. Betting again must
+        // build on B's reset list, not resurrect A's retired entry.
+        expect(tabA.placeBet(100, 'Plinko')).toBe(true)
+        const types = storedHistory().map(entry => entry.type)
+        expect(types).toEqual(['bet', 'reset'])
+        expect(types.filter(type => type === 'bet')).toHaveLength(1)
+    })
+})
+
 describe('D-1 concurrent acceptance (OPEN — expected to fail)', () => {
     // `it.fails` records a KNOWN OPEN DEFECT: the suite stays green, and the
     // moment someone serialises the credit path this test starts passing, which
