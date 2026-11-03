@@ -36,7 +36,7 @@ function readHistory() {
 // a full disk with no notice to the player, which is how a committed round
 // could be shown as saved while its balance was never written.
 function persistCredits(value) {
-    writeRaw(CREDIT_STORAGE_KEY, value)
+    return writeRaw(CREDIT_STORAGE_KEY, value)
 }
 
 function persistHistory(history) {

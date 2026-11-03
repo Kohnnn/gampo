@@ -228,3 +228,42 @@ describe('D-1 storage write failure', () => {
         expect(tab.placeBet(400, 'Plinko')).toBe(true)
     })
 })
+
+describe('D-1 successive writes keep peer reads', () => {
+    it('keeps reading peer balances after this document has written', () => {
+        // A successful write must NOT latch the document into ref-only mode.
+        // If it did, A would ignore B's committed stake and double-spend.
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabA = mountConsumer()
+        const tabB = mountConsumer()
+
+        expect(tabA.placeBet(100, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(900)
+        expect(tabB.placeBet(200, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(700)
+        // A writes again; storage still holds the truth, so A must see 700.
+        expect(tabA.placeBet(800, 'Plinko')).toBe(false)
+        expect(tabA.placeBet(700, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(0)
+    })
+
+    it('recovers peer reads in the same document once a refused write succeeds', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tab = mountConsumer()
+        const restore = localStorage.setItem
+        localStorage.setItem = () => { throw new Error('quota exceeded') }
+        expect(tab.placeBet(100, 'Plinko')).toBe(true)
+        localStorage.setItem = restore
+        tab.addWinnings(50, 'Plinko')
+        expect(storedBalance()).toBe(950)
+
+        // The refused write had latched this document onto its own ref (900).
+        // The successful write must clear that, so the stored 950 is
+        // authoritative again: leaving the latch on would let this tab keep
+        // reading 900 and accept a stake the balance cannot cover.
+        const peer = mountConsumer()
+        expect(peer.placeBet(950, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(0)
+        expect(tab.placeBet(1, 'Plinko')).toBe(false)
+    })
+})
