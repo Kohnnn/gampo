@@ -239,6 +239,10 @@ async function main() {
             arms.push({
                 arm: 'C two connections cannot overdraw',
                 results: [c1.kind, c2.kind],
+                // One committed result is not enough: the loser must be a durable
+                // refusal, not an abort or unknown that would leave the player
+                // without a decided outcome.
+                loser: [c1, c2].find(r => r.kind !== 'committed'),
                 before: beforeC,
                 state: cState,
             })
@@ -274,7 +278,9 @@ async function main() {
             && B.state.finals === B.before.finals
             && B.state.meta?.nextSequence === B.before.meta?.nextSequence,
         concurrentNoOverdraw: C?.results.filter(k => k === 'committed').length === 1
-            && C.state.wallet?.balance === (C.before.wallet?.balance ?? 0) - 600,
+            && C.state.wallet?.balance === (C.before.wallet?.balance ?? 0) - 600
+            && C.loser?.kind === 'rejected'
+            && C.loser?.code === 'insufficient-funds',
         replayIdempotent: D?.result.replay === true
             && D?.balanceAfter === 1150
             && D?.operationsUnchanged === true
