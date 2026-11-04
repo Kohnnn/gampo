@@ -281,7 +281,10 @@ async function main() {
         concurrencySerialised: pairArm.pair?.filter(r => r.kind === 'committed').length === 1
             && pairArm.afterPair?.balance === 400,
         lsObserved: lsArm.lsResult,
-        localStorageDoubleSpend: lsArm.lsResult?.balance === 400 && lsArm.lsResult?.staked === 1200,
+        // Compare the MEASURED accepted total, not the hardcoded 1200. If the
+        // control stops double-spending (bAccepts false), one 600 stake leaves
+        // balance 400 and a balance-only check would still report a defect.
+        localStorageDoubleSpend: lsArm.lsResult?.balance === 400 && lsArm.lsResult?.accepted === 1200,
         interpretation: 'Observation only. A pass shows IndexedDB serialises readwrite transactions and preserves the prior value on abort in this browser. It does NOT show crash durability, power-loss atomicity, quota behaviour under a full disk, or any hosted behaviour.',
     }
     const text = JSON.stringify(report, null, 2)
