@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import 'fake-indexeddb/auto'
 import { IDBFactory } from 'fake-indexeddb'
-import { Authority, makeSettleRequest, planFinalRetention } from './authority.js'
+import { Authority, canonical, makeSettleRequest, planFinalRetention } from './authority.js'
 import { DB_NAME } from './idb.js'
 import {
     RESULT_KINDS,
@@ -368,5 +368,33 @@ describe('codec — accepted facts survive a replay', () => {
         })
         expect(again.replay).toBe(true)
         expect(again.kind).toBe('committed')
+    })
+})
+
+describe('codec — accepted facts are captured, not aliased', () => {
+    it('is unaffected by a caller mutating its selected payload after the call', () => {
+        const selected = { bin: 8, multiplier: 1.8 }
+        const exact = makeSettleRequest('op-alias', { exitKind: 'win', stake: 1, payout: 2, selected })
+        const before = canonical(exact)
+        // The caller owns its object and may reuse it for the next round. If the
+        // request aliased it, the bytes already computed for THIS operation
+        // would silently change, so a replay of the original outcome would be
+        // rejected as an id-conflict against its own record.
+        selected.bin = 12
+        selected.multiplier = 0
+        expect(canonical(exact)).toBe(before)
+        expect(exact.selected).toEqual({ bin: 8, multiplier: 1.8 })
+    })
+
+    it('stores the captured facts, not a later mutation of the caller object', async () => {
+        const auth = await freshAuthority()
+        await seedWallet(auth, 100)
+        const selected = { bin: 8 }
+        const pending = auth.settleRound('op-alias-2', { exitKind: 'win', stake: 1, payout: 2, selected })
+        selected.bin = 99
+        const result = await pending
+        expect(result.kind).toBe('committed')
+        expect(result.value.selected).toEqual({ bin: 8 })
+        expect((await auth.readFinals(`e1:round:op-alias-2`))[0].result.value.selected).toEqual({ bin: 8 })
     })
 })

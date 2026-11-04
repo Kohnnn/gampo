@@ -176,15 +176,20 @@ async function launch(browser, profile) {
     return { evaluate, ready, kill, child }
 }
 
-// Reads the authority wallet and operations through the production modules.
+// Reads the WHOLE transaction scope through the production modules. Asserting
+// only the wallet and an operation id would pass even if the round/final writes
+// were dropped, or if an aborted round left an orphan behind.
 const READ_STATE = `(async () => {
     const db = await window.openAuthorityDb(indexedDB)
     const idb = new window.Idb(db)
     const wallet = await idb.read('wallet', 'current')
-    const operations = (await idb.all('operations')).map(r => ({ id: r.id, roundId: r.roundId, bytes: r.requestBytes, result: r.result?.kind }))
-    const finals = (await idb.all('finals')).map(r => ({ id: r.id, roundId: r.roundId, exitKind: r.exitKind }))
+    const meta = await idb.read('meta', 'current')
+    const rows = async name => (await idb.all(name)).map(r => JSON.stringify(r)).sort()
+    const operations = await rows('operations')
+    const rounds = await rows('rounds')
+    const finals = await rows('finals')
     db.close()
-    return { wallet, operations, finals }
+    return { wallet, meta, operations, rounds, finals }
 })()`
 
 async function main() {
@@ -306,22 +311,42 @@ async function main() {
 
     const by = p => report.arms.find(a => a.arm.startsWith(p))
     const A = by('A'), B = by('B'), C = by('C'), D = by('D')
-    const has = (state, opId) => Boolean(state?.operations?.some(o => o.id.endsWith(opId)))
+
+    // Assert the WHOLE committed record, not just the wallet. A dropped round or
+    // final write must fail this gate, and an orphaned aborted round must too.
+    const committedRecord = (state, roundId, exitKind) => {
+        const rounds = (state?.rounds ?? []).map(r => JSON.parse(r))
+        const finals = (state?.finals ?? []).map(r => JSON.parse(r))
+        return rounds.some(r => r.id === roundId && r.exitKind === exitKind)
+            && finals.some(r => r.roundId === roundId && r.exitKind === exitKind)
+    }
+    const nothingForRound = (state, roundId) => {
+        const rounds = (state?.rounds ?? []).map(r => JSON.parse(r))
+        const finals = (state?.finals ?? []).map(r => JSON.parse(r))
+        const ops = (state?.operations ?? []).map(r => JSON.parse(r))
+        return !rounds.some(r => r.id === roundId)
+            && !finals.some(r => r.roundId === roundId)
+            && !ops.some(o => o.roundId === roundId)
+    }
 
     report.conclusion = {
         committedBeforeRestart: A?.first.committed.kind === 'committed' && A?.first.committed.balanceAfter === 1150,
         abortedBeforeRestart: A?.first.aborted.kind === 'aborted' && A?.first.aborted.code === 'transaction-error',
-        abortedAbsent: A?.state.operations.every(o => !o.id.endsWith('op-aborted')),
-        survivesReload: B?.state.wallet?.balance === 1150 && has(B.state, 'op-durable'),
-        survivesProcessKill: C?.state.wallet?.balance === 1150 && has(C.state, 'op-durable'),
-        noResurrectedAbort: C?.state.operations.every(o => !o.id.endsWith('op-aborted')),
+        committedRecordComplete: committedRecord(A?.state, 'e1:round:op-durable', 'cashout'),
+        abortedLeavesNothing: nothingForRound(A?.state, 'e1:round:op-aborted'),
+        survivesReload: B?.state.wallet?.balance === 1150 && committedRecord(B?.state, 'e1:round:op-durable', 'cashout'),
+        survivesProcessKill: C?.state.wallet?.balance === 1150 && committedRecord(C?.state, 'e1:round:op-durable', 'cashout'),
+        noResurrectedAbort: nothingForRound(C?.state, 'e1:round:op-aborted'),
         secondCommitDurable: D?.second.kind === 'committed'
             && D.second.balanceAfter === 1220
             && D?.state.wallet?.balance === 1220
-            && has(D.state, 'op-durable-2')
-            && has(D.state, 'op-durable'),
-        noReplayAfterRestart: D?.second.replay === false,
-        interpretation: 'Real Chromium, real IndexedDB, real profile directory. A committed settlement survives ordinary reload and a SIGKILLed browser process relaunched on the same profile; a transaction aborted after every write queued leaves nothing behind. Owner decision 9 scope: current stable desktop Chromium, reload and browser restart only. NOT power loss, NOT OS crash, NOT cross-device sync, NOT quota exhaustion, NOT a second engine.',
+            && committedRecord(D?.state, 'e1:round:op-durable-2', 'win')
+            && committedRecord(D?.state, 'e1:round:op-durable', 'cashout'),
+        // The second commit uses a new id, so this proves the fresh operation was
+        // not silently replayed from a stale cache - not that an id replays
+        // idempotently across a restart. Replay-across-restart is unproven here.
+        freshOperationAfterRestart: D?.second.replay === false,
+        interpretation: 'Real Chromium, real IndexedDB, real profile directory. A committed settlement - wallet, operation, round and retained final - survives ordinary reload and a SIGKILLed browser process relaunched on the same profile; a transaction aborted after every write queued leaves no operation, round or final behind. Owner decision 9 scope: current stable desktop Chromium, reload and browser restart only. NOT power loss, NOT OS crash, NOT cross-device sync, NOT quota exhaustion, NOT a second engine. NOT idempotent replay of a pre-restart operation.',
     }
 
     const text = JSON.stringify(report, null, 2)
@@ -331,9 +356,10 @@ async function main() {
     const c = report.conclusion
     const cleanupOk = report.cleanup.serverClosed && report.cleanup.workRemoved && report.cleanup.errors.length === 0
     const valid = cleanupOk
-        && c.committedBeforeRestart && c.abortedBeforeRestart && c.abortedAbsent
+        && c.committedBeforeRestart && c.abortedBeforeRestart
+        && c.committedRecordComplete && c.abortedLeavesNothing
         && c.survivesReload && c.survivesProcessKill && c.noResurrectedAbort
-        && c.secondCommitDurable && c.noReplayAfterRestart
+        && c.secondCommitDurable && c.freshOperationAfterRestart
     console.log(`HARNESS VALID: ${valid} (cleanup=${Boolean(cleanupOk)})`)
     process.exit(valid ? 0 : 1)
 }

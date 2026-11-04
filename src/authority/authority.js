@@ -77,8 +77,13 @@ export function makeSettleRequest(operationId, request) {
     if (selected !== undefined && (typeof selected !== 'object' || selected === null || Array.isArray(selected))) {
         throw new TypeError('selected must be a plain object when present')
     }
+    // Snapshot, never alias. `settleRound` computes `requestBytes` before its
+    // first await and serialises the payload again later; an aliased object that
+    // the caller mutates in between would persist bytes for one outcome beside
+    // facts for another, and the operation's own replay would then read as an
+    // id-conflict. Structured-clone-free deep copy keeps this dependency-free.
     const exact = { operationId, exitKind, stake, payout, label: String(request?.label ?? 'Round') }
-    if (selected !== undefined) exact.selected = selected
+    if (selected !== undefined) exact.selected = JSON.parse(JSON.stringify(selected))
     return exact
 }
 
