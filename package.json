@@ -19,6 +19,7 @@
         "smoke:browser": "node --experimental-websocket scripts/browserSmoke.mjs",
         "ux:benchmark": "node --experimental-websocket scripts/browserSmoke.mjs --mode=ux --out=output/ux-benchmark",
         "verify:qa23-save-safety": "node scripts/qa23SaveSafety.mjs",
+        "verify:qa23-durability": "node scripts/qa23AuthorityDurabilityProbe.mjs",
         "verify:betsheet": "node --experimental-websocket scripts/verifyBetSheet.mjs",
         "probe:slots-accounting": "node --experimental-websocket scripts/slotsAccountingProbe.mjs",
         "probe:slots-qa-seam": "node --experimental-websocket scripts/slotsQaSeamProbe.mjs",
