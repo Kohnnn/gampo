@@ -33,9 +33,13 @@ export function isOpenDialogPresent(root = typeof document !== 'undefined' ? doc
     for (const dialog of dialogs) {
         if (dialog.getAttribute('aria-hidden') === 'true') continue
         // A portaled layer can stay mounted at opacity 0 / pointer-events none
-        // while collapsed; that is not an open dialog.
+        // while collapsed; that is not an open dialog. The mobile bet sheet is
+        // exactly this: rendered whenever `isMobile`, always `role="dialog"`,
+        // collapsed by CSS only. Without the opacity check it reads as open on
+        // every mobile viewport, and BetPanel then ignores S/Space entirely.
         const style = dialog.ownerDocument?.defaultView?.getComputedStyle?.(dialog)
         if (style && (style.display === 'none' || style.visibility === 'hidden')) continue
+        if (style && (Number(style.opacity) === 0 || style.pointerEvents === 'none')) continue
         return true
     }
     return false
