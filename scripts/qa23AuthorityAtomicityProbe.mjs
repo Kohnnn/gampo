@@ -16,12 +16,14 @@
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createServer } from 'node:http'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(here, '..')
@@ -40,6 +42,17 @@ function resolveBrowser() {
         }
     }
     throw new Error('No Chromium found. Set GAMPO_CHROMIUM to the browser binary.')
+}
+
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
+
+/** Candidate identity: the commit and the exact bytes actually exercised. */
+function identity(bundleBytes) {
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim()
+    const dirty = execFileSync('git', ['status', '--porcelain', '--', 'src/authority'], { cwd: repoRoot, encoding: 'utf8' }).trim()
+    const sources = ['src/authority/authority.js', 'src/authority/idb.js', 'src/authority/resultContract.js']
+        .map(path => ({ path, sha256: sha256(readFileSync(join(repoRoot, path))) }))
+    return { head, authoritySourcesDirty: dirty.length > 0, bundle: { bytes: bundleBytes.length, sha256: sha256(bundleBytes) }, sources }
 }
 
 /** Bundle the real authority module for the page. */
@@ -93,6 +106,7 @@ async function main() {
     const site = join(work, 'site')
     await mkdir(site, { recursive: true })
     await bundle(site)
+    const report = { arms: [], identity: identity(await readFile(join(site, 'bundle.js'))) }
     await writeFile(join(site, 'index.html'), '<!doctype html><meta charset="utf-8"><title>probe</title><script type="module" src="/bundle.js"></script>')
 
     const server = createServer(async (req, res) => {
@@ -112,7 +126,7 @@ async function main() {
         `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank',
     ], { stdio: ['ignore', 'pipe', 'pipe'] })
 
-    const report = { arms: [], origin }
+    report.origin = origin
     try {
         const activePort = join(profile, 'DevToolsActivePort')
         let text = null
@@ -163,13 +177,19 @@ async function main() {
             }
             const db = await openAuthorityDb(indexedDB)
             const idb = new Idb(db)
-            const dump = async () => ({
-                wallet: await idb.read('wallet', 'current'),
-                operations: (await idb.all('operations')).length,
-                rounds: (await idb.all('rounds')).length,
-                finals: (await idb.all('finals')).length,
-                meta: await idb.read('meta', 'current'),
-            })
+            // Full keyed contents, sorted: counts cannot detect an overwritten row.
+            const dump = async () => {
+                const rows = async name => (await idb.all(name))
+                    .map(r => JSON.stringify(r))
+                    .sort()
+                return {
+                    wallet: await idb.read('wallet', 'current'),
+                    operations: await rows('operations'),
+                    rounds: await rows('rounds'),
+                    finals: await rows('finals'),
+                    meta: await idb.read('meta', 'current'),
+                }
+            }
 
             await seed(1000)
             const zeros = await dump()
@@ -193,7 +213,7 @@ async function main() {
                 arm: 'D replay is idempotent',
                 result: { kind: d1.kind, replay: d1.replay === true },
                 balanceAfter: dState.wallet?.balance,
-                operationsUnchanged: dState.operations === aState.operations,
+                operationsUnchanged: JSON.stringify(dState.operations) === JSON.stringify(aState.operations),
                 nextSequenceUnchanged: dState.meta?.nextSequence === aState.meta?.nextSequence,
             })
 
@@ -209,11 +229,16 @@ async function main() {
             // Wrap the production Idb so the body queues all five puts and the
             // transaction then aborts. Every store must revert to its prior value.
             const beforeB = await dump()
+            // forcedAfterFn records that the body returned normally, i.e. the
+            // abort happened after the real settle path queued every write - not
+            // before it. Without this flag the arm could pass by aborting early.
+            let forcedAfterFn = false
             const abortingIdb = {
                 read: (s, k) => idb.read(s, k),
                 all: s => idb.all(s),
                 readwrite: (stores, fn) => idb.readwrite(stores, async (handles, tx) => {
                     await fn(handles, tx)
+                    forcedAfterFn = true
                     throw Object.assign(new Error('forced abort after all puts'), { aborted: true })
                 }),
             }
@@ -223,6 +248,7 @@ async function main() {
             arms.push({
                 arm: 'B multi-store abort rolls back all five stores',
                 result: { kind: b1.kind, code: b1.code },
+                forcedAfterFn,
                 before: beforeB,
                 state: bState,
             })
@@ -253,11 +279,28 @@ async function main() {
         report.arms.push(...armResults)
 
         await cdp.send('Target.closeTarget', { targetId: pageTarget.targetId })
-        report.cleanup = { profile: 'removed', server: true }
     } finally {
+        // Cleanup is measured AFTER it runs. An earlier revision wrote
+        // {profile:'removed', server:true} before doing anything and then swallowed
+        // rm errors, so the receipt claimed success it never observed.
         child.kill('SIGKILL')
-        server.close()
-        await rm(work, { recursive: true, force: true }).catch(() => {})
+        await once(child, 'exit').catch(() => {})
+        await new Promise(done => server.close(done))
+        let profileRemoved = false
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+            await rm(work, { recursive: true, force: true }).catch(() => {})
+            if (!existsSync(work)) { profileRemoved = true; break }
+            await sleep(200)
+        }
+        report.cleanup = {
+            browserExited: child.exitCode !== null || child.signalCode !== null,
+            serverClosed: !server.listening,
+            workRemoved: profileRemoved,
+            errors: [],
+        }
+        if (!report.cleanup.browserExited) report.cleanup.errors.push('browser did not exit')
+        if (!report.cleanup.serverClosed) report.cleanup.errors.push('server still listening')
+        if (!profileRemoved) report.cleanup.errors.push('work directory not removed')
     }
 
     const byArm = prefix => report.arms.find(a => a.arm.startsWith(prefix))
@@ -266,17 +309,13 @@ async function main() {
     report.conclusion = {
         settleCommitsAllStores: A?.result.kind === 'committed'
             && A.state.wallet?.balance === 1150
-            && A.state.operations === A.before.operations + 1
-            && A.state.rounds === A.before.rounds + 1
-            && A.state.finals === A.before.finals + 1
+            && A.state.operations.length === A.before.operations.length + 1
+            && A.state.rounds.length === A.before.rounds.length + 1
+            && A.state.finals.length === A.before.finals.length + 1
             && A.state.meta?.nextSequence === (A.before.meta?.nextSequence ?? 0) + 1,
         multiStoreAbortReverts: B?.result.kind === 'aborted'
-            && B.state.wallet?.balance === B.before.wallet?.balance
-            && B.state.wallet?.revision === B.before.wallet?.revision
-            && B.state.operations === B.before.operations
-            && B.state.rounds === B.before.rounds
-            && B.state.finals === B.before.finals
-            && B.state.meta?.nextSequence === B.before.meta?.nextSequence,
+            && B?.forcedAfterFn === true
+            && JSON.stringify(B.state) === JSON.stringify(B.before),
         concurrentNoOverdraw: C?.results.filter(k => k === 'committed').length === 1
             && C.state.wallet?.balance === (C.before.wallet?.balance ?? 0) - 600
             && C.loser?.kind === 'rejected'
@@ -294,10 +333,12 @@ async function main() {
     console.log(text)
 
     const c = report.conclusion
-    const valid = report.arms.length === 5
+    const cleanupOk = report.cleanup?.browserExited && report.cleanup?.serverClosed
+        && report.cleanup?.workRemoved && report.cleanup.errors.length === 0
+    const valid = cleanupOk && report.arms.length === 5
         && c.settleCommitsAllStores && c.multiStoreAbortReverts
         && c.concurrentNoOverdraw && c.replayIdempotent && c.idConflictRefused
-    console.log(`HARNESS VALID: ${valid}`)
+    console.log(`HARNESS VALID: ${valid} (cleanup=${Boolean(cleanupOk)})`)
     process.exit(valid ? 0 : 1)
 }
 
