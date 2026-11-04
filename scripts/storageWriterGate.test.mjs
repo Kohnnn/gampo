@@ -49,6 +49,36 @@ function fixture(files) {
     }
 }
 
+// --- unit: the scanner must not invent or hide a call site ---------------
+//
+// A regex could not do this: `//` inside a URL is not a comment, and a
+// writer-shaped token inside a string is not a writer. Both were miscounted by
+// an earlier version.
+{
+    const cases = [
+        ['real call', "localStorage.setItem('k','v')", 1],
+        ['commented out', "// localStorage.setItem('k','v')", 0],
+        ['block commented', "/* localStorage.setItem('k','v') */", 0],
+        ['url then call', "const u='https://host/x'\nlocalStorage.setItem('k','v')", 1],
+        ['token inside a string', "const s='https://h/localStorage.setItem(x)'", 0],
+        ['trailing comment', "localStorage.setItem('a','b') // localStorage.clear()", 1],
+        ['template literal', 'const t=`x ${1} localStorage.clear()`', 0],
+        ['escaped quote', "const s='it\\'s // local'\nlocalStorage.setItem('k','v')", 1],
+    ]
+    const root = mkdtempSync(join(tmpdir(), 'storage-writer-gate-strip-'))
+    mkdirSync(join(root, 'src'), { recursive: true })
+    try {
+        for (const [name, code, want] of cases) {
+            const file = join(root, 'src', 'case.js')
+            writeFileSync(file, code)
+            const counts = countWriterSites([file], root)
+            assert.equal(counts['src/case.js'] ?? 0, want, `${name}: expected ${want} site(s)`)
+        }
+    } finally {
+        rmSync(root, { recursive: true, force: true })
+    }
+}
+
 // --- unit: baseline comparison -------------------------------------------
 
 {

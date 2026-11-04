@@ -109,6 +109,15 @@ async function launch(browser, profile) {
         '--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
         `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank',
     ], { stdio: ['ignore', 'pipe', 'pipe'] })
+    // A bad GAMPO_CHROMIUM surfaces as an uncaught 'error' event, which kills the
+    // process before the caller's finally can remove the temp profile. Turn it
+    // into a rejection the caller can clean up after.
+    await new Promise((resolve, reject) => {
+        child.once('error', reject)
+        child.once('spawn', resolve)
+    }).catch((error) => {
+        throw new Error(`could not start the browser at ${browser}: ${error.message}`)
+    })
 
     const activePort = join(profile, 'DevToolsActivePort')
     // A relaunch reuses the profile, so a stale DevToolsActivePort from the
@@ -195,30 +204,34 @@ const READ_STATE = `(async () => {
 async function main() {
     const work = await mkdtemp(join(tmpdir(), 'qa23-durability-'))
     const profile = join(work, 'profile')
-    await mkdir(profile, { recursive: true })
     const site = join(work, 'site')
-    await mkdir(site, { recursive: true })
-    await bundle(site)
-    await writeFile(join(site, 'index.html'), '<!doctype html><meta charset="utf-8"><title>probe</title><script type="module" src="/bundle.js"></script>')
-
-    const report = { arms: [], identity: identity(await readFile(join(site, 'bundle.js'))) }
-    const browser = resolveBrowser()
-
-    const server = createServer(async (req, res) => {
-        const name = req.url === '/' ? 'index.html' : req.url.slice(1)
-        try {
-            const body = await readFile(join(site, name))
-            res.writeHead(200, { 'content-type': name.endsWith('.js') ? 'text/javascript' : 'text/html' })
-            res.end(body)
-        } catch { res.writeHead(404); res.end('nope') }
-    })
-    server.listen(0, '127.0.0.1')
-    await once(server, 'listening')
-    const origin = `http://127.0.0.1:${server.address().port}`
-
+    let server = null
     let session = null
     const closed = []
+    const report = { arms: [] }
     try {
+        // Everything from here on can throw. Bundling, browser resolution and
+        // server startup used to sit outside the try, so a failure there leaked
+        // the temp profile and (for a half-launched browser) a live process.
+        await mkdir(profile, { recursive: true })
+        await mkdir(site, { recursive: true })
+        await bundle(site)
+        await writeFile(join(site, 'index.html'), '<!doctype html><meta charset="utf-8"><title>probe</title><script type="module" src="/bundle.js"></script>')
+
+        report.identity = identity(await readFile(join(site, 'bundle.js')))
+        const browser = resolveBrowser()
+
+        server = createServer(async (req, res) => {
+            const name = req.url === '/' ? 'index.html' : req.url.slice(1)
+            try {
+                const body = await readFile(join(site, name))
+                res.writeHead(200, { 'content-type': name.endsWith('.js') ? 'text/javascript' : 'text/html' })
+                res.end(body)
+            } catch { res.writeHead(404); res.end('nope') }
+        })
+        server.listen(0, '127.0.0.1')
+        await once(server, 'listening')
+        const origin = `http://127.0.0.1:${server.address().port}`
         log('run1 start')
         // ---- Run 1: seed, commit one round, abort another --------------------
         session = await launch(browser, profile)
@@ -292,7 +305,7 @@ async function main() {
         await session.kill()
     } finally {
         if (session) { try { await session.kill() } catch {} }
-        await new Promise(done => server.close(done))
+        if (server?.listening) await new Promise(done => server.close(done))
         let profileRemoved = false
         for (let attempt = 0; attempt < 10; attempt += 1) {
             await rm(work, { recursive: true, force: true }).catch(() => {})
@@ -301,7 +314,7 @@ async function main() {
         }
         report.cleanup = {
             restartsObserved: closed.length,
-            serverClosed: !server.listening,
+            serverClosed: !(server?.listening ?? false),
             workRemoved: profileRemoved,
             errors: [],
         }

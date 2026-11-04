@@ -51,11 +51,57 @@ function collectFiles(dir, acc = []) {
     return acc
 }
 
-/** Strip line and block comments so a commented-out write is not counted. */
+/**
+ * Blank out comments and string/template literals.
+ *
+ * A regex cannot do this correctly: `//` inside `'https://…'` is not a comment,
+ * and a writer-shaped token inside a string is not a writer. An earlier version
+ * used `/\/\*…|(^|[^:])//…/` and miscounted both. This is a small scanner rather
+ * than a dependency; it does not need to be a full JS parser, only to never
+ * invent or hide a call site.
+ *
+ * Regex literals are not special-cased: a `/…/` containing an unbalanced quote
+ * could desynchronise the scanner, but a false count there is caught by the
+ * baseline diff instead of passing silently.
+ */
 function stripComments(source) {
-    return source
-        .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ' '))
-        .replace(/(^|[^:])\/\/[^\n]*/g, (match, lead) => lead + ' '.repeat(match.length - lead.length))
+    let out = ''
+    let i = 0
+    const n = source.length
+    while (i < n) {
+        const c = source[i]
+        const next = source[i + 1]
+        if (c === '/' && next === '/') {
+            while (i < n && source[i] !== '\n') { out += ' '; i += 1 }
+            continue
+        }
+        if (c === '/' && next === '*') {
+            out += '  '
+            i += 2
+            while (i < n && !(source[i] === '*' && source[i + 1] === '/')) {
+                out += source[i] === '\n' ? '\n' : ' '
+                i += 1
+            }
+            if (i < n) { out += '  '; i += 2 }
+            continue
+        }
+        if (c === '"' || c === "'" || c === '`') {
+            const quote = c
+            out += ' '
+            i += 1
+            while (i < n) {
+                const d = source[i]
+                if (d === '\\') { out += source[i] === '\n' ? '\n' : ' '; out += ' '; i += 2; continue }
+                if (d === quote) { out += ' '; i += 1; break }
+                out += d === '\n' ? '\n' : ' '
+                i += 1
+            }
+            continue
+        }
+        out += c
+        i += 1
+    }
+    return out
 }
 
 export function countWriterSites(files, root = process.cwd()) {
