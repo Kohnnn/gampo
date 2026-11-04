@@ -30,9 +30,21 @@ export const COMMAND = 'settle-round'
 
 const EXIT_KIND_SET = new Set(EXIT_KINDS)
 
-/** Deterministic canonical encoding: sorted top-level keys, no whitespace. */
-export function canonical(bytes) {
-    return JSON.stringify(bytes, Object.keys(bytes).sort())
+/**
+ * Deterministic canonical encoding: sorted keys at every depth, no whitespace.
+ *
+ * Depth matters now that the request carries `selected`. A top-level-only sort
+ * leaves a nested object's key order significant, so the same accepted outcome
+ * arriving with keys in a different order would serialise to different bytes
+ * and be misread as `id-conflict` against its own replay.
+ */
+export function canonical(value) {
+    if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+    if (value && typeof value === 'object') {
+        const keys = Object.keys(value).sort()
+        return `{${keys.map(k => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`
+    }
+    return JSON.stringify(value) ?? 'null'
 }
 
 function roundIdFor(epoch, operationId) {
@@ -56,7 +68,18 @@ export function makeSettleRequest(operationId, request) {
     const payout = Number(request?.payout ?? 0)
     if (!Number.isFinite(stake) || stake < 0) throw new TypeError('stake must be a finite non-negative number')
     if (!Number.isFinite(payout) || payout < 0) throw new TypeError('payout must be a finite non-negative number')
-    return { operationId, exitKind, stake, payout, label: String(request?.label ?? 'Round') }
+    // The accepted facts, not only the money. Without them a replay can restore
+    // a balance but not the round (bin, hand, roll), and two different selected
+    // outcomes with identical stake/payout are indistinguishable to
+    // id-conflict. Kept out of the request entirely when absent so the canonical
+    // bytes of a legacy caller do not change.
+    const selected = request?.selected
+    if (selected !== undefined && (typeof selected !== 'object' || selected === null || Array.isArray(selected))) {
+        throw new TypeError('selected must be a plain object when present')
+    }
+    const exact = { operationId, exitKind, stake, payout, label: String(request?.label ?? 'Round') }
+    if (selected !== undefined) exact.selected = selected
+    return exact
 }
 
 export class Authority {
@@ -133,7 +156,22 @@ export class Authority {
                     return
                 }
 
-                const nextBalance = Math.max(0, Number((balance - exact.stake + exact.payout).toFixed(2)))
+                // A payout large enough to leave the safe range would persist an
+                // `Infinity` balance, and every later affordability read would
+                // compare against it. Refuse durably rather than commit an
+                // absurd wallet: no wallet write, a rejected operation row, and
+                // the balance stays exactly as it was.
+                const rawNext = balance - exact.stake + exact.payout
+                const profit = exact.payout - exact.stake
+                if (!Number.isSafeInteger(Math.round(rawNext * 100)) || !Number.isSafeInteger(Math.round(profit * 100))) {
+                    const rej = rejected({ target, code: 'valuation-mismatch', sequence, revision: walletRow?.revision ?? 0 })
+                    await stores.operations.put({ id: key, sequence, requestBytes: bytes, revision: walletRow?.revision ?? 0, result: clone(rej), roundId })
+                    await stores.meta.put({ ...(meta ?? {}), id: 'current', nextSequence: sequence + 1, epoch, writerSessionId: this.writerSessionId, protocolVersion: PROTOCOL_VERSION })
+                    outcome.result = rej
+                    return
+                }
+
+                const nextBalance = Math.max(0, Number(rawNext.toFixed(2)))
                 const revision = (walletRow?.revision ?? 0) + 1
                 const value = {
                     operationId: exact.operationId,
@@ -141,8 +179,12 @@ export class Authority {
                     exitKind: exact.exitKind,
                     stake: exact.stake,
                     payout: exact.payout,
-                    profit: Number((exact.payout - exact.stake).toFixed(2)),
+                    profit: Number(profit.toFixed(2)),
                     balanceAfter: nextBalance,
+                    // The accepted facts, when the caller supplied them. Stored
+                    // with the effects so a replay restores the round, not just
+                    // the money.
+                    ...(exact.selected === undefined ? {} : { selected: exact.selected }),
                 }
                 const result = committed({ target, milestone: 'settled-result', sequence, revision, value })
 

@@ -258,3 +258,115 @@ describe('idb — one database', () => {
         expect(globalThis.localStorage).toBeUndefined()
     })
 })
+
+// --- Codec defects recorded by the 04-11-26 PVL ---------------------------
+//
+// Each case below asserts behaviour the PVL graded FAIL against source. They are
+// grouped in one block so the repair commit is self-documenting: the failing
+// assertion IS the finding.
+//
+// Not covered here, deliberately: the async caller cutover, rounding parity with
+// `roundCredits` (a cross-module decision needing AC09 sign-off, not a local
+// patch), and fail-closed `placeBet` (a product-behaviour change in
+// CreditContext, outside the authority module).
+
+describe('codec — accepted facts survive the settle request', () => {
+    it('retains the selected outcome so a round can be replayed, not just its money', () => {
+        const exact = makeSettleRequest('op-1', {
+            exitKind: 'win',
+            stake: 5,
+            payout: 9,
+            label: 'Plinko',
+            selected: { bin: 8, multiplier: 1.8 },
+        })
+        expect(exact.selected).toEqual({ bin: 8, multiplier: 1.8 })
+    })
+
+    it('treats two different selected outcomes with identical money as different operations', () => {
+        const a = makeSettleRequest('op-1', { exitKind: 'win', stake: 1, payout: 2, selected: { bin: 8 } })
+        const b = makeSettleRequest('op-1', { exitKind: 'win', stake: 1, payout: 2, selected: { bin: 12 } })
+        expect(a.selected).not.toEqual(b.selected)
+    })
+
+    it('omits `selected` entirely when the request carries none', () => {
+        const exact = makeSettleRequest('op-1', { exitKind: 'push', stake: 1, payout: 1 })
+        expect('selected' in exact).toBe(false)
+    })
+
+    it('refuses a non-object selected payload instead of coercing it', () => {
+        expect(() => makeSettleRequest('op-1', { exitKind: 'win', stake: 1, selected: 'bin:8' })).toThrow()
+    })
+})
+
+describe('codec — profit is readable by the Auto reconciler', () => {
+    it('lets normalizeBetResult read a settled profit out of a committed envelope', async () => {
+        const auth = await freshAuthority()
+        await seedWallet(auth, 100)
+        const result = await auth.settleRound('op-profit', { exitKind: 'win', stake: 5, payout: 9 })
+        expect(result.kind).toBe('committed')
+        // The envelope keeps its closed union and nests economic data under
+        // `value`; the reconciler is what must look there. Reading only
+        // `result.profit` yields 0 and books a real win as break-even.
+        const { normalizeBetResult } = await import('../components/games/primitives/autoAccounting.js')
+        expect(normalizeBetResult(result).profit).toBe(4)
+    })
+})
+
+describe('codec — settlement cannot overflow the wallet', () => {
+    it('refuses a settlement whose arithmetic leaves the safe-integer range', async () => {
+        const auth = await freshAuthority()
+        await seedWallet(auth, 100)
+        const result = await auth.settleRound('op-overflow', {
+            exitKind: 'win',
+            stake: 1,
+            payout: Number.MAX_VALUE,
+        })
+        // An `Infinity`/`NaN` balance would be persisted and every later
+        // affordability read would compare against it. The contract's answer is
+        // a durable non-committed kind, never a committed absurd balance.
+        expect(result.kind).not.toBe('committed')
+        const wallet = await auth.readWallet()
+        expect(Number.isFinite(wallet.balance)).toBe(true)
+        expect(wallet.balance).toBe(100)
+    })
+})
+
+describe('codec — one declaration of the six kinds', () => {
+    it('autoAccounting imports the contract instead of re-declaring the union', async () => {
+        const auto = await import('../components/games/primitives/autoAccounting.js')
+        const contract = await import('./resultContract.js')
+        // Two hand-maintained copies is how `superseded` gets added to one and
+        // not the other, silently making a superseded round look committed.
+        expect(auto.RESULT_KINDS).toBe(contract.RESULT_KINDS)
+    })
+})
+
+describe('codec — accepted facts survive a replay', () => {
+    it('returns the stored selected outcome on exact replay without charging again', async () => {
+        const auth = await freshAuthority()
+        await seedWallet(auth, 100)
+        const req = { exitKind: 'win', stake: 5, payout: 9, selected: { bin: 8, multiplier: 1.8 } }
+        const first = await auth.settleRound('op-replay', req)
+        expect(first.kind).toBe('committed')
+        expect(first.value.selected).toEqual({ bin: 8, multiplier: 1.8 })
+
+        const again = await auth.settleRound('op-replay', req)
+        expect(again.replay).toBe(true)
+        expect(again.value.selected).toEqual({ bin: 8, multiplier: 1.8 })
+        expect((await auth.readWallet()).balance).toBe(104)
+    })
+
+    it('is not confused by nested key order when the same outcome is replayed', async () => {
+        const auth = await freshAuthority()
+        await seedWallet(auth, 100)
+        const first = await auth.settleRound('op-order', {
+            exitKind: 'win', stake: 1, payout: 2, selected: { bin: 8, multiplier: 1.8 },
+        })
+        expect(first.kind).toBe('committed')
+        const again = await auth.settleRound('op-order', {
+            exitKind: 'win', stake: 1, payout: 2, selected: { multiplier: 1.8, bin: 8 },
+        })
+        expect(again.replay).toBe(true)
+        expect(again.kind).toBe('committed')
+    })
+})

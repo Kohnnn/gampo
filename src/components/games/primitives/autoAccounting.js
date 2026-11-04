@@ -10,28 +10,39 @@
 // This module is the single reconciliation point so a keyboard regression or a
 // per-game result-shape change can never silently move an accounting decision.
 
-export const RESULT_KINDS = /** @type {const} */ ([
-    'committed',
-    'rejected',
-    'not-admitted',
-    'aborted',
-    'unknown',
-    'superseded',
-])
+// One declaration, re-exported. Two hand-maintained copies is how `superseded`
+// lands in one and not the other, silently making a superseded round look
+// committed to the loop.
+export { RESULT_KINDS } from '../../../authority/resultContract.js'
+import { RESULT_KINDS as CONTRACT_KINDS } from '../../../authority/resultContract.js'
+const RESULT_KINDS = CONTRACT_KINDS
+
 
 const isAccepted = kind => kind === 'committed'
 
-// Normalize any legacy per-game resolution into the six-kind shape.
+// Normalize any per-game resolution into the six-kind shape.
 // Legacy games resolve `{profit}` (or `{profit, error}`); a positive balance
 // movement is `committed`. A refusal must already carry an explicit non-zero
 // kind, otherwise it is treated as committed (current behavior is preserved for
 // a game that has not migrated yet) — call out the ambiguity instead of guessing.
+//
+// A committed authority envelope carries its economics under `value`
+// (`committed({ value: { profit } })`), not at the top level. Reading only
+// `result.profit` there yields 0, so a real win reconciles as a break-even
+// round and the Auto stop-loss/stop-profit limits never fire.
+function profitOf(result) {
+    const direct = Number(result?.profit)
+    if (Number.isFinite(direct)) return direct
+    const nested = Number(result?.value?.profit)
+    return Number.isFinite(nested) ? nested : 0
+}
+
 export function normalizeBetResult(result) {
     if (result && typeof result === 'object' && RESULT_KINDS.includes(result.kind)) {
-        return { kind: result.kind, profit: Number(result.profit) || 0, result }
+        return { kind: result.kind, profit: profitOf(result), result }
     }
     // Legacy shape. `committed` is the only kind that books a debit.
-    return { kind: 'committed', profit: Number(result?.profit) || 0, result }
+    return { kind: 'committed', profit: profitOf(result), result }
 }
 
 export const acceptedResult = (profit, extra = {}) => ({ kind: 'committed', profit: Number(profit) || 0, ...extra })
