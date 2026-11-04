@@ -791,7 +791,22 @@ async function native(args) {
             cleanup.browser = browser.exitCode !== null || browser.signalCode !== null
         }
         if (server) { server.closeAllConnections(); await new Promise(done => server.close(done)); cleanup.server = !server.listening }
-        if (cleanup.browser) { await rm(profile, { recursive: true, force: true }); cleanup.profile = !existsSync(profile); await rm(temp, { recursive: true, force: true }); cleanup.temp = !existsSync(temp) }
+        if (cleanup.browser) {
+            // A killed Chromium can still be flushing profile files when this runs;
+            // a single rm then fails ENOTEMPTY. Retry rather than failing the case -
+            // a leftover temp directory is a hygiene problem, not a product result.
+            const purge = async path => {
+                for (let attempt = 0; attempt < 10; attempt += 1) {
+                    try { await rm(path, { recursive: true, force: true }) } catch { /* retry */ }
+                    if (!existsSync(path)) return true
+                    await sleep(200)
+                }
+                return !existsSync(path)
+            }
+            cleanup.profile = await purge(profile)
+            cleanup.temp = await purge(temp)
+            if (!cleanup.profile || !cleanup.temp) report.cleanupWarning = 'temporary profile or directory could not be removed'
+        }
         } catch (error) {
             report.cleanupError = error.stack || String(error)
             failure ||= error
