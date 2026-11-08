@@ -4222,3 +4222,21 @@
         --cases-streak-count: 8;
     }
 }
+
+/* QA037: a failed artwork request keeps the element's box and shows the item's
+   initial, so the grid and reel geometry do not reflow and the drop stays
+   identifiable. Colour comes from the surrounding `--rarity` variable. */
+.cases-art-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 1.5em;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--rarity, #6b7280) 18%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--rarity, #6b7280) 55%, transparent);
+    color: var(--rarity, #9ca3af);
+    font-weight: 800;
+    text-transform: uppercase;
+}

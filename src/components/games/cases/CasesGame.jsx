@@ -71,6 +71,7 @@ import {
     shouldPlayRarityStinger,
 } from './casesAnimation'
 import { createCaseOpeningRound } from './caseOpening'
+import CaseArt from './CaseArt'
 import { useCasesManifest } from './useCasesManifest'
 import {
     CASE_CATEGORIES,
@@ -140,7 +141,7 @@ export function CaseReelTile({
             data-case-outcome-id={item.skinId || item.id}
             data-case-outcome-variant={item.variantKey || ''}
         >
-            <img src={item.image} alt={item.name} loading="lazy" />
+            <CaseArt src={item.image} alt={item.name} />
             <small>{displayName}</small>
             {item.valueGc != null && (
                 <em className="cases-carousel-value">{formatCredits(item.valueGc)}</em>
@@ -207,7 +208,7 @@ export function CaseMultiOpenGrid({
                         </div>
                         {result ? (
                             <div className="cases-mini-result">
-                                <img src={result.image} alt={result.name} loading="lazy" />
+                                <CaseArt src={result.image} alt={result.name} />
                                 <div>
                                     <span className="cases-mini-badges">
                                         {result.statTrak && <b className="stattrak">ST™</b>}
@@ -323,7 +324,7 @@ function CaseRightPanel({
         <aside className="cases-right-panel" data-case-panel="commands" data-ux-surface="controls" aria-label="Cases controls and stats">
             <section className="cases-control-card cases-control-primary">
                 <header className="cases-right-selected">
-                    {activeCase && <img src={activeCase.image} alt="" loading="lazy" />}
+                    {activeCase && <CaseArt src={activeCase.image} alt="" />}
                     <div>
                         <span>Selected case</span>
                         <strong>{activeCase?.name || 'Loading case'}</strong>
@@ -434,7 +435,7 @@ function CaseRightPanel({
                             onClick={() => selectCase(c.id)}
                             disabled={running}
                         >
-                            <img src={c.image} alt="" loading="lazy" />
+                            <CaseArt src={c.image} alt="" />
                             <span>
                                 <strong>{c.name}</strong>
                                 <em>{c.items.length} items · EV {formatCredits(c.evGc || 0)}</em>
@@ -463,7 +464,7 @@ function CaseRightPanel({
                     {caseUxStats.best.length === 0 ? <em>No opens yet</em> : caseUxStats.best.map((drop, index) => (
                         <span key={`${drop.dropId || drop.key}-${index}`} style={{ '--rarity': drop.color }}>
                             <b>#{index + 1}</b>
-                            <img src={drop.image} alt="" loading="lazy" />
+                            <CaseArt src={drop.image} alt="" />
                             <small>{drop.name}</small>
                             <strong>{formatCredits(drop.valueGc || 0)}</strong>
                         </span>
@@ -1562,7 +1563,7 @@ export default function CasesGame() {
                         <>
                             {activeCase && (
                                 <section className="cases-selected-case" aria-label="Selected case">
-                                    <img src={activeCase.image} alt="" loading="lazy" />
+                                    <CaseArt src={activeCase.image} alt="" />
                                     <div className="cases-selected-copy">
                                         <span>{activeCase.categoryLabel || activeCase.type || 'Case'}</span>
                                         <strong>{activeCase.name}</strong>
@@ -1576,7 +1577,7 @@ export default function CasesGame() {
                                     <div className="cases-selected-rares" aria-label="Rare item preview">
                                         {(activeCase.rarePreview || []).map(item => (
                                             <span key={item.id} title={`${item.name} · ${item.rarity || 'Rare'}`} style={{ '--rarity': item.color }}>
-                                                <img src={item.image} alt="" loading="lazy" />
+                                                <CaseArt src={item.image} alt="" />
                                             </span>
                                         ))}
                                     </div>
@@ -1715,7 +1716,7 @@ export default function CasesGame() {
                                                         className="cases-preview-tile"
                                                         style={{ '--rarity': item.color }}
                                                     >
-                                                        <img src={item.image} alt="" loading="lazy" />
+                                                        <CaseArt src={item.image} alt="" />
                                                         <em>{formatCredits(item.valueGc || item.multiplier || 0)}</em>
                                                     </span>
                                                 ))}
@@ -1742,7 +1743,7 @@ export default function CasesGame() {
                                         onClick={() => selectCase(c.id)}
                                         title={`${c.name} · ${formatCredits(c.openPriceGc || 0)} · ${c.items.length} items · EV ${formatCredits(c.evGc || 0)} · ${c.volatility?.label || 'volatility'}`}
                                     >
-                                        <img src={c.image} alt={c.name} loading="lazy" />
+                                        <CaseArt src={c.image} alt={c.name} />
                                         <strong className="cases-case-price">{formatCredits(c.openPriceGc || 0)}</strong>
                                         <span title={c.name}>{c.name}</span>
                                         <em>{casePriceBand(c.openPriceGc)} · {c.items.length} items · {c.type || 'Case'}</em>
@@ -1753,7 +1754,7 @@ export default function CasesGame() {
                                         <div className="cases-rare-preview" aria-label="Rare item preview">
                                             {(c.rarePreview || []).slice(0, 3).map(item => (
                                                 <i key={item.id} title={`${item.name} · ${item.rarity || 'Rare'}`} style={{ '--rarity': item.color }}>
-                                                    <img src={item.image} alt="" loading="lazy" />
+                                                    <CaseArt src={item.image} alt="" />
                                                 </i>
                                             ))}
                                         </div>
@@ -1834,7 +1835,7 @@ export default function CasesGame() {
                                                 data-case-outcome-id={r.skinId || r.id}
                                                 data-case-outcome-variant={r.variantKey || ''}
                                             >
-                                                <img src={r.image} alt={r.name} />
+                                                <CaseArt src={r.image} alt={r.name} />
                                                 <div className="cases-result-badges">
                                                     {r.statTrak && <b className="stattrak">StatTrak™</b>}
                                                     {r.souvenir && <b className="souvenir">Souvenir</b>}
@@ -1890,7 +1891,7 @@ export default function CasesGame() {
                                     aria-label="Rare drop"
                                 >
                                     <div className="cases-prize-card">
-                                        <img src={celebrationDrop.image} alt={celebrationDrop.name} />
+                                        <CaseArt src={celebrationDrop.image} alt={celebrationDrop.name} />
                                         <span>
                                             {celebrationDrop.statTrak && <em>StatTrak™ </em>}
                                             {celebrationDrop.souvenir && <em>Souvenir </em>}
@@ -1934,7 +1935,7 @@ export default function CasesGame() {
                                 <ul className="cases-history-list">
                                     {filteredDrops.map((d, i) => (
                                         <li key={`${d.key}-${d.ts}-${i}`} className={RARE_TIERS.has(d.rarity) ? 'rare' : ''} style={{ '--rarity': d.color }}>
-                                            <img src={d.image} alt={d.name} loading="lazy" />
+                                            <CaseArt src={d.image} alt={d.name} />
                                             <span className="cases-history-name">
                                                 {d.statTrak && <em className="cases-tag-st">ST™</em>}
                                                 {d.souvenir && <em className="cases-tag-sv">SV</em>}
@@ -2045,7 +2046,7 @@ export default function CasesGame() {
                                                     {drop.favorite ? '★' : '☆'}
                                                 </button>
                                                 <strong>{formatCredits(drop.valueGc || 0)}</strong>
-                                                <img src={drop.image} alt={drop.name} loading="lazy" />
+                                                <CaseArt src={drop.image} alt={drop.name} />
                                                 <small>
                                                     {drop.statTrak && <em className="cases-tag-st">ST™</em>}
                                                     {drop.souvenir && <em className="cases-tag-sv">SV</em>}
@@ -2080,7 +2081,7 @@ export default function CasesGame() {
                                     <div className="cases-collection-grid">
                                         {lockedSkins.slice(0, 48).map(skin => (
                                             <div key={skin.key} className="cases-skin-card cases-skin-locked" style={{ '--rarity': skin.color }} aria-label={`Locked skin ${skin.name}`}>
-                                                <img src={skin.image} alt={skin.name} loading="lazy" />
+                                                <CaseArt src={skin.image} alt={skin.name} />
                                                 <small className="cases-locked-name">{skin.name}</small>
                                                 <span className="cases-skin-meta">
                                                     <em>{skin.rarity}</em>
