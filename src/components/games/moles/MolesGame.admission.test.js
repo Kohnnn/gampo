@@ -139,10 +139,16 @@ describe('Moles double admission', () => {
         visit.render()
         await expect(first).resolves.toMatchObject({ profit: expect.any(Number) })
         expect(h.env.session.record, 'one settled round').toHaveBeenCalledTimes(1)
-        // roll 0.5 with 2 picks: prove the round paid by comparing to the recorded profit.
+        // Credits follow the gross return, not the profit: a partial loss still pays.
         const settled = h.env.session.record.mock.calls[0][0]
         expect(settled.betAmount).toBe(5)
-        expect(h.env.credits.addWinnings.mock.calls.length).toBe(settled.profit > 0 ? 1 : 0)
+        const gross = Math.round((settled.betAmount + settled.profit) * 100) / 100
+        if (gross > 0) {
+            expect(h.env.credits.addWinnings).toHaveBeenCalledTimes(1)
+            expect(h.env.credits.addWinnings.mock.calls[0][0]).toBe(gross)
+        } else {
+            expect(h.env.credits.addWinnings).not.toHaveBeenCalled()
+        }
         visit.cleanup()
     })
 

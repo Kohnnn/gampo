@@ -137,13 +137,9 @@ export default function MolesGame() {
     }
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        // Synchronous in-flight guard. `running` only becomes true after React
-        // flushes, so two calls in one tick would both charge; the second would then
-        // cancel the first one's scheduled settlement and swallow its payout.
         // `running` is React state and flushes late, so it alone cannot stop two
-        // calls in the same tick; the ref decides admission. Without it the second
-        // call charges and then cancels the first round's scheduled settlement,
-        // silently swallowing a paid round.
+        // calls in the same tick. The ref decides admission: without it the second
+        // call would charge and then cancel the first round's payment timer.
         if (inFlightRef.current || running) { resolve({ profit: 0 }); return }
         if (picks.length === 0) { showToast('error', 'No picks', 'Tap holes to pick first'); resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Moles')) {
