@@ -391,6 +391,12 @@ export default function PlinkoGame() {
                         definition={definition}
                         betAmount={selectedBet * ball.cost}
                         winProbability={quote?.settlementWinChance}
+                        // QA007: Plinko's payout is a discrete distribution with
+                        // partial returns (0.5x), so bankrollRisk's binary
+                        // win/lose-stake model does not describe it. Passing the
+                        // distribution suppresses that inapplicable risk figure,
+                        // exactly as EducationPanel already does for other slots.
+                        expectedGrossMultiplier={quote?.settlementRtp}
                         effectiveRtp={quote?.settlementRtp}
                         rtpLabel="RTP (this stake)"
                         rtpNote={quote

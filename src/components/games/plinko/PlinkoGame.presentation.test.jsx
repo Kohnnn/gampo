@@ -99,7 +99,9 @@ describe('Plinko current stake and accepted outcomes', () => {
         expect(props.rtpLabel).toBe('RTP (this stake)')
         expect(props.winProbability).toBeGreaterThan(0)
         expect(props.winProbability).toBeLessThan(1)
-        expect(props.expectedGrossMultiplier).toBeUndefined()
+        // Passing the distribution through suppresses the binary win/lose ruin
+        // model, which cannot describe Plinko's partial returns.
+        expect(props.expectedGrossMultiplier).toBe(props.effectiveRtp)
         expect(props.payoutMultiplier).toBeUndefined()
         expect(props.rtpNote).toContain('Measured after rounding')
         mounted.unmount()

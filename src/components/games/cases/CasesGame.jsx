@@ -704,12 +704,18 @@ export default function CasesGame() {
 
     useEffect(() => {
         if (!allCases?.length) return
+        // QA041: a round in flight owns the selected case until it settles.
+        // Switching mid-spin would leave finishPendingRound attributing the old
+        // round's picks to the newly selected case. Same guard as selectCase and
+        // selectCategory; the queued caseId is applied once the round ends, because
+        // searchParams is unchanged and this effect re-runs on `running`.
+        if (running) return
         const requestedCaseId = searchParams.get('caseId')
         if (requestedCaseId && requestedCaseId !== caseId && allCases.some(c => c.id === requestedCaseId)) {
             setCaseId(requestedCaseId)
             clearStaleResult()
         }
-    }, [allCases, caseId, searchParams])
+    }, [allCases, caseId, searchParams, running])
 
     const categoryCases = useMemo(() => {
         const list = filterCasesByCategory(allCases || [], category)

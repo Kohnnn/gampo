@@ -462,6 +462,36 @@ describe('Actual Cases controls and visible preparation slot', () => {
         expect(nodes(visit).some(node => node.props.dangerouslySetInnerHTML)).toBe(false)
     })
 
+    it('ignores a mid-round deep link and keeps the in-flight round on its case (QA041)', async () => {
+        // A back/forward or pasted URL during a spin used to repoint `activeCase`
+        // while finishPendingRound still settled the old round's picks, showing
+        // one case's drops under another.
+        h.params = new URLSearchParams()
+        fetch.mockResolvedValueOnce(response(realCatalog))
+        const visit = mount(CasesGame); await settle(visit)
+        const opened = visit.value.props.aside.props.activeCase.id
+        const other = realCatalog.map(value => normalizeCaseForRuntime(value))
+            .find(value => value.id !== opened).id
+        desktop(visit).props.onClick(); visit.render()
+        expect(visit.value.props.aside.props.running, 'round is in flight').toBe(true)
+        h.params = new URLSearchParams({ caseId: other }); visit.render()
+        expect(visit.value.props.aside.props.activeCase.id, 'selection pinned while spinning').toBe(opened)
+        // One real tick: the guard holds while the round is still running, and the
+        // effect only re-applies the queued caseId once `running` is false.
+        vi.advanceTimersByTime(500); visit.render()
+        expect(visit.value.props.aside.props.activeCase.id, 'still pinned mid-round').toBe(opened)
+        for (let i = 0; i < 40 && visit.value.props.aside.props.running; i++) {
+            vi.advanceTimersByTime(500); visit.render()
+        }
+        // The round settled and credited without the case ever changing under it;
+        // the queued selection then applies on the same render that clears `running`.
+        // If it had switched mid-round, finishPendingRound would have shown the old
+        // picks under the new case - which the running-state pin above prevents.
+        expect(h.env.credits.addWinnings).toHaveBeenCalled()
+        expect(visit.value.props.aside.props.activeCase.id, 'queued deep link applied after settle').toBe(other)
+        visit.cleanup()
+    })
+
     it('pages a settled result out of the DOM on every selection path (QA041)', async () => {
         // A real round is opened and advanced to settlement, so `results` is
         // genuinely non-empty before the case changes. Without that, "no stale
