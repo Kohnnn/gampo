@@ -9,7 +9,11 @@
 import { useState } from 'react'
 
 export default function CaseArt({ src, alt = '', className = '', style, ...rest }) {
-    const [failed, setFailed] = useState(false)
+    // Keyed by source, not a bare boolean: the selected-case slot reuses this
+    // component as `activeCase` changes, and a sticky flag would let one broken
+    // image permanently mask every later valid one.
+    const [failedSrc, setFailedSrc] = useState(null)
+    const failed = failedSrc !== null && failedSrc === src
     if (failed || !src) {
         return (
             <span
@@ -30,7 +34,7 @@ export default function CaseArt({ src, alt = '', className = '', style, ...rest 
             className={className}
             style={style}
             loading="lazy"
-            onError={() => setFailed(true)}
+            onError={() => setFailedSrc(src)}
             data-case-art="true"
             {...rest}
         />
