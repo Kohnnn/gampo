@@ -16,6 +16,25 @@ import { claimEscape } from '../../../utils/escapeClaims'
 import { accountAutoRound } from './autoAccounting'
 import { isOpenDialogPresent } from './HotkeyHelp'
 
+// QA028: a shortcut may only start or change a paid action when the keystroke is
+// a genuine, unheld press aimed at the page itself. Extracted from the effect so
+// the guard can be pinned by a test without mounting a DOM.
+export function shouldHandleShortcut(event, { dialogOpen = false } = {}) {
+    if (!event) return false
+    if (event.ctrlKey || event.metaKey || event.altKey) return false
+    // A held/repeating key must not fire a second paid action.
+    if (event.repeat) return false
+    const tag = (event.target?.tagName || '').toLowerCase()
+    // A focused interactive control owns Space natively (Game tools, Mute,
+    // choices, dialog buttons). Never start a paid round from it.
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a') return false
+    if (event.target?.isContentEditable) return false
+    // While a dialog is open its controls own Space; the panel must not start a
+    // paid round underneath it.
+    if (dialogOpen) return false
+    return true
+}
+
 const TABS = ['manual', 'auto', 'strategy']
 
 export default function BetPanel({
@@ -280,17 +299,7 @@ export default function BetPanel({
     // (ctrl/cmd/alt) are held, and when an auto round is in progress to keep things safe.
     useEffect(() => {
         const onKey = (e) => {
-            if (e.ctrlKey || e.metaKey || e.altKey) return
-            // A held/repeating key must not fire a second paid action.
-            if (e.repeat) return
-            const tag = (e.target?.tagName || '').toLowerCase()
-            // A focused interactive control owns Space natively (Game tools,
-            // Mute, choices, dialog buttons). Never start a paid round from it.
-            if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a') return
-            if (e.target?.isContentEditable) return
-            // While a dialog is open its controls own Space; the panel must not
-            // start a paid round underneath it.
-            if (isOpenDialogPresent()) return
+            if (!shouldHandleShortcut(e, { dialogOpen: isOpenDialogPresent() })) return
             switch (e.key) {
                 case ' ': // Space: play / stop autobet / in-round CTA
                     e.preventDefault()
