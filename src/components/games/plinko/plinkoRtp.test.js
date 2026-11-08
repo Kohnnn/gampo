@@ -4,7 +4,7 @@
 // of "Unavailable".
 import { describe, expect, it } from 'vitest'
 import { BIN_PAYOUTS } from './engine/constants'
-import { binProbabilities, binomialWeights, PLINKO_BALLS, plinkoRtp, plinkoRtpTable, plinkoSettlements } from './plinkoRtp'
+import { binProbabilities, binomialWeights, PLINKO_BALLS, plinkoRtp, plinkoRtpTable, plinkoSettlementRtp, plinkoSettlements } from './plinkoRtp'
 
 describe('Plinko bin distribution', () => {
     it('builds exact binomial weights', () => {
@@ -43,7 +43,7 @@ describe('Plinko payout arithmetic', () => {
         const basic = plinkoRtp({ rows: 8, risk: 'low', ballId: 'normal' })
         for (const ball of PLINKO_BALLS.slice(1)) {
             const premium = plinkoRtp({ rows: 8, risk: 'low', ballId: ball.id })
-            expect(premium.effectiveRtp, ball.id).toBeCloseTo(basic.effectiveRtp, 12)
+            expect(premium.nominalRtp, ball.id).toBeCloseTo(basic.nominalRtp, 12)
             expect(premium.ballCost, ball.id).toBe(ball.cost)
         }
     })
@@ -64,15 +64,15 @@ describe('Plinko payout arithmetic', () => {
         const basic = plinkoRtp({ rows: 8, risk: 'low', ballId: 'normal' })
         // bins paying strictly more than 1x: 5.6,2.1,1.1,1.1,2.1,5.6
         const expected = (2 + 2 * 8 + 2 * 28) / 256
-        expect(basic.winChance).toBeCloseTo(expected, 12)
+        expect(basic.nominalWinChance).toBeCloseTo(expected, 12)
         // A bronze ball pays 2x and costs 2, so a bin is a *net win* only when its
         // gross multiplier exceeds 1. Bins 3, 4 and 5 pay exactly 1x, i.e. 2.0x
         // after the bonus - break-even, not a win. The same bins qualify for both
         // ball types, so the win chance is identical: the bonus scales the payout
         // and the cost together.
         const bronze = plinkoRtp({ rows: 8, risk: 'low', ballId: 'bronze' })
-        expect(bronze.winChance).toBeCloseTo((2 + 2 * 8 + 2 * 28) / 256, 12)
-        expect(bronze.winChance).toBeCloseTo(basic.winChance, 12)
+        expect(bronze.nominalWinChance).toBeCloseTo((2 + 2 * 8 + 2 * 28) / 256, 12)
+        expect(bronze.nominalWinChance).toBeCloseTo(basic.nominalWinChance, 12)
     })
 
     it('quotes every configured table with a finite effective RTP', () => {
@@ -81,8 +81,8 @@ describe('Plinko payout arithmetic', () => {
         expect(table).toHaveLength(configured)
         for (const row of table) {
             expect(row, `${row.rows}/${row.risk}`).not.toBeNull()
-            expect(Number.isFinite(row.effectiveRtp)).toBe(true)
-            expect(row.effectiveRtp).toBeGreaterThan(0)
+            expect(Number.isFinite(row.nominalRtp)).toBe(true)
+            expect(row.nominalRtp).toBeGreaterThan(0)
         }
     })
 })
@@ -111,5 +111,43 @@ describe('Plinko per-stake settlement (what the player is credited)', () => {
     it('refuses a settlement quote for an unknown table or stake', () => {
         expect(plinkoSettlements({ rows: 8, risk: 'low', betAmount: 0 })).toBeNull()
         expect(plinkoSettlements({ rows: 99, risk: 'low', betAmount: 1 })).toBeNull()
+    })
+})
+
+describe('Plinko settlement RTP at a real stake', () => {
+    it('differs from the nominal ratio in both directions at a tiny stake', () => {
+        // 0.01 GC stake, 8 rows low. round2(0.01 * 1.1) = 0.01, so bins 2 and 6
+        // become pushes (not wins), which REDUCES the win chance. But round2
+        // also lifts round2(0.01 * 0.5) to 0.01, so the centre bin stops being a
+        // half loss - and the mean rises to 1.1016 against a nominal 0.9898.
+        // Rounding is not a pure house favour at this scale, and a quote that
+        // showed only the nominal figure would understate what is actually paid.
+        const nominal = plinkoRtp({ rows: 8, risk: 'low', ballId: 'normal' })
+        const settled = plinkoSettlementRtp({ rows: 8, risk: 'low', betAmount: 0.01, ballId: 'normal' })
+        expect(settled.settlementWinChance).toBeCloseTo(18 / 256, 12)
+        expect(settled.settlementWinChance).toBeLessThan(nominal.nominalWinChance)
+        expect(settled.pushChance).toBeCloseTo(238 / 256, 12)
+        expect(settled.settlementRtp).toBeGreaterThan(nominal.nominalRtp)
+        expect(settled.settlementRtp).toBeCloseTo(1.1015625, 10)
+    })
+
+    it('converges to the nominal ratio at a stake large enough to round cleanly', () => {
+        const nominal = plinkoRtp({ rows: 8, risk: 'low', ballId: 'normal' })
+        const settled = plinkoSettlementRtp({ rows: 8, risk: 'low', betAmount: 100, ballId: 'normal' })
+        expect(settled.settlementRtp).toBeCloseTo(nominal.nominalRtp, 6)
+    })
+
+    it('matches an independent sum over the settlement rows', () => {
+        const stake = 5
+        const rows = plinkoSettlements({ rows: 10, risk: 'high', betAmount: stake, ballId: 'emerald' })
+        const expectedReturn = rows.reduce((sum, row) => sum + row.probability * row.returnAmount, 0)
+        const quote = plinkoSettlementRtp({ rows: 10, risk: 'high', betAmount: stake, ballId: 'emerald' })
+        expect(quote.expectedReturnGc).toBeCloseTo(expectedReturn, 10)
+        expect(quote.settlementRtp).toBeCloseTo(expectedReturn / quote.cost, 10)
+        expect(quote.expectedProfitGc).toBeCloseTo(expectedReturn - quote.cost, 10)
+    })
+
+    it('refuses an unquotable settlement', () => {
+        expect(plinkoSettlementRtp({ rows: 8, risk: 'low', betAmount: 0 })).toBeNull()
     })
 })

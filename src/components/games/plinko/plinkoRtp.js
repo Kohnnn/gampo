@@ -105,11 +105,15 @@ export function plinkoRtp({ rows, risk, ballId = 'normal' } = {}) {
         ballId: ball.id,
         ballCost: ball.cost,
         ballBonus: ball.bonus,
+        // NOMINAL ratios: unrounded, stake-independent. At small stakes the
+        // settlement's `round2` turns some of these into pushes or losses, so a
+        // disclosure must quote `settlementRtp` / `settlementWinChance` from
+        // `plinkoSettlements()` at the player's actual stake instead.
         grossReturn: gross,                 // per 1.00 GC staked, multiplier units
         netReturn: gross - ball.cost,       // per 1.00 GC staked, after the ball cost
-        effectiveRtp: gross / ball.cost,    // payout / cost
-        houseEdge: 1 - gross / ball.cost,
-        winChance,
+        nominalRtp: gross / ball.cost,
+        nominalHouseEdge: 1 - gross / ball.cost,
+        nominalWinChance: winChance,
         worstMultiplier: worst,
         bestMultiplier: best,
         probabilities,
@@ -126,4 +130,38 @@ export function plinkoRtpTable(ballId = 'normal') {
         }
     }
     return out
+}
+
+// Probability-weighted settlement at a real stake: what the player is actually
+// credited, after the ball bonus and the `round2` on both the return and the
+// profit. This is the figure a disclosure must quote - the nominal ratios above
+// describe intent, not outcome, once a stake is small enough for rounding to
+// turn a 1.1x bin into a 1.0x push (or a loss).
+export function plinkoSettlementRtp(options = {}) {
+    const rows = plinkoSettlements(options)
+    if (!rows) return null
+    const stake = Number(options.betAmount)
+    const ball = PLINKO_BALLS.find(candidate => candidate.id === (options.ballId || 'normal'))
+    const cost = round2(stake * ball.cost)
+    let expectedReturn = 0
+    let winChance = 0
+    for (const row of rows) {
+        expectedReturn += row.probability * row.returnAmount
+        if (row.profit > 0) winChance += row.probability
+    }
+    return {
+        rows: rows.length - 1,
+        risk: options.risk,
+        ballId: ball.id,
+        betAmount: stake,
+        cost,
+        expectedReturnGc: expectedReturn,
+        expectedProfitGc: expectedReturn - cost,
+        // Rounded at the same precision the ledger uses, so a quote cannot claim
+        // more precision than the settlement has.
+        settlementRtp: expectedReturn / cost,
+        settlementHouseEdge: 1 - expectedReturn / cost,
+        settlementWinChance: winChance,
+        pushChance: rows.reduce((sum, row) => sum + (row.profit === 0 ? row.probability : 0), 0),
+    }
 }
