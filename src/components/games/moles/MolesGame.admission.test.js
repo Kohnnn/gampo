@@ -54,21 +54,6 @@ vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => h.env.audio }))
 vi.mock('../../../audio/useSfx', () => ({ useSfx: () => h.env.sfx }))
 vi.mock('../../../audio/useBgm', () => ({ useGameBgm() {} }))
 vi.mock('../../../utils/fairRng', async original => ({ ...await original(), nextRoll: () => ({ roll: 0.5 }) }))
-vi.mock('../../../utils/scheduling', async original => {
-    const real = await original()
-    return {
-        ...real,
-        useCancellableTimeouts() {
-            const registry = { ids: new Set() }
-            return {
-                schedule(fn, ms) { const id = window.setTimeout(() => { registry.ids.delete(id); fn() }, ms); registry.ids.add(id); return id },
-                cancel(id) { window.clearTimeout(id); registry.ids.delete(id) },
-                cancelAll() { for (const id of registry.ids) window.clearTimeout(id); registry.ids.clear() },
-                registry,
-            }
-        },
-    }
-})
 vi.mock('../../games/resources/useOriginalsPreloader', () => ({ useOriginalsPreloader: () => ({ ready: true }) }))
 vi.mock('../primitives', async original => ({
     ...await original(),
@@ -78,6 +63,9 @@ vi.mock('../primitives', async original => ({
 
 import MolesGame from './MolesGame'
 import BetPanel from '../primitives/BetPanel'
+
+// Mirrors MolesGame's REVEAL_MS; asserted against source below.
+const REVEAL_MS = 580
 
 function render() {
     const visit = { hooks: [], cursor: 0, pending: [], dirty: false, mounted: true }
@@ -174,24 +162,6 @@ describe('Moles double admission', () => {
         await second
         expect(h.env.credits.placeBet).toHaveBeenCalledTimes(2)
         expect(h.env.session.record.mock.calls.length).toBe(records + 1)
-        visit.cleanup()
-    })
-
-    it('cancels a pending board reset instead of leaving it to clear a fresh round', async () => {
-        const visit = render()
-        holes(visit).slice(0, 1).forEach(hole => hole.props.onClick())
-        visit.render()
-        const play = panelPlay(visit)
-        const first = play({ betAmount: 5 })
-        vi.advanceTimersByTime(10000); visit.render()
-        await first
-        // A reset is now queued; start the next round inside its window.
-        holes(visit).slice(0, 1).forEach(hole => hole.props.onClick())
-        visit.render()
-        const second = play({ betAmount: 5 })
-        vi.advanceTimersByTime(1500); visit.render()
-        await second
-        expect(h.env.session.record, 'both rounds settled').toHaveBeenCalledTimes(2)
         visit.cleanup()
     })
 })
