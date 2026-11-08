@@ -26,6 +26,25 @@ describe('CasesGame timer lifecycle', () => {
     })
 })
 
+// QA041: a settled result belongs to the case it came from. `selectCase` used
+// to update caseId/URL only, leaving the previous case's drops rendered under a
+// newly selected case. `results` is otherwise cleared only when a *new* opening
+// starts, so selection has to clear the result surfaces itself.
+describe('QA041 result identity on case selection', () => {
+    const selectCaseBody = () => src.slice(src.indexOf('const selectCase = useCallback'), src.indexOf('}, [caseId, running, setSearchParams, sfx])'))
+
+    it('clears the settled result surfaces when a different case is selected', () => {
+        const body = selectCaseBody()
+        expect(body).toContain('setResults([])')
+        expect(body).toContain('setSettlementSummary(null)')
+    })
+
+    it('leaves wallet and inventory untouched in the selection path', () => {
+        const body = selectCaseBody()
+        expect(body).not.toMatch(/placeBet|addWinnings|setBalance|commitBalance|recordDrop/)
+    })
+})
+
 describe('CasesGame settle rounding is handled at source', () => {
     it('rounds totalReturn and profit inside summarizeCaseSettlement', () => {
         const anim = readFileSync(new URL('./casesAnimation.js', import.meta.url), 'utf8')

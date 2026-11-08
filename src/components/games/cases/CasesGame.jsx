@@ -1352,6 +1352,13 @@ export default function CasesGame() {
         if (running || caseId === nextCaseId) return
         sfx.play('reveal', { volume: 0.24 })
         setCaseId(nextCaseId)
+        // QA041: a settled result belongs to the case it came from. Leaving it
+        // rendered while a different case is selected attributes one case's
+        // drops to another. Clear the result surfaces with the selection; wallet,
+        // inventory and the recorded settlement are untouched.
+        setResults([])
+        setSettlementSummary(null)
+        setCelebrationDrop(null)
         // C-P1-2: once the player actively picks a case, collapse the browser so
         // the reel-first stage leads. The browser stays open until this first
         // explicit selection (or an open), and the toggle still reopens it.
