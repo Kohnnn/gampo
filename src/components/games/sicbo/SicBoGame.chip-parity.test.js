@@ -8,6 +8,7 @@
 // rule. If the two paths ever diverge, one of these assertions fails.
 import { describe, expect, it } from 'vitest'
 import { canAddSicBoBet, applySicBoChipAdd } from './SicBoGame'
+import { resolveSicBoTicket } from './bets'
 
 // Every boundary the acceptance criteria name, plus the fractional wallet.
 const BOUNDARIES = [
@@ -50,5 +51,23 @@ describe('QA021 Sic Bo control/handler parity', () => {
     it('handler returns the identical reference when the chip is rejected', () => {
         const before = { big: 4 }
         expect(applySicBoChipAdd(before, 'odd', 5, false, 4.5)).toBe(before)
+    })
+})
+
+// QA027: the control predicate guards chip *entry*, but a ticket can also become
+// unaffordable after the chips are placed (a prior round's debit, or a restored
+// repeat ticket). The play path therefore re-resolves the whole ticket and
+// refuses the round on the total, not on the last chip.
+describe('QA027 Sic Bo ticket affordability at play time', () => {
+    it('resolves the whole ticket total, not the last chip', () => {
+        const bets = { big: 50, small: 50, odd: 25 }
+        expect(resolveSicBoTicket(bets, {}, 'manual').stake).toBe(125)
+    })
+
+    it('falls back to the repeat ticket only when the live ticket is empty', () => {
+        const last = { big: 5 }
+        expect(resolveSicBoTicket({}, last, 'manual')).toEqual({ bets: last, stake: 5 })
+        expect(resolveSicBoTicket({ odd: 5 }, last, 'manual')).toEqual({ bets: { odd: 5 }, stake: 5 })
+        expect(resolveSicBoTicket({}, last, 'strategy')).toEqual({ bets: {}, stake: 0 })
     })
 })
