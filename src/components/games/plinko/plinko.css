@@ -18,8 +18,10 @@
 .plinko-canvas-wrap {
     position: relative;
     --plinko-bin-height: 28px;
-    /* Board padding, bin row, gap and border; the canvas keeps its native 4:3 ratio. */
-    width: min(100cqw, calc((100cqh - 70px) * 4 / 3 + 34px));
+    /* Board padding, bin row and border (the 70px; the stage gap is already
+       spent above the canvas) plus the 34px of horizontal padding. The canvas
+       keeps its native 760:570 ratio. Mirrored in frameSize.js. */
+    width: min(100cqw, calc((100cqh - 68px) * 4 / 3 + 34px));
     max-width: 100%;
     flex: 0 0 auto;
     background: linear-gradient(180deg, rgba(15, 33, 46, 0.85), rgba(20, 39, 51, 0.7));
@@ -172,7 +174,7 @@
     .plinko-stage { gap: 6px; }
     .plinko-canvas-wrap {
         --plinko-bin-height: 20px;
-        width: min(100cqw, calc((100cqh - 43px) * 4 / 3 + 14px));
+        width: min(100cqw, calc((100cqh - 42px) * 4 / 3 + 14px));
         padding: 8px 6px;
         gap: 5px;
     }
@@ -198,7 +200,7 @@
         gap: 6px;
     }
     .plinko-canvas-wrap {
-        width: min(100cqw, calc((100cqh - 32px) * 4 / 3 + 6px));
+        width: min(100cqw, calc((100cqh - 31px) * 4 / 3 + 6px));
         padding: 3px 2px;
         gap: 4px;
     }
