@@ -639,6 +639,15 @@ export default function CasesGame() {
     const [celebrationDrop, setCelebrationDrop] = useState(null)
     const [shakeKey, setShakeKey] = useState(0) // B1: increment to re-trigger screen shake on Contraband
     const [settlementSummary, setSettlementSummary] = useState(null)
+    // QA041: a settled result belongs to the case it came from. Every path that
+    // changes the selected case must clear the result surfaces with it, or one
+    // case's drops are attributed to another. View-only: wallet, inventory and
+    // the recorded settlement are untouched.
+    const clearStaleResult = useCallback(() => {
+        setResults([])
+        setSettlementSummary(null)
+        setCelebrationDrop(null)
+    }, [])
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
@@ -698,6 +707,7 @@ export default function CasesGame() {
         const requestedCaseId = searchParams.get('caseId')
         if (requestedCaseId && requestedCaseId !== caseId && allCases.some(c => c.id === requestedCaseId)) {
             setCaseId(requestedCaseId)
+            clearStaleResult()
         }
     }, [allCases, caseId, searchParams])
 
@@ -1335,13 +1345,14 @@ export default function CasesGame() {
         const first = filterCasesByCategory(allCases || [], nextCategory)[0]
         if (first) {
             setCaseId(first.id)
+            clearStaleResult()
             setSearchParams(prev => {
                 const next = new URLSearchParams(prev)
                 next.set('caseId', first.id)
                 return next
             }, { replace: true })
         }
-    }, [allCases, category, running, setSearchParams, sfx])
+    }, [allCases, category, running, setSearchParams, sfx, clearStaleResult])
 
     const selectRows = useCallback((nextRows) => {
         if (running || rows === nextRows) return
@@ -1353,13 +1364,7 @@ export default function CasesGame() {
         if (running || caseId === nextCaseId) return
         sfx.play('reveal', { volume: 0.24 })
         setCaseId(nextCaseId)
-        // QA041: a settled result belongs to the case it came from. Leaving it
-        // rendered while a different case is selected attributes one case's
-        // drops to another. Clear the result surfaces with the selection; wallet,
-        // inventory and the recorded settlement are untouched.
-        setResults([])
-        setSettlementSummary(null)
-        setCelebrationDrop(null)
+        clearStaleResult()
         // C-P1-2: once the player actively picks a case, collapse the browser so
         // the reel-first stage leads. The browser stays open until this first
         // explicit selection (or an open), and the toggle still reopens it.
@@ -1369,7 +1374,7 @@ export default function CasesGame() {
             next.set('caseId', nextCaseId)
             return next
         }, { replace: true })
-    }, [caseId, running, setSearchParams, sfx])
+    }, [caseId, running, setSearchParams, sfx, clearStaleResult])
 
     // P4: long-press the Open button to auto-roll until cancel
     const handleOpenMouseDown = useCallback(() => {

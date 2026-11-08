@@ -35,6 +35,7 @@ import { getBigWinThreshold,
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { plinkoBackingSize } from './frameSize'
+import { plinkoSettlementRtp } from './plinkoRtp'
 import EducationPanel from '../../EducationPanel'
 import './plinko.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -361,9 +362,18 @@ export default function PlinkoGame() {
     const lastResult = session.history[0]
     const lastMultiplier = lastResult?.multiplier ?? null
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
-    const expected = useMemo(() => payouts ? expectedReturn(payouts) : 0, [payouts])
     const ball = BALL_TYPES[ballType]
-    const expectedGrossMultiplier = payouts ? expected * ball.bonus / ball.cost : undefined
+    // QA007: the quoted RTP must be what the player is actually credited, which
+    // depends on the accepted stake - `plinkoReturn` rounds to 0.01 GC, which turns
+    // some bins into pushes and half-bins into full refunds at small stakes. The
+    // binomial table is the board's payout schedule; `plinkoSettlementRtp` weights
+    // the real settlement over it at this stake, ball and row count.
+    const quote = useMemo(() => plinkoSettlementRtp({
+        rows,
+        risk,
+        betAmount: selectedBet,
+        ballId: ballType,
+    }), [rows, risk, selectedBet, ballType])
 
     return (
         <GameShell
@@ -377,7 +387,18 @@ export default function PlinkoGame() {
                 <>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim drops" />
-                    <EducationPanel definition={definition} betAmount={selectedBet * ball.cost} expectedGrossMultiplier={expectedGrossMultiplier} effectiveRtp={expectedGrossMultiplier} balance={balance} recentProfit={recentProfit} />
+                    <EducationPanel
+                        definition={definition}
+                        betAmount={selectedBet * ball.cost}
+                        winProbability={quote?.settlementWinChance}
+                        effectiveRtp={quote?.settlementRtp}
+                        rtpLabel="RTP (this stake)"
+                        rtpNote={quote
+                            ? `${rows} rows · ${risk} risk · ${ball.name} ball at ${formatCredits(selectedBet * ball.cost)}. ${(quote.pushChance * 100).toFixed(1)}% of drops return exactly the stake. Measured after rounding, not a theoretical ratio.`
+                            : undefined}
+                        balance={balance}
+                        recentProfit={recentProfit}
+                    />
                 </>
             }
             panel={
@@ -431,7 +452,7 @@ export default function PlinkoGame() {
                             <button className="bp-bet-btn" type="button" onClick={() => quickDrop(25, 1)}>+25</button>
                         </div>
                     </div>
-                    <div className="bp-bal-line"><span>Avg return</span><strong>{expected.toFixed(2)}×</strong></div>
+                    <div className="bp-bal-line"><span>Avg return</span><strong>{quote ? `${(quote.expectedReturnGc / quote.cost).toFixed(2)}×` : '—'}</strong></div>
                     <div className="bp-bal-line"><span>In flight</span><strong>{activeDrops}</strong></div>
                 </BetPanel>
             }

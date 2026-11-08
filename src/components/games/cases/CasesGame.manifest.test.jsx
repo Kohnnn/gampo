@@ -72,6 +72,8 @@ vi.mock('../primitives', async original => ({
 }))
 
 import CasesGame from './CasesGame'
+import { CASE_CATEGORIES } from './caseEconomy'
+const CASE_CATEGORY_VALUES = CASE_CATEGORIES.map(entry => entry.value)
 import { useCasesManifest } from './useCasesManifest'
 import { filterCasesByCategory, normalizeCaseForRuntime, rarityDropWeight } from './caseEconomy'
 import * as opening from './caseOpening'
@@ -134,6 +136,24 @@ function nodes(visit, root = visit.value) {
     }
     walk(root)
     if (root === visit.value) visit.portals.forEach(walk)
+    return found
+}
+// Same as nodes(), but also descends into the stage frame children so controls
+// rendered outside CaseRightPanel (category chips, browser toggle) are reachable.
+function allNodes(visit) {
+    const found = []
+    const walk = node => {
+        if (!React.isValidElement(node)) return
+        found.push(node)
+        if (typeof node.type === 'function' && ['CaseRightPanel', 'CoreStageFrame'].includes(node.type.name)) {
+            walk(node.type(node.props)); return
+        }
+        React.Children.forEach(node.props.children, walk)
+        React.Children.forEach(node.props.aside, walk)
+        React.Children.forEach(node.props.panel, walk)
+    }
+    walk(visit.value)
+    visit.portals.forEach(node => walk(node))
     return found
 }
 function find(visit, predicate) {
@@ -440,5 +460,66 @@ describe('Actual Cases controls and visible preparation slot', () => {
         const visit = mount(CasesGame); await settle(visit)
         expect(nodes(visit).some(node => node.type === 'strong' && node.props.children === name)).toBe(true)
         expect(nodes(visit).some(node => node.props.dangerouslySetInnerHTML)).toBe(false)
+    })
+
+    it('pages a settled result out of the DOM on every selection path (QA041)', async () => {
+        // A real round is opened and advanced to settlement, so `results` is
+        // genuinely non-empty before the case changes. Without that, "no stale
+        // result" would pass trivially and prove nothing.
+        const normalized = realCatalog.map(value => normalizeCaseForRuntime(value))
+        const stage = visit => find(visit, node => node.type === 'div'
+            && String(node.props.className || '').startsWith('cases-stage '))
+        const summaryBlocks = visit => allNodes(visit).filter(node =>
+            String(node.props?.className || '').includes('cases-settlement'))
+        const runRound = visit => {
+            desktop(visit).props.onClick(); visit.render()
+            for (let i = 0; i < 40 && !String(stage(visit).props.className).includes('has-result'); i++) {
+                vi.advanceTimersByTime(500); visit.render()
+            }
+            expect(stage(visit).props.className, 'round settled with a visible result').toContain('has-result')
+        }
+        const paths = {
+            'direct case click': visit => {
+                const panel = visit.value.props.aside
+                const target = normalized.find(value => value.id !== panel.props.activeCase.id).id
+                panel.props.selectCase(target); visit.render()
+            },
+            'category selection': visit => {
+                const first = visit.value.props.aside.props.activeCase.id
+                const toggle = allNodes(visit).find(node => node.type === 'button'
+                    && String(node.props.className || '').includes('cases-browser-toggle'))
+                if (toggle.props['aria-expanded'] === false) { toggle.props.onClick(); visit.render() }
+                const chips = allNodes(visit).filter(node => node.type === 'button'
+                    && String(node.props.className || '').includes('cases-category-chip'))
+                const pick = chips.find((node, index) => {
+                    const firstForCategory = filterCasesByCategory(normalized, CASE_CATEGORY_VALUES[index])[0]
+                    return firstForCategory && firstForCategory.id !== first
+                })
+                expect(pick, 'a chip selecting another case').toBeTruthy()
+                pick.props.onClick(); visit.render()
+            },
+            'URL deep link': visit => {
+                const first = visit.value.props.aside.props.activeCase.id
+                h.params = new URLSearchParams({ caseId: normalized.find(value => value.id !== first).id })
+                visit.render()
+            },
+        }
+        for (const [label, act] of Object.entries(paths)) {
+            h.params = new URLSearchParams()
+            fetch.mockResolvedValueOnce(response(realCatalog))
+            const visit = mount(CasesGame); await settle(visit)
+            const before = visit.value.props.aside.props.activeCase.id
+            runRound(visit)
+            const creditsAtSettle = h.env.credits.addWinnings.mock.calls.length
+            h.env.credits.placeBet.mockClear()
+            act(visit)
+            expect(visit.value.props.aside.props.activeCase.id, `${label}: selection changed`).not.toBe(before)
+            expect(stage(visit).props.className, `${label}: stale result stage cleared`).not.toContain('has-result')
+            expect(summaryBlocks(visit).length, `${label}: stale summary cleared`).toBe(0)
+            expect(h.env.credits.placeBet, `${label}: selecting a case charges nothing`).not.toHaveBeenCalled()
+            expect(h.env.credits.addWinnings.mock.calls.length, `${label}: settling already credited; selection adds none`)
+                .toBe(creditsAtSettle)
+            visit.cleanup()
+        }
     })
 })
