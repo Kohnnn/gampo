@@ -219,4 +219,14 @@ describe('settled slot presentation', () => {
         expect(props.winProbability).toBeUndefined()
         expect(props.rtpNote).toContain('Fun on')
     })
+
+    it('does not promise an outcome hold the resolver never receives (QA034)', () => {
+        // `resolveSlotSpin(config, {...})` is called without `lockedCols`, so a frozen
+        // column only stops its reel animation. Any "Hold"/"Lock" label would promise
+        // the player that symbols are carried into the next result. They are not.
+        const tree = render('bars')
+        expect(find(tree, node => node.props?.['aria-label'] === 'Freeze columns')).not.toBeNull()
+        expect(find(tree, node => typeof node.props?.['aria-label'] === 'string' && /^(Unlock|Lock) column/.test(node.props['aria-label']))).toBeNull()
+        expect(find(tree, node => node.props?.['aria-label'] === 'Freeze column 1 reels')).not.toBeNull()
+    })
 })

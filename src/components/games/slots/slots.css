@@ -3506,7 +3506,8 @@
         linear-gradient(180deg, #2a120c 0%, #110604 100%);
 }
 
-/* Wave 36 P4: hold-and-respin column lock UI */
+/* Column freeze UI. QA034: freezes reel animation only — the outcome resolver
+   never receives `lockedCols`, so this does not hold symbols into the result. */
 .slot-col-locks {
     display: flex;
     gap: 4px;

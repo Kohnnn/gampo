@@ -2131,7 +2131,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     >
                         {config.layout.evaluation === 'megaways' ? (
                             <>
-                                <div className="slot-col-locks" aria-label="Hold columns">
+                                {/* QA034: this control freezes a column's reel animation only.
+                                    `resolveSlotSpin` is never given `lockedCols`, so the resolved
+                                    outcome is freshly drawn for every spin. Labelling it "Hold"
+                                    promised an outcome-level hold the resolver does not implement,
+                                    and adding one would change RNG consumption and payouts.
+                                    Relabelled to the behaviour that actually exists. */}
+                                <div className="slot-col-locks" aria-label="Freeze columns">
                                     {Array.from({ length: config.layout.cols }).map((_, col) => (
                                         <button
                                             key={col}
@@ -2139,7 +2145,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                             className={`slot-col-lock ${lockedCols.has(col) ? 'is-locked' : ''}`}
                                             onClick={() => toggleColLock(col)}
                                             disabled={running}
-                                            aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                            aria-label={`${lockedCols.has(col) ? 'Unfreeze' : 'Freeze'} column ${col + 1} reels`}
                                             aria-pressed={lockedCols.has(col)}
                                         >
                                             {lockedCols.has(col) ? '🔒' : col + 1}
@@ -2159,7 +2165,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                 className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''} ${!running && wildColumns.has(col) ? 'wild-column' : ''} ${lockedCols.has(col) ? 'is-locked' : ''}`}
                                                 onClick={() => !running && toggleColLock(col)}
                                                 role="button"
-                                                aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                                aria-label={`${lockedCols.has(col) ? 'Unfreeze' : 'Freeze'} column ${col + 1} reels`}
                                                 tabIndex={running ? -1 : 0}
                                             >
                                                 {cellsInCol.map(({ index }) => {
@@ -2189,7 +2195,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             </>
                         ) : (
                             <>
-                                <div className="slot-col-locks" aria-label="Hold columns">
+                                <div className="slot-col-locks" aria-label="Freeze columns">
                                     {Array.from({ length: config.layout.cols }).map((_, col) => (
                                         <button
                                             key={col}
@@ -2197,7 +2203,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                             className={`slot-col-lock ${lockedCols.has(col) ? 'is-locked' : ''}`}
                                             onClick={() => toggleColLock(col)}
                                             disabled={running}
-                                            aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                            aria-label={`${lockedCols.has(col) ? 'Unfreeze' : 'Freeze'} column ${col + 1} reels`}
                                             aria-pressed={lockedCols.has(col)}
                                         >
                                             {lockedCols.has(col) ? '🔒' : col + 1}
