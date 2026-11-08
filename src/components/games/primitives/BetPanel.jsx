@@ -215,8 +215,11 @@ export default function BetPanel({
             // session profit — `{profit:0}` alone is ambiguous.
             const step = accountAutoRound(autoState, raced.value)
             autoState = step.state
-            const { lastKind, lastProfit: profit, sessionProfit } = autoState
-            sessionProfit.current = sessionProfit
+            // The destructured `sessionProfit` is a NUMBER; the ref of the same
+            // name is what the shell reads. Shadowing them made this line assign
+            // a property on a primitive and throw on every resolved Auto round.
+            const { lastKind, lastProfit: profit, sessionProfit: sessionProfitNow } = autoState
+            sessionProfit.current = sessionProfitNow
             if (step.stop) { stopAuto(); break }
             if (!step.accepted) {
                 // A refusal is not a round: retry the same stake, but do not
