@@ -31,17 +31,20 @@ const outArg = process.argv.find(a => a.startsWith('--out='))
 const outDir = outArg ? outArg.slice('--out='.length) : null
 
 function resolveBrowser() {
-    if (process.env.GAMPO_CHROMIUM) return process.env.GAMPO_CHROMIUM
-    const roots = [process.env.PLAYWRIGHT_BROWSERS_PATH, join(homedir(), '.cache', 'ms-playwright')].filter(Boolean)
+    if (process.env.CHROME_BIN && existsSync(process.env.CHROME_BIN)) return process.env.CHROME_BIN
+    if (process.env.GAMPO_CHROMIUM && existsSync(process.env.GAMPO_CHROMIUM)) return process.env.GAMPO_CHROMIUM
+    const roots = [process.env.PLAYWRIGHT_BROWSERS_PATH, join(homedir(), '.cache', 'ms-playwright'), '/home/compute_01/.cache/ms-playwright'].filter(Boolean)
     for (const root of roots) {
         if (!existsSync(root)) continue
         const dirs = readdirSync(root).filter(d => /^chromium-\d+$/.test(d)).sort().reverse()
         for (const d of dirs) {
-            const candidate = join(root, d, 'chrome-linux', 'chrome')
-            if (existsSync(candidate)) return candidate
+            for (const rel of ['chrome-linux64/chrome', 'chrome-linux/chrome']) {
+                const candidate = join(root, d, rel)
+                if (existsSync(candidate)) return candidate
+            }
         }
     }
-    throw new Error('No Chromium found. Set GAMPO_CHROMIUM to the browser binary.')
+    throw new Error('No Chromium found. Set CHROME_BIN or GAMPO_CHROMIUM to the browser binary.')
 }
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')

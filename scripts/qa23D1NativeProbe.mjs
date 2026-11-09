@@ -58,7 +58,7 @@ const evaluate = async (cdp, session, expression) => {
     return result.result.value
 }
 
-const browserPath = process.env.GAMPO_CHROMIUM || '/home/compute_01/.cache/ms-playwright/chromium-1187/chrome-linux/chrome'
+const browserPath = process.env.CHROME_BIN || process.env.GAMPO_CHROMIUM || '/home/compute_01/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome'
 
 const temp = await mkdtemp(join(tmpdir(), 'gampo-d1-probe-'))
 const profile = join(temp, 'profile')

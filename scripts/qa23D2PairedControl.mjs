@@ -30,7 +30,7 @@ import { createServer } from 'node:http'
 
 const REPEATS = Number(process.env.GAMPO_D2_REPEATS || 5)
 const FLAGS = ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--disable-background-networking', '--disable-features=MediaRouter,OptimizationHints', '--no-proxy-server', '--mute-audio', '--remote-debugging-port=0']
-const browserPath = process.env.GAMPO_CHROMIUM || '/home/compute_01/.cache/ms-playwright/chromium-1187/chrome-linux/chrome'
+const browserPath = process.env.CHROME_BIN || process.env.GAMPO_CHROMIUM || '/home/compute_01/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome'
 
 class Cdp {
     constructor(url) { this.socket = new WebSocket(url); this.id = 0; this.pending = new Map() }
