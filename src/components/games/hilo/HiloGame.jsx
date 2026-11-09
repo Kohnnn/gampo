@@ -118,7 +118,7 @@ export default function HiloGame() {
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (winChance <= 0) { showToast('error', 'No winning cards', 'Choose other direction'); resolve(notAdmittedResult('no-winning-cards', { stopAuto: true })); return }
-        if (!placeBet(betAmount, 'Hi-Lo')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        if (!placeBet(betAmount, 'Hi-Lo')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve(notAdmittedResult('insufficient-funds', { stopAuto: true })); return }
         setLastBet(betAmount)
         setToast(null)
         playSound('flip')
