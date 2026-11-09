@@ -88,6 +88,7 @@ try {
     await new Promise((ok, fail) => { proxy.once('error', fail); proxy.listen(0, '127.0.0.1', ok) })
     child = spawn(browser, ['--headless=new', '--no-sandbox', '--no-zygote', '--disable-gpu', '--disable-dev-shm-usage', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-extensions', '--disable-quic', '--mute-audio', '--remote-debugging-port=0', `--user-data-dir=${profile}`, `--proxy-server=http://127.0.0.1:${proxy.address().port}`, '--proxy-bypass-list=127.0.0.1', '--host-resolver-rules=MAP * ~NOTFOUND,EXCLUDE 127.0.0.1', 'about:blank'], { detached: true, stdio: 'ignore' })
     exit = new Promise(done => { child.once('error', error => done({ error: String(error) })); child.once('exit', (code, signal) => done({ code, signal })) })
+    await once(child, 'spawn')
     const port = await until(async () => { try { return Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]) } catch { return 0 } }, 'browser debugger')
     const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()
     cdp = new Cdp(version.webSocketDebuggerUrl); await cdp.open()
@@ -172,7 +173,7 @@ try {
     }
 } finally {
     if (cdp) { try { await cdp.send('Browser.close') } catch {} ; cdp.close() }
-    if (child) {
+    if (child?.pid) {
         const signal = s => { try { process.kill(-child.pid, s) } catch (e) { if (e.code !== 'ESRCH') throw e } }
         let result = await Promise.race([exit, sleep(4000).then(() => null)])
         if (!result) { signal('SIGTERM'); result = await Promise.race([exit, sleep(2000).then(() => null)]) }
