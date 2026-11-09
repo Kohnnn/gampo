@@ -5,7 +5,7 @@
 // Temporary scaffold for the D-1 verification run; deleted with the probe page.
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, lstat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
@@ -58,6 +58,39 @@ const evaluate = async (cdp, session, expression) => {
     return result.result.value
 }
 
+// ponytail: bounded local cleanup; unknown exits retain the profile and fail the probe.
+async function stopProcess(child, group = false) {
+    const exited = () => typeof child.exitCode === 'number' || typeof child.signalCode === 'string'
+    const gone = () => {
+        try { process.kill(-child.pid, 0); return false } catch (error) { if (error.code === 'ESRCH') return true; throw error }
+    }
+    if (!child.pid) throw new Error('process has no observed pid')
+    if (!exited()) {
+        await new Promise((resolve, reject) => {
+            const done = error => { clearTimeout(timer); child.removeListener('exit', onExit); child.removeListener('error', onError); error ? reject(error) : resolve() }
+            const onExit = () => done()
+            const onError = error => done(error)
+            const timer = setTimeout(() => done(new Error('process exit was not observed')), 5000)
+            child.once('exit', onExit); child.once('error', onError)
+            try {
+                if (group) process.kill(-child.pid, 'SIGKILL')
+                else if (!child.kill('SIGKILL') && !exited()) throw new Error('process signal was refused')
+            } catch (error) { if (error.code !== 'ESRCH' || !group) done(error) }
+            if (exited()) done()
+        })
+    }
+    if (!exited()) throw new Error('process exit was not observed')
+    if (group) {
+        for (let i = 0; i < 50 && !gone(); i += 1) await new Promise(resolve => setTimeout(resolve, 100))
+        if (!gone()) throw new Error('process group still exists')
+    }
+}
+async function removeDirectory(path) {
+    await rm(path, { recursive: true, force: true })
+    try { await lstat(path) } catch (error) { if (error.code === 'ENOENT') return; throw error }
+    throw new Error('directory still exists after removal')
+}
+
 const browserPath = process.env.CHROME_BIN || process.env.GAMPO_CHROMIUM || '/home/compute_01/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome'
 
 const temp = await mkdtemp(join(tmpdir(), 'gampo-d1-probe-'))
@@ -65,19 +98,22 @@ const profile = join(temp, 'profile')
 let vite, browser, cdp
 const report = { rows: [], cleanup: { vite: false, browser: false, temp: false } }
 const cdpErrors = new Map()
+let probeFailed = false
 
 try {
     // `detached` gives vite its own process group so cleanup can signal the
     // whole tree. Killing the `npx` wrapper alone leaves the vite child holding
     // the port, which is what made a later run fail with EADDRINUSE.
     vite = spawn('npx', ['vite', '--port', '5199', '--strictPort'], { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'], detached: true })
+    vite.on('error', () => {})
     let viteLog = ''
     vite.stdout.on('data', d => { viteLog += d })
     vite.stderr.on('data', d => { viteLog += d })
     await until(async () => viteLog.includes('5199') || viteLog.includes('ready in'), 'vite dev server')
     const origin = 'http://127.0.0.1:5199'
 
-    browser = spawn(browserPath, [...FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] })
+    browser = spawn(browserPath, [...FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], detached: true })
+    browser.on('error', () => {})
     let browserLog = ''
     browser.stderr.on('data', d => { browserLog += d })
     const port = await until(async () => {
@@ -160,15 +196,24 @@ try {
         await fetch(`http://127.0.0.1:${port}/json/close/${tab.targetId}`)
         report.rows.push({ step: `closed tab ${i}` })
     }
+} catch (error) {
+    probeFailed = true
+    throw error
 } finally {
-    if (cdp) cdp.close()
-    if (browser) { browser.kill('SIGKILL'); report.cleanup.browser = true }
-    if (vite) {
-        try { process.kill(-vite.pid, 'SIGKILL') } catch { /* group already gone */ }
-        report.cleanup.vite = true
+    const failures = []
+    const record = async (key, action) => {
+        try { await action(); report.cleanup[key] = true } catch (error) { failures.push(`${key}: ${error.message}`) }
     }
-    await rm(temp, { recursive: true, force: true }).catch(() => {})
-    report.cleanup.temp = true
+    if (cdp) cdp.close()
+    if (browser) await record('browser', () => stopProcess(browser, true))
+    if (vite) await record('vite', () => stopProcess(vite, true))
+    if (!browser || report.cleanup.browser) await record('temp', () => removeDirectory(temp))
+    else failures.push('temp: retained because browser exit was not confirmed')
+    if (failures.length) {
+        report.cleanup.errors = failures
+        console.error(`Cleanup failure: ${failures.join('; ')}`)
+        if (!probeFailed) throw new Error(`Cleanup failure: ${failures.join('; ')}`)
+    }
 }
 
 console.log(JSON.stringify(report, null, 1))

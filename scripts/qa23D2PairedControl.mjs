@@ -22,13 +22,14 @@
 // disagreed (see the report), 2 = harness failure.
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile, mkdir, lstat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 
-const REPEATS = Number(process.env.GAMPO_D2_REPEATS || 5)
+const REPEATS = Number(process.env.GAMPO_D2_REPEATS ?? 5)
+if (!Number.isSafeInteger(REPEATS) || REPEATS <= 0) throw new Error('GAMPO_D2_REPEATS must be a positive finite integer')
 const FLAGS = ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--disable-background-networking', '--disable-features=MediaRouter,OptimizationHints', '--no-proxy-server', '--mute-audio', '--remote-debugging-port=0']
 const browserPath = process.env.CHROME_BIN || process.env.GAMPO_CHROMIUM || '/home/compute_01/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome'
 
@@ -74,18 +75,61 @@ const evaluate = async (cdp, session, expression) => {
     return result.result.value
 }
 
+// ponytail: bounded local cleanup; unknown exits retain the profile and fail the probe.
+async function stopProcess(child, group = false) {
+    const exited = () => typeof child.exitCode === 'number' || typeof child.signalCode === 'string'
+    const gone = () => {
+        try { process.kill(-child.pid, 0); return false } catch (error) { if (error.code === 'ESRCH') return true; throw error }
+    }
+    if (!child.pid) throw new Error('process has no observed pid')
+    if (!exited()) {
+        await new Promise((resolve, reject) => {
+            const done = error => { clearTimeout(timer); child.removeListener('exit', onExit); child.removeListener('error', onError); error ? reject(error) : resolve() }
+            const onExit = () => done()
+            const onError = error => done(error)
+            const timer = setTimeout(() => done(new Error('process exit was not observed')), 5000)
+            child.once('exit', onExit); child.once('error', onError)
+            try {
+                if (group) process.kill(-child.pid, 'SIGKILL')
+                else if (!child.kill('SIGKILL') && !exited()) throw new Error('process signal was refused')
+            } catch (error) { if (error.code !== 'ESRCH' || !group) done(error) }
+            if (exited()) done()
+        })
+    }
+    if (!exited()) throw new Error('process exit was not observed')
+    if (group) {
+        for (let i = 0; i < 50 && !gone(); i += 1) await sleep(100)
+        if (!gone()) throw new Error('process group still exists')
+    }
+}
+async function closeServer(server) {
+    await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('server close was not observed')), 5000)
+        server.close(error => { clearTimeout(timer); error ? reject(error) : resolve() })
+    })
+    if (server.listening) throw new Error('server is still listening')
+}
+async function removeDirectory(path) {
+    await rm(path, { recursive: true, force: true })
+    try { await lstat(path) } catch (error) { if (error.code === 'ENOENT') return; throw error }
+    throw new Error('directory still exists after removal')
+}
+
 const startedAt = Date.now()
 const temp = await mkdtemp(join(tmpdir(), 'gampo-d2-control-'))
 const profile = join(temp, 'profile')
-await mkdir(profile)
+// Initialization after mkdtemp is inside the cleanup boundary.
 // Outside `temp`: the report is evidence and must outlive cleanup.
 const outDir = process.env.GAMPO_D2_OUT || join(process.cwd(), 'output', 'd2-paired-control')
-await mkdir(outDir, { recursive: true })
+// The evidence directory is created inside the cleanup boundary.
 
 let browser, cdp, server
-const report = { arms: [], environment: {}, cleanup: { outDir } }
+const report = { arms: [], environment: {}, cleanup: { outDir, browser: false, server: false, temp: false } }
+let probeFailed = false
 
 try {
+    await mkdir(profile)
+    await mkdir(outDir, { recursive: true })
     // A real same-origin page: an error page or opaque origin denies
     // localStorage entirely, which would test nothing.
     server = createServer((request, response) => {
@@ -98,6 +142,7 @@ try {
     report.environment.pageOrigin = pageOrigin
 
     browser = spawn(browserPath, [...FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], detached: true })
+    browser.on('error', () => {})
     const port = await until(async () => {
         try { return Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]) } catch { return false }
     }, 'browser debugger')
@@ -206,12 +251,24 @@ try {
     }))
 
     await fetch(`http://127.0.0.1:${port}/json/close/${target.id}`).catch(() => {})
+} catch (error) {
+    probeFailed = true
+    throw error
 } finally {
+    const failures = []
+    const record = async (key, action) => {
+        try { await action(); report.cleanup[key] = true } catch (error) { failures.push(`${key}: ${error.message}`) }
+    }
     if (cdp) cdp.close()
-    if (browser) { try { process.kill(-browser.pid, 'SIGKILL') } catch { /* gone */ } report.cleanup.browser = true }
-    if (server) { server.close(); report.cleanup.server = true }
-    await rm(temp, { recursive: true, force: true }).catch(() => {})
-    report.cleanup.temp = true
+    if (browser) await record('browser', () => stopProcess(browser, true))
+    if (server) await record('server', () => closeServer(server))
+    if (!browser || report.cleanup.browser) await record('temp', () => removeDirectory(temp))
+    else failures.push('temp: retained because browser exit was not confirmed')
+    if (failures.length) {
+        report.cleanup.errors = failures
+        console.error(`Cleanup failure: ${failures.join('; ')}`)
+        if (!probeFailed) throw new Error(`Cleanup failure: ${failures.join('; ')}`)
+    }
 }
 
 const [cdpArm, cachedArm, crossArm, rendererArm] = report.arms

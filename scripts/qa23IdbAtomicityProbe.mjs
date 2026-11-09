@@ -15,7 +15,7 @@
 // Exit codes: 0 = observations recorded (see report), 1 = harness invalid.
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile, lstat } from 'node:fs/promises'
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { createServer } from 'node:http'
@@ -74,6 +74,41 @@ class Cdp {
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// ponytail: bounded local cleanup; unknown exits retain the profile and fail the probe.
+async function stopProcess(child) {
+    const exited = () => typeof child.exitCode === 'number' || typeof child.signalCode === 'string'
+    const gone = () => {
+        try { process.kill(-child.pid, 0); return false } catch (error) { if (error.code === 'ESRCH') return true; throw error }
+    }
+    if (!child.pid) throw new Error('process has no observed pid')
+    if (!exited()) {
+        await new Promise((resolve, reject) => {
+            const done = error => { clearTimeout(timer); child.removeListener('exit', onExit); child.removeListener('error', onError); error ? reject(error) : resolve() }
+            const onExit = () => done()
+            const onError = error => done(error)
+            const timer = setTimeout(() => done(new Error('process exit was not observed')), 5000)
+            child.once('exit', onExit); child.once('error', onError)
+            try { process.kill(-child.pid, 'SIGKILL') } catch (error) { if (error.code !== 'ESRCH') done(error) }
+            if (exited()) done()
+        })
+    }
+    if (!exited()) throw new Error('process exit was not observed')
+    for (let i = 0; i < 50 && !gone(); i += 1) await sleep(100)
+    if (!gone()) throw new Error('process group still exists')
+}
+async function closeServer(server) {
+    await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('server close was not observed')), 5000)
+        server.close(error => { clearTimeout(timer); error ? reject(error) : resolve() })
+    })
+    if (server.listening) throw new Error('server is still listening')
+}
+async function removeDirectory(path) {
+    await rm(path, { recursive: true, force: true })
+    try { await lstat(path) } catch (error) { if (error.code === 'ENOENT') return; throw error }
+    throw new Error('directory still exists after removal')
+}
 
 const PAGE = `<!doctype html><meta charset="utf-8"><title>idb probe</title>
 <script>
@@ -184,17 +219,21 @@ window.__probe = {
 
 async function main() {
     const profile = await mkdtemp(join(tmpdir(), 'gampo-idb-probe-'))
-    const server = createServer((req, res) => {
-        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-        res.end(PAGE)
-    })
-    await new Promise(r => server.listen(0, '127.0.0.1', r))
-    const port = server.address().port
-    const pageOrigin = `http://127.0.0.1:${port}`
-
-    const child = spawn(browserPath, [...FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'pipe' })
-    const report = { arms: [], environment: {}, cleanup: {} }
+    let server, child, cdp
+    const report = { arms: [], environment: {}, cleanup: { browser: false, server: false, profile: false } }
+    let probeFailed = false
     try {
+        server = createServer((req, res) => {
+            res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+            res.end(PAGE)
+        })
+        server.listen(0, '127.0.0.1')
+        await once(server, 'listening')
+        const port = server.address().port
+        const pageOrigin = `http://127.0.0.1:${port}`
+
+        child = spawn(browserPath, [...FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'pipe', detached: true })
+        child.on('error', () => {})
         const activePort = join(profile, 'DevToolsActivePort')
         let target = null
         for (let i = 0; i < 200; i += 1) {
@@ -206,7 +245,7 @@ async function main() {
             } catch { await sleep(50) }
         }
         assert(target, 'browser did not expose DevToolsActivePort')
-        const cdp = new Cdp(target)
+        cdp = new Cdp(target)
         await cdp.open()
         const { targetInfos } = await cdp.send('Target.getTargets')
         const pageTarget = targetInfos.find(t => t.type === 'page')
@@ -270,11 +309,26 @@ async function main() {
         report.arms.push({ arm: 'localStorage contrast (absolute writes)', lsResult })
 
         await cdp.send('Target.closeTarget', { targetId: pageTarget.targetId })
-        report.cleanup = { profile: 'removed', server: true }
+    } catch (error) {
+        probeFailed = true
+        throw error
     } finally {
-        child.kill('SIGKILL')
-        server.close()
-        await rm(profile, { recursive: true, force: true }).catch(() => {})
+        const failures = []
+        const record = async (key, action, value = true) => {
+            try { await action(); report.cleanup[key] = value } catch (error) { failures.push(`${key}: ${error.message}`) }
+        }
+        if (cdp) {
+            try { cdp.socket.close() } catch (error) { failures.push(`cdp: ${error.message}`) }
+        }
+        if (child) await record('browser', () => stopProcess(child))
+        if (server) await record('server', () => closeServer(server))
+        if (!child || report.cleanup.browser) await record('profile', () => removeDirectory(profile), 'removed')
+        else failures.push('profile: retained because browser exit was not confirmed')
+        if (failures.length) {
+            report.cleanup.errors = failures
+            console.error(`Cleanup failure: ${failures.join('; ')}`)
+            if (!probeFailed) throw new Error(`Cleanup failure: ${failures.join('; ')}`)
+        }
     }
 
     const [settleArm, abortArm, pairArm, lsArm] = report.arms
