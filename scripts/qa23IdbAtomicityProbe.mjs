@@ -75,8 +75,25 @@ class Cdp {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
+function watchChild(child) {
+    const state = { spawned: false, failedSpawn: null }
+    state.ready = new Promise((resolve, reject) => {
+        child.once('spawn', () => { state.spawned = true; resolve() })
+        child.on('error', error => { if (!state.spawned && !child.pid) state.failedSpawn = error; reject(error) })
+    })
+    state.closed = new Promise(resolve => child.once('close', resolve))
+    return state
+}
+async function waitForClose(state) {
+    let timer
+    try {
+        await Promise.race([state.closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('process close was not observed')), 5000) })])
+    } finally { clearTimeout(timer) }
+}
+
 // ponytail: bounded local cleanup; unknown exits retain the profile and fail the probe.
-async function stopProcess(child) {
+async function stopProcess(child, lifecycle) {
+    if (lifecycle.failedSpawn) { await waitForClose(lifecycle); return }
     const exited = () => typeof child.exitCode === 'number' || typeof child.signalCode === 'string'
     const gone = () => {
         try { process.kill(-child.pid, 0); return false } catch (error) { if (error.code === 'ESRCH') return true; throw error }
@@ -94,6 +111,7 @@ async function stopProcess(child) {
         })
     }
     if (!exited()) throw new Error('process exit was not observed')
+    await waitForClose(lifecycle)
     for (let i = 0; i < 50 && !gone(); i += 1) await sleep(100)
     if (!gone()) throw new Error('process group still exists')
 }
@@ -219,7 +237,7 @@ window.__probe = {
 
 async function main() {
     const profile = await mkdtemp(join(tmpdir(), 'gampo-idb-probe-'))
-    let server, child, cdp
+    let server, child, cdp, childLifecycle
     const report = { arms: [], environment: {}, cleanup: { browser: false, server: false, profile: false } }
     let probeFailed = false
     try {
@@ -233,7 +251,8 @@ async function main() {
         const pageOrigin = `http://127.0.0.1:${port}`
 
         child = spawn(browserPath, [...FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'pipe', detached: true })
-        child.on('error', () => {})
+        childLifecycle = watchChild(child)
+        await childLifecycle.ready
         const activePort = join(profile, 'DevToolsActivePort')
         let target = null
         for (let i = 0; i < 200; i += 1) {
@@ -320,7 +339,7 @@ async function main() {
         if (cdp) {
             try { cdp.socket.close() } catch (error) { failures.push(`cdp: ${error.message}`) }
         }
-        if (child) await record('browser', () => stopProcess(child))
+        if (child) await record('browser', () => stopProcess(child, childLifecycle))
         if (server) await record('server', () => closeServer(server))
         if (!child || report.cleanup.browser) await record('profile', () => removeDirectory(profile), 'removed')
         else failures.push('profile: retained because browser exit was not confirmed')

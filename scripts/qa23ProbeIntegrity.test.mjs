@@ -15,25 +15,41 @@ const names = {
 const selected = process.argv.slice(2)
 const cases = selected.length ? selected : ['counts', 'd1', 'd2', 'idb']
 
-async function simulate(name, { repeats = '1', failCleanup = [], failProbe = false, survivors = false } = {}) {
+async function simulate(name, { repeats = '1', failCleanup = [], failProbe = false, survivors = false, earlyExit, spawnFailure, delayedClose = false, unknownPid = false } = {}) {
     let source = await readFile(new URL(names[name], directory), 'utf8')
     source = source.replace(/^import .* from ['"]node:[^'"\n]+['"]\s*$/gm, '')
         .replace('const report = {', 'const report = globalThis.__probeReport = {')
         .replace('main().catch(error => { console.error(error.stack || error); process.exit(1) })', 'await main()')
-    const calls = { spawned: 0, removed: false, logs: [], groups: [], detached: [] }
-    let browser, server, balanceReads = 0
+    const calls = { spawned: 0, removed: false, logs: [], groups: [], detached: [], removedBeforeClose: false, groupSignalsAfterExit: [], runtimeEvaluations: 0 }
+    let browser, vite, server, balanceReads = 0, betCalls = 0, storedReads = 0
+    const storage = new Map()
+    function exitLauncher() {
+        const child = earlyExit === 'vite' ? vite : browser
+        if (!earlyExit || !child || child.exitCode !== null) return
+        child.exitCode = 0
+        child.emit('exit', 0, null)
+        child.closed = true
+        child.emit('close', 0, null)
+    }
     class Child extends EventEmitter {
-        constructor(vite) {
+        constructor(isVite) {
             super()
-            this.pid = vite ? 2222 : 1111
+            this.kind = isVite ? 'vite' : 'browser'
+            this.pid = spawnFailure?.resource === this.kind || (unknownPid && !isVite) ? undefined : isVite ? 2222 : 1111
             this.exitCode = null
             this.signalCode = null
-            this.stdout = { on: (event, callback) => { if (vite && event === 'data') callback('ready in 1ms on 5199') } }
+            this.closed = false
+            this.stdout = { on: (event, callback) => { if (isVite && this.pid && event === 'data') callback('ready in 1ms on 5199') } }
             this.stderr = { on() {} }
         }
         kill(signal) {
             if (failCleanup.includes(this.pid === 2222 ? 'vite' : 'browser')) return false
-            queueMicrotask(() => { this.signalCode = signal; this.emit('exit', null, signal) })
+            queueMicrotask(() => {
+                this.signalCode = signal
+                this.emit('exit', null, signal)
+                const close = () => { this.closed = true; this.emit('close', null, signal) }
+                if (delayedClose) setTimeout(close, 5); else close()
+            })
             return true
         }
     }
@@ -59,15 +75,28 @@ async function simulate(name, { repeats = '1', failCleanup = [], failProbe = fal
             const { id, method, params } = JSON.parse(payload)
             let result = {}
             let error
-            if (failProbe && method === 'Target.getTargets') error = { message: 'ORIGINAL_PROBE_FAILURE' }
+            if (failProbe && method === 'Target.getTargets') { exitLauncher(); error = { message: 'ORIGINAL_PROBE_FAILURE' } }
             else if (method === 'Target.getTargets') result = { targetInfos: [{ type: 'page', targetId: 'page' }] }
+            else if (method === 'DOMStorage.setDOMStorageItem') storage.set(params.key, params.value)
             else if (method === 'Target.attachToTarget') result = { sessionId: 'session' }
             else if (method === 'Runtime.evaluate') {
                 const expression = params.expression
+                calls.runtimeEvaluations += 1
                 let value = null
                 if (expression === 'location.protocol') value = 'http:'
                 else if (expression === 'location.origin') value = 'http://127.0.0.1:12345'
                 else if (expression.includes('typeof window.__probe')) value = true
+                else if (expression.includes('Boolean(window.__probe')) value = true
+                else if (expression.includes('window.__probe.placeBet')) value = [true, false, true, true, true, false][betCalls++]
+                else if (expression.includes('window.__probe.betAt')) value = false
+                else if (expression.includes('window.__probe.stored')) value = ['400', '400', '0', '700', '700', '400'][storedReads++]
+                else if (expression.includes('window.__probe.history')) value = []
+                else if (expression.startsWith('localStorage.getItem(')) value = storage.get(JSON.parse(expression.slice('localStorage.getItem('.length, -1))) ?? null
+                else if (expression.startsWith('localStorage.removeItem(')) storage.delete(JSON.parse(expression.slice('localStorage.removeItem('.length, -1)))
+                else if (expression.startsWith('localStorage.setItem(')) {
+                    const [key, valueToStore] = JSON.parse(`[${expression.slice('localStorage.setItem('.length, -1)}]`)
+                    storage.set(key, valueToStore)
+                }
                 else if (expression === 'navigator.userAgent') value = 'in-memory control'
                 else if (expression.includes('window.__probe.settleThenAbort')) value = { kind: 'aborted' }
                 else if (expression.includes('window.__probe.settle(')) value = { kind: 'committed' }
@@ -87,10 +116,14 @@ async function simulate(name, { repeats = '1', failCleanup = [], failProbe = fal
         kill(pid, signal) {
             if (signal === 0) {
                 const child = pid === -2222 ? vite : browser
-                if (child?.signalCode && !(survivors && child === browser)) throw Object.assign(new Error('gone'), { code: 'ESRCH' })
+                const exited = !!child && (child.signalCode !== null || child.exitCode !== null)
+                const groupSurvives = survivors && child === (earlyExit === 'vite' ? vite : browser)
+                if (exited && !groupSurvives) throw Object.assign(new Error('gone'), { code: 'ESRCH' })
                 return true
             }
             calls.groups.push(pid)
+            const signalledChild = pid === -2222 ? vite : browser
+            if (signalledChild && (signalledChild.exitCode !== null || signalledChild.signalCode !== null)) calls.groupSignalsAfterExit.push(pid)
             if (failCleanup.includes(pid === -2222 ? 'vite' : 'browser')) throw Object.assign(new Error('SIMULATED_GROUP_KILL_FAILURE'), { code: 'EPERM' })
             const child = pid === -2222 ? vite : browser
             child?.kill(signal)
@@ -98,7 +131,6 @@ async function simulate(name, { repeats = '1', failCleanup = [], failProbe = fal
         },
         exit(status) { exitStatus = status; throw new Error(`SIMULATED_EXIT_${status}`) },
     }
-    let vite
     const context = {
         assert, once, join,
         process: fakeProcess,
@@ -109,22 +141,37 @@ async function simulate(name, { repeats = '1', failCleanup = [], failProbe = fal
             const child = new Child(_command === 'npx')
             if (_command === 'npx') vite = child
             else browser = child
+            queueMicrotask(() => {
+                if (spawnFailure?.resource === child.kind) {
+                    child.emit('error', Object.assign(new Error(`SIMULATED_SPAWN_${spawnFailure.code}_${child.kind}`), { code: spawnFailure.code }))
+                    child.closed = true
+                    child.emit('close', -2, null)
+                } else child.emit('spawn')
+            })
             return child
         },
         createServer: () => { server = new Server(); return server },
         mkdtemp: async () => '/virtual/probe-temp', mkdir: async () => {},
-        readFile: async () => '12345\n/devtools/browser/fake',
+        readFile: async () => {
+            if (spawnFailure && (spawnFailure.resource !== 'vite' || !browser)) throw Object.assign(new Error('no debugger file'), { code: 'ENOENT' })
+            return '12345\n/devtools/browser/fake'
+        },
         writeFile: async () => {},
-        rm: async () => { if (failCleanup.includes('remove')) throw new Error('SIMULATED_REMOVE_FAILURE'); calls.removed = true },
+        rm: async () => {
+            if (failCleanup.includes('remove')) throw new Error('SIMULATED_REMOVE_FAILURE')
+            if (delayedClose && [vite, browser].some(child => child && !child.closed)) calls.removedBeforeClose = true
+            calls.removed = true
+        },
         lstat: async () => { if (calls.removed) throw Object.assign(new Error('gone'), { code: 'ENOENT' }); return {} },
         existsSync: path => path === '/virtual/chromium' || !calls.removed,
         readdirSync: () => [], homedir: () => '/virtual', tmpdir: () => '/virtual',
         fetch: async url => {
-            if (failProbe && String(url).includes('/json/version')) throw new Error('ORIGINAL_PROBE_FAILURE')
+            if (failProbe && String(url).includes('/json/version')) { exitLauncher(); throw new Error('ORIGINAL_PROBE_FAILURE') }
             return { json: async () => String(url).includes('/json/version')
                 ? { Browser: 'fake', webSocketDebuggerUrl: 'ws://fake' } : { id: 'page' } }
         },
         WebSocket: Socket,
+        Date: spawnFailure ? class extends Date { static now() { return Date.now() + (this.offset = (this.offset || 0) + 60000) } } : Date,
         setTimeout: (callback, ms) => setTimeout(callback, ms <= 50 ? 0 : 10),
         clearTimeout, queueMicrotask,
     }
@@ -165,6 +212,56 @@ for (const selectedCase of cases) {
                 assert.match(result.calls.logs.join('\n'), /cleanup/i, 'cleanup failure was not reported')
             })
         }
+        for (const resource of selectedCase === 'd1' ? ['vite', 'browser'] : ['browser']) {
+            await check(`${selectedCase} fails closed if ${resource} launcher exits with a surviving group`, async () => {
+                const result = await simulate(selectedCase, { failProbe: true, earlyExit: resource, survivors: true })
+                const cleanup = result.report?.cleanup
+                const id = resource === 'vite' ? -2222 : -1111
+                assert(cleanup, 'missing cleanup report')
+                assert.notEqual(cleanup[resource], true, 'reported an extant process group cleaned')
+                assert(!result.calls.groups.includes(id), 'signalled a group after its original launcher exited')
+                assert.match(result.calls.logs.join('\n'), /cleanup/i, 'failed group cleanup not reported')
+                assert.match(String(result.error?.stack || result.error), /ORIGINAL_PROBE_FAILURE/)
+                if (resource === 'browser') assert.equal(result.calls.removed, false, 'removed a profile while descendants may survive')
+            })
+            for (const code of ['ENOENT', 'EACCES']) {
+                await check(`${selectedCase} preserves ${resource} spawn ${code}`, async () => {
+                    const result = await simulate(selectedCase, { spawnFailure: { resource, code } })
+                    assert.match(String(result.error?.stack || result.error), new RegExp(`SIMULATED_SPAWN_${code}_${resource}`), 'spawn failure was replaced')
+                    assert(!result.calls.groups.includes(resource === 'vite' ? -2222 : -1111), 'signalled a process that failed to spawn')
+                    assert.equal(result.calls.removed, true, 'confirmed failed spawn left the temporary directory behind')
+                })
+            }
+            await check(`${selectedCase} does not signal ${resource} after observed exit when its group is absent`, async () => {
+                const result = await simulate(selectedCase, { failProbe: true, earlyExit: resource })
+                assert(!result.calls.groupSignalsAfterExit.includes(resource === 'vite' ? -2222 : -1111))
+                assert.match(String(result.error?.stack || result.error), /ORIGINAL_PROBE_FAILURE/)
+            })
+        }
+        await check(`${selectedCase} retains profile for an unknown browser launch`, async () => {
+            const result = await simulate(selectedCase, { unknownPid: true, failProbe: true })
+            assert.equal(result.calls.removed, false, 'unknown process treated as a failed spawn')
+            assert.notEqual(result.report?.cleanup?.browser, true)
+            assert.match(String(result.error?.stack || result.error), /ORIGINAL_PROBE_FAILURE/)
+        })
+        await check(`${selectedCase} fails cleanup after complete successful observations`, async () => {
+            const result = await simulate(selectedCase, { failCleanup: ['remove'] })
+            const expectedRows = selectedCase === 'd1' ? 8 : 4
+            assert.equal((result.report?.rows || result.report?.arms || []).length, expectedRows, 'probe did not finish the simulated observations')
+            if (selectedCase === 'd1') {
+                assert.equal(result.report.rows[6].step, 'closed tab 0')
+                assert.equal(result.report.rows[7].step, 'closed tab 1')
+            }
+            assert.match(String(result.error?.stack || result.error), /cleanup/i, 'cleanup failure did not fail the otherwise successful probe')
+            assert.notEqual(result.exitStatus, 0, 'cleanup failure reported success')
+            assert.equal(result.calls.removed, false)
+        })
+        await check(`${selectedCase} awaits child close before removing profile`, async () => {
+            const result = await simulate(selectedCase, { failProbe: true, delayedClose: true })
+            assert.match(String(result.error?.stack || result.error), /ORIGINAL_PROBE_FAILURE/)
+            assert.equal(result.calls.removedBeforeClose, false, 'profile removed before child close')
+            assert.equal(result.calls.removed, true, 'profile not removed after confirmed close')
+        })
         await check(`${selectedCase} reports confirmed cleanup on original failure`, async () => {
             const result = await simulate(selectedCase, { failProbe: true })
             const cleanup = result.report?.cleanup

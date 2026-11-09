@@ -75,8 +75,25 @@ const evaluate = async (cdp, session, expression) => {
     return result.result.value
 }
 
+function watchChild(child) {
+    const state = { spawned: false, failedSpawn: null }
+    state.ready = new Promise((resolve, reject) => {
+        child.once('spawn', () => { state.spawned = true; resolve() })
+        child.on('error', error => { if (!state.spawned && !child.pid) state.failedSpawn = error; reject(error) })
+    })
+    state.closed = new Promise(resolve => child.once('close', resolve))
+    return state
+}
+async function waitForClose(state) {
+    let timer
+    try {
+        await Promise.race([state.closed, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('process close was not observed')), 5000) })])
+    } finally { clearTimeout(timer) }
+}
+
 // ponytail: bounded local cleanup; unknown exits retain the profile and fail the probe.
-async function stopProcess(child, group = false) {
+async function stopProcess(child, lifecycle, group = false) {
+    if (lifecycle.failedSpawn) { await waitForClose(lifecycle); return }
     const exited = () => typeof child.exitCode === 'number' || typeof child.signalCode === 'string'
     const gone = () => {
         try { process.kill(-child.pid, 0); return false } catch (error) { if (error.code === 'ESRCH') return true; throw error }
@@ -97,6 +114,7 @@ async function stopProcess(child, group = false) {
         })
     }
     if (!exited()) throw new Error('process exit was not observed')
+    await waitForClose(lifecycle)
     if (group) {
         for (let i = 0; i < 50 && !gone(); i += 1) await sleep(100)
         if (!gone()) throw new Error('process group still exists')
@@ -123,7 +141,7 @@ const profile = join(temp, 'profile')
 const outDir = process.env.GAMPO_D2_OUT || join(process.cwd(), 'output', 'd2-paired-control')
 // The evidence directory is created inside the cleanup boundary.
 
-let browser, cdp, server
+let browser, cdp, server, browserLifecycle
 const report = { arms: [], environment: {}, cleanup: { outDir, browser: false, server: false, temp: false } }
 let probeFailed = false
 
@@ -142,7 +160,8 @@ try {
     report.environment.pageOrigin = pageOrigin
 
     browser = spawn(browserPath, [...FLAGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'], detached: true })
-    browser.on('error', () => {})
+    browserLifecycle = watchChild(browser)
+    await browserLifecycle.ready
     const port = await until(async () => {
         try { return Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]) } catch { return false }
     }, 'browser debugger')
@@ -260,7 +279,7 @@ try {
         try { await action(); report.cleanup[key] = true } catch (error) { failures.push(`${key}: ${error.message}`) }
     }
     if (cdp) cdp.close()
-    if (browser) await record('browser', () => stopProcess(browser, true))
+    if (browser) await record('browser', () => stopProcess(browser, browserLifecycle, true))
     if (server) await record('server', () => closeServer(server))
     if (!browser || report.cleanup.browser) await record('temp', () => removeDirectory(temp))
     else failures.push('temp: retained because browser exit was not confirmed')
