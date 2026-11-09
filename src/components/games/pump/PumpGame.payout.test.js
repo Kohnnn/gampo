@@ -47,6 +47,7 @@ vi.mock('../primitives', async () => {
 
 const { default: PumpGame } = await import('./PumpGame.jsx')
 const { default: BetPanel } = await import('../primitives/BetPanel.jsx')
+const { default: StageActionButton } = await import('../primitives/StageActionButton.jsx')
 const { default: EducationPanel } = await import('../../EducationPanel.jsx')
 const { nextRoll } = await import('../../../utils/fairRng')
 
@@ -73,6 +74,7 @@ const educationHtml = game => renderToStaticMarkup(EducationPanel(find(game, nod
 const stakeInput = panel => find(panel, node => node.type === 'input' && node.props?.type === 'number')
 const resetButton = panel => find(panel, node => node.type === 'button' && node.props?.['data-bet-chip'] === 'reset')
 const playButton = panel => find(panel, node => node.type === 'button' && node.props?.className?.startsWith('bp-play '))
+const pumpButton = game => find(game, node => node.type === StageActionButton)
 
 beforeEach(() => {
     fixture.states = {}; fixture.rolls = []; fixture.winnings.mockClear(); fixture.placeBet.mockClear(); nextRoll.mockClear()
@@ -98,6 +100,50 @@ describe('Pump controls and education', () => {
         expect(educationHtml(game)).toContain('GC 5.00')
         await playButton(panel).props.onClick()
         expect(fixture.placeBet).toHaveBeenCalledWith(5, 'Pump')
+    })
+
+    it.each(['Pump', 'Cashout'])('quotes the guaranteed 10-pump return before %s cashes out', async action => {
+        let game = renderGame()
+        let panel = renderPanel(game)
+        stakeInput(panel).props.onChange({ target: { value: '10' } })
+        panel = renderPanel(game)
+        game = renderGame()
+        panel = renderPanel(game)
+        await playButton(panel).props.onClick()
+        expect(educationHtml(renderGame())).toContain('88.00%')
+        for (let index = 0; index < 10; index++) {
+            game = renderGame()
+            expect(pumpButton(game).props.disabled).toBe(false)
+            pumpButton(game).props.onClick()
+            if (index === 8) {
+                const beforeCap = educationHtml(renderGame())
+                expect(beforeCap).toContain('88.00%')
+                expect(beforeCap).toContain('A failure returns 0 GC')
+                expect(beforeCap).not.toContain('Cap reached')
+            }
+        }
+        game = renderGame()
+        const html = educationHtml(game)
+        expect(html).toContain('Cashout success')
+        expect(html).toContain('100.00%')
+        expect(html).not.toContain('88.00%')
+        expect(html).toContain('GC 23.87')
+        expect(html).toContain('2.39×')
+        expect(html).toContain('EV vs cashout')
+        expect(html).toMatch(/EV vs cashout<\/span><strong[^>]*>GC 0\.00/)
+        expect(html).toMatch(/cap reached/i)
+        expect(html).toContain('2.3870×')
+        expect(html).toContain('Pump and Cashout both immediately')
+        expect(html).toContain('RTP per risky pump')
+        expect(html).toContain('not this cashout or a whole round')
+        expect(html).toMatch(/guaranteed/i)
+        expect(html).not.toContain('A failure returns 0 GC')
+        expect(nextRoll).toHaveBeenCalledTimes(10)
+        if (action === 'Pump') pumpButton(game).props.onClick()
+        else await playButton(renderPanel(game)).props.onClick()
+        expect(nextRoll).toHaveBeenCalledTimes(10)
+        expect(fixture.winnings).toHaveBeenCalledOnce()
+        expect(fixture.winnings).toHaveBeenCalledWith(23.87, 'Pump return')
     })
 })
 
