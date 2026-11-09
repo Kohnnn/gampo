@@ -24,6 +24,7 @@ import { getBigWinThreshold,
     buildEvents,
     useRoundMachine,
 } from '../primitives'
+import { notAdmittedResult } from '../primitives/autoAccounting'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import CardFace, { CardBack } from '../../ui/CardFace'
 import '../../ui/card-face.css'
@@ -116,8 +117,8 @@ export default function HiloGame() {
     const machine = useRoundMachine({ onEvent: handleEvent })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (winChance <= 0) { showToast('error', 'No winning cards', 'Choose other direction'); resolve({ profit: 0 }); return }
-        if (!placeBet(betAmount, 'Hi-Lo')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        if (winChance <= 0) { showToast('error', 'No winning cards', 'Choose other direction'); resolve(notAdmittedResult('no-winning-cards', { stopAuto: true })); return }
+        if (!placeBet(betAmount, 'Hi-Lo')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve(notAdmittedResult('insufficient-funds', { stopAuto: true })); return }
         setLastBet(betAmount)
         setToast(null)
         playSound('flip')

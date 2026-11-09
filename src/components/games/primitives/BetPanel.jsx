@@ -224,10 +224,8 @@ export default function BetPanel({
             sessionProfit.current = sessionProfitNow
             if (step.stop) { stopAuto(); break }
             if (!step.accepted) {
-                // A refusal is not a round: retry the same stake, but do not
-                // spin forever on a persistent refusal — the eligibility guard
-                // above already stopped the loop when the balance ran out.
-                if (lastKind === 'unknown' || lastKind === 'aborted') { stopAuto(); break }
+                // Retry temporary refusals; terminal refusals stop without consuming a round.
+                if (raced.value?.stopAuto === true || lastKind === 'unknown' || lastKind === 'aborted') { stopAuto(); break }
                 await new Promise(res => setTimeout(res, autoIntervalMs))
                 if (runId !== autoRunId.current) return
                 continue
