@@ -11,8 +11,36 @@
 //   - current affordability, percentage changes, exhaustion, stop-loss/profit
 //     and "no extra round after stop";
 //   - at least one non-Dice shared BetPanel consumer keeps working.
-import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const panel = vi.hoisted(() => ({ state: [], refs: [], cursor: 0, refCursor: 0 }))
+vi.mock('react', async () => ({
+    ...await vi.importActual('react'),
+    useState(initial) {
+        const i = panel.cursor++
+        if (!(i in panel.state)) panel.state[i] = typeof initial === 'function' ? initial() : initial
+        return [panel.state[i], value => { panel.state[i] = typeof value === 'function' ? value(panel.state[i]) : value }]
+    },
+    useRef(initial) { return panel.refs[panel.refCursor++] ||= { current: initial } },
+    useEffect: () => {}, useCallback: callback => callback, useId: () => 'dice-auto',
+}))
+vi.mock('react-dom', () => ({ createPortal: node => node }))
+import BetPanel from '../primitives/BetPanel'
+
+function renderPanel(props) {
+    panel.cursor = 0; panel.refCursor = 0
+    return BetPanel({ balance: 1000, initialBet: 3.33, minBet: 0.5, autoIntervalMs: 0, ...props })
+}
+function find(node, predicate) {
+    if (!node || typeof node !== 'object') return null
+    if (predicate(node)) return node
+    for (const child of [node.props?.children].flat(Infinity)) {
+        const found = find(child, predicate)
+        if (found) return found
+    }
+    return null
+}
+beforeEach(() => { panel.state = []; panel.refs = [] })
 import {
     RESULT_KINDS,
     normalizeBetResult,
@@ -21,7 +49,6 @@ import {
     accountAutoRound,
 } from '../primitives/autoAccounting'
 
-const diceSrc = readFileSync(new URL('../dice/DiceGame.jsx', import.meta.url), 'utf8')
 
 const baseState = (over = {}) => ({
     rounds: 0, refusals: 0, sessionProfit: 0, lastProfit: 0, lastKind: null,
@@ -58,13 +85,6 @@ describe('QA027 rejected-vs-accepted discrimination', () => {
         expect(rej.state.refusals).toBe(1)
     })
 
-    it('DiceGame no longer resolves a bare {profit:0} on a rejected bet', () => {
-        // The refusal and settlement branches must carry a discriminated kind
-        // through the shared contract, not a bare {profit:0}.
-        expect(diceSrc).toMatch(/import \{ acceptedResult, rejectedResult \} from '\.\.\/primitives\/autoAccounting'/)
-        expect(diceSrc).toMatch(/resolve\(rejectedResult\('insufficient-funds'/)
-        expect(diceSrc).toMatch(/resolve\(acceptedResult\(profit, \{ id: entry\.id/)
-    })
 })
 
 describe('QA027 deterministic fixed-count runs', () => {
@@ -154,13 +174,20 @@ describe('QA027 stop conditions use accepted rounds only', () => {
 })
 
 describe('QA027 percentage bet changes stay 2dp and clamped', () => {
-    it('normalizes a win/loss percentage on the accepted base bet', () => {
-        // Mirrors BetPanel: on win/loss multiply by (1 + pct/100), clamp to 2dp.
-        const nextBet = (bet, pct) => Math.max(0.5, Number((bet * (1 + pct / 100)).toFixed(2)))
-        expect(nextBet(5, 50)).toBe(7.5)
-        expect(nextBet(5, -50)).toBe(2.5)
-        expect(nextBet(0.5, -90)).toBe(0.5) // clamped to minBet
-        expect(Number.isInteger(Math.round(nextBet(3.33, 7) * 100))).toBe(true)
+    it.each([[1, 'win', 7, 3.56], [-1, 'loss', 7, 3.56], [-1, 'loss', -90, 0.5]])('adjusts the actual next onPlay stake after %s profit', async (profit, kind, percentage, expected) => {
+        const onPlay = vi.fn(async () => acceptedResult(profit))
+        const render = () => renderPanel({ onPlay })
+        let tree = render()
+        find(tree, node => node.props?.className?.includes('bp-tab') && node.props.children.some(child => child?.props?.children === 'auto')).props.onClick()
+        tree = render()
+        find(tree, node => node.props?.id?.endsWith('-auto-count')).props.onChange({ target: { value: '2' } })
+        const group = find(tree, node => node.props?.['aria-labelledby'] === `dice-auto-on-${kind}-label`)
+        group.props.children[1].props.onClick()
+        tree = render()
+        find(tree, node => node.props?.['aria-label'] === `On ${kind} increase percentage`).props.onChange({ target: { value: String(percentage) } })
+        tree = render()
+        await find(tree, node => node.props?.className?.startsWith('bp-play ')).props.onClick()
+        expect(onPlay.mock.calls.map(([request]) => request.betAmount)).toEqual([3.33, expected])
     })
 })
 

@@ -89,20 +89,44 @@ describe('Auto loop reconciles a resolved round', () => {
     })
 
     it('retries a refusal without spending the configured count, and stops on a terminal kind', async () => {
-        // A refusal is retried at the same stake and does not decrement the count,
-        // so a persistent refusal loops until a terminal kind arrives. `unknown`
-        // and `aborted` are the loop's own stop signal.
+        // Admission may recover without spending a configured round.
         const onPlay = vi.fn()
-            .mockResolvedValueOnce({ kind: 'rejected', code: 'insufficient-funds', profit: 0 })
+            .mockResolvedValueOnce({ kind: 'rejected', code: 'active-obligation', profit: 0 })
             .mockResolvedValueOnce({ kind: 'committed', profit: 1 })
         await expect(runAuto({ onPlay, count: 1 })).resolves.toBeUndefined()
         expect(onPlay).toHaveBeenCalledTimes(2)
         for (const [request] of onPlay.mock.calls) expect(request).toMatchObject({ mode: 'auto' })
     })
 
+    it('stops on insufficient funds even before the wallet rerenders', async () => {
+        const onPlay = vi.fn(async () => ({ kind: 'rejected', code: 'insufficient-funds', profit: 0 }))
+        await runAuto({ onPlay, count: 5 })
+        expect(onPlay).toHaveBeenCalledTimes(1)
+    })
+
+    it('checks the latest non-ticket wallet before issuing another round', async () => {
+        const onPlay = vi.fn(async () => {
+            render({ balance: 0, onPlay })
+            return { kind: 'committed', profit: -5 }
+        })
+        await runAuto({ onPlay, count: 5 })
+        expect(onPlay).toHaveBeenCalledTimes(1)
+    })
+
     it('stops the loop on an `aborted` round instead of retrying it forever', async () => {
         const onPlay = vi.fn(async () => ({ kind: 'aborted', profit: 0 }))
         await expect(runAuto({ onPlay, count: 5 })).resolves.toBeUndefined()
+        expect(onPlay).toHaveBeenCalledTimes(1)
+    })
+
+    it('stops on the configured loss limit without issuing another round', async () => {
+        const onPlay = vi.fn(async () => ({ kind: 'committed', profit: -5 }))
+        let tree = render({ onPlay })
+        tabButton(tree, 'auto').props.onClick()
+        tree = render({ onPlay })
+        find(tree, node => node.type === 'input' && node.props?.id?.endsWith('-stop-loss')).props.onChange({ target: { value: '5' } })
+        tree = render({ onPlay })
+        await playButton(tree).props.onClick()
         expect(onPlay).toHaveBeenCalledTimes(1)
     })
 

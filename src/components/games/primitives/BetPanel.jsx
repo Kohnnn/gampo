@@ -124,7 +124,6 @@ export default function BetPanel({
     const autoLeft = useRef(0)
     const autoBaseBet = useRef(initialBet)
     const sessionProfit = useRef(0)
-    // The retained Auto loop must quote and play the same current table ticket.
     const latestAutoPlay = useRef({ onPlay, ticketStake, balance })
     latestAutoPlay.current.onPlay = onPlay
     latestAutoPlay.current.ticketStake = ticketStake
@@ -186,9 +185,7 @@ export default function BetPanel({
         let currentBet = effectiveBetAmount
         while (autoRunning.current && autoLeft.current > 0) {
             // Table eligibility follows the same complete ticket as its quote.
-            const livePlay = hasTicketStake ? latestAutoPlay.current.onPlay : onPlay
-            const liveTicketStake = hasTicketStake ? latestAutoPlay.current.ticketStake : ticketStake
-            const liveBalance = hasTicketStake ? latestAutoPlay.current.balance : balance
+            const { onPlay: livePlay, ticketStake: liveTicketStake, balance: liveBalance } = latestAutoPlay.current
             const charge = typeof liveTicketStake === 'function'
                 ? liveTicketStake({ mode: 'auto', betAmount: currentBet })
                 : hasTicketStake ? liveTicketStake : currentBet
@@ -222,10 +219,9 @@ export default function BetPanel({
             sessionProfit.current = sessionProfitNow
             if (step.stop) { stopAuto(); break }
             if (!step.accepted) {
-                // A refusal is not a round: retry the same stake, but do not
-                // spin forever on a persistent refusal — the eligibility guard
-                // above already stopped the loop when the balance ran out.
-                if (lastKind === 'unknown' || lastKind === 'aborted') { stopAuto(); break }
+                // Transient admission refusals may retry; an exhausted wallet
+                // cannot recover within this run, even before React rerenders.
+                if (lastKind === 'unknown' || lastKind === 'aborted' || raced.value?.code === 'insufficient-funds') { stopAuto(); break }
                 await new Promise(res => setTimeout(res, autoIntervalMs))
                 continue
             }

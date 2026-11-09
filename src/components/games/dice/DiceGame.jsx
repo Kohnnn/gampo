@@ -95,6 +95,7 @@ export default function DiceGame() {
                 const { roll, won, profit, multiplier } = ev.payload || {}
                 if (Number.isFinite(roll)) setLastRoll(roll)
                 setLastWon(!!won)
+                pendingRoundsRef.current.get(ev.payload.roundId)?.record()
                 setBurstKey(k => k + 1)
                 setToast({
                     kind: won ? (multiplier >= 5 ? 'win' : 'win') : 'lose',
@@ -127,12 +128,18 @@ export default function DiceGame() {
     const machine = useRoundMachine({ onEvent: handleEvent })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
+        if (currentRoundIdRef.current !== null) {
+            resolve(rejectedResult('active-obligation'))
+            return
+        }
         if (!placeBet(betAmount, 'Dice')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`)
             resolve(rejectedResult('insufficient-funds', { betAmount }))
             return
         }
         setLastBet(betAmount)
+        setRunning(true)
+        setToast(null)
         setLastWon(null)
         sfx.play('roll')
         playSound('tick')
@@ -143,13 +150,13 @@ export default function DiceGame() {
         const won = rollMode === 'under' ? roll < winChance : roll > (100 - winChance)
         const returnAmount = won ? round2(betAmount * payout) : 0
         const profit = round2(returnAmount - betAmount)
-        if (won) addWinnings(returnAmount, 'Dice return')
         const entry = { id: crypto.randomUUID(), label: roll.toFixed(2), profit, betAmount, multiplier: won ? payout : 0, meta: { winChance, rollMode } }
         let recorded = false
         const pending = {
             record: () => {
                 if (recorded) return
                 recorded = true
+                if (returnAmount > 0) addWinnings(returnAmount, 'Dice return')
                 session.record(entry)
             },
             finish: () => {
@@ -161,8 +168,6 @@ export default function DiceGame() {
         }
         pendingRoundsRef.current.set(entry.id, pending)
         currentRoundIdRef.current = entry.id
-        // Accepted receipts outlive replacement of the presentation machine.
-        schedule(pending.record, DICE_ROLL_DURATION_MS)
 
         // Pre-roll ticks -> reveal -> result. Drives both visuals and SFX
         // from a single deterministic event list.
@@ -275,7 +280,9 @@ export default function DiceGame() {
                 <div className={`dice-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
                     <div className="dice-outcome-wrap">
                         <div className={`dice-big ${lastWon === true ? 'win' : lastWon === false ? 'loss' : ''}`}>
-                            <NumberRoll value={lastRoll === null ? 0 : Number(lastRoll.toFixed(2))} format={v => lastRoll === null ? '--.--' : v.toFixed(2)} />
+                            {lastWon === null
+                                ? <NumberRoll value={lastRoll === null ? 0 : Number(lastRoll.toFixed(2))} format={v => lastRoll === null ? '--.--' : v.toFixed(2)} />
+                                : lastRoll.toFixed(2)}
                         </div>
                         {lastWon && burstKey > 0 && <Particles key={burstKey} count={20} color="#00e701" />}
                     </div>
@@ -297,7 +304,7 @@ export default function DiceGame() {
                         </div>
                         <MultiplierBadge label="Multiplier" value={payout} state={running ? 'active' : (lastWon === true ? 'win' : lastWon === false ? 'bust' : 'idle')} size="md" />
                     </div>
-                    <ActionLockOverlay active={running} label="Rolling..." />
+                    <ActionLockOverlay active={running && lastWon === null} label="Rolling..." />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
