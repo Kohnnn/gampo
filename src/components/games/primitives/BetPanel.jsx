@@ -225,7 +225,7 @@ export default function BetPanel({
             if (step.stop) { stopAuto(); break }
             if (!step.accepted) {
                 // Retry temporary refusals; terminal refusals stop without consuming a round.
-                if (raced.value?.stopAuto === true || lastKind === 'unknown' || lastKind === 'aborted') { stopAuto(); break }
+                if (raced.value?.stopAuto === true || raced.value?.code === 'insufficient-funds' || lastKind === 'unknown' || lastKind === 'aborted') { stopAuto(); break }
                 await new Promise(res => setTimeout(res, autoIntervalMs))
                 if (runId !== autoRunId.current) return
                 continue
