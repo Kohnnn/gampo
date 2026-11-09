@@ -29,17 +29,17 @@ export function isEditableHotkeyTarget(target) {
 // own focused control, not to a paid game action behind it.
 export function isOpenDialogPresent(root = typeof document !== 'undefined' ? document : null) {
     if (!root) return false
-    const dialogs = root.querySelectorAll('[role="dialog"], [aria-modal="true"]')
+    const dialogs = root.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open]')
     for (const dialog of dialogs) {
         if (dialog.getAttribute('aria-hidden') === 'true') continue
-        // A portaled layer can stay mounted at opacity 0 / pointer-events none
-        // while collapsed; that is not an open dialog. The mobile bet sheet is
-        // exactly this: rendered whenever `isMobile`, always `role="dialog"`,
-        // collapsed by CSS only. Without the opacity check it reads as open on
-        // every mobile viewport, and BetPanel then ignores S/Space entirely.
+        // Closed mobile sheets stay mounted but cannot receive pointer input.
+        // An opening dialog may also be at opacity 0 for its first frame, so
+        // distinguish a live opacity animation from a permanently hidden layer.
         const style = dialog.ownerDocument?.defaultView?.getComputedStyle?.(dialog)
-        if (style && (style.display === 'none' || style.visibility === 'hidden')) continue
-        if (style && (Number(style.opacity) === 0 || style.pointerEvents === 'none')) continue
+        if (style && (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none')) continue
+        if (style && Number(style.opacity) === 0 && !dialog.getAnimations?.().some(animation =>
+            animation.playState !== 'finished' && animation.playState !== 'idle'
+            && animation.effect?.getKeyframes?.().some(frame => parseFloat(frame.opacity) > 0))) continue
         return true
     }
     return false
