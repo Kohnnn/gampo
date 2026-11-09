@@ -177,7 +177,6 @@ export default function PumpGame() {
                     onPlay={performPlay}
                     disableAuto
                     lastBet={lastBet}
-                    initialBet={selectedStake}
                     onStakeChange={setSelectedStake}
                     playPhase={inRound && pumps > 0 ? 'in-round' : null}
                     playLabel={inRound && pumps > 0 ? `Cashout ${currentMult.toFixed(2)}×` : 'Place Bet'}

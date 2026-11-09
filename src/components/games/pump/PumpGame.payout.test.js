@@ -1,6 +1,105 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { round2 } from '../../../utils/simulationMath'
+
+// Exercise Pump with the real BetPanel and EducationPanel controls. Only the
+// unrelated providers, timing and RNG are replaced; each component keeps its
+// own state across renders, like the existing BetPanel behavior harness.
+const fixture = vi.hoisted(() => ({ states: {}, scope: '', cursor: 0, effects: [], effectCursor: 0, rolls: [], winnings: vi.fn(), placeBet: vi.fn(() => true) }))
+vi.mock('react', async original => ({
+    ...await original(),
+    useState(initial) {
+        const state = fixture.states[fixture.scope] ||= []
+        const index = fixture.cursor++
+        if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial
+        return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value }]
+    },
+    useRef: initial => ({ current: initial }),
+    useCallback: callback => callback,
+    useMemo: callback => callback(),
+    useId: () => 'pump-test',
+    useEffect(effect) {
+        if (fixture.scope === 'panel' && fixture.effectCursor++ === 0) fixture.effects.push(effect)
+    },
+}))
+vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 1000, placeBet: fixture.placeBet, addWinnings: fixture.winnings, showToast: () => {} }) }))
+vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: () => {} }) }))
+vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: () => {} }) }))
+vi.mock('../../../audio/useBgm', () => ({ useGameBgm: () => {} }))
+vi.mock('../../../utils/fairRng', () => ({ nextRoll: vi.fn(() => ({ roll: fixture.rolls.shift() ?? 0.99 })) }))
+vi.mock('../../../utils/scheduling', async original => ({ ...await original(), useCancellableTimeouts: () => ({ schedule: () => {} }) }))
+vi.mock('../../games/resources/useOriginalsPreloader', () => ({ useOriginalsPreloader: () => ({ ready: true }) }))
+vi.mock('../primitives', async () => {
+    const { default: BetPanel } = await import('../primitives/BetPanel.jsx')
+    const { default: StageActionButton } = await import('../primitives/StageActionButton.jsx')
+    const component = () => null
+    return {
+        BetPanel, StageActionButton,
+        BigWinOverlay: component, GameShell: component, HistoryDrawer: component, RecentResultsStrip: component,
+        StatsOverlay: component, MultiplierBadge: component, ResultToast: component, ActionLockOverlay: component, CoreStageFrame: component,
+        getBigWinThreshold: () => 5,
+        useGameSession: () => ({ history: [], stats: {}, clear: () => {}, record: () => {} }),
+        useRoundMachine: () => ({ start: () => {}, finish: () => {} }),
+        ROUND_EVENTS: { ROUND_START: 'start', INPUT_LOCK: 'lock', BET_ACCEPTED: 'bet' },
+    }
+})
+
+const { default: PumpGame } = await import('./PumpGame.jsx')
+const { default: BetPanel } = await import('../primitives/BetPanel.jsx')
+const { default: EducationPanel } = await import('../../EducationPanel.jsx')
+const { nextRoll } = await import('../../../utils/fairRng')
+
+function find(node, predicate) {
+    if (!node || typeof node !== 'object') return null
+    if (predicate(node)) return node
+    for (const child of [node.props?.panel, ...[node.props?.children].flat(Infinity)]) {
+        const found = find(child, predicate)
+        if (found) return found
+    }
+    return null
+}
+function renderGame() {
+    fixture.scope = 'game'; fixture.cursor = 0
+    return PumpGame()
+}
+function renderPanel(game) {
+    fixture.scope = 'panel'; fixture.cursor = 0; fixture.effectCursor = 0; fixture.effects = []
+    const tree = BetPanel(find(game, node => node.type === BetPanel).props)
+    fixture.effects.forEach(effect => effect())
+    return tree
+}
+const educationHtml = game => renderToStaticMarkup(EducationPanel(find(game, node => node.type === EducationPanel).props))
+const stakeInput = panel => find(panel, node => node.type === 'input' && node.props?.type === 'number')
+const resetButton = panel => find(panel, node => node.type === 'button' && node.props?.['data-bet-chip'] === 'reset')
+const playButton = panel => find(panel, node => node.type === 'button' && node.props?.className?.startsWith('bp-play '))
+
+beforeEach(() => {
+    fixture.states = {}; fixture.rolls = []; fixture.winnings.mockClear(); fixture.placeBet.mockClear(); nextRoll.mockClear()
+})
+
+describe('Pump controls and education', () => {
+    it('keeps the edited stake live while 1× resets to the labeled default', async () => {
+        let game = renderGame()
+        let panel = renderPanel(game)
+        expect(resetButton(panel).props['aria-label']).toBe('Reset to default bet GC 5.00')
+        stakeInput(panel).props.onChange({ target: { value: '10' } })
+        panel = renderPanel(game)
+        game = renderGame()
+        panel = renderPanel(game)
+        expect(stakeInput(panel).props.value).toBe(10)
+        expect(educationHtml(game)).toContain('GC 10.00')
+        expect(resetButton(panel).props['aria-label']).toBe('Reset to default bet GC 5.00')
+        resetButton(panel).props.onClick()
+        panel = renderPanel(game)
+        game = renderGame()
+        panel = renderPanel(game)
+        expect(stakeInput(panel).props.value).toBe(5)
+        expect(educationHtml(game)).toContain('GC 5.00')
+        await playButton(panel).props.onClick()
+        expect(fixture.placeBet).toHaveBeenCalledWith(5, 'Pump')
+    })
+})
 
 const source = readFileSync(new URL('./PumpGame.jsx', import.meta.url), 'utf8')
 
