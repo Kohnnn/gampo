@@ -89,10 +89,13 @@ describe('current progressive decisions', () => {
             expect(education(tree)).toMatchObject({ betAmount: 10, conditionalDecision: { probability: safe, payoutMultiplier: next, cashoutMultiplier: first } })
             named(tree, 'BetPanel').props.onPlayPhaseAction()
             tree = render(Game)
-            expect(education(tree).conditionalDecision).toEqual({ settled: true })
+            // QA030: after settling, the lesson still quotes the next step the player
+            // can take (the default stake), instead of the old bare `{ settled: true }`.
+            expect(education(tree).conditionalDecision).toMatchObject({ probability: safe, payoutMultiplier: first })
+            expect(education(tree).conditionalDecision.cashoutMultiplier).toBeUndefined()
             expect(fixture.winnings).toHaveBeenLastCalledWith(name === 'Dino' ? 13.8 : 13.7, `${name} return`)
             flush()
-            expect(education(render(Game)).conditionalDecision).toEqual({ settled: true })
+            expect(education(render(Game)).conditionalDecision).toMatchObject({ probability: safe, payoutMultiplier: first })
         })
         it(`${name} has no live next action after a fall and idle reset`, () => {
             let tree = render(Game)
@@ -101,7 +104,10 @@ describe('current progressive decisions', () => {
             tree = render(Game)
             find(tree, node => typeof node.props?.onClick === 'function' && String(node.props.children).startsWith(action)).props.onClick()
             flush()
-            expect(education(render(Game)).conditionalDecision).toEqual({ settled: true })
+            // QA030: a fall resets the ladder, so the lesson is back to the first
+            // step for the stake the panel now offers (the default, not the lost one).
+            expect(education(render(Game))).toMatchObject({ betAmount: 5, conditionalDecision: { probability: safe, payoutMultiplier: first } })
+            expect(education(render(Game)).conditionalDecision.cashoutMultiplier).toBeUndefined()
             expect(fixture.records[0]).toMatchObject({ profit: -7, betAmount: 7 })
         })
     }

@@ -73,3 +73,17 @@ export function accountAutoRound(state, rawResult) {
     else if (Number.isFinite(limitBigWin) && limitBigWin > 0 && accepted && profit >= limitBigWin) stop = true
     return { state: next, accepted, stop }
 }
+
+// A per-round quote of what the *next* paid round pays if the player repeats the
+// current commitment. Games feed it whatever state their round is in; it exists
+// so the education panel cannot be handed a base constant while the player is
+// five steps into a ladder. Pure, so it is checkable without a DOM.
+export function nextStepQuote({ probability, payoutMultiplier, cashoutMultiplier }) {
+    const finite = value => Number.isFinite(value) && value >= 0
+    if (!finite(probability) || !finite(payoutMultiplier)) return null
+    return {
+        probability,
+        payoutMultiplier,
+        ...(finite(cashoutMultiplier) && cashoutMultiplier > 0 ? { cashoutMultiplier } : {}),
+    }
+}

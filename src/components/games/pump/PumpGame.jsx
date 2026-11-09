@@ -30,6 +30,7 @@ import { getBigWinThreshold,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
+import { nextStepQuote } from '../primitives/autoAccounting'
 import EducationPanel from '../../EducationPanel'
 import './pump.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -57,6 +58,7 @@ export default function PumpGame() {
     const [busted, setBusted] = useState(false)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [selectedStake, setSelectedStake] = useState(5)
     const [toast, setToast] = useState(null)
     const { schedule } = useCancellableTimeouts()
 
@@ -65,6 +67,15 @@ export default function PumpGame() {
     const currentMult = pumps === 0 ? 1 : Number(Math.pow(STEP_RAMP, pumps).toFixed(4))
     const nextMult = pumps >= MAX_PUMPS ? currentMult : Number(Math.pow(STEP_RAMP, pumps + 1).toFixed(4))
     const inRound = phase === 'playing'
+    // QA030: the lesson describes the step the player is on. Outside a round that
+    // is the first pump; inside one it is the next pump at `pumps + 1`, and the
+    // banked multiplier is offered as the cash-out alternative.
+    const educationDecision = nextStepQuote({
+        probability: 1 - STEP_BUST_CHANCE,
+        payoutMultiplier: inRound && pumps >= MAX_PUMPS ? currentMult : nextMult,
+        // Only a live round with a banked step has something to cash out.
+        cashoutMultiplier: inRound && pumps > 0 ? currentMult : undefined,
+    })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (inRound) { resolve({ profit: 0 }); return }
@@ -161,6 +172,8 @@ export default function PumpGame() {
                     onPlay={performPlay}
                     disableAuto
                     lastBet={lastBet}
+                    initialBet={selectedStake}
+                    onStakeChange={setSelectedStake}
                     playPhase={inRound && pumps > 0 ? 'in-round' : null}
                     playLabel={inRound && pumps > 0 ? `Cashout ${currentMult.toFixed(2)}×` : 'Place Bet'}
                     onPlayPhaseAction={cashOut}
@@ -213,7 +226,13 @@ export default function PumpGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('pump')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={1 - STEP_BUST_CHANCE} payoutMultiplier={STEP_RAMP} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel
+                definition={definition}
+                betAmount={inRound ? stake : selectedStake}
+                conditionalDecision={educationDecision}
+                balance={balance}
+                recentProfit={recentProfit}
+            />
         </GameShell>
     )
 }
