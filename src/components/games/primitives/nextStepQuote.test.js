@@ -7,8 +7,8 @@ import { nextStepQuote } from '../primitives/autoAccounting'
 //   Dino   same `{ settled: true }` arm.
 //   Pump   base `STEP_BUST_CHANCE` / `STEP_RAMP` constants in every state.
 // Each now builds its quote through `nextStepQuote`, keyed to live round state.
-// Per-state figures for Pump are pinned in PumpGame.education.test.jsx; the real
-// rendered prop for Tower and Dino is asserted in EducationPanel.games.test.jsx.
+// The rendered prop for all three games is asserted in
+// EducationPanel.games.test.jsx; this file covers only the pure contract.
 
 describe('nextStepQuote contract', () => {
     it('omits a cash-out below one banked step', () => {

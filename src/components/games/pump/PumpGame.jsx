@@ -64,17 +64,22 @@ export default function PumpGame() {
 
     const machine = useRoundMachine({})
 
-    const currentMult = pumps === 0 ? 1 : Number(Math.pow(STEP_RAMP, pumps).toFixed(4))
-    const nextMult = pumps >= MAX_PUMPS ? currentMult : Number(Math.pow(STEP_RAMP, pumps + 1).toFixed(4))
+    const multiplierAt = count => (count === 0 ? 1 : Number(Math.pow(STEP_RAMP, count).toFixed(4)))
+    const currentMult = multiplierAt(pumps)
+    const nextMult = pumps >= MAX_PUMPS ? currentMult : multiplierAt(pumps + 1)
     const inRound = phase === 'playing'
     // QA030: the lesson describes the step the player is on. Outside a round that
     // is the first pump; inside one it is the next pump at `pumps + 1`, and the
     // banked multiplier is offered as the cash-out alternative.
+    // Outside a round `pumps` still holds the finished round's count (burst and
+    // cashout reset the phase but not the counter), so idle must read step 0 or
+    // the lesson quotes a step of a round that no longer exists.
+    const livePumps = inRound ? pumps : 0
     const educationDecision = nextStepQuote({
         probability: 1 - STEP_BUST_CHANCE,
-        payoutMultiplier: inRound && pumps >= MAX_PUMPS ? currentMult : nextMult,
+        payoutMultiplier: livePumps >= MAX_PUMPS ? multiplierAt(livePumps) : multiplierAt(livePumps + 1),
         // Only a live round with a banked step has something to cash out.
-        cashoutMultiplier: inRound && pumps > 0 ? currentMult : undefined,
+        cashoutMultiplier: livePumps > 0 ? multiplierAt(livePumps) : undefined,
     })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {

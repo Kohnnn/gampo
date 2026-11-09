@@ -45,6 +45,7 @@ vi.mock('./games/primitives', () => {
 import EducationPanel from './EducationPanel'
 import DinoGame from './games/dino/DinoGame'
 import TowerGame from './games/tower/TowerGame'
+import PumpGame from './games/pump/PumpGame'
 import DiamondsGame from './games/diamonds/DiamondsGame'
 import TomeOfLifeGame from './games/tomeoflife/TomeOfLifeGame'
 
@@ -111,6 +112,65 @@ describe('current progressive decisions', () => {
             expect(fixture.records[0]).toMatchObject({ profit: -7, betAmount: 7 })
         })
     }
+})
+
+describe('Pump lesson reads only the live round (QA030)', () => {
+    const STEP_RAMP = Number((0.96 / 0.88).toFixed(4))
+    const multiplierAt = pumps => (pumps === 0 ? 1 : Number(Math.pow(STEP_RAMP, pumps).toFixed(4)))
+    const pumpButton = tree => find(tree, node => node.type?.displayName === 'StageActionButton')
+
+    it('quotes the first pump while idle and the live next pump inside a round', () => {
+        let tree = render(PumpGame)
+        expect(education(tree)).toMatchObject({ betAmount: 5, conditionalDecision: { probability: 0.88, payoutMultiplier: multiplierAt(1) } })
+        expect(education(tree).conditionalDecision.cashoutMultiplier).toBeUndefined()
+
+        named(tree, 'BetPanel').props.onStakeChange(10)
+        named(tree, 'BetPanel').props.onPlay({ betAmount: 10 })
+        fixture.rolls = [0.99, 0.99]
+        // Re-render before each click: the handler closes over the render's state.
+        tree = render(PumpGame)
+        pumpButton(tree).props.onClick()
+        tree = render(PumpGame)
+        pumpButton(tree).props.onClick()
+        tree = render(PumpGame)
+        expect(education(tree)).toMatchObject({
+            betAmount: 10,
+            conditionalDecision: { probability: 0.88, payoutMultiplier: multiplierAt(3), cashoutMultiplier: multiplierAt(2) },
+        })
+    })
+
+    it('drops the finished round count once a burst returns the game to idle', () => {
+        let tree = render(PumpGame)
+        named(tree, 'BetPanel').props.onPlay({ betAmount: 10 })
+        fixture.rolls = [0.99, 0.99]
+        tree = render(PumpGame)
+        pumpButton(tree).props.onClick()
+        tree = render(PumpGame)
+        pumpButton(tree).props.onClick()
+        tree = render(PumpGame)
+        // Third pump bursts: pumps stays at 2 through the idle transition, so a
+        // quote that reads it would promise 1.30x instead of the first step.
+        fixture.rolls = [0.01]
+        pumpButton(tree).props.onClick()
+        flush()
+        const idle = education(render(PumpGame))
+        expect(idle.conditionalDecision).toMatchObject({ probability: 0.88, payoutMultiplier: multiplierAt(1) })
+        expect(idle.conditionalDecision.cashoutMultiplier).toBeUndefined()
+    })
+
+    it('returns to the first step after a cashout keeps the counter', () => {
+        let tree = render(PumpGame)
+        named(tree, 'BetPanel').props.onPlay({ betAmount: 10 })
+        fixture.rolls = [0.99]
+        tree = render(PumpGame)
+        pumpButton(tree).props.onClick()
+        tree = render(PumpGame)
+        named(tree, 'BetPanel').props.onPlayPhaseAction()
+        flush()
+        const idle = education(render(PumpGame))
+        expect(idle.conditionalDecision).toMatchObject({ probability: 0.88, payoutMultiplier: multiplierAt(1) })
+        expect(fixture.winnings).toHaveBeenLastCalledWith(10.91, 'Pump return')
+    })
 })
 
 describe('Diamonds canonical visible paytable', () => {
