@@ -52,6 +52,37 @@ function fixture(files) {
     }
 }
 
+// Division and JSX in interpolations must not obscure writers or expose template text.
+{
+    const cases = [
+        ['of identifier division', 'const of = 2; const t = `${of / (localStorage.clear(), 2) / 2}`;', 1],
+        ['JSX then division', 'const t = `${<i></i> + localStorage.clear() / 2}`;', 1],
+        ['JSX followed by literal text', 'const t = `${<i></i>} / localStorage.clear()`;', 0],
+        ['division followed by literal text', 'const t = `${2 / 2} / localStorage.clear()`;', 0],
+    ]
+    const root = fixture({ 'case.jsx': '' })
+    try {
+        const actual = cases.map(([name, source]) => {
+            writeFileSync(join(root, 'src', 'case.jsx'), `${source}\n`)
+            const { code, out } = run([], root)
+            return [name, code, /NEW unguarded writer: src\/case\.jsx \(1 site\)/.test(out)]
+        })
+        assert.deepEqual(actual, cases.map(([name, , code]) => [name, code, code === 1]))
+
+        writeFileSync(join(root, 'src', 'case.jsx'), 'const t = `${<i title={localStorage.clear()}></i>}`;\n')
+        const unsupported = run([], root)
+        assert.equal(unsupported.code, 2, `ambiguous JSX must fail closed: ${unsupported.out}`)
+        assert.match(unsupported.out, /cannot safely scan JSX in template interpolation/)
+
+        writeFileSync(join(root, 'src', 'case.jsx'), 'const t = `${(() => { for (const of of /{/.exec("x") || []) {} return 1 })()}`; localStorage.clear();\n')
+        const forOf = run([], root)
+        assert.equal(forOf.code, 1, `regex after for-of must not hide a writer: ${forOf.out}`)
+        assert.match(forOf.out, /NEW unguarded writer: src\/case\.jsx \(1 site\)/)
+    } finally {
+        rmSync(root, { recursive: true, force: true })
+    }
+}
+
 // --- unit: counting and comment stripping ---------------------------------
 
 {

@@ -59,9 +59,9 @@ function collectFiles(dir, acc = []) {
  * used `/\/\*…|(^|[^:])//…/` and miscounted both. This is a small scanner rather
  * than a dependency; it is not a full JS parser.
  *
- * ponytail: regex/division is classified by common expression-start tokens
- * inside template interpolations only. Use a JS parser for complete lexing;
- * regex literals elsewhere or uncommon contexts may still desynchronise it.
+ * ponytail: this is not a parser. Regex/division uses expression-start tokens
+ * inside interpolations; only empty JSX elements are recognized there. Other
+ * JSX interpolation shapes fail closed. Use a parser for complete lexing.
  */
 function stripComments(source) {
     let out = ''
@@ -73,7 +73,7 @@ function stripComments(source) {
 
     const canStartRegex = () => previousToken === ''
         || (previousToken.length === 1 && '([{=,:;!?&|+*%~^<>-'.includes(previousToken))
-        || /^(return|throw|case|delete|void|typeof|instanceof|in|of|yield|await|new)$/.test(previousToken)
+        || /^(return|throw|case|delete|void|typeof|instanceof|in|for-of|yield|await|new|const|let|var)$/.test(previousToken)
 
     const scanString = (quote) => {
         out += ' '
@@ -121,6 +121,15 @@ function stripComments(source) {
             if (i < n) { out += '  '; i += 2 }
             continue
         }
+        if (c === '<' && templateDepths.length > 0 && canStartRegex() && /[a-zA-Z_$>]/.test(next ?? '')) {
+            // Only skip empty JSX; anything more complex needs a real JSX parser.
+            const empty = source.slice(i).match(/^<(?:([a-zA-Z_$][\w$.-]*)\s*\/\s*>|([a-zA-Z_$][\w$.-]*)\s*>\s*<\/\2\s*>|>\s*<\/>)/)
+            if (!empty) throw new SyntaxError('cannot safely scan JSX in template interpolation')
+            out += ' '.repeat(empty[0].length)
+            i += empty[0].length
+            previousToken = 'value'
+            continue
+        }
         if (c === '/' && templateDepths.length > 0 && canStartRegex()) {
             let end = i + 1
             let inClass = false
@@ -143,7 +152,8 @@ function stripComments(source) {
             while (i < n && /[\w$]/.test(source[i])) i += 1
             const word = source.slice(start, i)
             out += word
-            previousToken = previousToken === '.' ? 'value' : word
+            previousToken = previousToken === '.' ? 'value'
+                : word === 'of' ? (canStartRegex() ? 'value' : 'for-of') : word
             continue
         }
         if ((c === '+' || c === '-') && next === c) {
@@ -183,7 +193,12 @@ export function countWriterSites(files, root = process.cwd()) {
     for (const file of files) {
         const rel = relative(root, file).split('\\').join('/')
         if (rel === WRAPPER || /\.test\./.test(rel)) continue
-        const source = stripComments(readFileSync(file, 'utf8'))
+        let source
+        try {
+            source = stripComments(readFileSync(file, 'utf8'))
+        } catch (error) {
+            throw new Error(`${rel}: ${error.message}`, { cause: error })
+        }
         const hits = source.match(WRITE_RE)
         if (!hits) continue
         // Reset lastIndex: WRITE_RE is global and reused across files.
@@ -224,7 +239,13 @@ function main() {
         process.exit(2)
     }
 
-    const counts = countWriterSites(files)
+    let counts
+    try {
+        counts = countWriterSites(files)
+    } catch (error) {
+        console.error(`storage-writer-gate: ${error.message} — nothing was verified`)
+        process.exit(2)
+    }
 
     if (update) {
         const ordered = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)))
