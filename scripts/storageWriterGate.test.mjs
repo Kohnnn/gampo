@@ -32,6 +32,36 @@ function fixture(files) {
     return root
 }
 
+// A quote inside a regex must not hide a subsequent writer, even in strict mode.
+{
+    const root = fixture({ 'case.js': 'const re = /foo/;\n' })
+    try {
+        for (const [name, source] of [
+            ['benign regex', 'const re = /foo/;\n'],
+            ['ordinary division', 'const ratio = 4 / 2;\n'],
+            ['JSX', 'const el = <p title="x">Hi</p>;\n'],
+        ]) {
+            writeFileSync(join(root, 'src', 'case.js'), source)
+            for (const args of [[], ['--strict']]) {
+                const benign = run(args, root)
+                assert.equal(benign.code, 0, `${name} should pass: ${benign.out}`)
+            }
+        }
+
+        writeFileSync(join(root, 'src', 'case.js'), 'const re = /"/;\nlocalStorage.clear()')
+        for (const args of [[], ['--strict']]) {
+            const writer = run(args, root)
+            assert.ok(
+                (writer.code === 1 && /NEW unguarded writer: src\/case\.js \(1 site\)/.test(writer.out)) ||
+                (writer.code === 2 && /cannot safely scan a quoted regex outside template interpolation/.test(writer.out) && /nothing was verified/.test(writer.out)),
+                `regex must not hide the writer (${args.join(' ') || 'default'}): exit ${writer.code}: ${writer.out}`,
+            )
+        }
+    } finally {
+        rmSync(root, { recursive: true, force: true })
+    }
+}
+
 // An opening brace in a regex must not hide a later, real writer.
 {
     const source = 'const value = `${/{/.test("x")}${Boolean(/[\\/{]/.test("/"))}`\n'

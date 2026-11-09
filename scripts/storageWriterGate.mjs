@@ -137,6 +137,28 @@ function stripComments(source) {
             previousToken = 'value'
             continue
         }
+        // ponytail: reject quoted regex candidates after `=`; use a parser to
+        // distinguish regex, division and JSX in every other context.
+        if (c === '/' && templateDepths.length === 0 && previousToken === '=') {
+            let end = i + 1
+            let inClass = false
+            let hasQuote = false
+            while (end < n && source[end] !== '\n' && source[end] !== '\r') {
+                if (source[end] === '"' || source[end] === "'" || source[end] === '`') hasQuote = true
+                if (source[end] === '\\') {
+                    if (source[end + 1] === '"' || source[end + 1] === "'" || source[end + 1] === '`') hasQuote = true
+                    end += 2
+                    continue
+                }
+                if (source[end] === '[') inClass = true
+                else if (source[end] === ']') inClass = false
+                else if (source[end] === '/' && !inClass) break
+                end += 1
+            }
+            if (hasQuote && end < n && source[end] === '/') {
+                throw new SyntaxError('cannot safely scan a quoted regex outside template interpolation')
+            }
+        }
         // `let` can be an identifier in sloppy code; `/` after it is division.
         if (c === '/' && templateDepths.length > 0 && previousToken !== 'let' && canStartRegex()) {
             let end = i + 1
