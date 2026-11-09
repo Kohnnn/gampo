@@ -313,9 +313,20 @@ function Header() {
                     )}
                 </div>
 
-                {toasts.length > 0 && (
+                {toasts.filter(toast => toast.kind === 'history-write-failure').map(toast => (
+                    <div key={toast.id} className={`credit-toast credit-toast-${toast.type} credit-toast-history-warning`} role="alert">
+                        <div className="credit-toast-icon">
+                            <CreditIcon size={20} />
+                        </div>
+                        <div className="credit-toast-content">
+                            <span className="credit-toast-title">{toast.title}</span>
+                            <span className="credit-toast-desc">{toast.description}</span>
+                        </div>
+                    </div>
+                ))}
+                {toasts.some(toast => toast.kind !== 'history-write-failure') && (
                     <div className="credit-toast-container">
-                        {toasts.map(toast => (
+                        {toasts.filter(toast => toast.kind !== 'history-write-failure').map(toast => (
                             <div key={toast.id} className={`credit-toast credit-toast-${toast.type}`}>
                                 <div className="credit-toast-icon">
                                     <CreditIcon size={20} />

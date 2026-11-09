@@ -143,7 +143,7 @@ export function CreditProvider({ children }) {
         setTransactions(next)
         if (!persistHistory(next)) {
             setToasts(prev => prev.some(toast => toast.id === HISTORY_WARNING) ? prev : [
-                { id: HISTORY_WARNING, type: 'error', title: 'History may be incomplete', description: 'Some activity was not saved.' },
+                { id: HISTORY_WARNING, kind: HISTORY_WARNING, type: 'error', title: 'History may be incomplete', description: 'Some activity was not saved.' },
                 ...prev.slice(-2),
             ])
         }

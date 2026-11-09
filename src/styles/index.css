@@ -803,6 +803,26 @@ body {
     white-space: nowrap;
 }
 
+.credit-toast-history-warning {
+    position: fixed;
+    top: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(420px, calc(100vw - 24px));
+    max-width: 100%;
+    z-index: var(--z-toast);
+    animation: none;
+    white-space: normal;
+}
+
+.credit-toast-history-warning .credit-toast-content {
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    overflow-wrap: anywhere;
+}
+
 @keyframes creditToastSlide {
     from {
         opacity: 0;

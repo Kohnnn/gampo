@@ -306,6 +306,7 @@ describe('D-1 storage write failure', () => {
         expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull()
         render()
         expect(warning()).toBeTruthy()
+        expect(warning()).toMatchObject({ kind: 'history-write-failure' })
 
         expect(credits.placeBet(5, 'Later debit')).toBe(true)
         expect(storedBalance()).toBe(85)
