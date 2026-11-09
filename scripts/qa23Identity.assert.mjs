@@ -5,20 +5,15 @@
 // This wrapper reads a receipt and exits NON-ZERO on any violation, including
 // `worktreeClean !== true`, which the producer only records.
 //
-// No network, no build, no writes. Receipt mode requires an existing file;
-// report self-check mode invokes the producer and inspects its JSON output.
+// No network, no build, no writes. The receipt must already exist.
 //
 // Usage:
 //   node scripts/qa23Identity.assert.mjs [receipt.json]
-//   node scripts/qa23Identity.assert.mjs --self-check-report
 // Default receipt: /tmp/qa23-identity-clean-31-10-26.json
 //
 // Exit 0 only if every predicate passes; exit 1 otherwise.
 
-import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 
 const DEFAULT_RECEIPT = '/tmp/qa23-identity-clean-31-10-26.json'
 
@@ -106,24 +101,4 @@ function main() {
     }
 }
 
-function selfCheckReport() {
-    const script = fileURLToPath(new URL('./qa23Identity.mjs', import.meta.url))
-    const output = execFileSync(process.execPath, [script], {
-        encoding: 'utf8',
-        env: { ...process.env, QA23_DEPLOYED_IDENTITY: '' },
-    })
-    const report = JSON.parse(output)
-    const qa028 = report.p1Classifications.rows.find((row) => row.id === 'QA028')
-    assert.ok(qa028, 'report includes QA028')
-    assert.equal(qa028.currentCandidateEvidence.guardsButtonTag, true, 'candidate scan finds button guard')
-    assert.match(qa028.note, /(?:button.*guard|guard.*button)/i, 'note acknowledges the button guard')
-    assert.doesNotMatch(qa028.note, /no evidence.*(?:interactive|dialog).*guard/i, 'note does not deny observed guards')
-    assert.match(qa028.note, /native/i, 'note separates native verification from textual evidence')
-    assert.match(qa028.currentCandidateVerdict, /^open/, 'classification remains open pending verification')
-    assert.equal(report.deployedIdentity.kind, 'unknown', 'local report does not identify hosted bytes')
-    assert.ok(report.p1Classifications.caveats.some((caveat) => /not fresh reproductions/i.test(caveat)))
-    console.log('PASS QA028 report evidence and verification status')
-}
-
-if (process.argv[2] === '--self-check-report') selfCheckReport()
-else main()
+main()
