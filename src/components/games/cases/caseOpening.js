@@ -171,7 +171,7 @@ export function createCaseOpeningRound({
         )
         const jitter = (nextRoll('cases-jit').roll - 0.5) * 14
         const finalOffset = finalCaseReelOffset({ jitter, targetIndex, tilePx, gapPx })
-        return { outcome, reelTrack, targetIndex, finalOffset, nearMiss }
+        return { outcome, reelTrack, targetIndex, finalOffset, jitter, nearMiss }
     })
 
     return {

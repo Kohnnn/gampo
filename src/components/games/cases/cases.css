@@ -1290,7 +1290,8 @@
     .cases-case-grid { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); max-height: 330px; }
     .cases-case-card img { height: 104px; }
     .cases-carousel-frame { height: 126px; }
-    .cases-carousel-tile { height: 108px; width: 104px; flex: 0 0 104px; }
+    .cases-stage { --case-tile-px: 104px !important; }
+    .cases-carousel-tile { height: 108px; }
     .cases-carousel-tile img { height: 66px; }
     .cases-history-list { max-height: 360px; }
     .cases-collection-grid { max-height: 380px; }
@@ -1514,19 +1515,13 @@
     .cases-skeleton-line { animation: none; }
 }
 .cases-stage.is-opening .cases-category-row,
-.cases-stage.is-opening .cases-case-grid,
-.cases-stage.has-result .cases-category-row,
-.cases-stage.has-result .cases-case-grid {
+.cases-stage.is-opening .cases-case-grid {
     opacity: 0.46;
     filter: saturate(0.76);
 }
 .cases-stage.is-opening .cases-case-grid {
     max-height: 82px;
     pointer-events: none;
-}
-.cases-stage.has-result .cases-category-row,
-.cases-stage.has-result .cases-case-grid {
-    display: none;
 }
 .cases-stage.has-result .cases-room-summary,
 .cases-stage.has-result .cases-opening-timeline {

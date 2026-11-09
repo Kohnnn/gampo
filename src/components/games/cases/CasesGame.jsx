@@ -72,6 +72,7 @@ import {
 } from './casesAnimation'
 import { createCaseOpeningRound } from './caseOpening'
 import CaseArt from './CaseArt'
+import { caseDisclosure } from './caseDisclosure'
 import { useCasesManifest } from './useCasesManifest'
 import {
     CASE_CATEGORIES,
@@ -438,7 +439,7 @@ function CaseRightPanel({
                             <CaseArt src={c.image} alt="" />
                             <span>
                                 <strong>{c.name}</strong>
-                                <em>{c.items.length} items · EV {formatCredits(c.evGc || 0)}</em>
+                                <em>{c.items.length} items · Base EV {formatCredits(c.evGc || 0)}</em>
                             </span>
                             <b>{formatCredits(c.openPriceGc || 0)}</b>
                         </button>
@@ -677,6 +678,7 @@ export default function CasesGame() {
     const autoTimerRef = useRef(null)
     const autoRollTimerRef = useRef(null) // P4: long-press auto-roll
     const pendingRoundRef = useRef(null)
+    const geometryRoundRef = useRef(null)
     const celebrationTimerRef = useRef(null)
     const resultsPanelRef = useRef(null)
     const reelAreaRef = useRef(null)
@@ -699,7 +701,7 @@ export default function CasesGame() {
         if (!allCases) return
         const requestedCaseId = initialCaseIdRef.current
         const first = allCases.find(c => c.id === requestedCaseId) || filterCasesByCategory(allCases, 'popular')[0] || allCases[0]
-        if (first) setCaseId(first.id)
+        if (first && first.id !== caseId && !running) { setCaseId(first.id); clearStaleResult() }
     }, [allCases])
 
     useEffect(() => {
@@ -739,6 +741,23 @@ export default function CasesGame() {
     const totalStake = roundGc(casePrice * rows, casePrice)
 
     const machine = useRoundMachine({})
+    useEffect(() => {
+        if (!tracks.length || !stageRef.current) return undefined
+        const align = () => {
+            const round = geometryRoundRef.current
+            if (!round) return
+            const { tilePx, gapPx } = getCaseReelMetrics(stageRef.current)
+            round.entries.forEach((entry, index) => {
+                round.offsets[index] = -(entry.targetIndex * (tilePx + gapPx) + tilePx / 2) + entry.jitter
+            })
+            if (!pendingRoundRef.current || ['land', 'reveal', 'settled'].includes(casePhase)) setTrackOffsets([...round.offsets])
+        }
+        align()
+        window.addEventListener?.('resize', align)
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(align)
+        observer?.observe(stageRef.current)
+        return () => { observer?.disconnect(); window.removeEventListener?.('resize', align) }
+    }, [tracks, casePhase])
 
     const clearRevealTimers = useCallback(() => {
         revealTimersRef.current.forEach(id => window.clearTimeout(id))
@@ -975,6 +994,7 @@ export default function CasesGame() {
             tilePx,
             gapPx,
         })
+        geometryRoundRef.current = round
         const picks = round.outcomes
         const newTracks = round.tracks
         const finalOffsets = round.offsets
@@ -1312,31 +1332,7 @@ export default function CasesGame() {
         [activeCase, collection.caseStats],
     )
 
-    // C-P0-2: feed the EV coach real per-case numbers instead of placeholders.
-    //  - payoutMultiplier: the case's expected value per unit stake (evGc / open
-    //    price). Below 1 reflects the built-in house edge of opening.
-    //  - winProbability: weight-normalized chance a single drop is worth at least
-    //    the open price (a "break even or better" proxy), using the same drop
-    //    weights as the live roll so the figure matches the odds table.
-    const educationMetrics = useMemo(() => {
-        if (!activeCase) return { winProbability: undefined, payoutMultiplier: undefined }
-        const price = Math.max(1, roundGc(activeCase.openPriceGc, 1))
-        const ev = Number(activeCase.evGc) || 0
-        const payoutMultiplier = price > 0 ? roundGc(ev / price, 0) : undefined
-        const items = Array.isArray(activeCase.items) ? activeCase.items : []
-        let totalWeight = 0
-        let winWeight = 0
-        items.forEach(item => {
-            const weight = rarityDropWeight(item)
-            totalWeight += weight
-            const value = Number(item.valueGc) || Number(item.multiplier) || 0
-            if (value >= price) winWeight += weight
-        })
-        const winProbability = totalWeight > 0
-            ? Math.min(1, Math.max(0, winWeight / totalWeight))
-            : undefined
-        return { winProbability, payoutMultiplier }
-    }, [activeCase])
+    const educationMetrics = useMemo(() => caseDisclosure(activeCase, rows), [activeCase, rows])
 
     const selectView = useCallback((nextView) => {
         if (running || view === nextView) return
@@ -1364,7 +1360,8 @@ export default function CasesGame() {
         if (running || rows === nextRows) return
         sfx.play('click', { volume: 0.32 })
         setRows(nextRows)
-    }, [rows, running, sfx])
+        clearStaleResult()
+    }, [rows, running, sfx, clearStaleResult])
 
     const selectCase = useCallback((nextCaseId) => {
         if (running || caseId === nextCaseId) return
@@ -1580,7 +1577,7 @@ export default function CasesGame() {
                                         <strong>{activeCase.name}</strong>
                                         <em>{activeCase.items.length} possible drops · {activeCase.priceSource === 'csmarket' ? 'market median price' : 'EV-based price'}</em>
                                         <div className="cases-selected-metrics">
-                                            <b>EV {formatCredits(activeCase.evGc || 0)}</b>
+                                            <b>Base EV {formatCredits(activeCase.evGc || 0)}</b>
                                             <b>{activeCase.volatility?.label || casePriceBand(casePrice)}</b>
                                             <b>{casePriceBand(casePrice)}</b>
                                         </div>
@@ -1709,7 +1706,7 @@ export default function CasesGame() {
                                     <header className="cases-market-reel-head">
                                         <span>{activeCase.items.length} possible drops</span>
                                         <strong>{activeCase.name}</strong>
-                                        <em>{formatCredits(casePrice)} open · EV {formatCredits(activeCase.evGc || 0)}</em>
+                                        <em>{formatCredits(casePrice)} open · Base EV {formatCredits(activeCase.evGc || 0)}</em>
                                     </header>
                                     <div className="cases-market-reel-window" aria-hidden="true">
                                         {reelPreviewRows.map((row, rowIndex) => (
@@ -1759,7 +1756,7 @@ export default function CasesGame() {
                                         <span title={c.name}>{c.name}</span>
                                         <em>{casePriceBand(c.openPriceGc)} · {c.items.length} items · {c.type || 'Case'}</em>
                                         <div className="cases-case-metrics" aria-label="Expected value and volatility">
-                                            <b>EV {formatCredits(c.evGc || 0)}</b>
+                                            <b>Base EV {formatCredits(c.evGc || 0)}</b>
                                             <b>{c.volatility?.label || 'Stable'}</b>
                                         </div>
                                         <div className="cases-rare-preview" aria-label="Rare item preview">
@@ -2111,7 +2108,7 @@ export default function CasesGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('cases')} />
-            <EducationPanel definition={definition} betAmount={casePrice} winProbability={educationMetrics.winProbability} payoutMultiplier={educationMetrics.payoutMultiplier} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={{ ...definition, rtp: educationMetrics?.rtp, houseEdge: educationMetrics ? 1 - educationMetrics.rtp : undefined }} betAmount={totalStake} winProbability={educationMetrics?.winChance} expectedGrossMultiplier={educationMetrics?.rtp} effectiveRtp={educationMetrics?.rtp} rtpLabel="Final payout RTP" rtpNote={educationMetrics ? `Base item EV ${formatCredits(educationMetrics.baseEv)} per drop, before modifiers. Final gross EV ${formatCredits(educationMetrics.grossEv)} and net EV ${formatCredits(educationMetrics.netEv)} for ${rows} row(s) at ${formatCredits(totalStake)}. Includes weighted wear, 10% StatTrak and 6% souvenir conditional on no StatTrak, with each payout rounded to 0.01 GC. Float does not change value; simulator modifiers apply to every item. Win means strictly above price (single drop only). ${activeCase.priceSource === 'fallback-ev' ? 'Fallback/manifest EV-based price, floored at 1 GC; not a target 92% RTP or live market quote.' : 'Uses the displayed opening price and normalized item values.'}` : 'Final payout expectation unavailable until a case loads.'} balance={balance} recentProfit={recentProfit} />
             {dockPortal && view === 'open' && createPortal(
                 <div className="cases-mobile-dock" data-cases-mobile-dock data-ux-surface="dock">
                     <button

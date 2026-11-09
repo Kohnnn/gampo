@@ -26,6 +26,13 @@ describe('cases animation helpers', () => {
         expect(finalPrizeOffset(6)).toBe(finalPrizeOffset(0) + 6)
     })
 
+    it('prefers actual unscaled tile layout over conflicting custom properties', () => {
+        const originalWindow = globalThis.window
+        globalThis.window = { getComputedStyle: () => ({ getPropertyValue: () => '118px' }) }
+        try {
+            expect(getCaseReelMetrics({ querySelector: () => ({ offsetWidth: 104, offsetLeft: 0, nextElementSibling: { offsetLeft: 108 } }) })).toEqual({ tilePx: 104, gapPx: 4 })
+        } finally { globalThis.window = originalWindow }
+    })
     it('reads reel metrics from rendered CSS custom properties', () => {
         const el = { nodeType: 1 }
         const originalWindow = globalThis.window

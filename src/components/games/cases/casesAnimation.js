@@ -97,6 +97,11 @@ export function getCaseReelMetrics(element) {
     if (!element || typeof window === 'undefined') {
         return { tilePx: CASE_TILE_PX, gapPx: CASE_TILE_GAP_PX }
     }
+    const tile = element.querySelector?.('.cases-carousel-tile')
+    if (tile?.offsetWidth > 0) {
+        const stride = tile.nextElementSibling ? tile.nextElementSibling.offsetLeft - tile.offsetLeft : 0
+        return { tilePx: tile.offsetWidth, gapPx: stride > 0 ? stride - tile.offsetWidth : CASE_TILE_GAP_PX }
+    }
     const style = window.getComputedStyle(element)
     const tilePx = parseFloat(style.getPropertyValue('--case-tile-px')) || CASE_TILE_PX
     const gapPx = parseFloat(style.getPropertyValue('--case-tile-gap')) || CASE_TILE_GAP_PX
