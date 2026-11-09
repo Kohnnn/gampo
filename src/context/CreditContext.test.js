@@ -278,6 +278,47 @@ describe('D-1 history read failure', () => {
 })
 
 describe('D-1 storage write failure', () => {
+    it('keeps a history-incomplete warning after a non-quota write failure and later successful activity', () => {
+        const timers = []
+        vi.stubGlobal('window', { setTimeout: callback => { timers.push(callback); return timers.length } })
+        localStorage.setItem(CREDIT_STORAGE_KEY, '100')
+        const setItem = localStorage.setItem
+        let failHistory = true
+        localStorage.setItem = (key, value) => {
+            if (key === HISTORY_STORAGE_KEY && failHistory) {
+                failHistory = false
+                throw new Error('storage unavailable')
+            }
+            setItem(key, value)
+        }
+
+        observedRender.states = []
+        let credits
+        function Consumer() { credits = useCredits(); return null }
+        const render = () => {
+            observedRender.cursor = 0
+            renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+        }
+        const warning = () => credits.toasts.find(({ title, description }) => /history/i.test(`${title} ${description}`) && /incomplete/i.test(`${title} ${description}`))
+        render()
+        expect(credits.placeBet(10, 'Accepted debit')).toBe(true)
+        expect(storedBalance()).toBe(90)
+        expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull()
+        render()
+        expect(warning()).toBeTruthy()
+
+        expect(credits.placeBet(5, 'Later debit')).toBe(true)
+        expect(storedBalance()).toBe(85)
+        expect(storedHistory().map(({ label }) => label)).toEqual(['Later debit'])
+        for (const title of ['One', 'Two', 'Three', 'Four']) credits.showToast('bet', title, 'ordinary activity')
+        render()
+        expect(warning()).toBeTruthy()
+        expect(credits.toasts.length).toBeLessThanOrEqual(3)
+        for (const callback of timers) callback()
+        render()
+        expect(warning()).toBeTruthy()
+    })
+
     it('does not resurrect a debit whose credits write was refused', () => {
         // Storage is full: the credits write is refused, so the stored value
         // cannot advance. Reading it back on the next stake would re-offer the
