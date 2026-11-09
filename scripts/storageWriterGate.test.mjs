@@ -32,6 +32,26 @@ function fixture(files) {
     return root
 }
 
+// An opening brace in a regex must not hide a later, real writer.
+{
+    const source = 'const value = `${/{/.test("x")}${Boolean(/[\\/{]/.test("/"))}`\n'
+    const root = fixture({ 'case.js': source })
+    try {
+        const negative = run([], root)
+        assert.equal(negative.code, 0, negative.out)
+        writeFileSync(join(root, 'src', 'case.js'), `${source}localStorage.setItem('k', 'v')\n`)
+        const positive = run([], root)
+        assert.equal(positive.code, 1, `writer after template must fail the gate: ${positive.out}`)
+        assert.match(positive.out, /NEW unguarded writer: src\/case\.js \(1 site\)/)
+        writeFileSync(join(root, 'src', 'case.js'), 'const value = `${"x" / localStorage.setItem("k", "v") / 2}`\n')
+        const division = run([], root)
+        assert.equal(division.code, 1, `division must not hide an interpolated writer: ${division.out}`)
+        assert.match(division.out, /NEW unguarded writer: src\/case\.js \(1 site\)/)
+    } finally {
+        rmSync(root, { recursive: true, force: true })
+    }
+}
+
 // --- unit: counting and comment stripping ---------------------------------
 
 {

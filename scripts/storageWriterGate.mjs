@@ -57,12 +57,11 @@ function collectFiles(dir, acc = []) {
  * A regex cannot do this correctly: `//` inside `'https://…'` is not a comment,
  * and a writer-shaped token inside a string is not a writer. An earlier version
  * used `/\/\*…|(^|[^:])//…/` and miscounted both. This is a small scanner rather
- * than a dependency; it does not need to be a full JS parser, only to never
- * invent or hide a call site.
+ * than a dependency; it is not a full JS parser.
  *
- * Regex literals are not special-cased: a `/…/` containing an unbalanced quote
- * could desynchronise the scanner, but a false count there is caught by the
- * baseline diff instead of passing silently.
+ * ponytail: regex/division is classified by common expression-start tokens
+ * inside template interpolations only. Use a JS parser for complete lexing;
+ * regex literals elsewhere or uncommon contexts may still desynchronise it.
  */
 function stripComments(source) {
     let out = ''
@@ -70,6 +69,11 @@ function stripComments(source) {
     const n = source.length
     const templateDepths = []
     let braceDepth = 0
+    let previousToken = ''
+
+    const canStartRegex = () => previousToken === ''
+        || (previousToken.length === 1 && '([{=,:;!?&|+*%~^<>-'.includes(previousToken))
+        || /^(return|throw|case|delete|void|typeof|instanceof|in|of|yield|await|new)$/.test(previousToken)
 
     const scanString = (quote) => {
         out += ' '
@@ -86,11 +90,13 @@ function stripComments(source) {
                 out += '  '
                 i += 2
                 templateDepths.push(braceDepth)
+                previousToken = '{'
                 return
             }
             if (d === quote) {
                 out += ' '
                 i += 1
+                previousToken = 'value'
                 return
             }
             out += d === '\n' ? '\n' : ' '
@@ -115,12 +121,44 @@ function stripComments(source) {
             if (i < n) { out += '  '; i += 2 }
             continue
         }
+        if (c === '/' && templateDepths.length > 0 && canStartRegex()) {
+            let end = i + 1
+            let inClass = false
+            while (end < n && source[end] !== '\n' && source[end] !== '\r') {
+                if (source[end] === '\\') { end += 2; continue }
+                if (source[end] === '[') inClass = true
+                else if (source[end] === ']') inClass = false
+                else if (source[end] === '/' && !inClass) break
+                end += 1
+            }
+            if (end < n && source[end] === '/') {
+                out += ' '.repeat(end - i + 1)
+                i = end + 1
+                previousToken = 'value'
+                continue
+            }
+        }
+        if (/[a-zA-Z_$]/.test(c)) {
+            const start = i
+            while (i < n && /[\w$]/.test(source[i])) i += 1
+            const word = source.slice(start, i)
+            out += word
+            previousToken = previousToken === '.' ? 'value' : word
+            continue
+        }
+        if ((c === '+' || c === '-') && next === c) {
+            previousToken = canStartRegex() ? c : 'value'
+            out += c + c
+            i += 2
+            continue
+        }
         if (c === '"' || c === "'" || c === '`') {
             scanString(c)
             continue
         }
         if (c === '{') {
             braceDepth += 1
+            previousToken = c
             out += c
             i += 1
             continue
@@ -133,6 +171,7 @@ function stripComments(source) {
         if (c === '}' && braceDepth > 0) {
             braceDepth -= 1
         }
+        if (!/\s/.test(c)) previousToken = /[0-9]/.test(c) ? 'value' : c
         out += c
         i += 1
     }
