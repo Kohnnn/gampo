@@ -4,12 +4,11 @@
  *
  * Source inspection shows the BetPanel key handler gaps (`e.repeat` absent, no
  * dialog guard, key path bypassed `runningRound` for non-ticket games). Source
- * assertions cannot prove a browser outcome, so this runs a real
- * Chromium/CDP session against a served candidate and dispatches NATIVE
- * key events (`Input.dispatchKeyEvent`, which sets `isTrusted` and exercises
- * the browser's own focused-control activation and key-repeat model).
+ * assertions cannot prove a browser outcome. This probe was intended to run a
+ * Chromium/CDP session against a served candidate using NATIVE key events.
+ * It is currently disabled: see the unconditional guard in run().
  *
- * Proves, per issue #30 QA028:
+ * Intended coverage (none currently verified), per issue #30 QA028:
  *   A. Space on the focused Game tools button opens the tools popover and does
  *      NOT start a paid round (balance unchanged, no history entry).
  *   B. Space on a focused Mute toggle toggles mute and does NOT bet.
@@ -181,6 +180,14 @@ function record(name, passed, detail) {
 }
 
 async function run() {
+    // Keep this unconditional until a reviewed replacement binds a dynamic
+    // debugger endpoint to the launched process/profile, blocks every non-loopback
+    // request (including redirects and other targets) before navigation, and
+    // verifies no paid action using persisted balance and round/history evidence.
+    console.error('qa028: DISABLED — debugger ownership, loopback-only network containment, and persisted no-paid-action evidence are not established')
+    console.error('qa028: nothing was verified; all keyboard scenarios (A–F) are unavailable')
+    process.exit(2)
+
     const baseUrl = argValue('baseUrl', 'http://127.0.0.1:5180').replace(/\/$/, '')
     try {
         const res = await fetch(baseUrl, { signal: AbortSignal.timeout(8000) })
