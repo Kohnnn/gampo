@@ -68,6 +68,7 @@ function stripComments(source) {
     let i = 0
     const n = source.length
     const templateDepths = []
+    const parens = []
     let braceDepth = 0
     let previousToken = ''
 
@@ -121,6 +122,12 @@ function stripComments(source) {
             if (i < n) { out += '  '; i += 2 }
             continue
         }
+        if (c === '<' && next === '<' && templateDepths.length > 0) {
+            out += '<<'
+            i += 2
+            previousToken = '<'
+            continue
+        }
         if (c === '<' && templateDepths.length > 0 && canStartRegex() && /[a-zA-Z_$>]/.test(next ?? '')) {
             // Only skip empty JSX; anything more complex needs a real JSX parser.
             const empty = source.slice(i).match(/^<(?:([a-zA-Z_$][\w$.-]*)\s*\/\s*>|([a-zA-Z_$][\w$.-]*)\s*>\s*<\/\2\s*>|>\s*<\/>)/)
@@ -130,7 +137,8 @@ function stripComments(source) {
             previousToken = 'value'
             continue
         }
-        if (c === '/' && templateDepths.length > 0 && canStartRegex()) {
+        // `let` can be an identifier in sloppy code; `/` after it is division.
+        if (c === '/' && templateDepths.length > 0 && previousToken !== 'let' && canStartRegex()) {
             let end = i + 1
             let inClass = false
             while (end < n && source[end] !== '\n' && source[end] !== '\r') {
@@ -180,6 +188,13 @@ function stripComments(source) {
         }
         if (c === '}' && braceDepth > 0) {
             braceDepth -= 1
+        }
+        if (templateDepths.length > 0 && c === '(') parens.push(/^(if|for|while|with|switch|catch)$/.test(previousToken))
+        else if (templateDepths.length > 0 && c === ')' && parens.pop()) {
+            previousToken = ';'
+            out += c
+            i += 1
+            continue
         }
         if (!/\s/.test(c)) previousToken = /[0-9]/.test(c) ? 'value' : c
         out += c

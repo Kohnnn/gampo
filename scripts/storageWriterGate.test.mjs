@@ -83,6 +83,29 @@ function fixture(files) {
     }
 }
 
+// Shift operators and statement-position JSX must not mislead interpolation scanning.
+{
+    const cases = [
+        ['left shift', 'case.js', 'const t = `${1<<bits}`;', 'clean'],
+        ['sloppy CJS let division', 'case.cjs', 'var let=2; const t=`${let / (localStorage.clear(),2) / 2}`;', 'writer'],
+        ['JSX after if', 'case.jsx', 'const t = `${(() => { if (true) <i></i>; return localStorage.clear() / 2; })()}`;', 'writer-or-unsupported'],
+    ]
+    const actual = cases.map(([name, file, source, expected]) => {
+        const root = fixture({ [file]: `${source}\n` })
+        try {
+            const { code, out } = run([], root)
+            const writer = code === 1 && out.includes(`NEW unguarded writer: src/${file} (1 site)`)
+            const unsupported = code === 2 && /cannot safely scan JSX in template interpolation/.test(out)
+            const passed = expected === 'clean' ? code === 0
+                : expected === 'writer' ? writer : writer || unsupported
+            return `${name}: ${passed ? 'ok' : `exit ${code}: ${out}`}`
+        } finally {
+            rmSync(root, { recursive: true, force: true })
+        }
+    })
+    assert.deepEqual(actual, cases.map(([name]) => `${name}: ok`))
+}
+
 // --- unit: counting and comment stripping ---------------------------------
 
 {
