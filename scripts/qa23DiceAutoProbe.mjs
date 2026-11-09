@@ -24,19 +24,26 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import BetPanel from '/src/components/games/primitives/BetPanel.jsx'
 const root = createRoot(document.querySelector('#root'))
-let props, id = 0
+let props, id = 0, storedBalance = null
 const pending = new Map(), attempts = [], receipts = [], completions = [], quotes = []
 const callback = identity => ({betAmount, mode}) => {
   const attempt = {id: ++id, identity, betAmount, mode}; attempts.push(attempt)
+  if (storedBalance !== null) {
+    const result = storedBalance < betAmount ? {kind:'rejected',code:'insufficient-funds',profit:0} : {kind:'committed',profit:-betAmount}
+    if (result.kind === 'committed') { storedBalance -= betAmount; receipts.push({...attempt,profit:result.profit}) }
+    completions.push(attempt)
+    return Promise.resolve(result)
+  }
   return new Promise(resolve => pending.set(id, {attempt, resolve}))
 }
 function render(patch = {}) { props = {...props, ...patch}; flushSync(() => root.render(React.createElement(BetPanel, props))) }
 window.consumer = {
   mount(options = {}) { props = {balance:100, initialBet:1, autoIntervalMs:120, autoTimeoutMs:1000, ...options}; props.onPlay = callback(options.identity || 'A'); render() },
   update(options) { if(options.identity) options.onPlay = callback(options.identity); if(options.quote !== undefined) { const q=options.quote; options.ticketStake=({mode,betAmount}) => { quotes.push({q,mode,betAmount}); return q }; delete options.quote }; render(options) },
+  setStoredBalance(value) { storedBalance = value },
   release(n, result) { const item=pending.get(n); if(!item) throw Error('No pending '+n); pending.delete(n); completions.push(item.attempt); if(!result.kind || result.kind==='committed') receipts.push({...item.attempt,profit:result.profit}); item.resolve(result) },
   unmount() { flushSync(() => root.render(null)) },
-  snapshot() { return structuredClone({attempts,receipts,completions,quotes}) }
+  snapshot() { return structuredClone({attempts,receipts,completions,quotes,storedBalance}) }
 }
 consumer.mount()
 `
@@ -80,19 +87,19 @@ async function until(fn, label) {
 const profile = await mkdtemp(join(tmpdir(), 'gampo-qa027-check-'))
 let vite, proxy, child, exit, cdp
 try {
-    vite = await createVite({ root, configFile: false, plugins: [react(), plugin], server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
+    vite = await createVite({ root, cacheDir: join(profile, 'vite-cache'), configFile: false, plugins: [react(), plugin], server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })
     await vite.listen()
     const origin = `http://127.0.0.1:${vite.httpServer.address().port}`
     proxy = createServer((req, res) => { res.writeHead(403); res.end() })
     proxy.on('connect', (req, socket) => socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'))
     await new Promise((ok, fail) => { proxy.once('error', fail); proxy.listen(0, '127.0.0.1', ok) })
-    child = spawn(browser, ['--headless=new', '--no-sandbox', '--no-zygote', '--disable-gpu', '--disable-dev-shm-usage', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-extensions', '--disable-quic', '--mute-audio', '--remote-debugging-port=0', `--user-data-dir=${profile}`, `--proxy-server=http://127.0.0.1:${proxy.address().port}`, '--proxy-bypass-list=127.0.0.1', '--host-resolver-rules=MAP * ~NOTFOUND,EXCLUDE 127.0.0.1', 'about:blank'], { detached: true, stdio: 'ignore' })
+    child = spawn(browser, ['--headless=new', '--no-sandbox', '--no-zygote', '--disable-gpu', '--disable-dev-shm-usage', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--disable-extensions', '--disable-quic', '--mute-audio', '--remote-debugging-port=0', `--user-data-dir=${profile}`, `--proxy-server=http://127.0.0.1:${proxy.address().port}`, '--proxy-bypass-list=127.0.0.1', '--host-resolver-rules=MAP * ~NOTFOUND,EXCLUDE 127.0.0.1', 'about:blank'], { detached: true, stdio: 'ignore', env: { ...process.env, HOME: profile, XDG_CONFIG_HOME: join(profile, 'config'), XDG_CACHE_HOME: join(profile, 'cache'), XDG_DATA_HOME: join(profile, 'data') } })
     exit = new Promise(done => { child.once('error', error => done({ error: String(error) })); child.once('exit', (code, signal) => done({ code, signal })) })
     await once(child, 'spawn')
     const port = await until(async () => { try { return Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]) } catch { return 0 } }, 'browser debugger')
     const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()
     cdp = new Cdp(version.webSocketDebuggerUrl); await cdp.open()
-    for (const name of ['funded', 'exhausted', 'pending', 'cadence', 'retry', 'timeout', 'late', 'unmount-pending', 'unmount-cadence', 'unmount-retry', 'ticket', 'cadence-500']) {
+    for (const name of ['stale-funds', 'funded', 'exhausted', 'pending', 'cadence', 'retry', 'timeout', 'late', 'unmount-pending', 'unmount-cadence', 'unmount-retry', 'ticket', 'cadence-500']) {
         const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' })
         const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true })
         const send = (method, params) => cdp.send(method, params, sessionId), errors = [], warnings = []
@@ -131,10 +138,26 @@ try {
         await send('Page.navigate', { url: `${origin}/qa027` }); await until(async () => { assert.deepEqual(errors, []); return evalPage('!!window.consumer') }, 'mounted React consumer')
         await evalPage(`consumer.mount(${JSON.stringify({ balance: name === 'exhausted' ? 1 : 100, autoIntervalMs: name === 'cadence-500' ? 500 : 120 })})`)
         if (name === 'ticket') await evalPage('consumer.update({quote:2})')
+        if (name === 'stale-funds') await evalPage('consumer.setStoredBalance(0)')
         await click('.bp-tab:nth-child(2)') // default count 10; Stop/affordability bound each case
         await send('Emulation.setVirtualTimePolicy', { policy: 'pause' }); await click('.bp-content .bp-play')
         await until(async () => (await snap()).attempts.length === 1, 'first attempt')
-        if (name === 'funded' || name === 'exhausted' || name === 'ticket' || name === 'cadence-500') {
+        if (name === 'stale-funds') {
+            const refused = await snap()
+            assert.equal(refused.attempts.length, 1)
+            assert.equal(refused.receipts.length, 0)
+            assert.equal(refused.storedBalance, 0)
+            await advance(480)
+            assert.equal((await snap()).attempts.length, 1, 'Auto must stop after the definitive refusal')
+            await evalPage('consumer.setStoredBalance(100)')
+            await advance(360)
+            const final = await snap()
+            assert.equal(final.attempts.length, 1, 'Auto must not restart after the balance changes')
+            assert.equal(final.receipts.length, 0, 'a refused Auto run must not create a paid round')
+            assert.equal(final.storedBalance, 100)
+            await evalPage('consumer.update({})')
+            assert.match(await evalPage(`document.querySelector('.bp-content .bp-play').textContent`), /Start Autobet/)
+        } else if (name === 'funded' || name === 'exhausted' || name === 'ticket' || name === 'cadence-500') {
             if (name === 'ticket') await evalPage('consumer.update({identity:"B",quote:3})')
             else if (name !== 'cadence-500') await evalPage(`consumer.update({identity:"B",balance:${name === 'exhausted' ? 0 : 100}})`)
             await release(1, commit(-1))
