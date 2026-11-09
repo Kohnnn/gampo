@@ -127,11 +127,18 @@ export function CreditProvider({ children }) {
             showToast('error', 'Saved credit history unavailable', 'Saved credit history could not be read; it has not been changed.')
         }
     }, [initialHistory, showToast])
+    const warnHistoryIncomplete = useCallback(() => {
+        setToasts(prev => prev.some(toast => toast.id === HISTORY_WARNING) ? prev : [
+            { id: HISTORY_WARNING, kind: HISTORY_WARNING, type: 'error', title: 'History may be incomplete', description: 'Some activity was not saved.' },
+            ...prev.slice(-2),
+        ])
+    }, [])
+
 
     const recordTransaction = useCallback((entry) => {
         const history = readStoredHistory()
         if (history === null) {
-            showToast('error', 'Credit history not saved', 'The balance change was applied, but its history entry was not saved.')
+            warnHistoryIncomplete()
             return
         }
         const next = [{
@@ -141,13 +148,8 @@ export function CreditProvider({ children }) {
         }, ...history].slice(0, 100)
         transactionsRef.current = next
         setTransactions(next)
-        if (!persistHistory(next)) {
-            setToasts(prev => prev.some(toast => toast.id === HISTORY_WARNING) ? prev : [
-                { id: HISTORY_WARNING, kind: HISTORY_WARNING, type: 'error', title: 'History may be incomplete', description: 'Some activity was not saved.' },
-                ...prev.slice(-2),
-            ])
-        }
-    }, [readStoredHistory, showToast])
+        if (!persistHistory(next)) warnHistoryIncomplete()
+    }, [readStoredHistory, warnHistoryIncomplete])
 
     // D-1: affordability and the applied delta are decided against the value
     // that is actually stored, never against a tab-local ref. A ref is seeded

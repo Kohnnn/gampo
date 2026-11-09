@@ -237,6 +237,48 @@ describe('D-1 cross-document history', () => {
 })
 
 describe('D-1 history read failure', () => {
+    it('keeps a single marked history warning after accepted activity encounters a read failure and storage recovers', () => {
+        const timers = []
+        vi.stubGlobal('window', { setTimeout: callback => { timers.push(callback); return timers.length } })
+        localStorage.setItem(CREDIT_STORAGE_KEY, '100')
+        const priorHistory = JSON.stringify([{ id: 'prior', timestamp: '2026-01-01T00:00:00.000Z', type: 'bet', label: 'Prior', amount: -5, balance: 100 }])
+        localStorage.setItem(HISTORY_STORAGE_KEY, priorHistory)
+        const getItem = localStorage.getItem
+        let denyHistoryReads = false
+        localStorage.getItem = key => {
+            if (key === HISTORY_STORAGE_KEY && denyHistoryReads) throw new Error('history unavailable')
+            return getItem(key)
+        }
+
+        observedRender.states = []
+        let credits
+        function Consumer() { credits = useCredits(); return null }
+        const render = () => {
+            observedRender.cursor = 0
+            renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+        }
+        const warnings = () => credits.toasts.filter(toast => toast.kind === 'history-write-failure')
+        render()
+        denyHistoryReads = true
+        expect(credits.placeBet(10, 'Accepted debit')).toBe(true)
+        expect(credits.placeBet(5, 'Another debit')).toBe(true)
+        expect(storedBalance()).toBe(85)
+        expect(getItem(HISTORY_STORAGE_KEY)).toBe(priorHistory)
+        render()
+        expect(warnings()).toHaveLength(1)
+        expect(`${warnings()[0].title} ${warnings()[0].description}`).toMatch(/history.*incomplete/i)
+
+        denyHistoryReads = false
+        expect(credits.placeBet(5, 'Later debit')).toBe(true)
+        expect(storedBalance()).toBe(80)
+        expect(storedHistory().map(({ label }) => label)).toEqual(['Later debit', 'Prior'])
+        for (const title of ['One', 'Two', 'Three', 'Four']) credits.showToast('bet', title, 'ordinary activity')
+        for (const callback of timers) callback()
+        render()
+        expect(warnings()).toHaveLength(1)
+        expect(credits.toasts.length).toBeLessThanOrEqual(3)
+    })
+
     it('preserves stored history, warns, and rejects transactional preparation when a history read fails', () => {
         vi.stubGlobal('window', { setTimeout: () => 0 })
         localStorage.setItem(CREDIT_STORAGE_KEY, '100')

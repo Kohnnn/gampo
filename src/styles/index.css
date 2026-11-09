@@ -803,14 +803,14 @@ body {
     white-space: nowrap;
 }
 
+.credit-toast-container-with-history-warning {
+    width: min(420px, calc(100% - 24px));
+}
+
 .credit-toast-history-warning {
-    position: fixed;
-    top: 72px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(420px, calc(100vw - 24px));
-    max-width: 100%;
-    z-index: var(--z-toast);
+    width: 100%;
+    flex-shrink: 0;
+    pointer-events: none;
     animation: none;
     white-space: normal;
 }

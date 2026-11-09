@@ -50,7 +50,7 @@ describe('Header game chrome', () => {
 })
 
 describe('Header history warning', () => {
-    it('announces the marked history-loss warning without announcing ordinary toasts', () => {
+    it('exposes the marked history-loss warning as an alert without marking ordinary toasts', () => {
         creditFixture.toasts = [
             { id: 'warning', kind: 'history-write-failure', type: 'error', title: 'Recent activity', description: 'Some entries could not be saved.' },
             { id: 'ordinary', type: 'error', title: 'Ordinary notice', description: 'Try again.' },
