@@ -67,7 +67,7 @@ function TicketSnapshot({ ticket, eventMap, cashoutValuation, onCashOut }) {
             <small>{focusLeg.bookmaker || 'Bookmaker unavailable'} · {focusLeg.provider || 'Source unavailable'} · accepted {formatOdds(focusLeg.acceptedOdds || focusLeg.odds || 0, 'decimal')} · {formatObservedAge(focusLeg.observedAt)}</small>
             <footer>
                 <span>Stake {formatGc(ticket.stake)}</span>
-                <span>{settled ? `Returned ${formatGc(ticket.payout)}` : `Est. ${formatGc(ticket.estimatedPayout)}`}</span>
+                <span>{settled ? `Returned ${formatGc(ticket.payout)}` : `${ticket.mode === BET_MODES.SYSTEM_2 ? 'All legs win:' : 'Est.'} ${formatGc(ticket.estimatedPayout)}`}</span>
                 {settled ? <strong className={profit >= 0 ? 'is-positive' : 'is-negative'}>{profit >= 0 ? '+' : ''}{formatGc(profit)}</strong> : null}
             </footer>
             {onCashOut && offer > 0 ? (
@@ -142,6 +142,9 @@ function BetSlip({ selections = [], tickets = [], events = [], cashoutValuations
     const [showSettings, setShowSettings] = useState(false)
     const [activeTab, setActiveTab] = useState('slip')
     const quote = quoteTicket({ selections, stake, mode })
+    const systemPairs = mode === BET_MODES.SYSTEM_2
+        ? (quote.combinations ? quote : quoteTicket({ selections, stake: 1, mode })).combinationDetails
+        : []
     const analysis = analyzeTicket({ selections, stake, mode, quote })
     const validation = validateTicket({ selections, stake, balance, settings, mode })
     const status = placing ? 'placing' : selections.length === 0 ? 'empty' : validation.valid ? 'ready' : validation.needsManualAccept ? 'odds-changed' : 'selected'
@@ -205,10 +208,24 @@ function BetSlip({ selections = [], tickets = [], events = [], cashoutValuations
                             {mode !== BET_MODES.SINGLES && selections.length >= 2 ? (
                                 <section className="sb-slip-section">
                                     <h3>{mode === BET_MODES.MULTI ? `${selections.length} Leg Multi` : `2-of-${selections.length} System`}</h3>
-                                    <div className="sb-slip-total-odds">
-                                        <span>Total Odds</span>
-                                        <strong>{quote.totalOdds ? formatOdds(quote.totalOdds, settings.oddsFormat) : '-'}</strong>
-                                    </div>
+                                    {mode === BET_MODES.MULTI ? (
+                                        <div className="sb-slip-total-odds">
+                                            <span>Total Odds</span>
+                                            <strong>{quote.totalOdds ? formatOdds(quote.totalOdds, settings.oddsFormat) : '-'}</strong>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <p>{systemPairs.length} two-leg {systemPairs.length === 1 ? 'pair' : 'pairs'} · {formatGc(quote.stakePerCombo)} per pair</p>
+                                            <p>Each pair returns only if both picks win. Total return below assumes all legs win.</p>
+                                            {systemPairs.map(pair => (
+                                                <article className="sb-slip-leg" key={pair.id}>
+                                                    <strong>{pair.selectionIds.map(id => selections.find((selection, index) => String(selection.selectionId || selection.id || index) === id)?.label).join(' + ')}</strong>
+                                                    <span>Pair odds: {formatOdds(pair.oddsProduct, settings.oddsFormat)}</span>
+                                                    <span>Return if both win: {formatGc(quote.combinations ? pair.estimatedReturn : 0)}</span>
+                                                </article>
+                                            ))}
+                                        </>
+                                    )}
                                 </section>
                             ) : null}
 
@@ -260,7 +277,7 @@ function BetSlip({ selections = [], tickets = [], events = [], cashoutValuations
                     </div>
 
                     <div className="sb-slip-payout">
-                        <span>Est. Return</span>
+                        <span>{mode === BET_MODES.SYSTEM_2 ? 'Total return if all legs win' : 'Est. Return'}</span>
                         <strong>{formatGc(quote.estimatedPayout)}</strong>
                     </div>
 
@@ -281,7 +298,7 @@ function BetSlip({ selections = [], tickets = [], events = [], cashoutValuations
                             {placing ? 'Placing...' : (
                                 <>
                                     <span>Place Practice Bet</span>
-                                    {validation.valid && quote.estimatedPayout > 0 ? <b>{formatGc(quote.estimatedPayout)}</b> : null}
+                                    {validation.valid && quote.estimatedPayout > 0 ? <b>{mode === BET_MODES.SYSTEM_2 ? 'All legs win: ' : ''}{formatGc(quote.estimatedPayout)}</b> : null}
                                 </>
                             )}
                         </button>
