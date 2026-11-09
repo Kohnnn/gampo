@@ -93,6 +93,7 @@ export default function BetPanel({
     const panelRef = useRef(null)
     const [betAmount, setBetAmount] = useState(initialBet)
     // Auto state
+    const [autoActive, setAutoActive] = useState(false)
     const [autoCount, setAutoCount] = useState(10)
     const [autoInfinite, setAutoInfinite] = useState(false)
     const [autoBetAmount, setAutoBetAmount] = useState(null)
@@ -147,6 +148,7 @@ export default function BetPanel({
     const stopAuto = useCallback(() => {
         autoRunId.current += 1
         autoRunning.current = false
+        setAutoActive(false)
         autoLeft.current = 0
         sessionProfit.current = 0
         setAutoBetAmount(null)
@@ -178,6 +180,7 @@ export default function BetPanel({
         }
         const runId = ++autoRunId.current
         autoRunning.current = true
+        setAutoActive(true)
         autoLeft.current = autoInfinite ? Infinity : Math.max(1, Number(autoCount) || 1)
         autoBaseBet.current = effectiveBetAmount
         sessionProfit.current = 0
@@ -249,6 +252,7 @@ export default function BetPanel({
         }
         if (runId !== autoRunId.current) return
         autoRunning.current = false
+        setAutoActive(false)
         if (hasTicketStake) setAutoBetAmount(null)
     }, [tab, onPlay, effectiveBetAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs, ticketStake, hasTicketStake, ticketIsFunded, runningRound])
 
@@ -353,7 +357,7 @@ export default function BetPanel({
         return () => window.removeEventListener('keydown', onKey)
     }, [handlePlay, stopAuto, lastBet, rebet, half, double, maxBet, minBet])
 
-    const isAutoLive = tab === 'auto' && autoRunning.current
+    const isAutoLive = tab === 'auto' && autoActive
     const inRound = playPhase === 'in-round'
     const playButtonLabel = (() => {
         if (inRound) return playLabel || 'Continue'
