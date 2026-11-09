@@ -72,9 +72,10 @@ function stripComments(source) {
     let braceDepth = 0
     let previousToken = ''
 
+    // `let` is a contextual keyword and may be a value in sloppy CJS.
     const canStartRegex = () => previousToken === ''
         || (previousToken.length === 1 && '([{=,:;!?&|+*%~^<>-'.includes(previousToken))
-        || /^(return|throw|case|delete|void|typeof|instanceof|in|for-of|yield|await|new|const|let|var)$/.test(previousToken)
+        || /^(return|throw|case|delete|void|typeof|instanceof|in|for-of|yield|await|new|const|var)$/.test(previousToken)
 
     const scanString = (quote) => {
         out += ' '
@@ -159,8 +160,7 @@ function stripComments(source) {
                 throw new SyntaxError('cannot safely scan a quoted regex outside template interpolation')
             }
         }
-        // `let` can be an identifier in sloppy code; `/` after it is division.
-        if (c === '/' && templateDepths.length > 0 && previousToken !== 'let' && canStartRegex()) {
+        if (c === '/' && templateDepths.length > 0 && canStartRegex()) {
             let end = i + 1
             let inClass = false
             while (end < n && source[end] !== '\n' && source[end] !== '\r') {

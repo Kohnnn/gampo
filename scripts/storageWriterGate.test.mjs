@@ -113,6 +113,32 @@ function fixture(files) {
     }
 }
 
+// Sloppy CJS may use `let` as an identifier, including before postfix operators.
+{
+    const cases = [
+        ['postfix increment writer', 'var let=2; const t=`${let++ / (localStorage.clear(),2) / 2}`;', 1],
+        ['postfix decrement writer', 'var let=2; const t=`${let-- / (localStorage.clear(),2) / 2}`;', 1],
+        ['less-than identifier', 'var let=2, bits=3; const t=`${let <bits}`;', 0],
+        ['ordinary postfix writer', 'var value=2; const t=`${value++ / (localStorage.clear(),2) / 2}`;', 1],
+        ['prefix writer', 'var value=2; const t=`${++value / (localStorage.clear(),2) / 2}`;', 1],
+    ]
+    const root = fixture({ 'case.cjs': '' })
+    try {
+        const actual = cases.flatMap(([name, source]) => {
+            writeFileSync(join(root, 'src', 'case.cjs'), `${source}\n`)
+            return [[], ['--strict']].map(args => {
+                const { code, out } = run(args, root)
+                return [name, args.join(' ') || 'default', code,
+                    /NEW unguarded writer: src\/case\.cjs \(1 site\)/.test(out)]
+            })
+        })
+        assert.deepEqual(actual, cases.flatMap(([name, , code]) =>
+            ['default', '--strict'].map(mode => [name, mode, code, code === 1])))
+    } finally {
+        rmSync(root, { recursive: true, force: true })
+    }
+}
+
 // Shift operators and statement-position JSX must not mislead interpolation scanning.
 {
     const cases = [
