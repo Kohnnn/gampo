@@ -74,14 +74,15 @@ export default function PumpGame() {
     // Outside a round `pumps` still holds the finished round's count (burst and
     // cashout reset the phase but not the counter), so idle must read step 0 or
     // the lesson quotes a step of a round that no longer exists.
+    // When the cap is reached the next pump is a deterministic cashout, not a
+    // risky next step: quote nothing risky; the cashout alternative holds.
     const livePumps = inRound ? pumps : 0
-    const educationDecision = nextStepQuote({
+    const educationDecision = pumps >= MAX_PUMPS ? null : nextStepQuote({
         probability: 1 - STEP_BUST_CHANCE,
-        payoutMultiplier: livePumps >= MAX_PUMPS ? multiplierAt(livePumps) : multiplierAt(livePumps + 1),
+        payoutMultiplier: multiplierAt(livePumps + 1),
         // Only a live round with a banked step has something to cash out.
         cashoutMultiplier: livePumps > 0 ? multiplierAt(livePumps) : undefined,
     })
-
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (inRound) { resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Pump')) {
@@ -177,7 +178,6 @@ export default function PumpGame() {
                     onPlay={performPlay}
                     disableAuto
                     lastBet={lastBet}
-                    initialBet={selectedStake}
                     onStakeChange={setSelectedStake}
                     playPhase={inRound && pumps > 0 ? 'in-round' : null}
                     playLabel={inRound && pumps > 0 ? `Cashout ${currentMult.toFixed(2)}×` : 'Place Bet'}
