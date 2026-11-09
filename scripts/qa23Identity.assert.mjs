@@ -8,20 +8,25 @@
 // No network, no build, no writes. The receipt must already exist.
 //
 // Usage:
-//   node scripts/qa23Identity.assert.mjs [receipt.json]
-// Default receipt: /tmp/qa23-identity-clean-31-10-26.json
+//   node scripts/qa23Identity.assert.mjs <receipt.json> <expected-full-revision>
+// The expected revision is the candidate's full 40-character lowercase Git SHA-1.
 //
 // Exit 0 only if every predicate passes; exit 1 otherwise.
 
 import { readFileSync } from 'node:fs'
 
-const DEFAULT_RECEIPT = '/tmp/qa23-identity-clean-31-10-26.json'
-
 // 64 lowercase hex chars.
 const DIGEST_RE = /^[0-9a-f]{64}$/
+// The candidate revision must be a full Git SHA-1, not an abbreviation.
+const REVISION_RE = /^[0-9a-f]{40}$/
 
 function main() {
-    const arg = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : DEFAULT_RECEIPT
+    const [arg, expectedRevision] = process.argv.slice(2)
+    if (process.argv.length !== 4 || !arg || arg.startsWith('--') || !REVISION_RE.test(expectedRevision ?? '')) {
+        console.log('FAIL arguments - Usage: node scripts/qa23Identity.assert.mjs <receipt.json> <expected-full-revision> (40 lowercase hex chars)')
+        process.exitCode = 1
+        return
+    }
     const results = []
     const check = (name, ok, detail) => {
         results.push({ name, ok })
@@ -39,7 +44,7 @@ function main() {
     }
     check('receipt-readable', true, '')
 
-    // --- The six predicates -------------------------------------------------
+    // --- Receipt predicates -------------------------------------------------
     const localBuild = receipt.localBuild ?? {}
     const artefact = localBuild.artefact ?? null
     const source = receipt.source ?? {}
@@ -64,6 +69,12 @@ function main() {
         artefact === null
             ? 'artefact is null/absent'
             : `expected 64 lowercase hex chars, got ${JSON.stringify(artefact.digest)}`,
+    )
+
+    check(
+        'source.revision === expected revision',
+        source.revision === expectedRevision,
+        `source.revision ${JSON.stringify(source.revision)} !== expected revision ${JSON.stringify(expectedRevision)}`,
     )
 
     check(
@@ -98,6 +109,7 @@ function main() {
         process.exitCode = 1
     } else {
         console.log(`\nall ${results.length} predicates passed for ${arg}`)
+        console.log('Local receipt only; deployment not verified.')
     }
 }
 
