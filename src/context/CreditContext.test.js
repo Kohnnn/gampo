@@ -1,7 +1,25 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { CreditProvider, CREDIT_STORAGE_KEY, HISTORY_STORAGE_KEY, INITIAL_CREDITS, commitPreparedCreditTransactions, prepareCreditTransactions, readNumber, useCredits } from './CreditContext'
+
+const observedRender = vi.hoisted(() => ({ states: null, cursor: 0 }))
+vi.mock('react', async original => {
+    const react = await original()
+    return {
+        ...react,
+        useState(initial) {
+            if (!observedRender.states) return react.useState(initial)
+            const index = observedRender.cursor++
+            if (!(index in observedRender.states)) {
+                observedRender.states[index] = typeof initial === 'function' ? initial() : initial
+            }
+            return [observedRender.states[index], value => {
+                observedRender.states[index] = typeof value === 'function' ? value(observedRender.states[index]) : value
+            }]
+        },
+    }
+})
 
 beforeEach(() => {
     const store = new Map()
@@ -10,6 +28,11 @@ beforeEach(() => {
         setItem: (key, value) => { store.set(key, String(value)) },
         removeItem: (key) => { store.delete(key) },
     }
+})
+
+afterEach(() => {
+    observedRender.states = null
+    vi.unstubAllGlobals()
 })
 
 function creditConsumer(initialBalance) {
@@ -210,6 +233,47 @@ describe('D-1 cross-document history', () => {
         expect(storedBalance()).toBe(0)
         expect(ledger.reduce((sum, entry) => sum + entry.amount, 0)).toBe(-1000)
         expect(ledger.map(entry => entry.amount).sort((a, b) => a - b)).toEqual([-600, -400])
+    })
+})
+
+describe('D-1 history read failure', () => {
+    it('preserves stored history, warns, and rejects transactional preparation when a history read fails', () => {
+        vi.stubGlobal('window', { setTimeout: () => 0 })
+        localStorage.setItem(CREDIT_STORAGE_KEY, '100')
+        const priorHistory = JSON.stringify([{ id: 'prior', timestamp: '2026-01-01T00:00:00.000Z', type: 'bet', label: 'Prior', amount: -5, balance: 100 }])
+        localStorage.setItem(HISTORY_STORAGE_KEY, priorHistory)
+        const getItem = localStorage.getItem
+        let denyHistoryReads = false
+        localStorage.getItem = key => {
+            if (key === HISTORY_STORAGE_KEY && denyHistoryReads) throw new Error('history unavailable')
+            return getItem(key)
+        }
+
+        observedRender.states = []
+        let credits
+        function Consumer() { credits = useCredits(); return null }
+        const render = () => {
+            observedRender.cursor = 0
+            renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+        }
+        render()
+        denyHistoryReads = true
+        expect(credits.placeBet(10, 'Accepted debit')).toBe(true)
+        expect(storedBalance()).toBe(90)
+        expect(getItem(HISTORY_STORAGE_KEY)).toBe(priorHistory)
+
+        let committed = false
+        const result = credits.placeBetTransactional(5, 'Ticket', 'ticket:debit', () => { committed = true; return { ok: true } })
+        expect(result).toMatchObject({ ok: false })
+        expect(committed).toBe(false)
+        expect(storedBalance()).toBe(90)
+        expect(getItem(HISTORY_STORAGE_KEY)).toBe(priorHistory)
+
+        render()
+        const warning = credits.toasts.map(({ title, description }) => `${title} ${description}`).join(' ')
+        expect(warning).toMatch(/history/i)
+        expect(warning).toMatch(/not saved|could not (?:be )?saved|failed to save|unable to save/i)
+        expect(warning).not.toMatch(/quota|storage is full/i)
     })
 })
 
