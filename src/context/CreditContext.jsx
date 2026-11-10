@@ -6,6 +6,7 @@ export const CREDIT_STORAGE_KEY = 'gampo_credits'
 export const HISTORY_STORAGE_KEY = 'gampo_history'
 
 const CreditContext = createContext(null)
+const HISTORY_WARNING = 'history-write-failure'
 
 export function readNumber(key, fallback) {
     try {
@@ -40,7 +41,7 @@ function persistCredits(value) {
 }
 
 function persistHistory(history) {
-    writeJson(HISTORY_STORAGE_KEY, history)
+    return writeJson(HISTORY_STORAGE_KEY, history)
 }
 
 
@@ -108,12 +109,13 @@ export function CreditProvider({ children }) {
 
     const showToast = useCallback((type, title, description, duration = 3000) => {
         const id = ++toastIdRef.current
-        // Wave 13: dedupe rapid-fire same-title toasts (e.g. autoplay spin spam)
-        // and cap the visible stack at 3 so the screen never fills with messages.
+        // Keep a session warning ahead of ordinary toasts, without allowing it
+        // to consume the remaining two places when rapid game toasts arrive.
         setToasts(prev => {
+            const warning = prev.find(toast => toast.id === HISTORY_WARNING)
             const sameKey = `${type}|${title}`
-            const filtered = prev.filter(t => `${t.type}|${t.title}` !== sameKey).slice(-2)
-            return [...filtered, { id, type, title, description }]
+            const filtered = prev.filter(toast => toast.id !== HISTORY_WARNING && `${toast.type}|${toast.title}` !== sameKey).slice(warning ? -1 : -2)
+            return [...(warning ? [warning] : []), ...filtered, { id, type, title, description }]
         })
         window.setTimeout(() => {
             setToasts(prev => prev.filter(toast => toast.id !== id))
@@ -125,11 +127,18 @@ export function CreditProvider({ children }) {
             showToast('error', 'Saved credit history unavailable', 'Saved credit history could not be read; it has not been changed.')
         }
     }, [initialHistory, showToast])
+    const warnHistoryIncomplete = useCallback(() => {
+        setToasts(prev => prev.some(toast => toast.id === HISTORY_WARNING) ? prev : [
+            { id: HISTORY_WARNING, kind: HISTORY_WARNING, type: 'error', title: 'History may be incomplete', description: 'Some activity was not saved.' },
+            ...prev.slice(-2),
+        ])
+    }, [])
+
 
     const recordTransaction = useCallback((entry) => {
         const history = readStoredHistory()
         if (history === null) {
-            showToast('error', 'Credit history not saved', 'The balance change was applied, but its history entry was not saved.')
+            warnHistoryIncomplete()
             return
         }
         const next = [{
@@ -139,8 +148,8 @@ export function CreditProvider({ children }) {
         }, ...history].slice(0, 100)
         transactionsRef.current = next
         setTransactions(next)
-        persistHistory(next)
-    }, [readStoredHistory, showToast])
+        if (!persistHistory(next)) warnHistoryIncomplete()
+    }, [readStoredHistory, warnHistoryIncomplete])
 
     // D-1: affordability and the applied delta are decided against the value
     // that is actually stored, never against a tab-local ref. A ref is seeded
