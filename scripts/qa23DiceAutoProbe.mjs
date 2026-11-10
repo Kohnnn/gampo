@@ -24,7 +24,7 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import BetPanel from '/src/components/games/primitives/BetPanel.jsx'
 const root = createRoot(document.querySelector('#root'))
-let props, id = 0, storedBalance = null
+let props, id = 0, storedBalance = null, notifyToast
 const pending = new Map(), attempts = [], receipts = [], completions = [], quotes = []
 const callback = identity => ({betAmount, mode}) => {
   const attempt = {id: ++id, identity, betAmount, mode}; attempts.push(attempt)
@@ -34,9 +34,19 @@ const callback = identity => ({betAmount, mode}) => {
     completions.push(attempt)
     return Promise.resolve(result)
   }
-  return new Promise(resolve => pending.set(id, {attempt, resolve}))
+  return new Promise(resolve => {
+    pending.set(id, {attempt, resolve})
+    if (identity === 'toast-refusal') notifyToast()
+  })
 }
-function render(patch = {}) { props = {...props, ...patch}; flushSync(() => root.render(React.createElement(BetPanel, props))) }
+function Consumer({panelProps}) {
+  const [toasts, setToasts] = React.useState(0)
+  notifyToast = () => setToasts(value => value + 1)
+  return React.createElement(React.Fragment, null,
+    React.createElement('output', {id:'toast-count'}, toasts),
+    React.createElement(BetPanel, panelProps))
+}
+function render(patch = {}) { props = {...props, ...patch}; flushSync(() => root.render(React.createElement(Consumer, {panelProps:props}))) }
 window.consumer = {
   mount(options = {}) { props = {balance:100, initialBet:1, autoIntervalMs:120, autoTimeoutMs:1000, ...options}; props.onPlay = callback(options.identity || 'A'); render() },
   update(options) { if(options.identity) options.onPlay = callback(options.identity); if(options.quote !== undefined) { const q=options.quote; options.ticketStake=({mode,betAmount}) => { quotes.push({q,mode,betAmount}); return q }; delete options.quote }; render(options) },
@@ -99,7 +109,7 @@ try {
     const port = await until(async () => { try { return Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]) } catch { return 0 } }, 'browser debugger')
     const version = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()
     cdp = new Cdp(version.webSocketDebuggerUrl); await cdp.open()
-    for (const name of ['stale-funds', 'funded', 'exhausted', 'pending', 'cadence', 'retry', 'timeout', 'late', 'unmount-pending', 'unmount-cadence', 'unmount-retry', 'ticket', 'cadence-500']) {
+    for (const name of ['stale-cta', 'natural-stop', 'manual-stop', 'stale-funds', 'funded', 'exhausted', 'pending', 'cadence', 'retry', 'timeout', 'late', 'unmount-pending', 'unmount-cadence', 'unmount-retry', 'ticket', 'cadence-500']) {
         const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' })
         const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true })
         const send = (method, params) => cdp.send(method, params, sessionId), errors = [], warnings = []
@@ -136,13 +146,42 @@ try {
         await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] }) // before navigation
         await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false })
         await send('Page.navigate', { url: `${origin}/qa027` }); await until(async () => { assert.deepEqual(errors, []); return evalPage('!!window.consumer') }, 'mounted React consumer')
-        await evalPage(`consumer.mount(${JSON.stringify({ balance: name === 'exhausted' ? 1 : 100, autoIntervalMs: name === 'cadence-500' ? 500 : 120 })})`)
+        await evalPage(`consumer.mount(${JSON.stringify({ balance: name === 'exhausted' ? 1 : 100, autoIntervalMs: name === 'cadence-500' ? 500 : 120, ...(name === 'stale-cta' ? { identity: 'toast-refusal' } : {}) })})`)
         if (name === 'ticket') await evalPage('consumer.update({quote:2})')
         if (name === 'stale-funds') await evalPage('consumer.setStoredBalance(0)')
         await click('.bp-tab:nth-child(2)') // default count 10; Stop/affordability bound each case
+        if (name === 'natural-stop') {
+            await click('.bp-content [id$="-auto-count"]')
+            const selectAll = {key:'a',code:'KeyA',windowsVirtualKeyCode:65,nativeVirtualKeyCode:65,modifiers:2}
+            await send('Input.dispatchKeyEvent', {type:'keyDown', ...selectAll})
+            await send('Input.dispatchKeyEvent', {type:'keyUp', ...selectAll})
+            await send('Input.insertText', {text:'1'})
+            assert.equal(await evalPage(`document.querySelector('.bp-content [id$="-auto-count"]').value`), '1')
+        }
         await send('Emulation.setVirtualTimePolicy', { policy: 'pause' }); await click('.bp-content .bp-play')
         await until(async () => (await snap()).attempts.length === 1, 'first attempt')
-        if (name === 'stale-funds') {
+        if (name === 'stale-cta') {
+            await until(() => evalPage(`document.querySelector('#toast-count').textContent === '1'`), 'toast parent render')
+            assert.match(await evalPage(`document.querySelector('.bp-content .bp-play').textContent`), /Stop Autobet/)
+            await release(1, {kind:'rejected',code:'insufficient-funds',profit:0})
+            await advance(120)
+            assert.match(await evalPage(`document.querySelector('.bp-content .bp-play').textContent`), /Start Autobet/, 'Auto must visibly stop without another parent render')
+            const final = await snap()
+            assert.equal(final.attempts.length, 1)
+            assert.equal(final.receipts.length, 0)
+        } else if (name === 'natural-stop' || name === 'manual-stop') {
+            await until(() => evalPage(`/Stop Autobet/.test(document.querySelector('.bp-content .bp-play').textContent)`), 'Auto start label')
+            if (name === 'manual-stop') {
+                await click('.bp-content .bp-play')
+                await until(() => evalPage(`/Start Autobet/.test(document.querySelector('.bp-content .bp-play').textContent)`), 'manual stop label')
+            }
+            await release(1, commit(-1))
+            await advance(480)
+            assert.match(await evalPage(`document.querySelector('.bp-content .bp-play').textContent`), /Start Autobet/)
+            const final = await snap()
+            assert.equal(final.attempts.length, 1, 'stopping must not start another round')
+            assert.equal(final.receipts.length, 1, 'an accepted round must settle exactly once')
+        } else if (name === 'stale-funds') {
             const refused = await snap()
             assert.equal(refused.attempts.length, 1)
             assert.equal(refused.receipts.length, 0)
@@ -155,7 +194,6 @@ try {
             assert.equal(final.attempts.length, 1, 'Auto must not restart after the balance changes')
             assert.equal(final.receipts.length, 0, 'a refused Auto run must not create a paid round')
             assert.equal(final.storedBalance, 100)
-            await evalPage('consumer.update({})')
             assert.match(await evalPage(`document.querySelector('.bp-content .bp-play').textContent`), /Start Autobet/)
         } else if (name === 'funded' || name === 'exhausted' || name === 'ticket' || name === 'cadence-500') {
             if (name === 'ticket') await evalPage('consumer.update({identity:"B",quote:3})')
