@@ -383,7 +383,7 @@ export function analyzeTicket({ selections = [], stake = 0, mode = BET_MODES.SIN
             { label: 'Stake', value: gc(stake) },
             { label: stakeUnitLabel, value: stakeUnitValue },
             ...(mode === BET_MODES.SYSTEM_2 ? [{ label: '2-leg combos', value: String(ticketQuote.combinations || 0) }] : []),
-            { label: 'Est. return', value: gc(ticketQuote.estimatedPayout) },
+            { label: mode === BET_MODES.SYSTEM_2 ? 'Return if all legs win' : 'Est. return', value: gc(ticketQuote.estimatedPayout) },
             { label: 'EV hint', value: gc(ticketQuote.expectedValue), tone: ticketQuote.expectedValue >= 0 ? 'positive' : 'danger' },
         ],
         insights: [
@@ -402,19 +402,21 @@ export function analyzeTicket({ selections = [], stake = 0, mode = BET_MODES.SIN
                 'ticket-payout',
                 'beginner',
                 'Return is not profit',
-                `The estimated return is ${gc(ticketQuote.estimatedPayout)}. The maximum displayed profit after subtracting stake is about ${gc(profitIfMax)}.`,
+                `The estimated return${mode === BET_MODES.SYSTEM_2 ? ' if all legs win' : ''} is ${gc(ticketQuote.estimatedPayout)}. The maximum displayed profit after subtracting stake is about ${gc(profitIfMax)}.`,
                 'Max profit',
                 gc(profitIfMax),
             ),
             insight(
                 'ticket-break-even',
                 'intermediate',
-                mode === BET_MODES.SINGLES ? 'Singles use per-leg break-even rates' : 'Combined break-even chance',
+                mode === BET_MODES.SINGLES ? 'Singles use per-leg break-even rates' : mode === BET_MODES.SYSTEM_2 ? 'Each pair has its own break-even rate' : 'Combined break-even chance',
                 mode === BET_MODES.SINGLES
                     ? 'For singles, judge each price on its own break-even chance instead of multiplying the whole card.'
-                    : `This combined ticket needs to win about ${formatPercent(breakEven)} to break even before simulator variance.`,
+                    : mode === BET_MODES.SYSTEM_2
+                        ? 'For each two-leg pair, multiply its two prices; 1 divided by that pair’s odds is its break-even chance. That rate applies only to that pair’s stake, not the whole system. The system recovers its total stake only when the sum of winning-pair returns covers it; two winning legs do not guarantee a profit.'
+                        : `This combined ticket needs to win about ${formatPercent(breakEven)} to break even before simulator variance.`,
                 'Break-even',
-                mode === BET_MODES.SINGLES ? 'per leg' : formatPercent(breakEven),
+                mode === BET_MODES.SINGLES ? 'per leg' : mode === BET_MODES.SYSTEM_2 ? 'per pair' : formatPercent(breakEven),
             ),
             ...(mode === BET_MODES.SYSTEM_2 ? [
                 insight(
@@ -429,9 +431,11 @@ export function analyzeTicket({ selections = [], stake = 0, mode = BET_MODES.SIN
             insight(
                 'ticket-model',
                 'advanced',
-                'Model chance versus price',
-                `The simulator model chance is ${formatPercent(modelChance)}. EV is only a teaching signal because feed prices and local settlement are not a real market.`,
-                'Model chance',
+                mode === BET_MODES.SYSTEM_2 ? 'Model all-leg chance versus pair returns' : 'Model chance versus price',
+                mode === BET_MODES.SYSTEM_2
+                    ? `The simulator model all-leg chance is ${formatPercent(modelChance)}, not the chance of any return or of recovering the system stake. EV sums the individual pair expectations and is only a teaching signal because feed prices and local settlement are not a real market.`
+                    : `The simulator model chance is ${formatPercent(modelChance)}. EV is only a teaching signal because feed prices and local settlement are not a real market.`,
+                mode === BET_MODES.SYSTEM_2 ? 'Model all-leg chance' : 'Model chance',
                 formatPercent(modelChance),
                 ticketQuote.expectedValue >= 0 ? 'positive' : 'danger',
             ),
