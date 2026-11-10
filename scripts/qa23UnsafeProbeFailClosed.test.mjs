@@ -92,11 +92,9 @@ for (const name of probes) {
             assert.deepEqual(result.effects, [], 'must not acquire or signal anything')
             assert.ifError(result.unexpected)
             assert.doesNotMatch(result.output, /\b(?:pass(?:ed)?|success(?:ful(?:ly)?)?)\b/i, 'must not claim success')
-            if (mode === 'cli') {
-                assert.ok(Number.isInteger(result.exitCode) && result.exitCode !== 0, 'must exit nonzero')
-                assert.match(result.output, /unavailable/i, 'must say unavailable')
-                assert.match(result.output, /(?:not verified|nothing (?:was|is) verified)/i, 'must say not verified')
-            }
+            assert.equal(result.exitCode, 2, 'must exit with unavailable status')
+            assert.match(result.output, /unavailable/i, 'must say unavailable')
+            assert.match(result.output, /(?:not verified|nothing (?:was|is) verified)/i, 'must say not verified')
             console.log(`PASS ${label}`)
         } catch (error) {
             failures += 1
