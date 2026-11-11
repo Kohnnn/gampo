@@ -36,12 +36,8 @@ async function invoke(args, { redirect = false } = {}) {
         'node:fs': {
             existsSync: () => true,
             mkdtempSync: () => { effects.push('mkdtemp'); return '/fake/profile' },
-            readFileSync: () => '0\n/browser\n',
             rmSync: () => effects.push('rm'),
         },
-        // A deny-all proxy that records rather than listens: the safety harness
-        // asserts the probe never reaches the network, so binding is a no-op.
-        'node:http': { createServer: () => { effects.push('createServer'); return { on: () => {}, once: () => {}, listen: (port, host, ok) => ok && ok(), address: () => ({ port: 9 }), close: () => effects.push('proxy-close') } } },
         'node:os': { tmpdir: () => '/fake' },
         'node:path': { join: (...parts) => parts.join('/') },
     }
