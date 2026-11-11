@@ -32,6 +32,27 @@ function fixture(files) {
     return root
 }
 
+// Regex closing slashes and JSX text must not produce false alarms.
+{
+    const cases = [
+        ['regex then division', 'case.js', 'const re = /=/; const ratio = "4" / 2;'],
+        ['regex-shaped JSX text', 'case.jsx', 'const el = <code>pattern = /"foo"/</code>;'],
+    ]
+    const actual = cases.flatMap(([name, file, source]) => {
+        const root = fixture({ [file]: `${source}\n` })
+        try {
+            return [[], ['--strict']].map(args => {
+                const { code, out } = run(args, root)
+                return [name, args.join(' ') || 'default', code, code === 0 ? 'clean' : out]
+            })
+        } finally {
+            rmSync(root, { recursive: true, force: true })
+        }
+    })
+    assert.deepEqual(actual, cases.flatMap(([name]) =>
+        ['default', '--strict'].map(mode => [name, mode, 0, 'clean'])))
+}
+
 // A quote inside a regex must not hide a subsequent writer, even in strict mode.
 {
     const root = fixture({ 'case.js': 'const re = /foo/;\n' })
