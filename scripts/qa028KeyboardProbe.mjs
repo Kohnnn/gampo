@@ -179,6 +179,13 @@ function record(name, passed, detail) {
     console.log(`  ${passed ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
+// A "did not bet" check is only meaningful on an observed balance. Comparing
+// undefined/null to itself would pass without proving anything, so a missing
+// read is a failure rather than a vacuous success.
+const unchangedWallet = (before, after) =>
+    Number.isFinite(before) && Number.isFinite(after) && before === after
+
+
 async function run() {
     // Keep this unconditional until a reviewed replacement binds a dynamic
     // debugger endpoint to the launched process/profile, blocks every non-loopback
@@ -261,7 +268,7 @@ async function run() {
             const opened = await evaluate(cdp, sessionId, `!!document.querySelector('[role="menu"], .gt-popover')`)
             const balanceA = await evaluate(cdp, sessionId, BALANCE_EXPR)
             record('Space on Game tools opens tools popover', opened)
-            record('Space on Game tools does not start a paid round', balanceA === balance0, `balance ${balance0} -> ${balanceA}`)
+            record('Space on Game tools does not start a paid round', unchangedWallet(balance0, balanceA), `balance ${balance0} -> ${balanceA}`)
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
             await sleep(200)
@@ -280,7 +287,7 @@ async function run() {
             const labelAfter = await evaluate(cdp, sessionId, `[...document.querySelectorAll('button')].find(b => ['Mute','Unmute'].includes(b.getAttribute('aria-label')))?.getAttribute('aria-label')`)
             const balanceB = await evaluate(cdp, sessionId, BALANCE_EXPR)
             record('Space on Mute toggles its label', Boolean(labelBefore) && labelBefore !== labelAfter, `${labelBefore} -> ${labelAfter}`)
-            record('Space on Mute does not bet', balanceB === balance0, `balance ${balance0} -> ${balanceB}`)
+            record('Space on Mute does not bet', unchangedWallet(balance0, balanceB), `balance ${balance0} -> ${balanceB}`)
         } else {
             record('Space on Mute toggles its label', false, 'Mute control not found or not focused')
             record('Space on Mute does not bet', false, 'Mute control not found or not focused')
@@ -369,7 +376,7 @@ async function run() {
             await sleep(300)
             const rpsBalanceChoice = await evaluate(cdp, rpsSession, BALANCE_EXPR)
             const activeAfter = await evaluate(cdp, rpsSession, `document.querySelector('.rps-choice.active')?.textContent.trim() || null`)
-            record('Space on an RPS choice activates the choice without betting', rpsBalanceChoice === rpsBalance0, `balance ${rpsBalance0} -> ${rpsBalanceChoice}`)
+            record('Space on an RPS choice activates the choice without betting', unchangedWallet(rpsBalance0, rpsBalanceChoice), `balance ${rpsBalance0} -> ${rpsBalanceChoice}`)
             // Positive transition: the selection must become the focused choice.
             record('Space on an RPS choice moves the selection to that choice', activeAfter === choice.label, `focused=${choice.label} active ${choice.activeBefore} -> ${activeAfter}`)
         } else {
