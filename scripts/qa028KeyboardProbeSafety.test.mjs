@@ -9,6 +9,21 @@ const source = readFileSync(new URL('./qa028KeyboardProbe.mjs', import.meta.url)
 assert.match(source, /\brun\(\)\s*$/, 'CLI entrypoint must end in run()')
 const entrypoint = source.replace(/\brun\(\)\s*$/, 'await run()')
 
+// The CLI cases below all stop at the unconditional gate, so they never reach
+// the wallet oracle. Check the helper directly: a missing read must FAIL, not
+// compare equal to another missing read.
+const helperSource = source.match(/export const unchangedWallet = [\s\S]*?=== after[\s\S]*?\n/)[0]
+const { unchangedWallet } = await import(
+    `data:text/javascript,${encodeURIComponent(helperSource.replace('export const', 'const') + ';export { unchangedWallet }')}`
+)
+assert.equal(unchangedWallet(null, null), false, 'null/null must not count as unchanged')
+assert.equal(unchangedWallet(undefined, undefined), false, 'undefined/undefined must not count as unchanged')
+assert.equal(unchangedWallet(null, 10), false, 'missing before must not count as unchanged')
+assert.equal(unchangedWallet(10, null), false, 'missing after must not count as unchanged')
+assert.equal(unchangedWallet(10, 10), true, 'equal finite balances are unchanged')
+assert.equal(unchangedWallet(10, 9), false, 'a debit is a change')
+console.log('PASS unchangedWallet rejects unobserved balances')
+
 async function invoke(args, { redirect = false } = {}) {
     const effects = []
     const output = []

@@ -182,7 +182,7 @@ function record(name, passed, detail) {
 // A "did not bet" check is only meaningful on an observed balance. Comparing
 // undefined/null to itself would pass without proving anything, so a missing
 // read is a failure rather than a vacuous success.
-const unchangedWallet = (before, after) =>
+export const unchangedWallet = (before, after) =>
     Number.isFinite(before) && Number.isFinite(after) && before === after
 
 
@@ -328,7 +328,7 @@ async function run() {
             await pressSpace(cdp, sessionId)
             await sleep(600)
             const bd1 = await evaluate(cdp, sessionId, BALANCE_EXPR)
-            record('Space while a dialog is open does not start a paid round', bd0 === bd1, `balance ${bd0} -> ${bd1}`)
+            record('Space while a dialog is open does not start a paid round', unchangedWallet(bd0, bd1), `balance ${bd0} -> ${bd1}`)
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
             await sleep(200)
