@@ -187,7 +187,12 @@ describe('Pump cap quotes no risky next step (QA030 P2 #1)', () => {
             pumpButton(tree).props.onClick()
         }
         tree = render(PumpGame)
-        expect(education(tree).conditionalDecision).toBeNull()
+        // At the cap the only next action is a certain cashout: no risky step is quoted.
+        expect(education(tree).conditionalDecision).toMatchObject({
+            label: 'Cashout',
+            probability: 1,
+            payoutMultiplier: multiplierAt(10),
+        })
         // The capped press is a deterministic cashout, not an 11th risky pump.
         pumpButton(tree).props.onClick()
         expect(fixture.records[0]).toMatchObject({ profit: 13.87, betAmount: 10, multiplier: multiplierAt(10) })
