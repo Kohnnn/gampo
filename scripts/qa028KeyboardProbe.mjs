@@ -4,12 +4,11 @@
  *
  * Source inspection shows the BetPanel key handler gaps (`e.repeat` absent, no
  * dialog guard, key path bypassed `runningRound` for non-ticket games). Source
- * assertions cannot prove a browser outcome, so this runs a real
- * Chromium/CDP session against a served candidate and dispatches NATIVE
- * key events (`Input.dispatchKeyEvent`, which sets `isTrusted` and exercises
- * the browser's own focused-control activation and key-repeat model).
+ * assertions cannot prove a browser outcome. This probe was intended to run a
+ * Chromium/CDP session against a served candidate using NATIVE key events.
+ * It is currently disabled: see the unconditional guard in run().
  *
- * Proves, per issue #30 QA028:
+ * Intended coverage (none currently verified), per issue #30 QA028:
  *   A. Space on the focused Game tools button opens the tools popover and does
  *      NOT start a paid round (balance unchanged, no history entry).
  *   B. Space on a focused Mute toggle toggles mute and does NOT bet.
@@ -40,12 +39,37 @@ function argValue(name, fallback) {
 }
 
 const CHROME_CANDIDATES = [
+    argValue('chrome', null),
+    process.env.CHROME_BIN,
+    process.env.GAMPO_CHROMIUM,
     process.env.QA028_CHROME,
     '/home/compute_01/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome',
     '/home/compute_01/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome',
+    '/home/compute_01/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome',
     '/usr/bin/google-chrome',
     '/usr/bin/chromium',
 ].filter(Boolean)
+
+const MANDATORY_ASSERTIONS = [
+    'welcome modal is dismissed before scenarios',
+    'Game tools button is focusable',
+    'Space on Game tools opens tools popover',
+    'Space on Game tools does not start a paid round',
+    'Mute button is focusable',
+    'Space on Mute toggles its label',
+    'Space on Mute does not bet',
+    'playfield region is focusable',
+    'a single Space start commits exactly one round; held repeats are ignored',
+    'Hotkey help dialog opens',
+    'Space while a dialog is open does not start a paid round',
+    'playfield Space shortcut still starts a round',
+    'RPS choices region mounted',
+    'RPS choice button is focusable',
+    'Space on an RPS choice activates the choice without betting',
+    'Space on an RPS choice leaves a choice selected',
+    'RPS Play button is focusable',
+    'Space on the focused RPS Play button starts exactly one round',
+]
 
 function findBrowser() {
     return CHROME_CANDIDATES.find(p => existsSync(p)) || null
@@ -156,6 +180,14 @@ function record(name, passed, detail) {
 }
 
 async function run() {
+    // Keep this unconditional until a reviewed replacement binds a dynamic
+    // debugger endpoint to the launched process/profile, blocks every non-loopback
+    // request (including redirects and other targets) before navigation, and
+    // verifies no paid action using persisted balance and round/history evidence.
+    console.error('qa028: DISABLED — debugger ownership, loopback-only network containment, and persisted no-paid-action evidence are not established')
+    console.error('qa028: nothing was verified; all keyboard scenarios (A–F) are unavailable')
+    process.exit(2)
+
     const baseUrl = argValue('baseUrl', 'http://127.0.0.1:5180').replace(/\/$/, '')
     try {
         const res = await fetch(baseUrl, { signal: AbortSignal.timeout(8000) })
@@ -233,10 +265,14 @@ async function run() {
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
             await sleep(200)
+        } else {
+            record('Space on Game tools opens tools popover', false, 'Game tools button not focused')
+            record('Space on Game tools does not start a paid round', false, 'Game tools button not focused')
         }
 
         // --- B. Mute toggle: Space toggles, no bet ---
-        const mute = await focusByLabel(cdp, sessionId, 'Mute')
+        const mute = (await focusByLabel(cdp, sessionId, 'Mute')) || (await focusByLabel(cdp, sessionId, 'Unmute'))
+        record('Mute button is focusable', Boolean(mute && mute.focused), JSON.stringify(mute))
         if (mute?.focused) {
             const labelBefore = await evaluate(cdp, sessionId, `[...document.querySelectorAll('button')].find(b => ['Mute','Unmute'].includes(b.getAttribute('aria-label')))?.getAttribute('aria-label')`)
             await pressSpace(cdp, sessionId)
@@ -246,7 +282,8 @@ async function run() {
             record('Space on Mute toggles its label', Boolean(labelBefore) && labelBefore !== labelAfter, `${labelBefore} -> ${labelAfter}`)
             record('Space on Mute does not bet', balanceB === balance0, `balance ${balance0} -> ${balanceB}`)
         } else {
-            console.log('  SKIP  Mute control not found by aria-label "Mute" (mute may be labeled differently on this build)')
+            record('Space on Mute toggles its label', false, 'Mute control not found or not focused')
+            record('Space on Mute does not bet', false, 'Mute control not found or not focused')
         }
 
         // --- D. Held/repeat Space must not bet twice ---
@@ -267,6 +304,8 @@ async function run() {
             const rowsAfter = await evaluate(cdp, sessionId, `document.querySelectorAll('.hd-row').length`)
             record('a single Space start commits exactly one round; held repeats are ignored',
                 rowsAfter === rowsBefore + 1, `history rows ${rowsBefore} -> ${rowsAfter}`)
+        } else {
+            record('a single Space start commits exactly one round; held repeats are ignored', false, 'playfield not focused')
         }
 
         // --- E. Dialog open: Space must not bet ---
@@ -286,6 +325,8 @@ async function run() {
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
             await sleep(200)
+        } else {
+            record('Space while a dialog is open does not start a paid round', false, 'Hotkey help dialog did not open')
         }
 
         // --- F. Intentional playfield shortcut still works ---
@@ -300,7 +341,9 @@ async function run() {
         const { targetId: rpsTarget } = await cdp.send('Target.createTarget', { url: `${baseUrl}/rps` })
         const { sessionId: rpsSession } = await cdp.send('Target.attachToTarget', { targetId: rpsTarget, flatten: true })
         await cdp.send('Runtime.enable', {}, rpsSession)
-        await waitFor(cdp, rpsSession, `document.readyState === 'complete' && !!document.querySelector('.rps-choices')`, 45000)
+        const rpsReady = await waitFor(cdp, rpsSession, `document.readyState === 'complete' && !!document.querySelector('.rps-choices')`, 45000)
+        record('RPS choices region mounted', rpsReady)
+        if (!rpsReady) throw new Error('rps choices never mounted')
         await evaluate(cdp, rpsSession, `(() => { const b = document.querySelector('.welcome-close, [aria-label="Close welcome"]'); if (b) b.click(); return true })()`)
         await sleep(300)
         const rpsBalance0 = await evaluate(cdp, rpsSession, BALANCE_EXPR)
@@ -310,6 +353,7 @@ async function run() {
             el.focus()
             return { label: el.textContent.trim(), focused: document.activeElement === el, active: el.classList.contains('active') }
         })()`)
+        record('RPS choice button is focusable', Boolean(choice?.focused), JSON.stringify(choice))
         if (choice?.focused) {
             await pressSpace(cdp, rpsSession)
             await sleep(300)
@@ -317,6 +361,9 @@ async function run() {
             const stillActive = await evaluate(cdp, rpsSession, `document.querySelector('.rps-choice.active')?.textContent.trim()`)
             record('Space on an RPS choice activates the choice without betting', rpsBalanceChoice === rpsBalance0, `balance ${rpsBalance0} -> ${rpsBalanceChoice}`)
             record('Space on an RPS choice leaves a choice selected', Boolean(stillActive), `active=${stillActive}`)
+        } else {
+            record('Space on an RPS choice activates the choice without betting', false, 'RPS choice button not focused')
+            record('Space on an RPS choice leaves a choice selected', false, 'RPS choice button not focused')
         }
         const rpsPlay = await evaluate(cdp, rpsSession, `(() => {
             const el = [...document.querySelectorAll('button')].find(b => /Play/i.test(b.getAttribute('aria-label') || '') || /^(Play|Play Round)$/.test((b.textContent || '').trim()))
@@ -324,6 +371,7 @@ async function run() {
             el.focus()
             return { label: (el.getAttribute('aria-label') || el.textContent).trim(), focused: document.activeElement === el }
         })()`)
+        record('RPS Play button is focusable', Boolean(rpsPlay?.focused), JSON.stringify(rpsPlay))
         if (rpsPlay?.focused) {
             const rowsBefore = await evaluate(cdp, rpsSession, `document.querySelectorAll('.hd-row').length`)
             await pressSpace(cdp, rpsSession)
@@ -332,12 +380,18 @@ async function run() {
             record('Space on the focused RPS Play button starts exactly one round',
                 rowsAfter === rowsBefore + 1, `history rows ${rowsBefore} -> ${rowsAfter}`)
         } else {
-            console.log('  SKIP  RPS Play button not found')
+            record('Space on the focused RPS Play button starts exactly one round', false, 'RPS Play button not found or not focused')
         }
 
+        const recordedNames = new Set(results.map(r => r.name))
+        for (const requiredName of MANDATORY_ASSERTIONS) {
+            if (!recordedNames.has(requiredName)) {
+                record(requiredName, false, 'mandatory assertion was not executed')
+            }
+        }
         const failed = results.filter(r => !r.passed)
-        console.log(`\nqa028: ${results.length - failed.length}/${results.length} passed`)
-        exitCode = failed.length ? 1 : 0
+        console.log(`\nqa028: ${results.length - failed.length}/${results.length} passed (${MANDATORY_ASSERTIONS.length} mandatory)`)
+        exitCode = (failed.length || results.length < MANDATORY_ASSERTIONS.length) ? 1 : 0
     } catch (error) {
         console.error(`qa028: ${error.message}`)
         exitCode = 2

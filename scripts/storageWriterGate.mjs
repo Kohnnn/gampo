@@ -68,6 +68,36 @@ function stripComments(source) {
     let out = ''
     let i = 0
     const n = source.length
+    const templateDepths = []
+    let braceDepth = 0
+
+    const scanString = (quote) => {
+        out += ' '
+        i += 1
+        while (i < n) {
+            const d = source[i]
+            if (d === '\\') {
+                out += ' '
+                out += source[i + 1] === '\n' ? '\n' : ' '
+                i += 2
+                continue
+            }
+            if (quote === '`' && d === '$' && source[i + 1] === '{') {
+                out += '  '
+                i += 2
+                templateDepths.push(braceDepth)
+                return
+            }
+            if (d === quote) {
+                out += ' '
+                i += 1
+                return
+            }
+            out += d === '\n' ? '\n' : ' '
+            i += 1
+        }
+    }
+
     while (i < n) {
         const c = source[i]
         const next = source[i + 1]
@@ -86,17 +116,22 @@ function stripComments(source) {
             continue
         }
         if (c === '"' || c === "'" || c === '`') {
-            const quote = c
-            out += ' '
-            i += 1
-            while (i < n) {
-                const d = source[i]
-                if (d === '\\') { out += source[i] === '\n' ? '\n' : ' '; out += ' '; i += 2; continue }
-                if (d === quote) { out += ' '; i += 1; break }
-                out += d === '\n' ? '\n' : ' '
-                i += 1
-            }
+            scanString(c)
             continue
+        }
+        if (c === '{') {
+            braceDepth += 1
+            out += c
+            i += 1
+            continue
+        }
+        if (c === '}' && templateDepths.length > 0 && braceDepth === templateDepths[templateDepths.length - 1]) {
+            templateDepths.pop()
+            scanString('`')
+            continue
+        }
+        if (c === '}' && braceDepth > 0) {
+            braceDepth -= 1
         }
         out += c
         i += 1

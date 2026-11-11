@@ -41,8 +41,9 @@ const log = (...a) => console.error('[durability]', ...a)
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 
 function resolveBrowser() {
-    if (process.env.GAMPO_CHROMIUM) return process.env.GAMPO_CHROMIUM
-    const roots = [process.env.PLAYWRIGHT_BROWSERS_PATH, join(homedir(), '.cache', 'ms-playwright')].filter(Boolean)
+    if (process.env.CHROME_BIN && existsSync(process.env.CHROME_BIN)) return process.env.CHROME_BIN
+    if (process.env.GAMPO_CHROMIUM && existsSync(process.env.GAMPO_CHROMIUM)) return process.env.GAMPO_CHROMIUM
+    const roots = [process.env.PLAYWRIGHT_BROWSERS_PATH, join(homedir(), '.cache', 'ms-playwright'), '/home/compute_01/.cache/ms-playwright'].filter(Boolean)
     for (const root of roots) {
         if (!existsSync(root)) continue
         const dirs = readdirSync(root).filter(d => /^chromium-\d+$/.test(d)).sort().reverse()
@@ -53,7 +54,7 @@ function resolveBrowser() {
             }
         }
     }
-    throw new Error('No Chromium found. Set GAMPO_CHROMIUM to the browser binary.')
+    throw new Error('No Chromium found. Set CHROME_BIN or GAMPO_CHROMIUM to the browser binary.')
 }
 
 function identity(bundleBytes) {
@@ -325,14 +326,31 @@ async function main() {
     const by = p => report.arms.find(a => a.arm.startsWith(p))
     const A = by('A'), B = by('B'), C = by('C'), D = by('D')
 
-    // Assert the WHOLE committed record, not just the wallet. A dropped round or
-    // final write must fail this gate, and an orphaned aborted round must too.
-    const committedRecord = (state, roundId, exitKind) => {
+    // Assert the WHOLE committed record, not just the wallet. A dropped operation,
+    // round, final or meta write must fail this gate, and an orphaned aborted
+    // round must too.
+    const committedRecord = (state, { opId, roundId, exitKind, sequence, revision, balanceAfter, nextSequence }) => {
+        const ops = (state?.operations ?? []).map(r => JSON.parse(r))
         const rounds = (state?.rounds ?? []).map(r => JSON.parse(r))
         const finals = (state?.finals ?? []).map(r => JSON.parse(r))
-        return rounds.some(r => r.id === roundId && r.exitKind === exitKind)
-            && finals.some(r => r.roundId === roundId && r.exitKind === exitKind)
+        const op = ops.find(o => o.id === opId && o.roundId === roundId)
+        const round = rounds.find(r => r.id === roundId && r.exitKind === exitKind && r.status === exitKind)
+        const final = finals.find(f => f.roundId === roundId && f.exitKind === exitKind)
+        return Boolean(op && round && final)
+            && op.sequence === sequence
+            && op.revision === revision
+            && op.result?.kind === 'committed'
+            && op.result?.milestone === 'settled-result'
+            && op.result?.sequence === sequence
+            && op.result?.revision === revision
+            && op.result?.value?.balanceAfter === balanceAfter
+            && round.revision === revision
+            && final.createdAt === sequence
+            && final.requestBytes === op.requestBytes
+            && final.result?.value?.balanceAfter === balanceAfter
+            && (nextSequence === undefined || state?.meta?.nextSequence === nextSequence)
     }
+    const sameSnapshot = (left, right) => Boolean(left && right) && JSON.stringify(left) === JSON.stringify(right)
     const nothingForRound = (state, roundId) => {
         const rounds = (state?.rounds ?? []).map(r => JSON.parse(r))
         const finals = (state?.finals ?? []).map(r => JSON.parse(r))
@@ -342,24 +360,52 @@ async function main() {
             && !ops.some(o => o.roundId === roundId)
     }
 
+    const op1Spec = {
+        opId: 'e1\u0000op-durable',
+        roundId: 'e1:round:op-durable',
+        exitKind: 'cashout',
+        sequence: 0,
+        revision: 1,
+        balanceAfter: 1150,
+        nextSequence: 1,
+    }
+    const op2Spec = {
+        opId: 'e1\u0000op-durable-2',
+        roundId: 'e1:round:op-durable-2',
+        exitKind: 'win',
+        sequence: 1,
+        revision: 2,
+        balanceAfter: 1220,
+        nextSequence: 2,
+    }
+
     report.conclusion = {
         committedBeforeRestart: A?.first.committed.kind === 'committed' && A?.first.committed.balanceAfter === 1150,
         abortedBeforeRestart: A?.first.aborted.kind === 'aborted' && A?.first.aborted.code === 'transaction-error',
-        committedRecordComplete: committedRecord(A?.state, 'e1:round:op-durable', 'cashout'),
+        committedRecordComplete: A?.state.wallet?.balance === 1150
+            && A?.state.wallet?.revision === 1
+            && committedRecord(A?.state, op1Spec),
         abortedLeavesNothing: nothingForRound(A?.state, 'e1:round:op-aborted'),
-        survivesReload: B?.state.wallet?.balance === 1150 && committedRecord(B?.state, 'e1:round:op-durable', 'cashout'),
-        survivesProcessKill: C?.state.wallet?.balance === 1150 && committedRecord(C?.state, 'e1:round:op-durable', 'cashout'),
+        survivesReload: B?.state.wallet?.balance === 1150
+            && committedRecord(B?.state, op1Spec)
+            && sameSnapshot(A?.state, B?.state),
+        survivesProcessKill: C?.state.wallet?.balance === 1150
+            && committedRecord(C?.state, op1Spec)
+            && sameSnapshot(A?.state, C?.state),
         noResurrectedAbort: nothingForRound(C?.state, 'e1:round:op-aborted'),
         secondCommitDurable: D?.second.kind === 'committed'
             && D.second.balanceAfter === 1220
             && D?.state.wallet?.balance === 1220
-            && committedRecord(D?.state, 'e1:round:op-durable-2', 'win')
-            && committedRecord(D?.state, 'e1:round:op-durable', 'cashout'),
+            && D?.state.wallet?.revision === 2
+            && D?.state.meta?.nextSequence === 2
+            && D?.state.meta?.writerSessionId === 'durability-2'
+            && committedRecord(D?.state, op2Spec)
+            && committedRecord(D?.state, { ...op1Spec, nextSequence: 2 }),
         // The second commit uses a new id, so this proves the fresh operation was
         // not silently replayed from a stale cache - not that an id replays
         // idempotently across a restart. Replay-across-restart is unproven here.
         freshOperationAfterRestart: D?.second.replay === false,
-        interpretation: 'Real Chromium, real IndexedDB, real profile directory. A committed settlement - wallet, operation, round and retained final - survives ordinary reload and a SIGKILLed browser process relaunched on the same profile; a transaction aborted after every write queued leaves no operation, round or final behind. Owner decision 9 scope: current stable desktop Chromium, reload and browser restart only. NOT power loss, NOT OS crash, NOT cross-device sync, NOT quota exhaustion, NOT a second engine. NOT idempotent replay of a pre-restart operation.',
+        interpretation: 'Real Chromium, real IndexedDB, real profile directory. A committed settlement - wallet, operation, round, retained final and metadata sequence - survives ordinary reload and a SIGKILLed browser process relaunched on the same profile; a transaction aborted after every write queued leaves no operation, round or final behind. Owner decision 9 scope: current stable desktop Chromium, reload and browser restart only. NOT power loss, NOT OS crash, NOT cross-device sync, NOT quota exhaustion, NOT a second engine. NOT idempotent replay of a pre-restart operation.',
     }
 
     const text = JSON.stringify(report, null, 2)

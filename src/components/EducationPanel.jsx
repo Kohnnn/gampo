@@ -98,9 +98,11 @@ function EducationPanel({
             </div>
             {rtpNote && <p className="education-note">{rtpNote}</p>}
             {conditionalDecision && <p className="education-note">
-                {settled ? 'Round settled. Start a new round for the next decision.' : decision.cashoutMultiplier != null
-                    ? 'Conditional on reaching this point: compare the next action with cashing out now. A failure returns 0 GC.'
-                    : 'First action after starting: success returns the amount shown; failure returns 0 GC. EV is relative to the round stake.'}
+                {settled ? 'Round settled. Start a new round for the next decision.' : decision.probability === 1
+                    ? 'The next action is guaranteed to return the amount shown.'
+                    : decision.cashoutMultiplier != null
+                        ? 'Conditional on reaching this point: compare the next action with cashing out now. A failure returns 0 GC.'
+                        : 'First action after starting: success returns the amount shown; failure returns 0 GC. EV is relative to the round stake.'}
             </p>}
 
             <div className="education-note">

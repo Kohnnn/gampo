@@ -4,6 +4,7 @@
 // of "Unavailable".
 import { describe, expect, it } from 'vitest'
 import { BIN_PAYOUTS } from './engine/constants'
+import { plinkoReturn } from './PlinkoGame'
 import { binProbabilities, binomialWeights, PLINKO_BALLS, plinkoRtp, plinkoRtpTable, plinkoSettlementRtp, plinkoSettlements } from './plinkoRtp'
 
 describe('Plinko bin distribution', () => {
@@ -146,6 +147,31 @@ describe('Plinko settlement RTP at a real stake', () => {
         expect(quote.settlementRtp).toBeCloseTo(expectedReturn / quote.cost, 10)
         expect(quote.expectedProfitGc).toBeCloseTo(expectedReturn - quote.cost, 10)
     })
+    it('agrees with production plinkoReturn on win/push/loss at a fractional-cent stake (QA007)', () => {
+        // 0.015 GC, Basic, 8 rows low. Production subtracts the *unrounded*
+        // 0.015 cost, so rounding it first (0.02) would misclassify bins 2-6.
+        const stake = 0.015
+        const rows = plinkoSettlements({ rows: 8, risk: 'low', betAmount: stake, ballId: 'normal' })
+        const quote = plinkoSettlementRtp({ rows: 8, risk: 'low', betAmount: stake, ballId: 'normal' })
+        expect(quote.cost).toBe(stake)
+        for (const row of rows) {
+            const settled = plinkoReturn(stake, row.multiplier, stake)
+            expect(row.returnAmount).toBe(settled.returnAmount)
+            expect(row.profit).toBe(settled.profit)
+            expect(Math.sign(row.profit)).toBe(Math.sign(settled.profit))
+        }
+        // round2(0.015 * 0.5) = 0.01, i.e. 0.005 under the 0.015 cost: rounded
+        // to -0, a push rather than the -0.005 a naive quote would show.
+        expect(rows[4].profit).toBe(0)
+        expect(quote.pushChance).toBeCloseTo(70 / 256, 12)
+        // Every other bin credits 0.02+ against a 0.015 cost, so only the centre
+        // bin is not a win: 1.1x and 1.0x become wins at this stake.
+        expect(quote.settlementWinChance).toBeCloseTo(186 / 256, 12)
+        const expectedReturn = (2 * 0.08 + 2 * 8 * 0.03 + 2 * 28 * 0.02 + 2 * 56 * 0.02 + 70 * 0.01) / 256
+        expect(quote.expectedReturnGc).toBeCloseTo(expectedReturn, 12)
+        expect(quote.settlementRtp).toBeCloseTo(expectedReturn / stake, 12)
+    })
+
 
     it('refuses an unquotable settlement', () => {
         expect(plinkoSettlementRtp({ rows: 8, risk: 'low', betAmount: 0 })).toBeNull()

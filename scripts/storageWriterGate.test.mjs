@@ -63,6 +63,8 @@ function fixture(files) {
         ['token inside a string', "const s='https://h/localStorage.setItem(x)'", 0],
         ['trailing comment', "localStorage.setItem('a','b') // localStorage.clear()", 1],
         ['template literal', 'const t=`x ${1} localStorage.clear()`', 0],
+        ['interpolated writer', 'const t=`prefix ${localStorage.setItem("k", "v")} localStorage.clear()`', 1],
+        ['nested interpolation writer', 'const t=`a ${{ k: `b ${localStorage.removeItem("k")}` }.k} localStorage.setItem("x","y")`', 1],
         ['escaped quote', "const s='it\\'s // local'\nlocalStorage.setItem('k','v')", 1],
     ]
     const root = mkdtempSync(join(tmpdir(), 'storage-writer-gate-strip-'))

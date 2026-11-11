@@ -500,13 +500,14 @@ describe('Actual Cases controls and visible preparation slot', () => {
         const stage = visit => find(visit, node => node.type === 'div'
             && String(node.props.className || '').startsWith('cases-stage '))
         const summaryBlocks = visit => allNodes(visit).filter(node =>
-            String(node.props?.className || '').includes('cases-settlement'))
+            String(node.props?.className || '').split(' ').includes('cases-round-summary'))
         const runRound = visit => {
             desktop(visit).props.onClick(); visit.render()
             for (let i = 0; i < 40 && !String(stage(visit).props.className).includes('has-result'); i++) {
                 vi.advanceTimersByTime(500); visit.render()
             }
             expect(stage(visit).props.className, 'round settled with a visible result').toContain('has-result')
+            expect(summaryBlocks(visit), 'settlement summary must exist before selection').toHaveLength(1)
         }
         const paths = {
             'direct case click': visit => {
@@ -533,16 +534,19 @@ describe('Actual Cases controls and visible preparation slot', () => {
                 h.params = new URLSearchParams({ caseId: normalized.find(value => value.id !== first).id })
                 visit.render()
             },
+            'manifest auto-selection after replay': async visit => {
+                fetch.mockResolvedValueOnce(response(realCatalog.filter(value => value.id !== visit.value.props.aside.props.activeCase.id)))
+                visit.replay(); await settle(visit)
+            },
         }
         for (const [label, act] of Object.entries(paths)) {
-            h.params = new URLSearchParams()
             fetch.mockResolvedValueOnce(response(realCatalog))
             const visit = mount(CasesGame); await settle(visit)
             const before = visit.value.props.aside.props.activeCase.id
             runRound(visit)
             const creditsAtSettle = h.env.credits.addWinnings.mock.calls.length
             h.env.credits.placeBet.mockClear()
-            act(visit)
+            await act(visit)
             expect(visit.value.props.aside.props.activeCase.id, `${label}: selection changed`).not.toBe(before)
             expect(stage(visit).props.className, `${label}: stale result stage cleared`).not.toContain('has-result')
             expect(summaryBlocks(visit).length, `${label}: stale summary cleared`).toBe(0)
@@ -551,5 +555,38 @@ describe('Actual Cases controls and visible preparation slot', () => {
                 .toBe(creditsAtSettle)
             visit.cleanup()
         }
+    })
+
+    it('reopens a usable case browser after settlement without a reload (QA038)', async () => {
+        fetch.mockResolvedValueOnce(response(realCatalog))
+        const visit = mount(CasesGame); await settle(visit)
+        const stage = () => find(visit, node => node.type === 'div'
+            && String(node.props.className || '').startsWith('cases-stage '))
+        const toggle = () => allNodes(visit).find(node => node.type === 'button'
+            && String(node.props.className || '').includes('cases-browser-toggle'))
+        const cards = () => allNodes(visit).filter(node => node.type === 'button'
+            && String(node.props.className || '').includes('cases-case-card'))
+        const chips = () => allNodes(visit).filter(node => node.type === 'button'
+            && String(node.props.className || '').includes('cases-category-chip'))
+        desktop(visit).props.onClick(); visit.render()
+        for (let i = 0; i < 40 && !String(stage().props.className).includes('has-result'); i++) {
+            vi.advanceTimersByTime(500); visit.render()
+        }
+        expect(stage().props.className, 'settled before reopening the browser').toContain('has-result')
+        expect(toggle().props['aria-expanded'], 'browser collapsed by the open').toBe(false)
+        for (const round of [1, 2]) {
+            toggle().props.onClick(); visit.render()
+            expect(toggle().props['aria-expanded'], `round ${round}: expanded`).toBe(true)
+            expect(cards().length, `round ${round}: case cards rendered`).toBeGreaterThan(0)
+            expect(chips().length, `round ${round}: category chips rendered`).toBeGreaterThan(0)
+            for (const control of [...cards(), ...chips()]) {
+                expect(control.type, `round ${round}: native button`).toBe('button')
+                expect(control.props.disabled, `round ${round}: reachable after settle`).toBe(false)
+            }
+            toggle().props.onClick(); visit.render()
+            expect(toggle().props['aria-expanded'], `round ${round}: collapsed again`).toBe(false)
+            expect(cards().length, `round ${round}: cards removed while hidden`).toBe(0)
+        }
+        visit.cleanup()
     })
 })

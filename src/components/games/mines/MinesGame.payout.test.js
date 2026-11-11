@@ -2,7 +2,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ states: [], cursor: 0, play: null, cashout: null, tree: null, timers: [], record: vi.fn(), credit: vi.fn() }))
+const fixture = vi.hoisted(() => ({ states: [], cursor: 0, play: null, cashout: null, panel: null, tree: null, timers: [], record: vi.fn(), credit: vi.fn() }))
 vi.mock('react', async importOriginal => ({
     ...await importOriginal(),
     useState: initial => {
@@ -26,7 +26,7 @@ vi.mock('../primitives', () => {
         ROUND_EVENTS: {}, useRoundMachine: () => ({ start: () => {}, finish: () => {} }), getBigWinThreshold: () => 5,
         useGameSession: () => ({ record: fixture.record, history: [], stats: { lastResults: [] } }),
         GameShell: ({ panel, children }) => React.createElement(React.Fragment, null, panel, children),
-        BetPanel: props => { fixture.play = props.onPlay; fixture.cashout = props.onPlayPhaseAction; return props.children },
+        BetPanel: props => { fixture.play = props.onPlay; fixture.cashout = props.onPlayPhaseAction; fixture.panel = props.children; return props.children },
         CoreStageFrame: ({ children }) => { fixture.tree = children; return children },
         MultiplierBadge: ({ label, value }) => React.createElement('output', { 'aria-label': label }, value),
         BigWinOverlay: Empty, HistoryDrawer: Empty, RecentResultsStrip: Empty, StatsOverlay: Empty, ResultToast: Empty, ActionLockOverlay: Empty, SimBetStrip: Empty,
@@ -44,6 +44,12 @@ function cells(node = fixture.tree) {
     if (node.type === 'button' && node.props['aria-label']) return [node]
     return React.Children.toArray(node.props.children).flatMap(child => cells(child))
 }
+function bombButtons(node = fixture.panel) {
+    if (Array.isArray(node)) return node.flatMap(child => bombButtons(child))
+    if (!React.isValidElement(node)) return []
+    if (node.type === 'button' && typeof node.props.children === 'number') return [node]
+    return React.Children.toArray(node.props.children).flatMap(child => bombButtons(child))
+}
 function reveal(index) {
     cells()[index].props.onClick()
     return render()
@@ -51,7 +57,8 @@ function reveal(index) {
 const expectNoNextPick = html => {
     expect(html).not.toContain('aria-label="Next pick"')
     expect(html).not.toContain('Infinity')
-    expect(html).toContain('<span>Next pick</span><strong>—</strong>')
+    expect(html).not.toContain('NaN')
+    expect(html).toContain('<span>Next pick</span><strong>No next pick</strong>')
 }
 
 beforeEach(() => { fixture.states = []; fixture.cursor = 0; fixture.timers = []; vi.clearAllMocks() })
@@ -87,5 +94,25 @@ describe('Mines next-pick availability', () => {
         expect(fixture.credit).toHaveBeenCalledTimes(1)
         expect(fixture.record).toHaveBeenCalledTimes(1)
         expect(fixture.record).toHaveBeenCalledWith(expect.objectContaining({ multiplier: 2277 }))
+    })
+
+    it('never displays Infinity or stale multipliers when changing to 24 bombs after a 3-bomb cashout (QA010)', async () => {
+        render()
+        await fixture.play({ betAmount: 5 })
+        render()
+        reveal(3)
+        reveal(4)
+        fixture.cashout()
+        const cashedHtml = render()
+        expectNoNextPick(cashedHtml)
+        expect(cashedHtml).toContain('<span>Current</span><strong>1.29×</strong>')
+
+        const bomb24 = bombButtons().find(btn => btn.props.children === 24)
+        bomb24.props.onClick()
+        const after24Html = render()
+        expectNoNextPick(after24Html)
+        expect(after24Html).toContain('Bombs (24)')
+        expect(after24Html).toContain('<span>Current</span><strong>1.00×</strong>')
+        expect(after24Html).toContain('<output aria-label="Current">1</output>')
     })
 })
