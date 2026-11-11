@@ -66,7 +66,7 @@ const MANDATORY_ASSERTIONS = [
     'RPS choices region mounted',
     'RPS choice button is focusable',
     'Space on an RPS choice activates the choice without betting',
-    'Space on an RPS choice leaves a choice selected',
+    'Space on an RPS choice moves the selection to that choice',
     'RPS Play button is focusable',
     'Space on the focused RPS Play button starts exactly one round',
 ]
@@ -347,23 +347,34 @@ async function run() {
         await evaluate(cdp, rpsSession, `(() => { const b = document.querySelector('.welcome-close, [aria-label="Close welcome"]'); if (b) b.click(); return true })()`)
         await sleep(300)
         const rpsBalance0 = await evaluate(cdp, rpsSession, BALANCE_EXPR)
+        // E3: focus a choice that is NOT the current selection, so the positive
+        // assertion is "the selection moved to it" rather than "some choice
+        // remains selected" — the latter passes even if Space does nothing.
         const choice = await evaluate(cdp, rpsSession, `(() => {
-            const el = document.querySelector('.rps-choice')
-            if (!el) return null
+            const all = [...document.querySelectorAll('.rps-choice')]
+            if (!all.length) return null
+            const activeBefore = document.querySelector('.rps-choice.active')?.textContent.trim() || null
+            const el = all.find(c => c.textContent.trim() !== activeBefore) || all[0]
             el.focus()
-            return { label: el.textContent.trim(), focused: document.activeElement === el, active: el.classList.contains('active') }
+            return {
+                label: el.textContent.trim(),
+                activeBefore,
+                focused: document.activeElement === el,
+                active: el.classList.contains('active'),
+            }
         })()`)
         record('RPS choice button is focusable', Boolean(choice?.focused), JSON.stringify(choice))
         if (choice?.focused) {
             await pressSpace(cdp, rpsSession)
             await sleep(300)
             const rpsBalanceChoice = await evaluate(cdp, rpsSession, BALANCE_EXPR)
-            const stillActive = await evaluate(cdp, rpsSession, `document.querySelector('.rps-choice.active')?.textContent.trim()`)
+            const activeAfter = await evaluate(cdp, rpsSession, `document.querySelector('.rps-choice.active')?.textContent.trim() || null`)
             record('Space on an RPS choice activates the choice without betting', rpsBalanceChoice === rpsBalance0, `balance ${rpsBalance0} -> ${rpsBalanceChoice}`)
-            record('Space on an RPS choice leaves a choice selected', Boolean(stillActive), `active=${stillActive}`)
+            // Positive transition: the selection must become the focused choice.
+            record('Space on an RPS choice moves the selection to that choice', activeAfter === choice.label, `focused=${choice.label} active ${choice.activeBefore} -> ${activeAfter}`)
         } else {
             record('Space on an RPS choice activates the choice without betting', false, 'RPS choice button not focused')
-            record('Space on an RPS choice leaves a choice selected', false, 'RPS choice button not focused')
+            record('Space on an RPS choice moves the selection to that choice', false, 'RPS choice button not focused')
         }
         const rpsPlay = await evaluate(cdp, rpsSession, `(() => {
             const el = [...document.querySelectorAll('button')].find(b => /Play/i.test(b.getAttribute('aria-label') || '') || /^(Play|Play Round)$/.test((b.textContent || '').trim()))
