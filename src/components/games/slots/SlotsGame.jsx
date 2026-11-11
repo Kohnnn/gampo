@@ -479,6 +479,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     // during the 220ms gap would silently drop it and wedge autoplay (pending
     // stuck true, effect early-returns forever). This timer is only cleared on
     // stopAutoplay / reset / unmount.
+    const autoplayTimerRef = useRef(null)
+    const stopsRef = useRef(advancedStops)
+    const buyTierIdRef = useRef(null)
+    const persistentMultiplierRef = useRef(0)
     const reelFrameRef = useRef(null)
     const stageRef = useRef(null)
     const fullscreenReturnRef = useRef(null)
