@@ -57,19 +57,25 @@ function collectFiles(dir, acc = []) {
  * A regex cannot do this correctly: `//` inside `'https://…'` is not a comment,
  * and a writer-shaped token inside a string is not a writer. An earlier version
  * used `/\/\*…|(^|[^:])//…/` and miscounted both. This is a small scanner rather
- * than a dependency; it does not need to be a full JS parser, only to never
- * invent or hide a call site.
+ * than a dependency; it is not a full JS parser.
  *
- * Regex literals are not special-cased: a `/…/` containing an unbalanced quote
- * could desynchronise the scanner, but a false count there is caught by the
- * baseline diff instead of passing silently.
+ * ponytail: this is not a parser. Regex/division uses expression-start tokens
+ * inside interpolations; only empty JSX elements are recognized there. Other
+ * JSX interpolation shapes fail closed. Use a parser for complete lexing.
  */
 function stripComments(source) {
     let out = ''
     let i = 0
     const n = source.length
     const templateDepths = []
+    const parens = []
     let braceDepth = 0
+    let previousToken = ''
+
+    // `let` is a contextual keyword and may be a value in sloppy CJS.
+    const canStartRegex = () => previousToken === ''
+        || (previousToken.length === 1 && '([{=,:;!?&|+*%~^<>-'.includes(previousToken))
+        || /^(return|throw|case|delete|void|typeof|instanceof|in|for-of|yield|await|new|const|var)$/.test(previousToken)
 
     const scanString = (quote) => {
         out += ' '
@@ -86,11 +92,13 @@ function stripComments(source) {
                 out += '  '
                 i += 2
                 templateDepths.push(braceDepth)
+                previousToken = '{'
                 return
             }
             if (d === quote) {
                 out += ' '
                 i += 1
+                previousToken = 'value'
                 return
             }
             out += d === '\n' ? '\n' : ' '
@@ -115,12 +123,82 @@ function stripComments(source) {
             if (i < n) { out += '  '; i += 2 }
             continue
         }
+        if (c === '<' && next === '<' && templateDepths.length > 0) {
+            out += '<<'
+            i += 2
+            previousToken = '<'
+            continue
+        }
+        if (c === '<' && templateDepths.length > 0 && canStartRegex() && /[a-zA-Z_$>]/.test(next ?? '')) {
+            // Only skip empty JSX; anything more complex needs a real JSX parser.
+            const empty = source.slice(i).match(/^<(?:([a-zA-Z_$][\w$.-]*)\s*\/\s*>|([a-zA-Z_$][\w$.-]*)\s*>\s*<\/\2\s*>|>\s*<\/>)/)
+            if (!empty) throw new SyntaxError('cannot safely scan JSX in template interpolation')
+            out += ' '.repeat(empty[0].length)
+            i += empty[0].length
+            previousToken = 'value'
+            continue
+        }
+        // ponytail: reject quoted regex candidates after `=`; use a parser to
+        // distinguish regex, division and JSX in every other context.
+        if (c === '/' && templateDepths.length === 0 && previousToken === '=') {
+            let end = i + 1
+            let inClass = false
+            let hasQuote = false
+            while (end < n && source[end] !== '\n' && source[end] !== '\r') {
+                if (source[end] === '"' || source[end] === "'" || source[end] === '`') hasQuote = true
+                if (source[end] === '\\') {
+                    if (source[end + 1] === '"' || source[end + 1] === "'" || source[end + 1] === '`') hasQuote = true
+                    end += 2
+                    continue
+                }
+                if (source[end] === '[') inClass = true
+                else if (source[end] === ']') inClass = false
+                else if (source[end] === '/' && !inClass) break
+                end += 1
+            }
+            if (hasQuote && end < n && source[end] === '/') {
+                throw new SyntaxError('cannot safely scan a quoted regex outside template interpolation')
+            }
+        }
+        if (c === '/' && templateDepths.length > 0 && canStartRegex()) {
+            let end = i + 1
+            let inClass = false
+            while (end < n && source[end] !== '\n' && source[end] !== '\r') {
+                if (source[end] === '\\') { end += 2; continue }
+                if (source[end] === '[') inClass = true
+                else if (source[end] === ']') inClass = false
+                else if (source[end] === '/' && !inClass) break
+                end += 1
+            }
+            if (end < n && source[end] === '/') {
+                out += ' '.repeat(end - i + 1)
+                i = end + 1
+                previousToken = 'value'
+                continue
+            }
+        }
+        if (/[a-zA-Z_$]/.test(c)) {
+            const start = i
+            while (i < n && /[\w$]/.test(source[i])) i += 1
+            const word = source.slice(start, i)
+            out += word
+            previousToken = previousToken === '.' ? 'value'
+                : word === 'of' ? (canStartRegex() ? 'value' : 'for-of') : word
+            continue
+        }
+        if ((c === '+' || c === '-') && next === c) {
+            previousToken = canStartRegex() ? c : 'value'
+            out += c + c
+            i += 2
+            continue
+        }
         if (c === '"' || c === "'" || c === '`') {
             scanString(c)
             continue
         }
         if (c === '{') {
             braceDepth += 1
+            previousToken = c
             out += c
             i += 1
             continue
@@ -133,6 +211,14 @@ function stripComments(source) {
         if (c === '}' && braceDepth > 0) {
             braceDepth -= 1
         }
+        if (templateDepths.length > 0 && c === '(') parens.push(/^(if|for|while|with|switch|catch)$/.test(previousToken))
+        else if (templateDepths.length > 0 && c === ')' && parens.pop()) {
+            previousToken = ';'
+            out += c
+            i += 1
+            continue
+        }
+        if (!/\s/.test(c)) previousToken = /[0-9]/.test(c) ? 'value' : c
         out += c
         i += 1
     }
@@ -144,7 +230,12 @@ export function countWriterSites(files, root = process.cwd()) {
     for (const file of files) {
         const rel = relative(root, file).split('\\').join('/')
         if (rel === WRAPPER || /\.test\./.test(rel)) continue
-        const source = stripComments(readFileSync(file, 'utf8'))
+        let source
+        try {
+            source = stripComments(readFileSync(file, 'utf8'))
+        } catch (error) {
+            throw new Error(`${rel}: ${error.message}`, { cause: error })
+        }
         const hits = source.match(WRITE_RE)
         if (!hits) continue
         // Reset lastIndex: WRITE_RE is global and reused across files.
@@ -185,7 +276,13 @@ function main() {
         process.exit(2)
     }
 
-    const counts = countWriterSites(files)
+    let counts
+    try {
+        counts = countWriterSites(files)
+    } catch (error) {
+        console.error(`storage-writer-gate: ${error.message} — nothing was verified`)
+        process.exit(2)
+    }
 
     if (update) {
         const ordered = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)))
