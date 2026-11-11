@@ -26,6 +26,12 @@ describe('CasesGame timer lifecycle', () => {
     })
 })
 
+// QA041: a settled result belongs to the case it came from. Every path that
+// changes `caseId` used to update the selection only, leaving the previous
+// case's drops rendered under a newly selected case. `results` is otherwise
+// cleared only when a *new* opening starts, so each selection path must clear
+// the result surfaces itself. Behavioural proof lives in
+// CasesGame.manifest.test.jsx (QA041 describe).
 describe('CasesGame settle rounding is handled at source', () => {
     it('rounds totalReturn and profit inside summarizeCaseSettlement', () => {
         const anim = readFileSync(new URL('./casesAnimation.js', import.meta.url), 'utf8')

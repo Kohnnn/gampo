@@ -13,6 +13,27 @@ import { Play, Pause, ChevronsRight, Settings, Sliders, RotateCcw } from 'lucide
 import { formatCredits } from '../../../utils/simulationMath'
 import { withTimeout } from '../../../utils/scheduling'
 import { claimEscape } from '../../../utils/escapeClaims'
+import { accountAutoRound } from './autoAccounting'
+import { isOpenDialogPresent } from './HotkeyHelp'
+
+// QA028: a shortcut may only start or change a paid action when the keystroke is
+// a genuine, unheld press aimed at the page itself. Extracted from the effect so
+// the guard can be pinned by a test without mounting a DOM.
+export function shouldHandleShortcut(event, { dialogOpen = false } = {}) {
+    if (!event) return false
+    if (event.ctrlKey || event.metaKey || event.altKey) return false
+    // A held/repeating key must not fire a second paid action.
+    if (event.repeat) return false
+    const tag = (event.target?.tagName || '').toLowerCase()
+    // A focused interactive control owns Space natively (Game tools, Mute,
+    // choices, dialog buttons). Never start a paid round from it.
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a') return false
+    if (event.target?.isContentEditable) return false
+    // While a dialog is open its controls own Space; the panel must not start a
+    // paid round underneath it.
+    if (dialogOpen) return false
+    return true
+}
 
 const TABS = ['manual', 'auto', 'strategy']
 
@@ -72,6 +93,7 @@ export default function BetPanel({
     const panelRef = useRef(null)
     const [betAmount, setBetAmount] = useState(initialBet)
     // Auto state
+    const [autoActive, setAutoActive] = useState(false)
     const [autoCount, setAutoCount] = useState(10)
     const [autoInfinite, setAutoInfinite] = useState(false)
     const [autoBetAmount, setAutoBetAmount] = useState(null)
@@ -100,6 +122,7 @@ export default function BetPanel({
     }, [effectiveBetAmount, onStakeChange])
 
     const autoRunning = useRef(false)
+    const autoRunId = useRef(0)
     const autoLeft = useRef(0)
     const autoBaseBet = useRef(initialBet)
     const sessionProfit = useRef(0)
@@ -123,7 +146,9 @@ export default function BetPanel({
     }, [lastBet, maxBet, minBet])
 
     const stopAuto = useCallback(() => {
+        autoRunId.current += 1
         autoRunning.current = false
+        setAutoActive(false)
         autoLeft.current = 0
         sessionProfit.current = 0
         setAutoBetAmount(null)
@@ -135,7 +160,9 @@ export default function BetPanel({
             if (onPlayPhaseAction) await onPlayPhaseAction()
             return
         }
-        if (hasTicketStake && !(tab === 'auto' && autoRunning.current) && (!ticketIsFunded || runningRound)) return
+        // A locked round blocks a fresh paid start for every game, not only the
+        // ticket games. The Auto loop is the one caller allowed through.
+        if (!(tab === 'auto' && autoRunning.current) && (runningRound || (hasTicketStake && !ticketIsFunded))) return
         if (tab === 'manual') {
             if (!onPlay) return
             await onPlay({ betAmount: effectiveBetAmount, mode: 'manual' })
@@ -151,20 +178,21 @@ export default function BetPanel({
             stopAuto()
             return
         }
+        const runId = ++autoRunId.current
         autoRunning.current = true
+        setAutoActive(true)
         autoLeft.current = autoInfinite ? Infinity : Math.max(1, Number(autoCount) || 1)
         autoBaseBet.current = effectiveBetAmount
         sessionProfit.current = 0
+        // One reconciliation state for the whole loop. Only a `committed`
+        // round counts and moves session profit; a refusal must not consume
+        // the configured count or trip a stop threshold.
+        let autoState = { rounds: 0, refusals: 0, sessionProfit: 0, lastProfit: 0, lastKind: null, limitProfit: Number(stopProfit), limitLoss: Number(stopLoss), limitBigWin: Number(stopBigWin) }
         if (hasTicketStake) setAutoBetAmount(effectiveBetAmount)
         let currentBet = effectiveBetAmount
-        const limitProfit = Number(stopProfit)
-        const limitLoss = Number(stopLoss)
-        const limitBigWin = Number(stopBigWin)
         while (autoRunning.current && autoLeft.current > 0) {
-            // Table eligibility follows the same complete ticket as its quote.
-            const livePlay = hasTicketStake ? latestAutoPlay.current.onPlay : onPlay
-            const liveTicketStake = hasTicketStake ? latestAutoPlay.current.ticketStake : ticketStake
-            const liveBalance = hasTicketStake ? latestAutoPlay.current.balance : balance
+            // Every consumer must use the latest callback and affordability.
+            const { onPlay: livePlay, ticketStake: liveTicketStake, balance: liveBalance } = latestAutoPlay.current
             const charge = typeof liveTicketStake === 'function'
                 ? liveTicketStake({ mode: 'auto', betAmount: currentBet })
                 : hasTicketStake ? liveTicketStake : currentBet
@@ -179,20 +207,33 @@ export default function BetPanel({
                 Promise.resolve(livePlay({ betAmount: currentBet, mode: 'auto' })),
                 autoTimeoutMs,
             )
+            if (runId !== autoRunId.current) return
             if (raced.timedOut) {
                 // eslint-disable-next-line no-console
                 console.warn('[BetPanel] autoplay round timed out after', autoTimeoutMs, 'ms')
                 stopAuto()
                 break
             }
-            const result = raced.value || {}
-            const profit = Number(result?.profit) || 0
-            sessionProfit.current += profit
-            // stop conditions
-            if (Number.isFinite(limitProfit) && limitProfit > 0 && sessionProfit.current >= limitProfit) { stopAuto(); break }
-            if (Number.isFinite(limitLoss) && limitLoss > 0 && sessionProfit.current <= -limitLoss) { stopAuto(); break }
-            if (Number.isFinite(limitBigWin) && limitBigWin > 0 && profit >= limitBigWin) { stopAuto(); break }
-            // bet adjust
+            // Reconcile through the shared six-kind contract. A refused round
+            // (insufficient funds, in-round, gate-closed) resolves a
+            // non-`committed` kind and must neither consume the count nor move
+            // session profit — `{profit:0}` alone is ambiguous.
+            const step = accountAutoRound(autoState, raced.value)
+            autoState = step.state
+            // The destructured `sessionProfit` is a NUMBER; the ref of the same
+            // name is what the shell reads. Shadowing them made this line assign
+            // a property on a primitive and throw on every resolved Auto round.
+            const { lastKind, lastProfit: profit, sessionProfit: sessionProfitNow } = autoState
+            sessionProfit.current = sessionProfitNow
+            if (step.stop) { stopAuto(); break }
+            if (!step.accepted) {
+                // Retry temporary refusals; terminal refusals stop without consuming a round.
+                if (raced.value?.stopAuto === true || raced.value?.code === 'insufficient-funds' || lastKind === 'unknown' || lastKind === 'aborted') { stopAuto(); break }
+                await new Promise(res => setTimeout(res, autoIntervalMs))
+                if (runId !== autoRunId.current) return
+                continue
+            }
+            // bet adjust on the accepted result only
             if (profit > 0) {
                 if (onWinReset) currentBet = autoBaseBet.current
                 else if (onWinPct) currentBet = Math.max(minBet, Number((currentBet * (1 + onWinPct / 100)).toFixed(2)))
@@ -207,12 +248,15 @@ export default function BetPanel({
             // drop in a continuous shower. Default 120 keeps every other game
             // feeling snappy.
             await new Promise(res => setTimeout(res, autoIntervalMs))
+            if (runId !== autoRunId.current) return
         }
+        if (runId !== autoRunId.current) return
         autoRunning.current = false
+        setAutoActive(false)
         if (hasTicketStake) setAutoBetAmount(null)
     }, [tab, onPlay, effectiveBetAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs, ticketStake, hasTicketStake, ticketIsFunded, runningRound])
 
-    useEffect(() => () => { autoRunning.current = false }, [])
+    useEffect(() => () => { autoRunId.current += 1; autoRunning.current = false }, [])
 
     useEffect(() => {
         setPortalRoot(document.body)
@@ -265,10 +309,7 @@ export default function BetPanel({
     // (ctrl/cmd/alt) are held, and when an auto round is in progress to keep things safe.
     useEffect(() => {
         const onKey = (e) => {
-            if (e.ctrlKey || e.metaKey || e.altKey) return
-            const tag = (e.target?.tagName || '').toLowerCase()
-            if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a') return
-            if (e.target?.isContentEditable) return
+            if (!shouldHandleShortcut(e, { dialogOpen: isOpenDialogPresent() })) return
             switch (e.key) {
                 case ' ': // Space: play / stop autobet / in-round CTA
                     e.preventDefault()
@@ -316,7 +357,7 @@ export default function BetPanel({
         return () => window.removeEventListener('keydown', onKey)
     }, [handlePlay, stopAuto, lastBet, rebet, half, double, maxBet, minBet])
 
-    const isAutoLive = tab === 'auto' && autoRunning.current
+    const isAutoLive = tab === 'auto' && autoActive
     const inRound = playPhase === 'in-round'
     const playButtonLabel = (() => {
         if (inRound) return playLabel || 'Continue'

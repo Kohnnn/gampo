@@ -45,8 +45,9 @@ const GRID = 25
 const HOUSE_EDGE = 0.01
 
 // Multiplier after k safe picks given m bombs (no edge); we apply (1 - edge) at output.
-function multiplierFor(picks, bombs) {
+export function multiplierFor(picks, bombs) {
     if (picks <= 0) return 1
+    if (!Number.isFinite(bombs) || bombs < 1 || bombs >= GRID || picks > GRID - bombs) return null
     let m = 1
     for (let i = 0; i < picks; i++) {
         m *= (GRID - i) / (GRID - bombs - i)
@@ -80,6 +81,7 @@ export default function MinesGame() {
     const [revealed, setRevealed] = useState([])
     const [stake, setStake] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
+    const [settledMult, setSettledMult] = useState(null)
     const [burstKey, setBurstKey] = useState(0)
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
@@ -96,12 +98,26 @@ export default function MinesGame() {
     // machine's `finish` for bust/cashout and start with an empty event list.
     const machine = useRoundMachine({})
 
-    const picks = revealed.length
-    const currentMult = useMemo(() => multiplierFor(picks, bombs), [picks, bombs])
     const inRound = phase === 'playing'
+    const picks = inRound ? revealed.length : 0
+    const currentMult = useMemo(() => {
+        if (inRound) return multiplierFor(picks, bombs) ?? 1
+        if (phase === 'cashed' && Number.isFinite(settledMult)) return settledMult
+        if (phase === 'busted') return 0
+        return 1
+    }, [inRound, phase, picks, bombs, settledMult])
     const nextMult = inRound && picks < GRID - bombs ? multiplierFor(picks + 1, bombs) : null
     const minesBgmMode = inRound && currentMult >= 3 ? 'bonus' : 'idle'
     useGameBgm('mines', minesBgmMode)
+
+    const changeBombs = useCallback((nextBombs) => {
+        if (inRound) return
+        setBombs(nextBombs)
+        setRevealed([])
+        setBombSet(null)
+        setSettledMult(null)
+        if (phase !== 'idle') setPhase('idle')
+    }, [inRound, phase])
 
     const performPlay = ({ betAmount, mode }) => new Promise(resolve => {
         if (inRound) { resolve({ profit: 0 }); return }
@@ -112,6 +128,7 @@ export default function MinesGame() {
         const nextBombSet = placeBombs(bombs)
         setBombSet(nextBombSet)
         setRevealed([])
+        setSettledMult(null)
         setPhase('playing')
         setToast(null)
         playSound('click')
@@ -155,6 +172,7 @@ export default function MinesGame() {
                     setToast({ kind: 'lose', amount: -betAmount, message: 'Mines auto bust' })
                     machine.finish({ won: false, profit: -betAmount, picks: picked.length, hit })
                     pushSimResult({ bombs, outcome: 'auto-bust' })
+                    setSettledMult(0)
                     setPhase('busted')
                     schedule(() => {
                         setPhase('idle')
@@ -180,6 +198,7 @@ export default function MinesGame() {
                 setToast({ kind: 'cashout', amount: profit, multiplier: m, message: 'Mines auto cashout' })
                 machine.finish({ won: true, profit, multiplier: m, picks: picked.length })
                 pushSimResult({ bombs, outcome: 'auto-cashout' })
+                setSettledMult(m)
                 setPhase('cashed')
                 schedule(() => {
                     setPhase('idle')
@@ -218,6 +237,7 @@ export default function MinesGame() {
             setToast({ kind: 'lose', amount: -stake, message: 'Mines bust' })
             machine.finish({ won: false, profit: -stake, picks: next.length, hit: idx })
             pushSimResult({ bombs, outcome: 'bust' })
+            setSettledMult(0)
             setPhase('busted')
             schedule(() => setPhase('idle'), 1100)
             return
@@ -257,6 +277,7 @@ export default function MinesGame() {
         setToast({ kind: 'cashout', amount: profit, multiplier: m, message: 'Mines cashed out' })
         machine.finish({ won: true, profit, multiplier: m, picks: list.length })
         pushSimResult({ bombs, outcome: 'cashout' })
+        setSettledMult(m)
         setPhase('cashed')
         schedule(() => setPhase('idle'), 1100)
     }, [revealed, inRound, bombs, stake, addWinnings, playSound, sfx, session, showToast, machine, schedule])
@@ -304,10 +325,10 @@ export default function MinesGame() {
                 >
                     <div className="bp-section">
                         <label className="bp-label" htmlFor="mines-bomb-count">Bombs ({bombs})</label>
-                        <input id="mines-bomb-count" type="range" min="1" max="24" value={bombs} disabled={inRound} onChange={e => setBombs(Number(e.target.value))} className="dice-slider" />
+                        <input id="mines-bomb-count" type="range" min="1" max="24" value={bombs} disabled={inRound} onChange={e => changeBombs(Number(e.target.value))} className="dice-slider" />
                         <div className="bp-quick-actions">
                             {[1, 3, 5, 10, 24].map(b => (
-                                <button key={b} onClick={() => !inRound && setBombs(b)}>{b}</button>
+                                <button key={b} onClick={() => changeBombs(b)}>{b}</button>
                             ))}
                         </div>
                     </div>
@@ -317,7 +338,7 @@ export default function MinesGame() {
                     </div>
                     <div className="bp-bal-line">
                         <span>Next pick</span>
-                        <strong>{nextMult === null ? '—' : `${nextMult.toFixed(2)}×`}</strong>
+                        <strong>{nextMult === null ? 'No next pick' : `${nextMult.toFixed(2)}×`}</strong>
                     </div>
                 </BetPanel>
             }

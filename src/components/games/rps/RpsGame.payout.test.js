@@ -36,23 +36,23 @@ async function play(roll, betAmount = 7) {
 
 describe('RPS public settlement receipts', () => {
     it('returns the stake on a push and records its gross 1x multiplier', async () => {
-        expect(await play(0)).toEqual({ profit: 0 })
+        expect(await play(0)).toEqual(expect.objectContaining({ kind: 'committed', profit: 0, outcome: 'push', multiplier: 1 }))
         expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(7, 'RPS return')
         expect(fixture.record).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ label: 'Push', profit: 0, betAmount: 7, multiplier: 1 }))
     })
 
     it('keeps the existing win and loss payouts and gross multipliers', async () => {
-        expect(await play(0.9)).toEqual({ profit: 6.37 })
+        expect(await play(0.9)).toEqual(expect.objectContaining({ kind: 'committed', profit: 6.37, outcome: 'win' }))
         expect(fixture.credit).toHaveBeenLastCalledWith(13.37, 'RPS return')
         expect(fixture.record).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'Win', multiplier: 1.91, profit: 6.37 }))
         fixture.credit.mockClear()
-        expect(await play(0.5)).toEqual({ profit: -7 })
+        expect(await play(0.5)).toEqual(expect.objectContaining({ kind: 'committed', profit: -7, outcome: 'loss' }))
         expect(fixture.credit).not.toHaveBeenCalled()
         expect(fixture.record).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'Miss', multiplier: 0, profit: -7 }))
     })
 
     it('rounds the production payout for a fractional stake', async () => {
-        expect(await play(0.9, 0.01)).toEqual({ profit: 0.01 })
+        expect(await play(0.9, 0.01)).toEqual(expect.objectContaining({ kind: 'committed', profit: 0.01, outcome: 'win' }))
         expect(fixture.credit).toHaveBeenCalledWith(0.02, 'RPS return')
     })
 

@@ -32,4 +32,15 @@ describe('roulette native betting targets', () => {
             expect(html).toMatch(new RegExp(`<button[^>]*aria-label="${label}"[^>]*aria-pressed="false"`))
         }
     })
+
+    // QA020: the mobile dock quotes the live ticket total and the desktop rail
+    // names the active chip, so the total stays attributable when the dock is
+    // collapsed. Both read the same `bets` array, so add/remove/clear move both.
+    it('quotes the ticket total and names the active chip denomination', () => {
+        const html = renderToStaticMarkup(<RouletteGame />)
+        expect(html).toContain('Ticket stake')
+        expect(html).toContain('No active chips')
+        expect(html).toContain('rou-chip active')
+        expect(html).toContain('Chip Value')
+    })
 })

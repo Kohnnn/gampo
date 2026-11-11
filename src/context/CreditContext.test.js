@@ -1,7 +1,25 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { CreditProvider, CREDIT_STORAGE_KEY, HISTORY_STORAGE_KEY, INITIAL_CREDITS, commitPreparedCreditTransactions, prepareCreditTransactions, readNumber, useCredits } from './CreditContext'
+
+const observedRender = vi.hoisted(() => ({ states: null, cursor: 0 }))
+vi.mock('react', async original => {
+    const react = await original()
+    return {
+        ...react,
+        useState(initial) {
+            if (!observedRender.states) return react.useState(initial)
+            const index = observedRender.cursor++
+            if (!(index in observedRender.states)) {
+                observedRender.states[index] = typeof initial === 'function' ? initial() : initial
+            }
+            return [observedRender.states[index], value => {
+                observedRender.states[index] = typeof value === 'function' ? value(observedRender.states[index]) : value
+            }]
+        },
+    }
+})
 
 beforeEach(() => {
     const store = new Map()
@@ -10,6 +28,11 @@ beforeEach(() => {
         setItem: (key, value) => { store.set(key, String(value)) },
         removeItem: (key) => { store.delete(key) },
     }
+})
+
+afterEach(() => {
+    observedRender.states = null
+    vi.unstubAllGlobals()
 })
 
 function creditConsumer(initialBalance) {
@@ -22,6 +45,19 @@ function creditConsumer(initialBalance) {
     renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
     return credits
 }
+
+// Mounts a provider against whatever localStorage currently holds, without
+// seeding. Two calls model two documents that both mounted before either wrote.
+function mountConsumer() {
+    let credits
+    function Consumer() {
+        credits = useCredits()
+        return null
+    }
+    renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+    return credits
+}
+
 
 const storedBalance = () => Number(localStorage.getItem(CREDIT_STORAGE_KEY))
 const storedHistory = () => JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]')
@@ -140,5 +176,321 @@ describe('CreditContext storage reads', () => {
     it('preserves a stored zero balance', () => {
         globalThis.localStorage.setItem('stored-zero', '0')
         expect(readNumber('stored-zero', INITIAL_CREDITS)).toBe(0)
+    })
+})
+
+describe('D-1 credit lost update', () => {
+    it('rejects a stake that exceeds the stored balance even when the tab-local ref is stale', () => {
+        // Both documents mount while storage says 1000, so each holds its own
+        // balanceRef of 1000. Tab A commits 600. Tab B's ref is now stale; an
+        // affordability check against the ref would accept a second 600 and
+        // publish 400 over the correct 400 -> 1200 staked against 1000 funded.
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabB = mountConsumer()
+        const tabA = mountConsumer()
+
+        expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(400)
+
+        expect(tabB.placeBet(600, 'Plinko')).toBe(false)
+        expect(storedBalance()).toBe(400)
+    })
+
+    it('applies a win against the stored balance, not a stale tab-local ref', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabB = mountConsumer()
+        const tabA = mountConsumer()
+
+        expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+        tabB.addWinnings(50, 'Plinko')
+        expect(storedBalance()).toBe(450)
+    })
+
+    it('keeps repeated same-tab stakes correct without a second document', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tab = mountConsumer()
+        expect(tab.placeBet(600, 'Plinko')).toBe(true)
+        expect(tab.placeBet(600, 'Plinko')).toBe(false)
+        expect(tab.placeBet(400, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(0)
+    })
+})
+
+describe('D-1 cross-document history', () => {
+    it('keeps a peer document committed entry in the stored ledger', () => {
+        // Both documents mount with an empty history. Tab A commits a debit and
+        // its entry reaches storage. Tab B then commits its own debit. Building
+        // the stored list from B's ref would overwrite A's committed entry, so
+        // the ledger no longer accounts for the balance beside it.
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabB = mountConsumer()
+        const tabA = mountConsumer()
+
+        expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+        expect(tabB.placeBet(400, 'Plinko')).toBe(true)
+
+        const ledger = storedHistory()
+        expect(storedBalance()).toBe(0)
+        expect(ledger.reduce((sum, entry) => sum + entry.amount, 0)).toBe(-1000)
+        expect(ledger.map(entry => entry.amount).sort((a, b) => a - b)).toEqual([-600, -400])
+    })
+})
+
+describe('D-1 history read failure', () => {
+    it('keeps a single marked history warning after accepted activity encounters a read failure and storage recovers', () => {
+        const timers = []
+        vi.stubGlobal('window', { setTimeout: callback => { timers.push(callback); return timers.length } })
+        localStorage.setItem(CREDIT_STORAGE_KEY, '100')
+        const priorHistory = JSON.stringify([{ id: 'prior', timestamp: '2026-01-01T00:00:00.000Z', type: 'bet', label: 'Prior', amount: -5, balance: 100 }])
+        localStorage.setItem(HISTORY_STORAGE_KEY, priorHistory)
+        const getItem = localStorage.getItem
+        let denyHistoryReads = false
+        localStorage.getItem = key => {
+            if (key === HISTORY_STORAGE_KEY && denyHistoryReads) throw new Error('history unavailable')
+            return getItem(key)
+        }
+
+        observedRender.states = []
+        let credits
+        function Consumer() { credits = useCredits(); return null }
+        const render = () => {
+            observedRender.cursor = 0
+            renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+        }
+        const warnings = () => credits.toasts.filter(toast => toast.kind === 'history-write-failure')
+        render()
+        denyHistoryReads = true
+        expect(credits.placeBet(10, 'Accepted debit')).toBe(true)
+        expect(credits.placeBet(5, 'Another debit')).toBe(true)
+        expect(storedBalance()).toBe(85)
+        expect(getItem(HISTORY_STORAGE_KEY)).toBe(priorHistory)
+        render()
+        expect(warnings()).toHaveLength(1)
+        expect(`${warnings()[0].title} ${warnings()[0].description}`).toMatch(/history.*incomplete/i)
+
+        denyHistoryReads = false
+        expect(credits.placeBet(5, 'Later debit')).toBe(true)
+        expect(storedBalance()).toBe(80)
+        expect(storedHistory().map(({ label }) => label)).toEqual(['Later debit', 'Prior'])
+        for (const title of ['One', 'Two', 'Three', 'Four']) credits.showToast('bet', title, 'ordinary activity')
+        for (const callback of timers) callback()
+        render()
+        expect(warnings()).toHaveLength(1)
+        expect(credits.toasts.length).toBeLessThanOrEqual(3)
+    })
+
+    it('preserves stored history, warns, and rejects transactional preparation when a history read fails', () => {
+        vi.stubGlobal('window', { setTimeout: () => 0 })
+        localStorage.setItem(CREDIT_STORAGE_KEY, '100')
+        const priorHistory = JSON.stringify([{ id: 'prior', timestamp: '2026-01-01T00:00:00.000Z', type: 'bet', label: 'Prior', amount: -5, balance: 100 }])
+        localStorage.setItem(HISTORY_STORAGE_KEY, priorHistory)
+        const getItem = localStorage.getItem
+        let denyHistoryReads = false
+        localStorage.getItem = key => {
+            if (key === HISTORY_STORAGE_KEY && denyHistoryReads) throw new Error('history unavailable')
+            return getItem(key)
+        }
+
+        observedRender.states = []
+        let credits
+        function Consumer() { credits = useCredits(); return null }
+        const render = () => {
+            observedRender.cursor = 0
+            renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+        }
+        render()
+        denyHistoryReads = true
+        expect(credits.placeBet(10, 'Accepted debit')).toBe(true)
+        expect(storedBalance()).toBe(90)
+        expect(getItem(HISTORY_STORAGE_KEY)).toBe(priorHistory)
+
+        let committed = false
+        const result = credits.placeBetTransactional(5, 'Ticket', 'ticket:debit', () => { committed = true; return { ok: true } })
+        expect(result).toMatchObject({ ok: false })
+        expect(committed).toBe(false)
+        expect(storedBalance()).toBe(90)
+        expect(getItem(HISTORY_STORAGE_KEY)).toBe(priorHistory)
+
+        render()
+        const warning = credits.toasts.map(({ title, description }) => `${title} ${description}`).join(' ')
+        expect(warning).toMatch(/history/i)
+        expect(warning).toMatch(/not saved|could not (?:be )?saved|failed to save|unable to save/i)
+        expect(warning).not.toMatch(/quota|storage is full/i)
+    })
+})
+
+describe('D-1 storage write failure', () => {
+    it('keeps a history-incomplete warning after a non-quota write failure and later successful activity', () => {
+        const timers = []
+        vi.stubGlobal('window', { setTimeout: callback => { timers.push(callback); return timers.length } })
+        localStorage.setItem(CREDIT_STORAGE_KEY, '100')
+        const setItem = localStorage.setItem
+        let failHistory = true
+        localStorage.setItem = (key, value) => {
+            if (key === HISTORY_STORAGE_KEY && failHistory) {
+                failHistory = false
+                throw new Error('storage unavailable')
+            }
+            setItem(key, value)
+        }
+
+        observedRender.states = []
+        let credits
+        function Consumer() { credits = useCredits(); return null }
+        const render = () => {
+            observedRender.cursor = 0
+            renderToStaticMarkup(createElement(CreditProvider, null, createElement(Consumer)))
+        }
+        const warning = () => credits.toasts.find(({ title, description }) => /history/i.test(`${title} ${description}`) && /incomplete/i.test(`${title} ${description}`))
+        render()
+        expect(credits.placeBet(10, 'Accepted debit')).toBe(true)
+        expect(storedBalance()).toBe(90)
+        expect(localStorage.getItem(HISTORY_STORAGE_KEY)).toBeNull()
+        render()
+        expect(warning()).toBeTruthy()
+        expect(warning()).toMatchObject({ kind: 'history-write-failure' })
+
+        expect(credits.placeBet(5, 'Later debit')).toBe(true)
+        expect(storedBalance()).toBe(85)
+        expect(storedHistory().map(({ label }) => label)).toEqual(['Later debit'])
+        for (const title of ['One', 'Two', 'Three', 'Four']) credits.showToast('bet', title, 'ordinary activity')
+        render()
+        expect(warning()).toBeTruthy()
+        expect(credits.toasts.length).toBeLessThanOrEqual(3)
+        for (const callback of timers) callback()
+        render()
+        expect(warning()).toBeTruthy()
+    })
+
+    it('does not resurrect a debit whose credits write was refused', () => {
+        // Storage is full: the credits write is refused, so the stored value
+        // cannot advance. Reading it back on the next stake would re-offer the
+        // balance already spent and charge the stake twice, so a refused write
+        // must fall back to the in-memory ref for the rest of the session.
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tab = mountConsumer()
+        localStorage.setItem = () => { throw new Error('quota exceeded') }
+
+        expect(tab.placeBet(600, 'Plinko')).toBe(true)
+        expect(tab.placeBet(600, 'Plinko')).toBe(false)
+        expect(tab.placeBet(400, 'Plinko')).toBe(true)
+    })
+})
+
+describe('D-1 successive writes keep peer reads', () => {
+    it('keeps reading peer balances after this document has written', () => {
+        // A successful write must NOT latch the document into ref-only mode.
+        // If it did, A would ignore B's committed stake and double-spend.
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabA = mountConsumer()
+        const tabB = mountConsumer()
+
+        expect(tabA.placeBet(100, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(900)
+        expect(tabB.placeBet(200, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(700)
+        // A writes again; storage still holds the truth, so A must see 700.
+        expect(tabA.placeBet(800, 'Plinko')).toBe(false)
+        expect(tabA.placeBet(700, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(0)
+    })
+
+    it('recovers peer reads in the same document once a refused write succeeds', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tab = mountConsumer()
+        const restore = localStorage.setItem
+        localStorage.setItem = () => { throw new Error('quota exceeded') }
+        expect(tab.placeBet(100, 'Plinko')).toBe(true)
+        localStorage.setItem = restore
+        tab.addWinnings(50, 'Plinko')
+        expect(storedBalance()).toBe(950)
+
+        // The refused write had latched this document onto its own ref (900).
+        // The successful write must clear that, so the stored 950 is
+        // authoritative again: leaving the latch on would let this tab keep
+        // reading 900 and accept a stake the balance cannot cover.
+        const peer = mountConsumer()
+        expect(peer.placeBet(950, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(0)
+        expect(tab.placeBet(1, 'Plinko')).toBe(false)
+    })
+})
+
+describe('D-1 ledger resurrection', () => {
+    // Regression guard. An earlier fix for review finding F1 unioned this
+    // document's ref with the stored list so a peer's committed entry was never
+    // overwritten. That union was unconditional, so it also re-added entries
+    // retired on purpose. No refused write was needed: the peer replaces the
+    // list wholesale while this document still holds the old one.
+    //
+    // `resetBalance` is exactly such a replacement (it writes `[resetEntry]`),
+    // and a peer import does the same. Observed before the fix:
+    // `['bet','bet','reset']`.
+    //
+    // FIXED: history is now read from storage only, so this passes. Kept as a
+    // plain `it` so a future re-introduction of the union fails immediately.
+    it('does not resurrect a pre-reset entry after a peer resets', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabA = mountConsumer()
+        const tabB = mountConsumer()
+
+        expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+        expect(storedBalance()).toBe(400)
+        expect(storedHistory().map(entry => entry.type)).toEqual(['bet'])
+
+        // B resets: history becomes exactly the reset entry.
+        tabB.resetBalance()
+        expect(storedHistory().map(entry => entry.type)).toEqual(['reset'])
+
+        // A still holds its pre-reset `bet` entry in its ref. Betting again must
+        // build on B's reset list, not resurrect A's retired entry.
+        expect(tabA.placeBet(100, 'Plinko')).toBe(true)
+        const types = storedHistory().map(entry => entry.type)
+        expect(types).toEqual(['bet', 'reset'])
+        expect(types.filter(type => type === 'bet')).toHaveLength(1)
+    })
+})
+
+describe('D-1 concurrent acceptance (OPEN — expected to fail)', () => {
+    // `it.fails` records a KNOWN OPEN DEFECT: the suite stays green, and the
+    // moment someone serialises the credit path this test starts passing, which
+    // makes `it.fails` report a failure and forces the marker to be flipped to
+    // `it`. It cannot rot silently.
+    //
+    // Why it is open: `placeBet` is synchronous (`CreditContext.jsx:173-181`)
+    // and reads the balance, validates, then writes with no critical section
+    // held across the pair. A synchronous API cannot hold a cross-document mutex
+    // — `navigator.locks.request` is async — so this is an architectural limit,
+    // not a missing `if`. Closing it needs the async lock migration or the
+    // transactional authority cutover; both are unapproved architecture
+    // decisions recorded in the Phase 01 plan.
+    //
+    // A sequential two-document probe cannot detect this: it lets A finish
+    // before B starts, so B always reads the committed value.
+    it.fails('refuses the second of two documents that both read the same balance', () => {
+        localStorage.setItem(CREDIT_STORAGE_KEY, '1000')
+        const tabB = mountConsumer()
+        const tabA = mountConsumer()
+
+        // Force the real interleave: each getItem/setItem is atomic, the pair is
+        // not. While B sits between its read and its write, A's stake completes.
+        let interleaved = false
+        const realGet = localStorage.getItem
+        localStorage.getItem = (key) => {
+            const value = realGet(key)
+            if (key === CREDIT_STORAGE_KEY && !interleaved) {
+                interleaved = true
+                expect(tabA.placeBet(600, 'Plinko')).toBe(true)
+            }
+            return value
+        }
+        const bAccepted = tabB.placeBet(600, 'Plinko')
+        localStorage.getItem = realGet
+
+        expect(interleaved).toBe(true)
+        // The defect: B accepted 600 against a balance of 400 and published 400
+        // over A's committed 400 — 1200 staked from 1000 funded.
+        expect(bAccepted).toBe(false)
+        expect(storedBalance()).toBe(400)
     })
 })

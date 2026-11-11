@@ -34,6 +34,8 @@ import { getBigWinThreshold,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
+import { plinkoBackingSize } from './frameSize'
+import { plinkoSettlementRtp } from './plinkoRtp'
 import EducationPanel from '../../EducationPanel'
 import './plinko.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -54,6 +56,18 @@ function loadEngine() {
 const ROW_OPTIONS = [8, 10, 12, 14, 16]
 const RISK_OPTIONS = ['low', 'medium', 'high']
 
+// QA008: keep the canvas backing store equal to the rendered CSS box × clamped
+// DPR, so the fixed 760×570 model art never drifts out of its frame.
+function sizeCanvasToFrame(engine, canvas) {
+    if (!engine || !canvas) return
+    const rect = canvas.getBoundingClientRect?.()
+    const size = plinkoBackingSize(rect?.width || canvas.clientWidth, rect?.height || canvas.clientHeight, window.devicePixelRatio)
+    // A hidden or unlaid-out canvas reports 0×0; leave the buffer alone rather
+    // than collapsing it to nothing.
+    if (!size.width || !size.height) return
+    if (canvas.width === size.width && canvas.height === size.height) return
+    engine.handleResize?.()
+}
 
 const BALL_TYPES = {
     normal:   { id: 'normal',   name: 'Basic',    color: '#ff4d4f', image: '/images/coins/coin_original.svg', cost: 1,  bonus: 1  },
@@ -141,6 +155,22 @@ export default function PlinkoGame() {
     useEffect(() => {
         if (!canvasRef.current) return
         let cancelled = false
+        let resizeObserver = null
+        let dprQuery = null
+        let dprCleanup = null
+        function armDpr() {
+            if (typeof window.matchMedia !== 'function') return
+            dprQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+            dprQuery.addEventListener?.('change', onDprChange)
+            dprCleanup = () => dprQuery?.removeEventListener?.('change', onDprChange)
+        }
+        // A DPR change (drag to another display, browser zoom) re-reads the new
+        // ratio before resizing, then re-arms the query so it can fire again.
+        const onDprChange = () => {
+            sizeCanvasToFrame(engineRef.current, canvasRef.current)
+            dprCleanup?.()
+            armDpr()
+        }
         mountedRef.current = true
         loadEngine().then(async ({ PlinkoEngine, constants }) => {
             if (cancelled) return
@@ -164,6 +194,16 @@ export default function PlinkoGame() {
             })
             engine.start()
             engineRef.current = engine
+            // QA008: the backing store is sized from the rendered box, so it has
+            // to follow the frame (rotation, window resize, panel reflow) and
+            // DPR changes. Without this the buffer kept its mount size and the
+            // board drifted out of its CSS frame.
+            sizeCanvasToFrame(engine, canvasRef.current)
+            if (typeof ResizeObserver !== 'undefined' && canvasRef.current) {
+                resizeObserver = new ResizeObserver(() => sizeCanvasToFrame(engine, canvasRef.current))
+                resizeObserver.observe(canvasRef.current)
+            }
+            armDpr()
             setPayouts(BIN_PAYOUTS[rows][risk])
             setBinColors(getBinColors(rows))
             setEngineReady(true)
@@ -171,6 +211,11 @@ export default function PlinkoGame() {
         return () => {
             cancelled = true
             mountedRef.current = false
+            if (resizeObserver) resizeObserver.disconnect()
+            resizeObserver = null
+            if (dprCleanup) dprCleanup()
+            dprCleanup = null
+            dprQuery = null
             if (engineRef.current) engineRef.current.stop()
             engineRef.current = null
             // Each accepted drop already has its fair bin. Finish its accounting
@@ -317,9 +362,18 @@ export default function PlinkoGame() {
     const lastResult = session.history[0]
     const lastMultiplier = lastResult?.multiplier ?? null
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
-    const expected = useMemo(() => payouts ? expectedReturn(payouts) : 0, [payouts])
     const ball = BALL_TYPES[ballType]
-    const expectedGrossMultiplier = payouts ? expected * ball.bonus / ball.cost : undefined
+    // QA007: the quoted RTP must be what the player is actually credited, which
+    // depends on the accepted stake - `plinkoReturn` rounds to 0.01 GC, which turns
+    // some bins into pushes and half-bins into full refunds at small stakes. The
+    // binomial table is the board's payout schedule; `plinkoSettlementRtp` weights
+    // the real settlement over it at this stake, ball and row count.
+    const quote = useMemo(() => plinkoSettlementRtp({
+        rows,
+        risk,
+        betAmount: selectedBet,
+        ballId: ballType,
+    }), [rows, risk, selectedBet, ballType])
 
     return (
         <GameShell
@@ -333,7 +387,24 @@ export default function PlinkoGame() {
                 <>
                     <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
                     <SimBetStrip rows={simFeed} title="Sim drops" />
-                    <EducationPanel definition={definition} betAmount={selectedBet * ball.cost} expectedGrossMultiplier={expectedGrossMultiplier} effectiveRtp={expectedGrossMultiplier} balance={balance} recentProfit={recentProfit} />
+                    <EducationPanel
+                        definition={definition}
+                        betAmount={selectedBet * ball.cost}
+                        winProbability={quote?.settlementWinChance}
+                        // QA007: Plinko's payout is a discrete distribution with
+                        // partial returns (0.5x), so bankrollRisk's binary
+                        // win/lose-stake model does not describe it. Passing the
+                        // distribution suppresses that inapplicable risk figure,
+                        // exactly as EducationPanel already does for other slots.
+                        expectedGrossMultiplier={quote?.settlementRtp}
+                        effectiveRtp={quote?.settlementRtp}
+                        rtpLabel="RTP (this stake)"
+                        rtpNote={quote
+                            ? `${rows} rows · ${risk} risk · ${ball.name} ball at ${formatCredits(selectedBet * ball.cost)}. ${(quote.pushChance * 100).toFixed(1)}% of drops return exactly the stake. Measured after rounding, not a theoretical ratio.`
+                            : undefined}
+                        balance={balance}
+                        recentProfit={recentProfit}
+                    />
                 </>
             }
             panel={
@@ -387,7 +458,7 @@ export default function PlinkoGame() {
                             <button className="bp-bet-btn" type="button" onClick={() => quickDrop(25, 1)}>+25</button>
                         </div>
                     </div>
-                    <div className="bp-bal-line"><span>Avg return</span><strong>{expected.toFixed(2)}×</strong></div>
+                    <div className="bp-bal-line"><span>Avg return</span><strong>{quote ? `${(quote.expectedReturnGc / quote.cost).toFixed(2)}×` : '—'}</strong></div>
                     <div className="bp-bal-line"><span>In flight</span><strong>{activeDrops}</strong></div>
                 </BetPanel>
             }

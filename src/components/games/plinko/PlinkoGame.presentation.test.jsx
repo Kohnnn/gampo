@@ -89,11 +89,21 @@ describe('Plinko current stake and accepted outcomes', () => {
         find(mounted.tree, node => typeof node.props?.onStakeChange === 'function').props.onStakeChange(7.5)
         find(mounted.tree, node => node.type === 'button' && node.props?.title?.startsWith('Sapphire')).props.onClick()
         const props = find(render(), node => node.type === EducationPanel).props
-        expect(props.betAmount).toBe(150)
-        expect(props.expectedGrossMultiplier).toBeCloseTo(0.989892578125, 12)
-        expect(props.effectiveRtp).toBe(props.expectedGrossMultiplier)
-        expect(props.winProbability).toBeUndefined()
+        expect(props.betAmount).toBeCloseTo(150, 10)
+        // QA007: the disclosure is the settlement at this stake, ball and row
+        // count - probability-weighted over the real credited amounts, not the
+        // ball's cost-scaled "gross multiplier". At 150 GC the credited values round
+        // cleanly, so this coincides with the nominal 0.98984375; the module's own
+        // test covers the small-stake case where the two diverge.
+        expect(props.effectiveRtp).toBeCloseTo(0.989892578125, 10)
+        expect(props.rtpLabel).toBe('RTP (this stake)')
+        expect(props.winProbability).toBeGreaterThan(0)
+        expect(props.winProbability).toBeLessThan(1)
+        // Passing the distribution through suppresses the binary win/lose ruin
+        // model, which cannot describe Plinko's partial returns.
+        expect(props.expectedGrossMultiplier).toBe(props.effectiveRtp)
         expect(props.payoutMultiplier).toBeUndefined()
+        expect(props.rtpNote).toContain('Measured after rounding')
         mounted.unmount()
     })
 

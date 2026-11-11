@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ state: [], refs: [], stateCursor: 0, refCursor: 0, effects: [], outcome: null, fun: false, reduceMotion: false, animations: true, credit: vi.fn() }))
+const fixture = vi.hoisted(() => ({ state: [], refs: [], stateCursor: 0, refCursor: 0, effects: [], outcome: null, fun: false, reduceMotion: false, animations: true, credit: vi.fn(), bet: vi.fn(() => true), record: vi.fn(), dialogOpener: null }))
 vi.mock('react', async () => ({
     ...await vi.importActual('react'),
     useState(initial) {
@@ -13,7 +13,7 @@ vi.mock('react', async () => ({
     useMemo: callback => callback(),
     useCallback: callback => callback,
 }))
-vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 1000, placeBet: () => true, addWinnings: fixture.credit, showToast: () => {} }) }))
+vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 1000, placeBet: fixture.bet, addWinnings: fixture.credit, showToast: () => {} }) }))
 vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: () => {} }) }))
 vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: () => {} }) }))
 vi.mock('../../../audio/useBgm', () => ({ useBgm: () => {} }))
@@ -22,10 +22,10 @@ vi.mock('../../../hooks/useIsMobileViewport', () => ({ useIsMobileViewport: () =
 vi.mock('../../../hooks/useProgress', () => ({ recordFeatureEvent: () => {} }))
 vi.mock('../../../utils/gameFeedback', () => ({ FEEDBACK_EVENTS: {}, playFeedback: () => {} }))
 vi.mock('../../../utils/funMode', () => ({ FUN_PAYOUT_BOOST: 1.06, useFunMode: () => [fixture.fun], isFunMode: () => fixture.fun }))
-vi.mock('../primitives/useNativeDialog', () => ({ default: () => ({ current: null }) }))
+vi.mock('../primitives/useNativeDialog', () => ({ default: (_open, _close, opener) => { fixture.dialogOpener = opener; return { current: null } } }))
 vi.mock('../primitives', () => {
     const Empty = () => null
-    return { Asset: Empty, BigWinOverlay: Empty, GameShell: Empty, HistoryDrawer: Empty, RecentResultsStrip: Empty, StatsOverlay: Empty, useGameSession: () => ({ history: [], stats: {}, record: () => {}, clear: () => {} }) }
+    return { Asset: Empty, BigWinOverlay: Empty, GameShell: Empty, HistoryDrawer: Empty, RecentResultsStrip: Empty, StatsOverlay: Empty, useGameSession: () => ({ history: [], stats: {}, record: fixture.record, clear: () => {} }) }
 })
 vi.mock('./slotFactory', async () => ({
     ...await vi.importActual('./slotFactory'),
@@ -35,12 +35,12 @@ vi.mock('./slotFactory', async () => ({
 
 import SlotsGame from './SlotsGame'
 import EducationPanel from '../../EducationPanel'
-import { getSlotTemplate } from './slotFactory'
+import { SLOT_TEMPLATES, getSlotTemplate } from './slotFactory'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { buildCascadeTimeline, cascadeTimelineDurationMs } from './slotsMotion'
 import { claimEscape } from '../../../utils/escapeClaims'
 
-function render(id = 'wanted-revelation') {
+function render(id) {
     fixture.stateCursor = 0; fixture.refCursor = 0; fixture.effects = []
     return SlotsGame({ initialTemplateId: id })
 }
@@ -52,6 +52,9 @@ function find(node, predicate) {
         if (match) return match
     }
     return null
+}
+function autoplayEffect() {
+    return fixture.effects.find(entry => entry.dependencies?.includes(5) && entry.dependencies?.includes(1000) && entry.dependencies?.some(value => typeof value === 'function'))
 }
 function text(node) {
     if (node == null || typeof node === 'boolean') return ''
@@ -76,7 +79,7 @@ beforeEach(() => {
     vi.useFakeTimers()
     vi.stubGlobal('window', globalThis)
     fixture.state = []; fixture.refs = []; fixture.effects = []; fixture.fun = false; fixture.reduceMotion = false; fixture.animations = true
-    fixture.credit.mockClear()
+    fixture.credit.mockClear(); fixture.bet.mockReset().mockReturnValue(true); fixture.record.mockClear(); fixture.dialogOpener = null
 })
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
@@ -181,10 +184,12 @@ describe('settled slot presentation', () => {
 
     it('closes the native autoplay modal from its cancel event', () => {
         let tree = render('mummy-cascade')
-        find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Autoplay').props.onClick()
+        find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: {} })
         tree = render('mummy-cascade')
         const dialog = find(tree, node => node.type === 'dialog' && node.props?.['aria-label'] === 'Autoplay configuration')
-        expect(dialog).not.toBeNull()
+        const opener = fixture.dialogOpener
+        expect(opener).not.toBeNull()
+        expect(opener.current).toEqual({})
         const event = { preventDefault: vi.fn(), stopPropagation: vi.fn() }
         dialog.props.onCancel(event)
         expect(event.preventDefault).toHaveBeenCalledOnce()
@@ -218,5 +223,102 @@ describe('settled slot presentation', () => {
         expect(props.expectedGrossMultiplier).toBe(props.effectiveRtp)
         expect(props.winProbability).toBeUndefined()
         expect(props.rtpNote).toContain('Fun on')
+    })
+
+    it('does not promise an outcome hold the resolver never receives (QA034)', () => {
+        // `resolveSlotSpin(config, {...})` is called without `lockedCols`, so a frozen
+        // column only stops its reel animation. Any "Hold"/"Lock" label would promise
+        // the player that symbols are carried into the next result. They are not.
+        const tree = render('bars')
+        expect(find(tree, node => node.props?.['aria-label'] === 'Freeze columns')).not.toBeNull()
+        expect(find(tree, node => typeof node.props?.['aria-label'] === 'string' && /^(Unlock|Lock) column/.test(node.props['aria-label']))).toBeNull()
+        expect(find(tree, node => node.props?.['aria-label'] === 'Freeze column 1 reels')).not.toBeNull()
+    })
+
+    for (const template of [...SLOT_TEMPLATES, { id: undefined, title: 'generic' }]) {
+        for (const fun of [false, true]) {
+            it(`shares the selected model across every surface: ${template.title}, Fun ${fun}`, () => {
+                fixture.fun = fun
+                const tree = render(template.id)
+                const config = getSlotTemplate(template.id)
+                const expected = config.rtpTarget * (fun ? 1.06 : 1)
+                const education = find(tree, node => node.type === EducationPanel)
+                expect(tree.props.definition).toBe(education.props.definition)
+                expect(tree.props.definition.rtp).toBeCloseTo(expected, 12)
+                expect(tree.props.definition.houseEdge).toBeCloseTo(1 - expected, 12)
+                expect(education.props.effectiveRtp).toBe(expected)
+                expect(text(tree.props.panel)).toContain(`${(expected * 100).toFixed(2)}%`)
+                const infoToggle = find(tree, node => node.props?.className === 'slot-panel-info-toggle')
+                infoToggle.props.onClick()
+                const info = find(render(template.id), node => node.props?.rtpDisclosure)
+                expect(info.props.rtpDisclosure.rtp).toBe(expected)
+                expect(text(info.type(info.props))).toContain(`${(expected * 100).toFixed(2)}%`)
+                expect(text(EducationPanel(education.props))).toContain(`${((1 - expected) * 100).toFixed(2)}%`)
+            })
+        }
+    }
+
+    it('labels Gummy tumble sums as raw multipliers and credits only the resolved return', async () => {
+        const cells = outcome('gummy-drops').cells
+        fixture.outcome = outcome('gummy-drops', { multiplier: 0.4, cascadeSteps: 1, cascadeFrames: [
+            { cells, winCells: [0], stepPayout: 81.75, stepMultiplier: 1 },
+            { cells, winCells: [], stepPayout: 0, stepMultiplier: 2 },
+        ] })
+        const tree = await spin('gummy-drops')
+        const raw = text(find(tree, node => node.props?.className === 'slot-cascade-mult'))
+        expect(raw).toContain('81.75× raw · not GC')
+        expect(raw).toContain('payout scaling, caps and rounding')
+        expect(raw).not.toContain('GC 81.75')
+        expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(2, 'Gummy Drops return')
+    })
+
+    for (const mode of ['normal', 'turbo', 'instant']) it(`counts ten accepted Mummy ${mode} rounds including free rounds, waiting through replay`, async () => {
+        const id = 'mummy-cascade'
+        let tree = render(id)
+        find(tree, node => node.props?.value === 'normal' && node.props?.onChange).props.onChange(mode)
+        tree = render(id)
+        find(tree, node => node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: {} })
+        tree = render(id)
+        find(tree, node => node.props?.className === 'slot-auto-start').props.onClick()
+        const cells = outcome(id).cells
+        for (let round = 0; round < 10; round += 1) {
+            fixture.outcome = outcome(id, { multiplier: 0.2, cascadeSteps: 1, cascadeFrames: [
+                { cells, winCells: [0], stepPayout: 1, stepMultiplier: 1 },
+                { cells, winCells: [], stepPayout: 0, stepMultiplier: 2 },
+            ], featureEvents: round === 0 ? [{ type: 'free-spins', freeSpins: 20, indexes: [] }] : [] })
+            render(id)
+            autoplayEffect().effect()
+            await vi.advanceTimersByTimeAsync(mode === 'instant' ? 221 : 220)
+            if (mode !== 'instant') {
+                tree = render(id)
+                find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Skip animation').props.onClick()
+                await Promise.resolve()
+            }
+            tree = render(id)
+            expect(fixture.credit).toHaveBeenCalledTimes(round + 1)
+            // Running is false during replay: readiness must still block a fresh round.
+            autoplayEffect().effect()
+            await vi.advanceTimersByTimeAsync(250)
+            expect(fixture.credit).toHaveBeenCalledTimes(round + 1)
+            await vi.advanceTimersByTimeAsync(1000)
+        }
+        tree = render(id)
+        expect(find(tree, node => node.props?.className === 'slot-autoplay-pill')).toBeNull()
+        expect(find(tree, node => node.props?.totalAwarded === 20).props.remaining).toBe(11)
+        expect(fixture.bet).toHaveBeenCalledTimes(1)
+        expect(fixture.record).toHaveBeenCalledTimes(10)
+        expect(fixture.record.mock.calls.filter(([entry]) => entry.meta.freeSpin)).toHaveLength(9)
+    })
+
+    it('updates the selected model immediately after template and mode switches', () => {
+        let tree = render()
+        find(tree, node => node.props?.id === 'slot-template').props.onChange({ target: { value: 'bars' } })
+        fixture.fun = true
+        tree = render()
+        expect(tree.props.definition.name).toBe('Bars')
+        expect(tree.props.definition.rtp).toBeCloseTo(1.007, 12)
+        fixture.fun = false
+        find(tree, node => node.props?.id === 'slot-template').props.onChange({ target: { value: 'gummy-drops' } })
+        expect(render().props.definition.rtp).toBe(0.94)
     })
 })

@@ -38,6 +38,7 @@ import EducationPanel from '../../EducationPanel'
 import CrashChart from './CrashChart'
 import { rollCrashMultiplier } from './crashMath'
 import './crash.css'
+import { notAdmittedResult, rejectedResult } from '../primitives/autoAccounting'
 import { useGameBgm } from '../../../audio/useBgm'
 
 const HOUSE_EDGE = 0.01
@@ -210,10 +211,12 @@ export default function CrashGame() {
     }, [phase])
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (phase === 'running' || phase === 'cashed' || phase === 'betting') { resolve({ profit: 0 }); return }
+        // QA021: a refusal must be distinguishable from a settled round, or Auto
+        // counts a declined stake as a completed one and drifts its P/L.
+        if (phase === 'running' || phase === 'cashed' || phase === 'betting') { resolve(notAdmittedResult('in-round')); return }
         if (!placeBet(betAmount, 'Crash')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`)
-            resolve({ profit: 0 }); return
+            resolve(rejectedResult('insufficient-funds')); return
         }
         cancelAll()
         setLastBet(betAmount)

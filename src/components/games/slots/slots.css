@@ -473,7 +473,6 @@
     min-width: 0;
 }
 
-
 .slot-stage-pills:empty {
     display: none;
 }
@@ -2806,6 +2805,13 @@
     color: #d8f0bf;
     letter-spacing: 0.04em;
 }
+.slot-collect-overlay small {
+    font-size: 10px;
+    font-weight: 700;
+    color: #d8f0bf;
+    line-height: 1.35;
+    max-width: 260px;
+}
 @keyframes slotCollectIn {
     0% { opacity: 0; transform: translateY(-10px) scale(0.7); }
     100% { opacity: 1; transform: scale(1); }
@@ -2906,6 +2912,12 @@
     font-weight: 800;
     letter-spacing: 0.06em;
     font-variant-numeric: tabular-nums;
+}
+.slot-cascade-mult small {
+    color: var(--slot-text-dim);
+    font-size: 9px;
+    line-height: 1.35;
+    max-width: 240px;
 }
 
 @keyframes slotCascadeMultIn {
@@ -3507,7 +3519,8 @@
         linear-gradient(180deg, #2a120c 0%, #110604 100%);
 }
 
-/* Wave 36 P4: hold-and-respin column lock UI */
+/* Column freeze UI. QA034: freezes reel animation only — the outcome resolver
+   never receives `lockedCols`, so this does not hold symbols into the result. */
 .slot-col-locks {
     display: flex;
     gap: 4px;

@@ -22,6 +22,16 @@ export const canAddSicBoBet = (running, totalStake, chip, balance) => !running
     && Number.isFinite(chip) && chip > 0
     && totalStake + chip <= balance
 
+// Pure handler for a chip tap on one board cell. The disabled *control* on
+// every cell and this *handler* both route through `canAddSicBoBet`, so the
+// two can never disagree about affordability. Returns the SAME map reference
+// when the chip is rejected so a caller can compare identity.
+export const applySicBoChipAdd = (bets, key, chip, running, balance) => {
+    const totalStake = Object.values(bets).reduce((sum, amount) => sum + amount, 0)
+    if (!canAddSicBoBet(running, totalStake, chip, balance)) return bets
+    return { ...bets, [key]: (bets[key] || 0) + chip }
+}
+
 export default function SicBoGame() {
     useGameBgm('sicbo', 'idle')
     const definition = findGameDefinition('sicbo')
@@ -53,8 +63,7 @@ export default function SicBoGame() {
 
     const totalStake = Object.values(bets).reduce((s, v) => s + v, 0)
     const addBet = (key) => {
-        if (!canAddSicBoBet(running, totalStake, chip, balance)) return
-        setBets(prev => ({ ...prev, [key]: (prev[key] || 0) + chip }))
+        setBets(prev => applySicBoChipAdd(prev, key, chip, running, balance))
     }
     const clear = () => setBets({})
     const restoreLast = () => {

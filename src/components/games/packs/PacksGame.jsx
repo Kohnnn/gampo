@@ -4,13 +4,13 @@
 //   - Stake cost multiplier
 //   - The weighted prize pool used for each of the 3 reveal cards
 //
-// Round opens 3 cards in sequence (200ms stagger). Each card pays its
-// own multiplier; payouts sum for the round.
+// Round opens 3 cards in sequence (220ms stagger). The round pays
+// the mean of their three multipliers against the tier-adjusted stake.
 //
 // Distinct from Cases: Packs uses 3 simultaneous reveals with a tiered
 // prize pool (no case carousel, no real CS data).
 
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -40,6 +40,8 @@ import { useGameBgm } from '../../../audio/useBgm'
 
 const REVEAL_STAGGER_MS = 220
 const PACK_REVEAL_DELAY_MS = 320
+
+const packStake = (amount, cost) => Math.max(1, Math.round(amount * cost * 100) / 100)
 
 const TIERS = {
     common: {
@@ -130,6 +132,7 @@ export default function PacksGame() {
     const [revealed, setRevealed] = useState([null, null, null])
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [betAmount, setBetAmount] = useState(5)
     const [toast, setToast] = useState(null)
     const { schedule } = useCancellableTimeouts()
 
@@ -141,7 +144,12 @@ export default function PacksGame() {
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (running) { resolve({ profit: 0 }); return }
-        const stake = Math.max(1, Math.round(betAmount * tierConf.cost * 100) / 100)
+        if (!Number.isFinite(betAmount) || betAmount <= 0) {
+            showToast('error', 'Invalid bet amount', 'Enter a positive, finite amount')
+            resolve({ profit: 0 })
+            return
+        }
+        const stake = packStake(betAmount, tierConf.cost)
         if (!placeBet(stake, 'Packs')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`)
             resolve({ profit: 0 })
@@ -180,17 +188,17 @@ export default function PacksGame() {
         const totalDelay = PACK_REVEAL_DELAY_MS + picks.length * REVEAL_STAGGER_MS + 320
         schedule(() => {
             if (returnAmount > 0) addWinnings(returnAmount, 'Packs return')
-            const headlineMult = picks.reduce((m, p) => Math.max(m, p.mult || 0), 0)
+            const bestCardMult = picks.reduce((m, p) => Math.max(m, p.mult || 0), 0)
             const won = profit > 0
             setToast({
                 kind: won ? 'win' : 'lose',
-                multiplier: won ? headlineMult : null,
+                multiplier: totalMult,
                 amount: profit,
-                message: picks.map(p => p.name).join(' · '),
+                message: `Best card ×${bestCardMult.toFixed(2)} · Gross ${formatCredits(returnAmount)} · Net ${profit >= 0 ? '+' : ''}${formatCredits(profit)} · ${picks.map(p => p.name).join(' · ')}`,
             })
-            if (won && headlineMult >= 12) {
+            if (won && totalMult >= 12) {
                 playSound('bigwin')
-                setBigWin({ trigger: Date.now(), profit, multiplier: headlineMult })
+                setBigWin({ trigger: Date.now(), profit, multiplier: totalMult })
             } else {
                 playSound(won ? 'win' : 'loss')
             }
@@ -202,7 +210,7 @@ export default function PacksGame() {
                 meta: { tier, picks: picks.map(p => p.name) },
             })
             machine.finish({ kind: won ? 'win' : 'lose', profit, multiplier: totalMult, picks: picks.map(p => p.name) })
-            showToast(won ? 'win' : 'loss', `Packs ${tierConf.label}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+            showToast(won ? 'win' : 'loss', `Packs ${tierConf.label} · ×${totalMult.toFixed(2)}`, `Gross ${formatCredits(returnAmount)} · Net ${profit >= 0 ? '+' : ''}${formatCredits(profit)} · Best card ×${bestCardMult.toFixed(2)}`)
             setRunning(false)
             resolve({ profit })
         }, totalDelay)
@@ -222,7 +230,9 @@ export default function PacksGame() {
                     balance={balance}
                     initialBet={5}
                     runningRound={running}
-                    actionLabel={`Open ${tierConf.label} (${formatCredits(Math.round(Number(lastBet || 5) * tierConf.cost * 100) / 100)})`}
+                    actionLabel={`Open ${tierConf.label} (${formatCredits(packStake(betAmount, tierConf.cost))})`}
+                    onStakeChange={setBetAmount}
+                    ticketStake={({ betAmount: amount }) => packStake(amount, tierConf.cost)}
                     onPlay={performPlay}
                     lastBet={lastBet}
                     disableAuto
@@ -293,7 +303,7 @@ export default function PacksGame() {
                 EV ≈ RTP in the binary EV model. Replaces the old flat 0.5 / 1.5. */}
             <EducationPanel
                 definition={definition}
-                betAmount={5}
+                betAmount={packStake(betAmount, tierConf.cost)}
                 winProbability={tierStats.winProbability}
                 payoutMultiplier={tierStats.winProbability > 0 ? tierStats.expectedMult / tierStats.winProbability : tierStats.expectedMult}
                 balance={balance}

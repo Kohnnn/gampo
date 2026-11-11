@@ -34,7 +34,7 @@ import { getBigWinThreshold,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
-import EducationPanel from '../../EducationPanel'
+import DrawEducation from './DrawEducation'
 import './keno.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
@@ -51,6 +51,7 @@ export default function KenoGame() {
     const preloader = useOriginalsPreloader('keno')
 
     const [selected, setSelected] = useState([4, 8, 15, 16, 23])
+    const [stake, setStake] = useState(5)
     const [drawAnim, setDrawAnim] = useState([])
     const [drawing, setDrawing] = useState(false)
     const [burstKey, setBurstKey] = useState(0)
@@ -158,7 +159,6 @@ export default function KenoGame() {
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((s, i) => s + (i.profit || 0), 0)
-    const estimatedChance = selected.length ? selected.length / 40 : 0
 
     return (
         <GameShell
@@ -168,7 +168,7 @@ export default function KenoGame() {
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             variant="stake"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={drawing} actionLabel="Draw Keno" mobilePlayLabel="Draw" onPlay={performPlay} lastBet={lastBet}>
+                <BetPanel balance={balance} initialBet={5} onStakeChange={setStake} runningRound={drawing} actionLabel="Draw Keno" mobilePlayLabel="Draw" onPlay={performPlay} lastBet={lastBet}>
                     <button className="bp-bet-btn" disabled={drawing} onClick={() => setSelected(sampleUniqueNumbers({ max: 40, count: 5, random: () => nextRoll('keno').roll }))}>Quick pick 5</button>
                     <div className="bp-bal-line"><span>Selected</span><strong>{selected.length}/10</strong></div>
                     {Number.isFinite(lastMultiplier) && lastMultiplier > 0 && (
@@ -204,7 +204,7 @@ export default function KenoGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('keno')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={estimatedChance} payoutMultiplier={kenoPayout(Math.max(1, selected.length), Math.max(1, Math.ceil(selected.length / 2)))} balance={balance} recentProfit={recentProfit} />
+            <DrawEducation game="keno" picks={selected.length} stake={stake} definition={definition} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

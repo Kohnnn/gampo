@@ -47,7 +47,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'Scatter retrigger keeps the bonus rolling.',
             'Side character animations on big hits.',
         ],
-        volatility: 'High volatility, ~94.5% RTP.',
+        volatility: 'High volatility.',
         buyBonus: 'Buy options: 60x (3 scatters), 120x (super, 4 scatters).',
     },
     'dust-rail': {
@@ -80,7 +80,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'Expanding wilds remain expanded.',
             'Persistent multiplier seeds at 1x.',
         ],
-        volatility: 'High volatility, ~95% RTP.',
+        volatility: 'High volatility.',
         buyBonus: null,
     },
     'bassline-bonus': {
@@ -113,7 +113,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'New scarabs that land also lock until the respin ends.',
             'Total win banner if the respin produces a stake-sized win.',
         ],
-        volatility: 'High volatility, ~94.5% RTP.',
+        volatility: 'High volatility.',
         buyBonus: null,
     },
     'bars': {
@@ -139,7 +139,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'Reel wilds in for the rest of the spin.',
             'Wins that cross the wild reel get a 1.3x boost.',
         ],
-        volatility: 'High volatility, ~94.5% RTP.',
+        volatility: 'High volatility.',
         buyBonus: null,
     },
     'wanted-revelation': {
@@ -154,7 +154,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             '6 free spins.',
             'Wanted reveal still applies during free spins.',
         ],
-        volatility: 'High volatility, ~94.5% RTP.',
+        volatility: 'High volatility.',
         buyBonus: 'Lite (40x), Standard (60x), Super (120x).',
     },
     'gates-ascent': {
@@ -174,17 +174,17 @@ export const SLOT_FEATURE_CONTRACTS = {
         buyBonus: 'Standard (100x, 4 scatters), Olympus (220x, 5 scatters + 2x persistent).',
     },
     'bass-bayou': {
-        summary: 'Bayou money-symbol collect. Free spins collect every prize on the board.',
+        summary: 'Bayou money-symbol collect. Prize multipliers contribute to each spin, including free spins.',
         mechanics: [
-            { name: 'Money symbols', detail: 'Each money symbol carries a credit value. They pay only during free-spin collect rounds.' },
+            { name: 'Money symbols', detail: 'Each prize carries a raw bet multiplier, not GC. Raw prizes and line wins are combined, then payout scaling and rounding determine the credited return on that spin.' },
             { name: 'Lines', detail: '20 paylines, left-to-right.' },
-            { name: 'Collect overlay', detail: 'A green "Angler collects +X" ribbon pops up when money totals come in.' },
+            { name: 'Collect overlay', detail: 'Raw collection is shown separately from the total paid return; it is not an additional credit.' },
         ],
         bonusEntry: '3+ tag scatters.',
         bonusFlow: [
             '8 free spins.',
             'Every money symbol that lands is added to the angler collect.',
-            'Collect total pays at the end of the bonus.',
+            'Each spin credits its own scaled return; the bonus total summarizes those credits, not another payout.',
         ],
         volatility: 'Medium-high.',
         buyBonus: 'Bayou (80x), Trophy (160x).',
@@ -262,7 +262,7 @@ export const SLOT_FEATURE_CONTRACTS = {
             'Multiplier applies to all 6 free spins.',
             'Re-triggering during the session re-spins the wheel.',
         ],
-        volatility: 'Very high volatility — the wheel multiplier drives rare but large sessions. RTP locked to 94%.',
+        volatility: 'Very high volatility — the wheel multiplier drives rare but large sessions.',
         buyBonus: 'Bell (70x), Knockout (180x + 3x persistent).',
     },
     'coop-cluck': {
@@ -315,17 +315,17 @@ export const SLOT_FEATURE_CONTRACTS = {
     'gummy-drops': {
         summary: 'Sweet 8×8 cluster slot with an explosive multiplier orb.',
         mechanics: [
-            { name: 'Cluster pays', detail: '6+ touching symbols on an 8×8 (64-cell) grid form a cluster; bigger clusters pay more.' },
-            { name: 'Cascade ladder', detail: 'Winning clusters clear and new candy tumbles in. Each cascade bumps a 1x → 2x → 3x → 5x → 8x → 12x multiplier ladder (capped to keep the swing fair).' },
-            { name: 'Multiplier orbs', detail: 'Orb symbols carry a random 2x–250x value. On any winning tumble the orb values are summed and multiply the whole win.' },
-            { name: 'Persistent multiplier', detail: 'During the bonus the ladder seeds at 1x and persists across free spins.' },
+            { name: 'Cluster pays', detail: '8+ matching symbols anywhere on the 8×8 grid form a win; bigger groups pay more.' },
+            { name: 'Cascade ladder', detail: 'Winning symbols clear and new candy tumbles in. The per-spin ladder is 1x → 2x → 3x → 4x → 6x → 8x. Tumble subtotals are raw bet multipliers, not credited GC.' },
+            { name: 'Multiplier orbs', detail: 'Orb symbols carry 2x–100x. On a winning spin, orbs on the final board multiply the raw win total. Persistent multipliers, payout scaling, the 2000x cap and rounding then determine the total paid return.' },
+            { name: 'Persistent multiplier', detail: 'During free spins a separate persistent multiplier grows on retriggers and cascades; the tumble ladder resets each spin.' },
         ],
         bonusEntry: '5+ lollipop scatters award 12 free spins.',
         bonusFlow: [
-            '12 free spins with a persistent cascade ladder.',
-            'Ladder carries across spins for escalating chains.',
+            '12 free spins, each crediting its own final scaled return.',
+            'The session total summarizes credited returns; raw tumble subtotals are not extra credits.',
         ],
-        volatility: 'Very high volatility — long dry spells then big cascade chains. RTP locked to 94%.',
+        volatility: 'Very high volatility — long dry spells then big cascade chains.',
         buyBonus: 'Sweet (100x), Sugar Rush (250x + 2x persistent).',
     },
 }

@@ -25,6 +25,7 @@ import { getBigWinThreshold,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
+import { nextStepQuote } from '../primitives/autoAccounting'
 import EducationPanel from '../../EducationPanel'
 import './tower.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -71,9 +72,13 @@ export default function TowerGame() {
     const config = PRESETS[risk]
     const multiplier = Number(Math.pow(config.growth, level).toFixed(2))
     const nextMultiplier = Number(Math.pow(config.growth, phase === 'climbing' ? level + 1 : 1).toFixed(2))
-    const educationDecision = phase !== 'climbing' && lastBet !== null
-        ? { settled: true }
-        : { label: 'Next climb', probability: config.safe, payoutMultiplier: nextMultiplier, ...(phase === 'climbing' && level > 0 ? { cashoutMultiplier: multiplier } : {}) }
+    // QA030: quote the climb the player faces now — level 1 while idle, the next
+    // level while climbing — plus the banked multiplier as the cash-out option.
+    const educationDecision = nextStepQuote({
+        probability: config.safe,
+        payoutMultiplier: nextMultiplier,
+        cashoutMultiplier: phase === 'climbing' && level > 0 ? multiplier : undefined,
+    })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (phase === 'climbing') { resolve({ profit: 0 }); return }

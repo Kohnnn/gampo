@@ -80,7 +80,7 @@ describe('Dice result publication', () => {
         expect(secondSettled).not.toHaveBeenCalled()
 
         await vi.advanceTimersByTimeAsync(260)
-        expect(firstSettled).toHaveBeenCalledWith({ profit: fixture.record.mock.calls[0][0].profit })
+        expect(firstSettled).toHaveBeenCalledWith(expect.objectContaining({ kind: 'committed', profit: fixture.record.mock.calls[0][0].profit }))
         expect(secondSettled).not.toHaveBeenCalled()
         expect(fixture.record).toHaveBeenCalledTimes(1)
         expect(fixture.toast).not.toHaveBeenCalled()
@@ -94,7 +94,7 @@ describe('Dice result publication', () => {
         expect(fixture.sound.mock.calls.filter(([name]) => name === 'win')).toHaveLength(2)
 
         await vi.runAllTimersAsync()
-        expect(secondSettled).toHaveBeenCalledWith({ profit: fixture.record.mock.calls[1][0].profit })
+        expect(secondSettled).toHaveBeenCalledWith(expect.objectContaining({ kind: 'committed', profit: fixture.record.mock.calls[1][0].profit }))
         expect(firstSettled).toHaveBeenCalledTimes(1)
         expect(secondSettled).toHaveBeenCalledTimes(1)
         await Promise.all([first, second])
@@ -120,7 +120,7 @@ describe('Dice result publication', () => {
         expect(new Set(fixture.record.mock.calls.map(([entry]) => entry.id)).size).toBe(3)
         settled.forEach((resolve, index) => {
             expect(resolve).toHaveBeenCalledTimes(1)
-            expect(resolve).toHaveBeenCalledWith({ profit: fixture.record.mock.calls[index][0].profit })
+            expect(resolve).toHaveBeenCalledWith(expect.objectContaining({ kind: 'committed', profit: fixture.record.mock.calls[index][0].profit }))
         })
         await Promise.all(rounds)
         await vi.runAllTimersAsync()
@@ -146,7 +146,7 @@ describe('Dice result publication', () => {
 
         expect(fixture.record.mock.calls.map(([entry]) => entry.betAmount)).toEqual([5, 7])
         expect(new Set(fixture.record.mock.calls.map(([entry]) => entry.id)).size).toBe(2)
-        expect(secondSettled).toHaveBeenCalledWith({ profit: fixture.record.mock.calls[1][0].profit })
+        expect(secondSettled).toHaveBeenCalledWith(expect.objectContaining({ kind: 'committed', profit: fixture.record.mock.calls[1][0].profit }))
         await Promise.all([first, second])
         await vi.runAllTimersAsync()
         expect(firstSettled).toHaveBeenCalledTimes(1)
@@ -174,8 +174,8 @@ describe('Dice result publication', () => {
         expect(new Set(fixture.record.mock.calls.map(([entry]) => entry.id)).size).toBe(2)
         expect(firstSettled).toHaveBeenCalledTimes(1)
         expect(secondSettled).toHaveBeenCalledTimes(1)
-        expect(firstSettled).toHaveBeenCalledWith({ profit: fixture.record.mock.calls[0][0].profit })
-        expect(secondSettled).toHaveBeenCalledWith({ profit: fixture.record.mock.calls[1][0].profit })
+        expect(firstSettled).toHaveBeenCalledWith(expect.objectContaining({ kind: 'committed', profit: fixture.record.mock.calls[0][0].profit }))
+        expect(secondSettled).toHaveBeenCalledWith(expect.objectContaining({ kind: 'committed', profit: fixture.record.mock.calls[1][0].profit }))
         await Promise.all([first, second])
         await vi.runAllTimersAsync()
         expect(fixture.credit).toHaveBeenCalledTimes(2)

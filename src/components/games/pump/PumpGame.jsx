@@ -30,6 +30,7 @@ import { getBigWinThreshold,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
+import { nextStepQuote } from '../primitives/autoAccounting'
 import EducationPanel from '../../EducationPanel'
 import './pump.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -57,14 +58,32 @@ export default function PumpGame() {
     const [busted, setBusted] = useState(false)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [selectedStake, setSelectedStake] = useState(5)
     const [toast, setToast] = useState(null)
     const { schedule } = useCancellableTimeouts()
 
     const machine = useRoundMachine({})
 
-    const currentMult = pumps === 0 ? 1 : Number(Math.pow(STEP_RAMP, pumps).toFixed(4))
-    const nextMult = pumps >= MAX_PUMPS ? currentMult : Number(Math.pow(STEP_RAMP, pumps + 1).toFixed(4))
+    const multiplierAt = count => (count === 0 ? 1 : Number(Math.pow(STEP_RAMP, count).toFixed(4)))
+    const currentMult = multiplierAt(pumps)
+    const nextMult = pumps >= MAX_PUMPS ? currentMult : multiplierAt(pumps + 1)
     const inRound = phase === 'playing'
+    // QA030: the lesson describes the step the player is on. Outside a round that
+    // is the first pump; inside one it is the next pump at `pumps + 1`, and the
+    // banked multiplier is offered as the cash-out alternative.
+    // Outside a round `pumps` still holds the finished round's count (burst and
+    // cashout reset the phase but not the counter), so idle must read step 0 or
+    // the lesson quotes a step of a round that no longer exists.
+    const livePumps = inRound ? pumps : 0
+    const atCap = inRound && pumps >= MAX_PUMPS
+    const educationDecision = atCap
+        ? { label: 'Cashout', probability: 1, payoutMultiplier: currentMult, cashoutMultiplier: currentMult }
+        : nextStepQuote({
+            probability: 1 - STEP_BUST_CHANCE,
+            payoutMultiplier: multiplierAt(livePumps + 1),
+            // Only a live round with a banked step has something to cash out.
+            cashoutMultiplier: livePumps > 0 ? multiplierAt(livePumps) : undefined,
+        })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (inRound) { resolve({ profit: 0 }); return }
@@ -161,6 +180,7 @@ export default function PumpGame() {
                     onPlay={performPlay}
                     disableAuto
                     lastBet={lastBet}
+                    onStakeChange={setSelectedStake}
                     playPhase={inRound && pumps > 0 ? 'in-round' : null}
                     playLabel={inRound && pumps > 0 ? `Cashout ${currentMult.toFixed(2)}×` : 'Place Bet'}
                     onPlayPhaseAction={cashOut}
@@ -170,7 +190,7 @@ export default function PumpGame() {
                         <strong>{STEP_RAMP.toFixed(2)}×</strong>
                     </div>
                     <div className="bp-bal-line">
-                        <span>Bust per pump</span>
+                        <span>Bust per risky pump</span>
                         <strong>{(STEP_BUST_CHANCE * 100).toFixed(0)}%</strong>
                     </div>
                     <div className="bp-bal-line">
@@ -213,7 +233,15 @@ export default function PumpGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('pump')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={1 - STEP_BUST_CHANCE} payoutMultiplier={STEP_RAMP} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel
+                definition={{ ...definition, lesson: 'Each risky pump increases the multiplier by about 1.09× with a 12% chance to burst. At the cap, Pump or Cashout pays the banked amount.' }}
+                betAmount={inRound ? stake : selectedStake}
+                rtpLabel="RTP per risky pump"
+                rtpNote={atCap ? `Cap reached: Pump and Cashout both immediately return the banked ${currentMult.toFixed(4)}× multiplier without a burst. RTP and house edge describe a risky pump, not this cashout or a whole round.` : undefined}
+                conditionalDecision={educationDecision}
+                balance={balance}
+                recentProfit={recentProfit}
+            />
         </GameShell>
     )
 }

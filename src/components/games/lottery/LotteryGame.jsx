@@ -8,15 +8,11 @@ import { nextRoll } from '../../../utils/fairRng'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
 import { Particles } from '../../fx'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
-import EducationPanel from '../../EducationPanel'
+import DrawEducation from '../keno/DrawEducation'
+import { LOTTERY_PAYOUTS } from '../keno/drawEducationMath'
 import './lottery.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
-// Prize table indexed by hits (pick-5, draw-5 from 36). Calibrated so the
-// expected return is ~0.90 RTP under the true hypergeometric hit distribution
-// (P(2)=0.1192, P(3)=0.0123, P(4)=4.1e-4, P(5)=3e-6). The previous table
-// [0,0,1,8,120,5000] only returned ~28% — far below the stated 90%.
-const TABLE = [0, 0, 4, 25, 250, 5000]
 
 export default function LotteryGame() {
     useGameBgm('lottery', 'idle')
@@ -27,6 +23,7 @@ export default function LotteryGame() {
     const session = useGameSession('lottery')
 
     const [selected, setSelected] = useState([3, 9, 14, 21, 32])
+    const [stake, setStake] = useState(5)
     const [drawAnim, setDrawAnim] = useState([])
     const [drawing, setDrawing] = useState(false)
     const [burstKey, setBurstKey] = useState(0)
@@ -57,7 +54,7 @@ export default function LotteryGame() {
         const next = sampleUniqueNumbers({ max: 36, count: 5, random: () => nextRoll('lottery').roll })
         next.forEach((n, i) => schedule(() => { playSound('flip'); setDrawAnim(prev => [...prev, n]) }, 400 + i * 350))
         const hits = selected.filter(n => next.includes(n)).length
-        const multiplier = TABLE[hits]
+        const multiplier = LOTTERY_PAYOUTS[hits]
         const returnAmount = round2(betAmount * multiplier)
         const profit = round2(returnAmount - betAmount)
         schedule(() => {
@@ -97,7 +94,7 @@ export default function LotteryGame() {
             accent="#ffcf5a"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             panel={
-                <BetPanel balance={balance} initialBet={5} runningRound={drawing} actionLabel="Draw Lottery" onPlay={performPlay} lastBet={lastBet}>
+                <BetPanel balance={balance} initialBet={5} onStakeChange={setStake} runningRound={drawing} actionLabel="Draw Lottery" onPlay={performPlay} lastBet={lastBet}>
                     <button className="bp-bet-btn" disabled={drawing} onClick={() => setSelected(sampleUniqueNumbers({ max: 36, count: 5, random: () => nextRoll('lottery').roll }))}>Quick pick</button>
                     <div className="bp-bal-line"><span>Selected</span><strong>{selected.length}/5</strong></div>
                 </BetPanel>
@@ -139,7 +136,7 @@ export default function LotteryGame() {
             </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('lottery')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={1 / 376992} payoutMultiplier={5000} balance={balance} recentProfit={recentProfit} />
+            <DrawEducation game="lottery" picks={selected.length} stake={stake} definition={definition} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

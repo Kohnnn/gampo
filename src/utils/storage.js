@@ -4,10 +4,10 @@
 // boilerplate that each hook previously reimplemented, and expose the canonical
 // `gampo_` key prefix + key enumeration used by the local save/restore feature.
 //
-// SSR/safety: every call guards against a missing localStorage (e.g. tests that
-// have not stubbed it, or non-browser environments) and never throws.
+// Ordinary reads/writes are forgiving; save enumeration/snapshot/restore fail loud.
 
 export const STORAGE_PREFIX = 'gampo_'
+export const MAX_SAVE_BYTES = 32 * 1024 * 1024
 
 // Quota-exceeded signalling. Writes that fail because storage is full notify
 // these listeners so the UI can surface a one-time "storage full" notice
@@ -52,16 +52,17 @@ function getStore() {
     return null
 }
 
-/** Read + JSON.parse a key, returning `fallback` on any failure. */
-export function readJson(key, fallback = null) {
-    const store = getStore()
+/** Read + JSON.parse a key; strict callers receive storage/parse failures. */
+export function readJson(key, fallback = null, { strict = false } = {}) {
+    const store = strict ? strictStore() : getStore()
     if (!store) return fallback
     try {
-        const raw = store.getItem(key)
+        const raw = readRaw(key, null, { strict })
         if (raw == null) return fallback
         const parsed = JSON.parse(raw)
         return parsed == null ? fallback : parsed
-    } catch {
+    } catch (error) {
+        if (strict) throw error
         return fallback
     }
 }
@@ -80,13 +81,14 @@ export function writeJson(key, value) {
 }
 
 /** Read a raw string value. */
-export function readRaw(key, fallback = null) {
-    const store = getStore()
+export function readRaw(key, fallback = null, { strict = false } = {}) {
+    const store = strict ? strictStore() : getStore()
     if (!store) return fallback
     try {
-        const raw = store.getItem(key)
+        const raw = strict ? strictCall(store, 'getItem', key) : store.getItem(key)
         return raw == null ? fallback : raw
-    } catch {
+    } catch (error) {
+        if (strict) throw error
         return fallback
     }
 }
@@ -116,18 +118,17 @@ export function removeKey(key) {
     }
 }
 
-/** Enumerate all persisted keys under the `gampo_` prefix. */
+/**
+ * Enumerate all persisted keys under the `gampo_` prefix.
+ * A failed enumeration throws: a truncated list would silently under-report
+ * exported state and under-restore it on import.
+ */
 export function listGampoKeys() {
-    const store = getStore()
-    if (!store) return []
+    const store = strictStore()
     const keys = []
-    try {
-        for (let i = 0; i < store.length; i += 1) {
-            const key = store.key(i)
-            if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key)
-        }
-    } catch {
-        /* ignore */
+    for (let i = 0; i < store.length; i += 1) {
+        const key = strictCall(store, 'key', i)
+        if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key)
     }
     return keys
 }
@@ -138,14 +139,7 @@ export function listGampoKeys() {
  * whether a given key stored JSON or a primitive.
  */
 export function snapshotGampoState() {
-    const store = getStore()
-    const data = {}
-    if (!store) return data
-    for (const key of listGampoKeys()) {
-        const raw = readRaw(key)
-        if (raw != null) data[key] = raw
-    }
-    return data
+    return strictSnapshot(strictStore())
 }
 
 function strictStore() {
@@ -164,20 +158,25 @@ function strictStore() {
     }
 }
 
-function invalidRestoreData() {
-    return Object.assign(new Error('Invalid GamPo save data.'), { validationFailed: true })
+function invalidRestoreData(code = 'invalidRestoreData') {
+    return Object.assign(new Error(code === 'saveTooLarge' ? 'GamPo save exceeds the 32 MiB limit.' : 'Invalid GamPo save data.'), { validationFailed: true, code })
 }
 
-function validateRestoreData(data) {
+export function validateRestoreData(data) {
     try {
-        const prototype = data != null && typeof data === 'object' ? Object.getPrototypeOf(data) : null
-        if (data == null || Array.isArray(data) || (prototype !== Object.prototype && prototype !== null)) throw invalidRestoreData()
-        const entries = Object.entries(data)
-        for (const [key, value] of entries) {
-            if (!key.startsWith(STORAGE_PREFIX) || typeof value !== 'string') throw invalidRestoreData()
+        if (data == null || typeof data !== 'object' || Array.isArray(data)) throw invalidRestoreData()
+        const prototype = Object.getPrototypeOf(data)
+        if (prototype !== Object.prototype && prototype !== null) throw invalidRestoreData()
+        const entries = []
+        for (const key of Reflect.ownKeys(data)) {
+            const descriptor = Object.getOwnPropertyDescriptor(data, key)
+            if (typeof key !== 'string' || !key.startsWith(STORAGE_PREFIX) || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'string') throw invalidRestoreData()
+            entries.push([key, descriptor.value])
         }
+        if (new TextEncoder().encode(JSON.stringify(data)).length > MAX_SAVE_BYTES) throw invalidRestoreData('saveTooLarge')
         return entries
-    } catch {
+    } catch (error) {
+        if (error?.validationFailed) throw error
         throw invalidRestoreData()
     }
 }
@@ -190,13 +189,10 @@ function strictCall(store, method, ...args) {
 
 function strictSnapshot(store) {
     const snapshot = {}
-    for (let index = 0; index < store.length; index += 1) {
-        const key = strictCall(store, 'key', index)
-        if (key && key.startsWith(STORAGE_PREFIX)) {
-            const value = strictCall(store, 'getItem', key)
-            if (value == null) throw new Error(`getItem ${key} failed.`)
-            snapshot[key] = value
-        }
+    for (const key of listGampoKeys()) {
+        const value = strictCall(store, 'getItem', key)
+        if (value == null) throw new Error(`getItem ${key} failed.`)
+        snapshot[key] = value
     }
     return snapshot
 }
@@ -207,7 +203,7 @@ function restoreSnapshot(store, snapshot) {
     for (const [key, value] of Object.entries(snapshot)) strictCall(store, 'setItem', key, value)
 }
 
-export function restoreGampoState(data, { clearExisting = true } = {}) {
+export function restoreGampoState(data, { clearExisting = true, confirmRemoval } = {}) {
     const entries = validateRestoreData(data)
     let store
     let snapshot
@@ -222,6 +218,19 @@ export function restoreGampoState(data, { clearExisting = true } = {}) {
             rollbackFailed: false,
             cause,
         })
+    }
+
+    if (clearExisting) {
+        const incomingKeys = new Set(entries.map(([key]) => key))
+        const removedKeys = Object.keys(snapshot).filter(key => !incomingKeys.has(key))
+        const addedKeys = [...incomingKeys].filter(key => !Object.hasOwn(snapshot, key))
+        if (removedKeys.length || addedKeys.length) {
+            if (typeof confirmRemoval !== 'function' || confirmRemoval(removedKeys, addedKeys) !== true) return { restored: 0, skipped: 0, declined: true }
+            const current = strictSnapshot(store)
+            if (Object.keys(current).length !== Object.keys(snapshot).length || Object.entries(snapshot).some(([key, value]) => !Object.hasOwn(current, key) || current[key] !== value)) {
+                throw Object.assign(new Error('Save changed while confirmation was open. Import was not applied.'), { conflict: true })
+            }
+        }
     }
 
     try {

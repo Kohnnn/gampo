@@ -379,9 +379,15 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [showIntro, setShowIntro] = useState(Boolean(startTemplate.features?.introOverlay))
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [showAutoplayDrawer, setShowAutoplayDrawer] = useState(false)
+    const autoplayOpenerRef = useRef(null)
+    const toggleAutoplay = useCallback(event => {
+        autoplayOpenerRef.current = event.currentTarget
+        setShowAutoplayDrawer(value => !value)
+    }, [])
     const closeAutoplay = useCallback(() => setShowAutoplayDrawer(false), [])
-    const autoplayDialogRef = useNativeDialog(showAutoplayDrawer && !running, closeAutoplay)
+    const autoplayDialogRef = useNativeDialog(showAutoplayDrawer && !running, closeAutoplay, autoplayOpenerRef)
     const [autoplayCount, setAutoplayCount] = useState(10)
+    const [autoplayRetry, setAutoplayRetry] = useState(0)
     const [autoplayInfinite, setAutoplayInfinite] = useState(false)
     const [autoplayActive, setAutoplayActive] = useState(false)
     const [autoplayRemaining, setAutoplayRemaining] = useState(0)
@@ -1488,7 +1494,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     }, [advancedStops])
 
     useEffect(() => {
-        if (!autoplayActive || running || autoplayPendingRef.current) return
+        if (!autoplayActive || running || cascadeReplayRef.current || autoplayPendingRef.current) return
         if (autoplayRemainingRef.current === Infinity) {
             // continue
         } else if (autoplayRemainingRef.current <= 0) {
@@ -1503,6 +1509,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             performSpin({ source: 'auto', bet: betAmount, free: canUseFreeSpin, tierId }).then(outcome => {
                 autoplayPendingRef.current = false
                 if (!autoplayActive) return
+                if (outcome.error) { stopAutoplay(); return }
+                if (outcome.skipped) { setAutoplayRetry(value => value + 1); return }
                 if (autoplayRemainingRef.current !== Infinity) {
                     autoplayRemainingRef.current = Math.max(0, autoplayRemainingRef.current - 1)
                     setAutoplayRemaining(autoplayRemainingRef.current)
@@ -1514,7 +1522,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 else if (autoplayRemainingRef.current <= 0 && autoplayRemainingRef.current !== Infinity) stopAutoplay()
             })
         }, 220)
-    }, [autoplayActive, betAmount, balance, canUseFreeSpin, performSpin, running, stopAutoplay])
+    }, [autoplayActive, autoplayRetry, betAmount, balance, canUseFreeSpin, cascadeStepIndex, performSpin, running, stopAutoplay])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
     const meterTarget = config.features?.coinMeter?.target || 0
@@ -1701,7 +1709,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         <button
                             type="button"
                             className={showAutoplayDrawer ? 'active' : ''}
-                            onClick={() => setShowAutoplayDrawer(value => !value)}
+                            onClick={toggleAutoplay}
                             disabled={running}
                         >
                             <RotateCcw size={14} /> Autoplay
@@ -1844,7 +1852,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     <div className="slot-collect-overlay" key={`collect-${lastResult?.multiplier ?? 0}`}>
                         <span>Raw collection</span>
                         <strong>{moneyTotal.toFixed(2)}×</strong>
-                        <em>{lastResult?.moneyValues?.length || 0} prize symbols · before payout scaling</em>
+                        <em>{lastResult?.moneyValues?.length || 0} prize symbols · raw bet multipliers, not GC</em>
+                        <small>Added to raw line wins, then payout scaling, caps and rounding determine the total paid return.</small>
                     </div>
                 )}
 
@@ -1947,7 +1956,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 <button
                     type="button"
                     className={autoplayActive || showAutoplayDrawer ? 'slot-mobile-icon active' : 'slot-mobile-icon'}
-                    onClick={() => setShowAutoplayDrawer(v => !v)}
+                    onClick={toggleAutoplay}
                     disabled={running}
                     aria-label="Autoplay"
                 >
@@ -2127,7 +2136,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     >
                         {config.layout.evaluation === 'megaways' ? (
                             <>
-                                <div className="slot-col-locks" aria-label="Hold columns">
+                                {/* QA034: this control freezes a column's reel animation only.
+                                    `resolveSlotSpin` is never given `lockedCols`, so the resolved
+                                    outcome is freshly drawn for every spin. Labelling it "Hold"
+                                    promised an outcome-level hold the resolver does not implement,
+                                    and adding one would change RNG consumption and payouts.
+                                    Relabelled to the behaviour that actually exists. */}
+                                <div className="slot-col-locks" aria-label="Freeze columns">
                                     {Array.from({ length: config.layout.cols }).map((_, col) => (
                                         <button
                                             key={col}
@@ -2135,7 +2150,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                             className={`slot-col-lock ${lockedCols.has(col) ? 'is-locked' : ''}`}
                                             onClick={() => toggleColLock(col)}
                                             disabled={running}
-                                            aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                            aria-label={`${lockedCols.has(col) ? 'Unfreeze' : 'Freeze'} column ${col + 1} reels`}
                                             aria-pressed={lockedCols.has(col)}
                                         >
                                             {lockedCols.has(col) ? '🔒' : col + 1}
@@ -2155,7 +2170,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                 className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''} ${!running && wildColumns.has(col) ? 'wild-column' : ''} ${lockedCols.has(col) ? 'is-locked' : ''}`}
                                                 onClick={() => !running && toggleColLock(col)}
                                                 role="button"
-                                                aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                                aria-label={`${lockedCols.has(col) ? 'Unfreeze' : 'Freeze'} column ${col + 1} reels`}
                                                 tabIndex={running ? -1 : 0}
                                             >
                                                 {cellsInCol.map(({ index }) => {
@@ -2172,7 +2187,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                             className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''}`}
                                                         >
                                                             <SlotSymbol symbol={item} />
-                                                            <em>{item?.label}</em>
+                                                            <em data-slot-symbol-label={item?.id}>{item?.label}</em>
                                                             {moneyValue ? <i className="money-chip" aria-label={`Raw prize multiplier ${moneyValue}`}>{moneyValue.toFixed(2)}× raw</i> : null}
                                                             {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
                                                         </div>
@@ -2185,7 +2200,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             </>
                         ) : (
                             <>
-                                <div className="slot-col-locks" aria-label="Hold columns">
+                                <div className="slot-col-locks" aria-label="Freeze columns">
                                     {Array.from({ length: config.layout.cols }).map((_, col) => (
                                         <button
                                             key={col}
@@ -2193,7 +2208,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                             className={`slot-col-lock ${lockedCols.has(col) ? 'is-locked' : ''}`}
                                             onClick={() => toggleColLock(col)}
                                             disabled={running}
-                                            aria-label={`${lockedCols.has(col) ? 'Unlock' : 'Lock'} column ${col + 1}`}
+                                            aria-label={`${lockedCols.has(col) ? 'Unfreeze' : 'Freeze'} column ${col + 1} reels`}
                                             aria-pressed={lockedCols.has(col)}
                                         >
                                             {lockedCols.has(col) ? '🔒' : col + 1}
@@ -2225,7 +2240,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                 style={{ animationDelay: `${col * 45}ms` }}
                                             >
                                                 <SlotSymbol symbol={item} />
-                                                <em>{item.label}</em>
+                                                <em data-slot-symbol-label={item.id}>{item.label}</em>
                                                 {moneyValue ? <i className="money-chip" aria-label={`Raw prize multiplier ${moneyValue}`}>{moneyValue.toFixed(2)}× raw</i> : null}
                                                 {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
                                                 {isSticky && <span className="slot-cell-sticky-badge" aria-hidden>★</span>}
@@ -2355,7 +2370,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         />
                         <button
                             type="button"
-                            onClick={() => setShowAutoplayDrawer(v => !v)}
+                            onClick={toggleAutoplay}
                             className={autoplayActive ? 'active' : ''}
                             disabled={running}
                             aria-label="Autoplay"
@@ -2496,9 +2511,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                         aria-live="polite"
                         aria-label={`Tumble step ${cascadeActiveStep.index + 1} of ${cascadeLadderSteps.length}, multiplier ${cascadeActiveStep.multiplier} times`}
                     >
-                        <span>Tumble</span>
+                        <span>Raw tumble subtotal</span>
                         <strong>×{cascadeActiveStep.multiplier}</strong>
-                        <em>{formatCredits(cascadeLivePayout)}</em>
+                        <em>{cascadeLivePayout.toFixed(2)}× raw · not GC</em>
+                        <small>Feature multipliers, payout scaling, caps and rounding determine the total paid return.</small>
                     </div>
                 )}
                 {/* Side ladder of every step's multiplier — fires while the
@@ -2532,6 +2548,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             <button type="button" onClick={closeAutoplay} aria-label="Close"><X size={16} /></button>
                         </header>
                         <p className="slot-auto-banner">Practice credits only. No real money.</p>
+                        <p className="slot-panel-note">Counts completed rounds, including free spins. Busy attempts do not count; unused free spins remain available after the selected count.</p>
                         <div className="slot-auto-counts">
                             {AUTOPLAY_COUNTS.map(count => (
                                 <button

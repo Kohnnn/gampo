@@ -16,6 +16,7 @@ import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
+import { nextStepQuote } from '../primitives/autoAccounting'
 import EducationPanel from '../../EducationPanel'
 import DinoEngine from './engine/DinoEngine'
 import './dino.css'
@@ -60,9 +61,14 @@ export default function DinoGame() {
     const multiplier = Number(Math.pow(config.growth, steps).toFixed(2))
     const inRound = phase === 'running'
     const nextMultiplier = Number(Math.pow(config.growth, inRound ? steps + 1 : 1).toFixed(2))
-    const educationDecision = !inRound && lastBet !== null
-        ? { settled: true }
-        : { label: 'Next jump', probability: config.safe, payoutMultiplier: nextMultiplier, ...(inRound && steps > 0 ? { cashoutMultiplier: multiplier } : {}) }
+    // QA030: the lesson states what the next jump pays in the state the player is
+    // in. The old `{ settled: true }` arm dropped the conditional quote as soon as
+    // a round ended, so the panel lost the very numbers it exists to teach.
+    const educationDecision = nextStepQuote({
+        probability: config.safe,
+        payoutMultiplier: nextMultiplier,
+        cashoutMultiplier: inRound && steps > 0 ? multiplier : undefined,
+    })
 
     // Mount engine
     useEffect(() => {

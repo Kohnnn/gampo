@@ -5,7 +5,7 @@
 // the implementation guide. `rainbet` polish is borrowed into the default skin
 // rather than a separate switch (per Wave plan 2026-05-23).
 
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { formatCredits } from '../../../utils/simulationMath'
 import { resolveImage } from '../../../utils/assetPaths'
@@ -36,7 +36,7 @@ export default function GameShell({
     const titlebarRef = useRef(null)
     const playfieldRef = useRef(null)
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!primaryStage) return undefined
         const shell = shellRef.current
         const playfield = playfieldRef.current

@@ -1,10 +1,12 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { readRaw, writeJson, writeRaw } from '../utils/storage'
 
 export const INITIAL_CREDITS = 1000
 export const CREDIT_STORAGE_KEY = 'gampo_credits'
 export const HISTORY_STORAGE_KEY = 'gampo_history'
 
 const CreditContext = createContext(null)
+const HISTORY_WARNING = 'history-write-failure'
 
 export function readNumber(key, fallback) {
     try {
@@ -20,31 +22,28 @@ export function readNumber(key, fallback) {
 function readHistory() {
     try {
         const stored = localStorage.getItem(HISTORY_STORAGE_KEY)
-        if (!stored) return []
+        if (stored === null) return []
         return JSON.parse(stored).map(item => ({
             ...item,
             timestamp: new Date(item.timestamp),
         }))
     } catch {
-        return []
+        return null
     }
 }
 
+// Routed through the shared storage helpers so a quota refusal signals the
+// session-guard banner. Writing `localStorage.setItem` directly here swallowed
+// a full disk with no notice to the player, which is how a committed round
+// could be shown as saved while its balance was never written.
 function persistCredits(value) {
-    try {
-        localStorage.setItem(CREDIT_STORAGE_KEY, String(value))
-    } catch {
-        /* local persistence is optional */
-    }
+    return writeRaw(CREDIT_STORAGE_KEY, value)
 }
 
 function persistHistory(history) {
-    try {
-        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history))
-    } catch {
-        /* local persistence is optional */
-    }
+    return writeJson(HISTORY_STORAGE_KEY, history)
 }
+
 
 function roundCredits(value) {
     return Math.max(0, Number(value.toFixed(2)))
@@ -92,7 +91,8 @@ export function commitPreparedCreditTransactions(prepared, commit, publish) {
 export function CreditProvider({ children }) {
     const [balance, setBalance] = useState(() => readNumber(CREDIT_STORAGE_KEY, INITIAL_CREDITS))
     const [currency, setCurrency] = useState('GC')
-    const [transactions, setTransactions] = useState(readHistory)
+    const [initialHistory] = useState(readHistory)
+    const [transactions, setTransactions] = useState(initialHistory ?? [])
     const [toasts, setToasts] = useState([])
     // Accepted mutations advance immediately, even when a timer retains an
     // earlier consumer callback and React has not rendered the next balance.
@@ -100,49 +100,100 @@ export function CreditProvider({ children }) {
     const transactionsRef = useRef(transactions)
     const toastIdRef = useRef(0)
 
-    const recordTransaction = useCallback((entry) => {
-        const next = [{
-            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            timestamp: new Date(),
-            ...entry,
-        }, ...transactionsRef.current].slice(0, 100)
-        transactionsRef.current = next
-        setTransactions(next)
-        persistHistory(next)
-    }, [])
+    // Read storage on each operation to include sequential peer writes, but do
+    // not merge the local ref: a reset or import can replace history wholesale.
+    // ponytail: a refused history write leaves its receipt unsaved; recovering it
+    // safely requires a replacement generation shared with reset and import.
+    const readStoredHistory = useCallback(() => readHistory(), [])
+
 
     const showToast = useCallback((type, title, description, duration = 3000) => {
         const id = ++toastIdRef.current
-        // Wave 13: dedupe rapid-fire same-title toasts (e.g. autoplay spin spam)
-        // and cap the visible stack at 3 so the screen never fills with messages.
+        // Keep a session warning ahead of ordinary toasts, without allowing it
+        // to consume the remaining two places when rapid game toasts arrive.
         setToasts(prev => {
+            const warning = prev.find(toast => toast.id === HISTORY_WARNING)
             const sameKey = `${type}|${title}`
-            const filtered = prev.filter(t => `${t.type}|${t.title}` !== sameKey).slice(-2)
-            return [...filtered, { id, type, title, description }]
+            const filtered = prev.filter(toast => toast.id !== HISTORY_WARNING && `${toast.type}|${toast.title}` !== sameKey).slice(warning ? -1 : -2)
+            return [...(warning ? [warning] : []), ...filtered, { id, type, title, description }]
         })
         window.setTimeout(() => {
             setToasts(prev => prev.filter(toast => toast.id !== id))
         }, duration)
     }, [])
 
+    useEffect(() => {
+        if (initialHistory === null) {
+            showToast('error', 'Saved credit history unavailable', 'Saved credit history could not be read; it has not been changed.')
+        }
+    }, [initialHistory, showToast])
+    const warnHistoryIncomplete = useCallback(() => {
+        setToasts(prev => prev.some(toast => toast.id === HISTORY_WARNING) ? prev : [
+            { id: HISTORY_WARNING, kind: HISTORY_WARNING, type: 'error', title: 'History may be incomplete', description: 'Some activity was not saved.' },
+            ...prev.slice(-2),
+        ])
+    }, [])
+
+
+    const recordTransaction = useCallback((entry) => {
+        const history = readStoredHistory()
+        if (history === null) {
+            warnHistoryIncomplete()
+            return
+        }
+        const next = [{
+            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            timestamp: new Date(),
+            ...entry,
+        }, ...history].slice(0, 100)
+        transactionsRef.current = next
+        setTransactions(next)
+        if (!persistHistory(next)) warnHistoryIncomplete()
+    }, [readStoredHistory, warnHistoryIncomplete])
+
+    // D-1: affordability and the applied delta are decided against the value
+    // that is actually stored, never against a tab-local ref. A ref is seeded
+    // at mount and only updated by this document's own writes, so in a second
+    // tab it stays stale for the life of the session; publishing from it
+    // overwrites a peer's committed balance (1200 staked against 1000 funded).
+    // Reading first is the whole repair, and it keeps the API synchronous so
+    // the 42 existing call sites are unchanged.
+    //
+    // `persistFailedRef` handles the one case where the stored value is the
+    // stale one: a refused write (quota, storage unavailable) leaves storage
+    // behind the ref. Continuing to trust storage there would re-offer a
+    // balance already spent and charge the same stake again, so from the first
+    // refused write until a write succeeds, the ref wins. That is the only
+    // state in which the ref is the fresher of the two.
+    const persistFailedRef = useRef(false)
+    const commitBalance = useCallback((nextBalance) => {
+        persistFailedRef.current = !persistCredits(nextBalance)
+    }, [])
+    const currentBalance = useCallback(() => {
+        if (persistFailedRef.current) return balanceRef.current
+        const stored = readNumber(CREDIT_STORAGE_KEY, NaN)
+        return Number.isFinite(stored) ? roundCredits(stored) : balanceRef.current
+    }, [])
+
     const updateBalance = useCallback((newBalance, reason = 'adjustment') => {
         const rounded = roundCredits(Number(newBalance) || 0)
         balanceRef.current = rounded
         setBalance(rounded)
-        persistCredits(rounded)
+        commitBalance(rounded)
         recordTransaction({ type: reason, amount: 0, balance: rounded })
-    }, [recordTransaction])
+    }, [commitBalance, recordTransaction])
 
     const placeBet = useCallback((amount, label = 'Practice bet') => {
         const amt = Number(amount)
-        if (!Number.isFinite(amt) || amt <= 0 || amt > balanceRef.current) {
+        const available = currentBalance()
+        if (!Number.isFinite(amt) || amt <= 0 || amt > available) {
             return false
         }
 
-        const nextBalance = roundCredits(balanceRef.current - amt)
+        const nextBalance = roundCredits(available - amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
-        persistCredits(nextBalance)
+        commitBalance(nextBalance)
         recordTransaction({
             type: 'bet',
             label,
@@ -150,26 +201,31 @@ export function CreditProvider({ children }) {
             balance: nextBalance,
         })
         return true
-    }, [recordTransaction])
+    }, [commitBalance, currentBalance, recordTransaction])
 
     const addWinnings = useCallback((amount, label = 'Simulation return') => {
         const amt = Number(amount)
         if (!Number.isFinite(amt) || amt <= 0) return
 
-        const nextBalance = roundCredits(balanceRef.current + amt)
+        const nextBalance = roundCredits(currentBalance() + amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
-        persistCredits(nextBalance)
+        commitBalance(nextBalance)
         recordTransaction({
             type: 'win',
             label,
             amount: roundCredits(amt),
             balance: nextBalance,
         })
-    }, [recordTransaction])
+    }, [commitBalance, currentBalance, recordTransaction])
 
     const runCreditTransactionsTransactional = useCallback((entries, commit) => {
-        const prepared = prepareCreditTransactions(balanceRef.current, transactionsRef.current, entries)
+        const history = readStoredHistory()
+        if (history === null) {
+            showToast('error', 'Credit history unavailable', 'The transaction was not saved because saved credit history could not be read.')
+            return { ok: false, code: 'history-unavailable' }
+        }
+        const prepared = prepareCreditTransactions(currentBalance(), history, entries)
         return commitPreparedCreditTransactions(prepared, commit, (nextBalance, nextTransactions) => {
             // The durable commit/readback has succeeded before either the
             // authoritative refs or React consumers see the prepared state.
@@ -177,8 +233,22 @@ export function CreditProvider({ children }) {
             transactionsRef.current = nextTransactions
             setBalance(nextBalance)
             setTransactions(nextTransactions)
+            // Repair storage only where it diverges from the committed state.
+            // A caller whose own commit already wrote these keys (the sportsbook
+            // `commitRaw` writes credits and history) would otherwise be written
+            // twice here. Repairing is still needed for a caller that commits
+            // elsewhere: without it `gampo_credits` lags the ref and the next
+            // affordability read rejects a stake the user can afford.
+            // ponytail: like every other local persist this is best-effort.
+            // Making it fail loud belongs with the lock wiring, where a failed
+            // write can be reported as one atomic outcome rather than leaving a
+            // round shown as committed while its balance is not on disk.
+            if (readNumber(CREDIT_STORAGE_KEY, NaN) !== nextBalance) commitBalance(nextBalance)
+            if (readRaw(HISTORY_STORAGE_KEY, null) !== JSON.stringify(nextTransactions)) {
+                persistHistory(nextTransactions)
+            }
         })
-    }, [])
+    }, [commitBalance, currentBalance, readStoredHistory, showToast])
 
     const placeBetTransactional = useCallback((amount, label, transactionId, commit) => (
         runCreditTransactionsTransactional([{ type: 'bet', label, amount, transactionId }], commit)
@@ -192,22 +262,22 @@ export function CreditProvider({ children }) {
         const amt = Number(amount)
         if (!Number.isFinite(amt) || amt <= 0) return
 
-        const nextBalance = roundCredits(balanceRef.current + amt)
+        const nextBalance = roundCredits(currentBalance() + amt)
         balanceRef.current = nextBalance
         setBalance(nextBalance)
-        persistCredits(nextBalance)
+        commitBalance(nextBalance)
         recordTransaction({
             type: 'grant',
             label: 'Practice credit top-up',
             amount: roundCredits(amt),
             balance: nextBalance,
         })
-    }, [recordTransaction])
+    }, [commitBalance, currentBalance, recordTransaction])
 
     const resetBalance = useCallback(() => {
         balanceRef.current = INITIAL_CREDITS
         setBalance(INITIAL_CREDITS)
-        persistCredits(INITIAL_CREDITS)
+        commitBalance(INITIAL_CREDITS)
         const entry = {
             id: `${Date.now()}-reset`,
             type: 'reset',
@@ -219,7 +289,7 @@ export function CreditProvider({ children }) {
         transactionsRef.current = [entry]
         setTransactions([entry])
         persistHistory([entry])
-    }, [])
+    }, [commitBalance])
 
     const value = {
         balance,

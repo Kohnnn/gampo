@@ -71,6 +71,9 @@ import {
     shouldPlayRarityStinger,
 } from './casesAnimation'
 import { createCaseOpeningRound } from './caseOpening'
+import CaseArt from './CaseArt'
+import { caseDisclosure } from './caseDisclosure'
+import { useCasesManifest } from './useCasesManifest'
 import {
     CASE_CATEGORIES,
     caseCategoryCounts,
@@ -78,7 +81,6 @@ import {
     caseDropOdds,
     casePriceBand,
     filterCasesByCategory,
-    normalizeCaseForRuntime,
     rarityDropWeight,
     roundGc,
     roundSignedGc,
@@ -140,7 +142,7 @@ export function CaseReelTile({
             data-case-outcome-id={item.skinId || item.id}
             data-case-outcome-variant={item.variantKey || ''}
         >
-            <img src={item.image} alt={item.name} loading="lazy" />
+            <CaseArt src={item.image} alt={item.name} />
             <small>{displayName}</small>
             {item.valueGc != null && (
                 <em className="cases-carousel-value">{formatCredits(item.valueGc)}</em>
@@ -207,7 +209,7 @@ export function CaseMultiOpenGrid({
                         </div>
                         {result ? (
                             <div className="cases-mini-result">
-                                <img src={result.image} alt={result.name} loading="lazy" />
+                                <CaseArt src={result.image} alt={result.name} />
                                 <div>
                                     <span className="cases-mini-badges">
                                         {result.statTrak && <b className="stattrak">ST™</b>}
@@ -271,6 +273,8 @@ function CaseBetRail({ activeCase, balance, casePrice, rows, totalStake }) {
 
 function CaseRightPanel({
     activeCase,
+    casesReady,
+    openButtonRef,
     allCases,
     autoOpen,
     autoPanelOpen,
@@ -321,7 +325,7 @@ function CaseRightPanel({
         <aside className="cases-right-panel" data-case-panel="commands" data-ux-surface="controls" aria-label="Cases controls and stats">
             <section className="cases-control-card cases-control-primary">
                 <header className="cases-right-selected">
-                    {activeCase && <img src={activeCase.image} alt="" loading="lazy" />}
+                    {activeCase && <CaseArt src={activeCase.image} alt="" />}
                     <div>
                         <span>Selected case</span>
                         <strong>{activeCase?.name || 'Loading case'}</strong>
@@ -385,6 +389,7 @@ function CaseRightPanel({
                     <span className={autoSessionProfit >= 0 ? 'pos' : 'neg'}><small>Auto P/L</small><strong>{autoSessionProfit >= 0 ? '+' : ''}{formatCredits(autoSessionProfit)}</strong></span>
                 </div>
                 <button
+                    ref={openButtonRef}
                     type="button"
                     className={`cases-right-cta ${isHolding ? 'is-auto-arming' : ''}`}
                     data-game-action={results.length > 0 ? 'case-open-again' : 'case-open'}
@@ -395,12 +400,12 @@ function CaseRightPanel({
                     onMouseLeave={handleOpenMouseUp}
                     onTouchStart={handleOpenMouseDown}
                     onTouchEnd={handleOpenMouseUp}
-                    disabled={running || !activeCase || balance < totalStake}
+                    disabled={running || !casesReady || balance < totalStake}
                 >
                     {results.length > 0 ? `Open again (${formatCredits(totalStake)})` : `Open ×${rows} (${formatCredits(totalStake)})`}
                 </button>
                 <div className="cases-side-actions">
-                    <button type="button" data-case-action={autoOpen ? 'auto-stop' : 'auto-start'} onClick={autoOpen ? stopCaseAuto : startCaseAuto} disabled={running && !autoOpen}>
+                    <button type="button" data-case-action={autoOpen ? 'auto-stop' : 'auto-start'} onClick={autoOpen ? stopCaseAuto : startCaseAuto} disabled={!casesReady || (running && !autoOpen)}>
                         {autoOpen ? 'Stop auto' : 'Start auto'}
                     </button>
                     <button type="button" onClick={skipCaseAnimation} disabled={!running}>
@@ -431,10 +436,10 @@ function CaseRightPanel({
                             onClick={() => selectCase(c.id)}
                             disabled={running}
                         >
-                            <img src={c.image} alt="" loading="lazy" />
+                            <CaseArt src={c.image} alt="" />
                             <span>
                                 <strong>{c.name}</strong>
-                                <em>{c.items.length} items · EV {formatCredits(c.evGc || 0)}</em>
+                                <em>{c.items.length} items · Base EV {formatCredits(c.evGc || 0)}</em>
                             </span>
                             <b>{formatCredits(c.openPriceGc || 0)}</b>
                         </button>
@@ -460,7 +465,7 @@ function CaseRightPanel({
                     {caseUxStats.best.length === 0 ? <em>No opens yet</em> : caseUxStats.best.map((drop, index) => (
                         <span key={`${drop.dropId || drop.key}-${index}`} style={{ '--rarity': drop.color }}>
                             <b>#{index + 1}</b>
-                            <img src={drop.image} alt="" loading="lazy" />
+                            <CaseArt src={drop.image} alt="" />
                             <small>{drop.name}</small>
                             <strong>{formatCredits(drop.valueGc || 0)}</strong>
                         </span>
@@ -607,7 +612,7 @@ export default function CasesGame() {
     const collection = useCaseCollection({ catalogTotal: csCatalog.catalog?.totalSkins || 0 })
     const [searchParams, setSearchParams] = useSearchParams()
 
-    const [allCases, setAllCases] = useState(null)
+    const { cases: allCases, status: manifestStatus, retry: retryManifest } = useCasesManifest()
     const [category, setCategory] = useState('popular')
     const [caseId, setCaseId] = useState(null)
     const [rows, setRows] = useState(1)
@@ -635,6 +640,15 @@ export default function CasesGame() {
     const [celebrationDrop, setCelebrationDrop] = useState(null)
     const [shakeKey, setShakeKey] = useState(0) // B1: increment to re-trigger screen shake on Contraband
     const [settlementSummary, setSettlementSummary] = useState(null)
+    // QA041: a settled result belongs to the case it came from. Every path that
+    // changes the selected case must clear the result surfaces with it, or one
+    // case's drops are attributed to another. View-only: wallet, inventory and
+    // the recorded settlement are untouched.
+    const clearStaleResult = useCallback(() => {
+        setResults([])
+        setSettlementSummary(null)
+        setCelebrationDrop(null)
+    }, [])
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
@@ -664,10 +678,15 @@ export default function CasesGame() {
     const autoTimerRef = useRef(null)
     const autoRollTimerRef = useRef(null) // P4: long-press auto-roll
     const pendingRoundRef = useRef(null)
+    const geometryRoundRef = useRef(null)
     const celebrationTimerRef = useRef(null)
     const resultsPanelRef = useRef(null)
     const reelAreaRef = useRef(null)
     const stageRef = useRef(null)
+    const manifestFocusRef = useRef(null)
+    const manifestRetriedRef = useRef(false)
+    const openButtonRef = useRef(null)
+    const mobileOpenButtonRef = useRef(null)
     const initialCaseIdRef = useRef(searchParams.get('caseId'))
     const [dockPortal, setDockPortal] = useState(null)
     useEffect(() => { setDockPortal(document.body) }, [])
@@ -679,28 +698,26 @@ export default function CasesGame() {
     }, [view, csCatalog.load])
 
     useEffect(() => {
-        let cancelled = false
-        fetch('/data/cs-cases.json').then(r => r.json()).then(data => {
-            if (cancelled) return
-            const normalized = data.map(c => normalizeCaseForRuntime(c))
-            setAllCases(normalized)
-            const requestedCaseId = initialCaseIdRef.current
-            const first = normalized.find(c => c.id === requestedCaseId) || filterCasesByCategory(normalized, 'popular')[0] || normalized[0]
-            if (first) setCaseId(first.id)
-        }).catch(err => {
-            // eslint-disable-next-line no-console
-            console.warn('[cases] manifest load failed', err)
-        })
-        return () => { cancelled = true }
-    }, [])
+        if (!allCases) return
+        const requestedCaseId = initialCaseIdRef.current
+        const first = allCases.find(c => c.id === requestedCaseId) || filterCasesByCategory(allCases, 'popular')[0] || allCases[0]
+        if (first && first.id !== caseId && !running) { setCaseId(first.id); clearStaleResult() }
+    }, [allCases])
 
     useEffect(() => {
         if (!allCases?.length) return
+        // QA041: a round in flight owns the selected case until it settles.
+        // Switching mid-spin would leave finishPendingRound attributing the old
+        // round's picks to the newly selected case. Same guard as selectCase and
+        // selectCategory; the queued caseId is applied once the round ends, because
+        // searchParams is unchanged and this effect re-runs on `running`.
+        if (running) return
         const requestedCaseId = searchParams.get('caseId')
         if (requestedCaseId && requestedCaseId !== caseId && allCases.some(c => c.id === requestedCaseId)) {
             setCaseId(requestedCaseId)
+            clearStaleResult()
         }
-    }, [allCases, caseId, searchParams])
+    }, [allCases, caseId, searchParams, running])
 
     const categoryCases = useMemo(() => {
         const list = filterCasesByCategory(allCases || [], category)
@@ -709,10 +726,38 @@ export default function CasesGame() {
     }, [allCases, category, caseGridSearch])
 
     const activeCase = useMemo(() => (allCases || []).find(c => c.id === caseId) || categoryCases[0], [allCases, caseId, categoryCases])
+    const casesReady = manifestStatus === 'ready' && Boolean(activeCase) && preloader.ready
+    useEffect(() => {
+        const priorFocus = manifestFocusRef.current
+        if (!casesReady || !priorFocus) return
+        manifestFocusRef.current = null
+        if (priorFocus.isConnected) return
+        if (document.activeElement && document.activeElement !== document.body) return
+        const mobileOpen = mobileOpenButtonRef.current
+        const open = mobileOpen?.getClientRects().length ? mobileOpen : openButtonRef.current
+        open?.focus()
+    }, [casesReady])
     const casePrice = activeCase ? Math.max(1, roundGc(activeCase.openPriceGc, 1)) : 5
     const totalStake = roundGc(casePrice * rows, casePrice)
 
     const machine = useRoundMachine({})
+    useEffect(() => {
+        if (!tracks.length || !stageRef.current) return undefined
+        const align = () => {
+            const round = geometryRoundRef.current
+            if (!round) return
+            const { tilePx, gapPx } = getCaseReelMetrics(stageRef.current)
+            round.entries.forEach((entry, index) => {
+                round.offsets[index] = -(entry.targetIndex * (tilePx + gapPx) + tilePx / 2) + entry.jitter
+            })
+            if (!pendingRoundRef.current || ['land', 'reveal', 'settled'].includes(casePhase)) setTrackOffsets([...round.offsets])
+        }
+        align()
+        window.addEventListener?.('resize', align)
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(align)
+        observer?.observe(stageRef.current)
+        return () => { observer?.disconnect(); window.removeEventListener?.('resize', align) }
+    }, [tracks, casePhase])
 
     const clearRevealTimers = useCallback(() => {
         revealTimersRef.current.forEach(id => window.clearTimeout(id))
@@ -908,8 +953,7 @@ export default function CasesGame() {
     }, [finishPendingRound])
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (running) { resolve({ profit: 0 }); return }
-        if (!activeCase) { showToast('error', 'Loading cases', 'Try again'); resolve({ profit: 0 }); return }
+        if (running || !casesReady) { resolve({ profit: 0 }); return }
         const unitPrice = Math.max(1, roundGc(activeCase.openPriceGc || betAmount || 1, 1))
         const stake = roundGc(unitPrice * rows, unitPrice)
         if (!placeBet(stake, 'Cases')) {
@@ -950,6 +994,7 @@ export default function CasesGame() {
             tilePx,
             gapPx,
         })
+        geometryRoundRef.current = round
         const picks = round.outcomes
         const newTracks = round.tracks
         const finalOffsets = round.offsets
@@ -1063,7 +1108,7 @@ export default function CasesGame() {
             window.clearTimeout(autoTimerRef.current)
             autoTimerRef.current = null
         }
-        if (!autoOpen || running || !activeCase) return undefined
+        if (!autoOpen || running || !casesReady) return undefined
         if (casePhase !== 'idle' && casePhase !== 'settled') return undefined
         if (autoRoundsLeft !== Infinity && Number(autoRoundsLeft || 0) <= 0) {
             setAutoOpen(false)
@@ -1085,10 +1130,38 @@ export default function CasesGame() {
                 autoTimerRef.current = null
             }
         }
-    }, [activeCase, autoOpen, autoRoundsLeft, autoSpeed, balance, casePhase, casePrice, quickOpen, running, showToast, totalStake])
+    }, [activeCase, autoOpen, autoRoundsLeft, autoSpeed, balance, casePhase, casePrice, casesReady, quickOpen, running, showToast, totalStake])
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
-    const stageLoading = !preloader.ready || !allCases
+    const stageLoading = !casesReady
+    const manifestLoadingNode = (
+        <div
+            className="cases-manifest-status"
+            role="status"
+            aria-live="polite"
+            aria-busy={manifestStatus === 'loading' || undefined}
+            onFocusCapture={event => { manifestFocusRef.current = event.target }}
+            onBlurCapture={event => {
+                if (!event.currentTarget.contains(event.relatedTarget) && (event.relatedTarget || !event.target.disabled)) manifestFocusRef.current = null
+            }}
+        >
+            <p>{manifestStatus === 'error' ? 'Cases are unavailable. Try again.' : manifestStatus === 'loading' ? 'Loading cases…' : 'Loading stage…'}</p>
+            {(manifestStatus === 'error' || manifestRetriedRef.current) && (
+                <button
+                    type="button"
+                    className="cases-manifest-retry"
+                    aria-label="Retry loading cases"
+                    disabled={manifestStatus !== 'error'}
+                    onClick={() => {
+                        manifestRetriedRef.current = true
+                        retryManifest()
+                    }}
+                >
+                    Retry
+                </button>
+            )}
+        </div>
+    )
 
     const pokedexList = useMemo(() => Object.values(collection.pokedex), [collection.pokedex])
     const caseUxStats = useMemo(() => {
@@ -1259,31 +1332,7 @@ export default function CasesGame() {
         [activeCase, collection.caseStats],
     )
 
-    // C-P0-2: feed the EV coach real per-case numbers instead of placeholders.
-    //  - payoutMultiplier: the case's expected value per unit stake (evGc / open
-    //    price). Below 1 reflects the built-in house edge of opening.
-    //  - winProbability: weight-normalized chance a single drop is worth at least
-    //    the open price (a "break even or better" proxy), using the same drop
-    //    weights as the live roll so the figure matches the odds table.
-    const educationMetrics = useMemo(() => {
-        if (!activeCase) return { winProbability: undefined, payoutMultiplier: undefined }
-        const price = Math.max(1, roundGc(activeCase.openPriceGc, 1))
-        const ev = Number(activeCase.evGc) || 0
-        const payoutMultiplier = price > 0 ? roundGc(ev / price, 0) : undefined
-        const items = Array.isArray(activeCase.items) ? activeCase.items : []
-        let totalWeight = 0
-        let winWeight = 0
-        items.forEach(item => {
-            const weight = rarityDropWeight(item)
-            totalWeight += weight
-            const value = Number(item.valueGc) || Number(item.multiplier) || 0
-            if (value >= price) winWeight += weight
-        })
-        const winProbability = totalWeight > 0
-            ? Math.min(1, Math.max(0, winWeight / totalWeight))
-            : undefined
-        return { winProbability, payoutMultiplier }
-    }, [activeCase])
+    const educationMetrics = useMemo(() => caseDisclosure(activeCase, rows), [activeCase, rows])
 
     const selectView = useCallback((nextView) => {
         if (running || view === nextView) return
@@ -1298,24 +1347,27 @@ export default function CasesGame() {
         const first = filterCasesByCategory(allCases || [], nextCategory)[0]
         if (first) {
             setCaseId(first.id)
+            clearStaleResult()
             setSearchParams(prev => {
                 const next = new URLSearchParams(prev)
                 next.set('caseId', first.id)
                 return next
             }, { replace: true })
         }
-    }, [allCases, category, running, setSearchParams, sfx])
+    }, [allCases, category, running, setSearchParams, sfx, clearStaleResult])
 
     const selectRows = useCallback((nextRows) => {
         if (running || rows === nextRows) return
         sfx.play('click', { volume: 0.32 })
         setRows(nextRows)
-    }, [rows, running, sfx])
+        clearStaleResult()
+    }, [rows, running, sfx, clearStaleResult])
 
     const selectCase = useCallback((nextCaseId) => {
         if (running || caseId === nextCaseId) return
         sfx.play('reveal', { volume: 0.24 })
         setCaseId(nextCaseId)
+        clearStaleResult()
         // C-P1-2: once the player actively picks a case, collapse the browser so
         // the reel-first stage leads. The browser stays open until this first
         // explicit selection (or an open), and the toggle still reopens it.
@@ -1325,14 +1377,14 @@ export default function CasesGame() {
             next.set('caseId', nextCaseId)
             return next
         }, { replace: true })
-    }, [caseId, running, setSearchParams, sfx])
+    }, [caseId, running, setSearchParams, sfx, clearStaleResult])
 
     // P4: long-press the Open button to auto-roll until cancel
     const handleOpenMouseDown = useCallback(() => {
-        if (running || !activeCase || balance < totalStake) return
+        if (running || !casesReady || balance < totalStake) return
         setIsHolding(true)
         const id = window.setTimeout(() => {
-            if (!activeCase || balance < totalStake) { setIsHolding(false); return }
+            if (!casesReady || balance < totalStake) { setIsHolding(false); return }
             const nextLeft = autoPreset === 'infinite' ? Infinity : Math.max(1, Number(autoPreset) || 10)
             setAutoRoundsLeft(nextLeft)
             setAutoSessionProfit(0)
@@ -1342,7 +1394,7 @@ export default function CasesGame() {
             sfx.play('click', { volume: 0.4 })
         }, 500)
         autoRollTimerRef.current = id
-    }, [activeCase, autoPreset, balance, running, sfx, totalStake])
+    }, [activeCase, autoPreset, balance, casesReady, running, sfx, totalStake])
 
     const handleOpenMouseUp = useCallback(() => {
         if (autoRollTimerRef.current) {
@@ -1350,22 +1402,23 @@ export default function CasesGame() {
             autoRollTimerRef.current = null
         }
         setIsHolding(false)
+        if (!casesReady) return
         if (autoRollArmed) {
             // Short press: do a single open
             setAutoRollArmed(false)
             performPlay({ betAmount: casePrice })
         }
-    }, [autoRollArmed, casePrice, performPlay])
+    }, [autoRollArmed, casePrice, casesReady, performPlay])
 
     const startCaseAuto = useCallback(() => {
-        if (running || autoOpen) return
+        if (!casesReady || running || autoOpen) return
         const nextLeft = autoPreset === 'infinite' ? Infinity : Math.max(1, Number(autoPreset) || 10)
         setAutoRoundsLeft(nextLeft)
         setAutoSessionProfit(0)
         setAutoOpen(true)
         setAutoPanelOpen(false)
         sfx.play('click', { volume: 0.32 })
-    }, [autoOpen, autoPreset, running, sfx])
+    }, [autoOpen, autoPreset, casesReady, running, sfx])
 
     const stopCaseAuto = useCallback(() => {
         if (autoTimerRef.current) {
@@ -1454,6 +1507,8 @@ export default function CasesGame() {
             aside={
                 <CaseRightPanel
                     activeCase={activeCase}
+                    casesReady={casesReady}
+                    openButtonRef={openButtonRef}
                     allCases={allCases || []}
                     autoOpen={autoOpen}
                     autoPanelOpen={autoPanelOpen}
@@ -1498,7 +1553,7 @@ export default function CasesGame() {
                 />
             }
         >
-            <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} className="cases-stage-frame">
+            <CoreStageFrame minHeight={620} maxWidth={1080} loading={stageLoading} loadingNode={manifestLoadingNode} className="cases-stage-frame">
                 <div
                     ref={stageRef}
                     className={`cases-stage case-phase-${casePhase}${running ? ' is-opening' : ''}${results.length > 0 ? ' has-result' : ''}${nearMiss ? ' case-near-miss' : ''}`}
@@ -1516,13 +1571,13 @@ export default function CasesGame() {
                         <>
                             {activeCase && (
                                 <section className="cases-selected-case" aria-label="Selected case">
-                                    <img src={activeCase.image} alt="" loading="lazy" />
+                                    <CaseArt src={activeCase.image} alt="" />
                                     <div className="cases-selected-copy">
                                         <span>{activeCase.categoryLabel || activeCase.type || 'Case'}</span>
                                         <strong>{activeCase.name}</strong>
                                         <em>{activeCase.items.length} possible drops · {activeCase.priceSource === 'csmarket' ? 'market median price' : 'EV-based price'}</em>
                                         <div className="cases-selected-metrics">
-                                            <b>EV {formatCredits(activeCase.evGc || 0)}</b>
+                                            <b>Base EV {formatCredits(activeCase.evGc || 0)}</b>
                                             <b>{activeCase.volatility?.label || casePriceBand(casePrice)}</b>
                                             <b>{casePriceBand(casePrice)}</b>
                                         </div>
@@ -1530,7 +1585,7 @@ export default function CasesGame() {
                                     <div className="cases-selected-rares" aria-label="Rare item preview">
                                         {(activeCase.rarePreview || []).map(item => (
                                             <span key={item.id} title={`${item.name} · ${item.rarity || 'Rare'}`} style={{ '--rarity': item.color }}>
-                                                <img src={item.image} alt="" loading="lazy" />
+                                                <CaseArt src={item.image} alt="" />
                                             </span>
                                         ))}
                                     </div>
@@ -1651,7 +1706,7 @@ export default function CasesGame() {
                                     <header className="cases-market-reel-head">
                                         <span>{activeCase.items.length} possible drops</span>
                                         <strong>{activeCase.name}</strong>
-                                        <em>{formatCredits(casePrice)} open · EV {formatCredits(activeCase.evGc || 0)}</em>
+                                        <em>{formatCredits(casePrice)} open · Base EV {formatCredits(activeCase.evGc || 0)}</em>
                                     </header>
                                     <div className="cases-market-reel-window" aria-hidden="true">
                                         {reelPreviewRows.map((row, rowIndex) => (
@@ -1669,7 +1724,7 @@ export default function CasesGame() {
                                                         className="cases-preview-tile"
                                                         style={{ '--rarity': item.color }}
                                                     >
-                                                        <img src={item.image} alt="" loading="lazy" />
+                                                        <CaseArt src={item.image} alt="" />
                                                         <em>{formatCredits(item.valueGc || item.multiplier || 0)}</em>
                                                     </span>
                                                 ))}
@@ -1696,18 +1751,18 @@ export default function CasesGame() {
                                         onClick={() => selectCase(c.id)}
                                         title={`${c.name} · ${formatCredits(c.openPriceGc || 0)} · ${c.items.length} items · EV ${formatCredits(c.evGc || 0)} · ${c.volatility?.label || 'volatility'}`}
                                     >
-                                        <img src={c.image} alt={c.name} loading="lazy" />
+                                        <CaseArt src={c.image} alt={c.name} />
                                         <strong className="cases-case-price">{formatCredits(c.openPriceGc || 0)}</strong>
                                         <span title={c.name}>{c.name}</span>
                                         <em>{casePriceBand(c.openPriceGc)} · {c.items.length} items · {c.type || 'Case'}</em>
                                         <div className="cases-case-metrics" aria-label="Expected value and volatility">
-                                            <b>EV {formatCredits(c.evGc || 0)}</b>
+                                            <b>Base EV {formatCredits(c.evGc || 0)}</b>
                                             <b>{c.volatility?.label || 'Stable'}</b>
                                         </div>
                                         <div className="cases-rare-preview" aria-label="Rare item preview">
                                             {(c.rarePreview || []).slice(0, 3).map(item => (
                                                 <i key={item.id} title={`${item.name} · ${item.rarity || 'Rare'}`} style={{ '--rarity': item.color }}>
-                                                    <img src={item.image} alt="" loading="lazy" />
+                                                    <CaseArt src={item.image} alt="" />
                                                 </i>
                                             ))}
                                         </div>
@@ -1788,7 +1843,7 @@ export default function CasesGame() {
                                                 data-case-outcome-id={r.skinId || r.id}
                                                 data-case-outcome-variant={r.variantKey || ''}
                                             >
-                                                <img src={r.image} alt={r.name} />
+                                                <CaseArt src={r.image} alt={r.name} />
                                                 <div className="cases-result-badges">
                                                     {r.statTrak && <b className="stattrak">StatTrak™</b>}
                                                     {r.souvenir && <b className="souvenir">Souvenir</b>}
@@ -1844,7 +1899,7 @@ export default function CasesGame() {
                                     aria-label="Rare drop"
                                 >
                                     <div className="cases-prize-card">
-                                        <img src={celebrationDrop.image} alt={celebrationDrop.name} />
+                                        <CaseArt src={celebrationDrop.image} alt={celebrationDrop.name} />
                                         <span>
                                             {celebrationDrop.statTrak && <em>StatTrak™ </em>}
                                             {celebrationDrop.souvenir && <em>Souvenir </em>}
@@ -1888,7 +1943,7 @@ export default function CasesGame() {
                                 <ul className="cases-history-list">
                                     {filteredDrops.map((d, i) => (
                                         <li key={`${d.key}-${d.ts}-${i}`} className={RARE_TIERS.has(d.rarity) ? 'rare' : ''} style={{ '--rarity': d.color }}>
-                                            <img src={d.image} alt={d.name} loading="lazy" />
+                                            <CaseArt src={d.image} alt={d.name} />
                                             <span className="cases-history-name">
                                                 {d.statTrak && <em className="cases-tag-st">ST™</em>}
                                                 {d.souvenir && <em className="cases-tag-sv">SV</em>}
@@ -1999,7 +2054,7 @@ export default function CasesGame() {
                                                     {drop.favorite ? '★' : '☆'}
                                                 </button>
                                                 <strong>{formatCredits(drop.valueGc || 0)}</strong>
-                                                <img src={drop.image} alt={drop.name} loading="lazy" />
+                                                <CaseArt src={drop.image} alt={drop.name} />
                                                 <small>
                                                     {drop.statTrak && <em className="cases-tag-st">ST™</em>}
                                                     {drop.souvenir && <em className="cases-tag-sv">SV</em>}
@@ -2034,7 +2089,7 @@ export default function CasesGame() {
                                     <div className="cases-collection-grid">
                                         {lockedSkins.slice(0, 48).map(skin => (
                                             <div key={skin.key} className="cases-skin-card cases-skin-locked" style={{ '--rarity': skin.color }} aria-label={`Locked skin ${skin.name}`}>
-                                                <img src={skin.image} alt={skin.name} loading="lazy" />
+                                                <CaseArt src={skin.image} alt={skin.name} />
                                                 <small className="cases-locked-name">{skin.name}</small>
                                                 <span className="cases-skin-meta">
                                                     <em>{skin.rarity}</em>
@@ -2053,7 +2108,7 @@ export default function CasesGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('cases')} />
-            <EducationPanel definition={definition} betAmount={casePrice} winProbability={educationMetrics.winProbability} payoutMultiplier={educationMetrics.payoutMultiplier} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={{ ...definition, rtp: educationMetrics?.rtp, houseEdge: educationMetrics ? 1 - educationMetrics.rtp : undefined }} betAmount={totalStake} winProbability={educationMetrics?.winChance} expectedGrossMultiplier={educationMetrics?.rtp} effectiveRtp={educationMetrics?.rtp} rtpLabel="Final payout RTP" rtpNote={educationMetrics ? `Base item EV ${formatCredits(educationMetrics.baseEv)} per drop, before modifiers. Final gross EV ${formatCredits(educationMetrics.grossEv)} and net EV ${formatCredits(educationMetrics.netEv)} for ${rows} row(s) at ${formatCredits(totalStake)}. Includes weighted wear, 10% StatTrak and 6% souvenir conditional on no StatTrak, with each payout rounded to 0.01 GC. Float does not change value; simulator modifiers apply to every item. Win means strictly above price (single drop only). ${activeCase.priceSource === 'fallback-ev' ? 'Fallback/manifest EV-based price, floored at 1 GC; not a target 92% RTP or live market quote.' : 'Uses the displayed opening price and normalized item values.'}` : 'Final payout expectation unavailable until a case loads.'} balance={balance} recentProfit={recentProfit} />
             {dockPortal && view === 'open' && createPortal(
                 <div className="cases-mobile-dock" data-cases-mobile-dock data-ux-surface="dock">
                     <button
@@ -2082,6 +2137,7 @@ export default function CasesGame() {
                         </button>
                     ) : (
                         <button
+                            ref={mobileOpenButtonRef}
                             type="button"
                             className={`cases-mobile-open ${isHolding ? 'is-auto-arming' : ''}`}
                             data-cases-mobile-open
@@ -2093,7 +2149,7 @@ export default function CasesGame() {
                             onMouseLeave={handleOpenMouseUp}
                             onTouchStart={handleOpenMouseDown}
                             onTouchEnd={handleOpenMouseUp}
-                            disabled={!activeCase || balance < totalStake}
+                            disabled={!casesReady || balance < totalStake}
                         >
                             {results.length > 0 ? `Open again ×${rows}` : `Open ×${rows}`}
                         </button>
