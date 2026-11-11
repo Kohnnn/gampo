@@ -63,6 +63,10 @@ for (const [name, args, options] of [
     ['remote base URL', ['--baseUrl=https://example.invalid']],
     ['lookalike loopback URL', ['--baseUrl=http://127.0.0.1.example.invalid']],
     ['loopback URL with remote redirect', ['--baseUrl=http://127.0.0.1:5180'], { redirect: true }],
+    // The gate is unconditional: arming must not be a way in. A future
+    // re-enablement has to delete this case deliberately, with review.
+    ['armed run still refuses', ['--arm', '--baseUrl=https://example.invalid']],
+    ['armed loopback run still refuses', ['--arm', '--baseUrl=http://127.0.0.1:5180']],
 ]) {
     const result = await invoke(args, options)
     try {
