@@ -75,12 +75,15 @@ export default function PumpGame() {
     // cashout reset the phase but not the counter), so idle must read step 0 or
     // the lesson quotes a step of a round that no longer exists.
     const livePumps = inRound ? pumps : 0
-    const educationDecision = nextStepQuote({
-        probability: 1 - STEP_BUST_CHANCE,
-        payoutMultiplier: livePumps >= MAX_PUMPS ? multiplierAt(livePumps) : multiplierAt(livePumps + 1),
-        // Only a live round with a banked step has something to cash out.
-        cashoutMultiplier: livePumps > 0 ? multiplierAt(livePumps) : undefined,
-    })
+    const atCap = inRound && pumps >= MAX_PUMPS
+    const educationDecision = atCap
+        ? { label: 'Cashout', probability: 1, payoutMultiplier: currentMult, cashoutMultiplier: currentMult }
+        : nextStepQuote({
+            probability: 1 - STEP_BUST_CHANCE,
+            payoutMultiplier: multiplierAt(livePumps + 1),
+            // Only a live round with a banked step has something to cash out.
+            cashoutMultiplier: livePumps > 0 ? multiplierAt(livePumps) : undefined,
+        })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (inRound) { resolve({ profit: 0 }); return }
@@ -177,7 +180,6 @@ export default function PumpGame() {
                     onPlay={performPlay}
                     disableAuto
                     lastBet={lastBet}
-                    initialBet={selectedStake}
                     onStakeChange={setSelectedStake}
                     playPhase={inRound && pumps > 0 ? 'in-round' : null}
                     playLabel={inRound && pumps > 0 ? `Cashout ${currentMult.toFixed(2)}×` : 'Place Bet'}
@@ -188,7 +190,7 @@ export default function PumpGame() {
                         <strong>{STEP_RAMP.toFixed(2)}×</strong>
                     </div>
                     <div className="bp-bal-line">
-                        <span>Bust per pump</span>
+                        <span>Bust per risky pump</span>
                         <strong>{(STEP_BUST_CHANCE * 100).toFixed(0)}%</strong>
                     </div>
                     <div className="bp-bal-line">
@@ -232,8 +234,10 @@ export default function PumpGame() {
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('pump')} />
             <EducationPanel
-                definition={definition}
+                definition={{ ...definition, lesson: 'Each risky pump increases the multiplier by about 1.09× with a 12% chance to burst. At the cap, Pump or Cashout pays the banked amount.' }}
                 betAmount={inRound ? stake : selectedStake}
+                rtpLabel="RTP per risky pump"
+                rtpNote={atCap ? `Cap reached: Pump and Cashout both immediately return the banked ${currentMult.toFixed(4)}× multiplier without a burst. RTP and house edge describe a risky pump, not this cashout or a whole round.` : undefined}
                 conditionalDecision={educationDecision}
                 balance={balance}
                 recentProfit={recentProfit}

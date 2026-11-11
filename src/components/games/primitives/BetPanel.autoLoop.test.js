@@ -93,7 +93,7 @@ describe('Auto loop reconciles a resolved round', () => {
         // so a persistent refusal loops until a terminal kind arrives. `unknown`
         // and `aborted` are the loop's own stop signal.
         const onPlay = vi.fn()
-            .mockResolvedValueOnce({ kind: 'rejected', code: 'insufficient-funds', profit: 0 })
+            .mockResolvedValueOnce({ kind: 'rejected', code: 'active-obligation', profit: 0 })
             .mockResolvedValueOnce({ kind: 'committed', profit: 1 })
         await expect(runAuto({ onPlay, count: 1 })).resolves.toBeUndefined()
         expect(onPlay).toHaveBeenCalledTimes(2)

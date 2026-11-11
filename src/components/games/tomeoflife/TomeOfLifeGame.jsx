@@ -46,12 +46,17 @@ const PAGE_COUNT = 3
 // face value; Skull busts the round; Star doubles the next page only.
 // (Previously Sun 1.4 / Moon 2.2 made optimal play ~226% RTP — every reachable
 // state was +EV. Values were solved via a cash-out DP against the 0.96 target.)
-const SYMBOLS = [
-    { id: 'sun', icon: '☀️', name: 'Sun', value: 0.6, weight: 38 },
-    { id: 'moon', icon: '🌙', name: 'Moon', value: 0.93, weight: 26 },
-    { id: 'star', icon: '⭐', name: 'Star', value: 0, weight: 14 },
-    { id: 'skull', icon: '💀', name: 'Skull', value: 0, weight: 22 },
+export const SYMBOLS = [
+    { id: 'sun', icon: '☀️', name: 'Sun', value: 0.6, weight: 38, effect: 'add' },
+    { id: 'moon', icon: '🌙', name: 'Moon', value: 0.93, weight: 26, effect: 'add' },
+    { id: 'star', icon: '⭐', name: 'Star', value: 0, weight: 14, effect: 'double' },
+    { id: 'skull', icon: '💀', name: 'Skull', value: 0, weight: 22, effect: 'bust' },
 ]
+
+export function symbolEffect(symbol) {
+    return symbol.effect === 'bust' ? 'Bust' : symbol.effect === 'double'
+        ? '×2 next Sun/Moon · no stacking' : `+${symbol.value.toFixed(2)}×`
+}
 
 function pickSymbol() {
     const total = SYMBOLS.reduce((s, x) => s + x.weight, 0)
@@ -121,7 +126,7 @@ export default function TomeOfLifeGame() {
 
     const revealPage = (idx, currentStake, currentAccum, currentPendingDouble) => {
         const pick = pickSymbol()
-        const contribution = pick.id === 'sun' || pick.id === 'moon' ? pick.value * (currentPendingDouble ? 2 : 1) : 0
+        const contribution = pick.effect === 'add' ? pick.value * (currentPendingDouble ? 2 : 1) : 0
         setPages(prev => {
             const out = [...prev]
             out[idx] = { ...pick, contribution }
@@ -130,11 +135,11 @@ export default function TomeOfLifeGame() {
         setRunning(false)
         sfx.play('reveal')
 
-        if (pick.id === 'skull') {
+        if (pick.effect === 'bust') {
             // Bust the round.
             sfx.play('lose')
             playSound('explode')
-            setSettledResult({ multiplier: 0, state: 'bust' })
+            setSettledResult({ multiplier: 0, returnAmount: 0, profit: -currentStake, state: 'bust' })
             setPendingDouble(false)
             setToast({ kind: 'lose', amount: -currentStake, message: `Skull on page ${idx + 1}` })
             session.record({
@@ -150,7 +155,7 @@ export default function TomeOfLifeGame() {
             return
         }
 
-        if (pick.id === 'star') {
+        if (pick.effect === 'double') {
             // Star consumes this page and arms one double; consecutive Stars do not stack.
             setPendingDouble(idx < PAGE_COUNT - 1)
             advanceOrFinish(idx, currentAccum, true, currentStake)
@@ -197,7 +202,7 @@ export default function TomeOfLifeGame() {
         const totalReturn = round2(currentStake * mult)
         const profit = round2(totalReturn - currentStake)
         const settledMultiplier = currentStake > 0 ? totalReturn / currentStake : 0
-        setSettledResult({ multiplier: settledMultiplier, state: totalReturn > 0 ? 'win' : 'bust' })
+        setSettledResult({ multiplier: settledMultiplier, returnAmount: totalReturn, profit, state: profit > 0 ? 'win' : profit === 0 ? 'idle' : 'bust' })
         setPendingDouble(false)
         addWinnings(totalReturn, 'Tome of Life return')
         setToast({ kind: totalReturn > 0 ? 'cashout' : 'lose', multiplier: settledMultiplier, amount: profit, message: totalReturn > 0 ? `Tome ${settledMultiplier.toFixed(2)}×` : 'No payout' })
@@ -305,15 +310,20 @@ export default function TomeOfLifeGame() {
                         </StageActionButton>
                     </div>
                     <div className="tome-paytable">
-                        {SYMBOLS.map(symbol => <span key={symbol.id}>{`${symbol.icon} ${symbol.name} ${symbol.id === 'skull' ? 'Bust' : symbol.id === 'star' ? '×2 next Sun/Moon · no stacking' : `+${symbol.value.toFixed(2)}×`}`}</span>)}
+                        {SYMBOLS.map(symbol => <span key={symbol.id}>{`${symbol.icon} ${symbol.name} ${symbolEffect(symbol)}`}</span>)}
                     </div>
                     {inRound || settledResult ? <MultiplierBadge label={inRound ? 'Accum' : 'Result'} value={inRound ? accumMult : settledResult.multiplier} state={inRound ? 'active' : settledResult.state} size="md" /> : <p className="bp-hint">Place a bet to reveal the first page.</p>}
+                    {!inRound && settledResult && <dl className="tome-result" aria-label="Settled gross return and net result">
+                        <div><dt>Gross multiplier</dt><dd>{settledResult.multiplier.toFixed(2)}×</dd></div>
+                        <div><dt>Gross return</dt><dd>{formatCredits(settledResult.returnAmount)}</dd></div>
+                        <div><dt>{settledResult.profit < 0 ? 'Net loss' : settledResult.profit > 0 ? 'Net profit' : 'Net result'}</dt><dd>{formatCredits(settledResult.profit)}</dd></div>
+                    </dl>}
                     <ActionLockOverlay active={running} label="Reading..." />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('tomeoflife')} />
-            <EducationPanel definition={definition} betAmount={inRound ? stake : selectedStake} rtpNote="Nominal RTP assumes optimal cashout decisions. Star adds no value, consumes a page, and doubles the next Sun or Moon only; it cannot stack or help after the final page." balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} betAmount={inRound ? stake : selectedStake} rtpNote={`Nominal RTP assumes optimal cashout decisions. ${SYMBOLS.map(symbol => `${symbol.name}: ${symbolEffect(symbol)}`).join('; ')}. Star consumes a page and cannot help after the final page.`} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

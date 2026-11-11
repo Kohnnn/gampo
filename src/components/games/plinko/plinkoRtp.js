@@ -9,6 +9,10 @@
 // that walk, so it can disagree with the engine only if the engine starts
 // steering the outcome, which would be a separate defect.
 import { BIN_PAYOUTS } from './engine/constants'
+// The settlement's exact rounding, shared with `PlinkoGame.jsx`'s `plinkoReturn`.
+// A local copy can differ on signed zero, which would make a quote disagree with
+// production even where both round to the same magnitude.
+import { round2 } from '../../../utils/simulationMath'
 
 // Exact binomial weights: C(n,k) as an integer, so rows up to 16 stay exact.
 export function binomialWeights(rows) {
@@ -46,11 +50,6 @@ export const PLINKO_BALLS = Object.freeze([
     { id: 'sapphire', name: 'Sapphire', cost: 20, bonus: 20 },
 ])
 
-// Rounding the settlement actually applies (PlinkoGame.jsx:89-92): the credited
-// return is `round2(betAmount * multiplier)`, profit is `round2(return - cost)`.
-// A quote that ignores this is wrong for any stake whose product is not already
-// two decimals, so the per-stake path below is the one a disclosure must use.
-const round2 = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100
 
 // Exact per-bin settlement for one ball at one stake. This is what the player
 // receives, including the ball bonus and the credited-amount rounding.
@@ -61,7 +60,7 @@ export function plinkoSettlements({ rows, risk, betAmount, ballId = 'normal' } =
     const stake = Number(betAmount)
     if (!ball || !payouts || !probabilities.length || payouts.length !== probabilities.length) return null
     if (!Number.isFinite(stake) || stake <= 0) return null
-    const cost = round2(stake * ball.cost)
+    const cost = stake * ball.cost
     return payouts.map((payout, index) => {
         // `PlinkoGame.jsx:300`: mult = round4(rawMult * ball.bonus)
         const mult = Number((payout * ball.bonus).toFixed(4))
@@ -142,7 +141,7 @@ export function plinkoSettlementRtp(options = {}) {
     if (!rows) return null
     const stake = Number(options.betAmount)
     const ball = PLINKO_BALLS.find(candidate => candidate.id === (options.ballId || 'normal'))
-    const cost = round2(stake * ball.cost)
+    const cost = stake * ball.cost
     let expectedReturn = 0
     let winChance = 0
     for (const row of rows) {

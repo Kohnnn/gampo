@@ -143,7 +143,7 @@ export function deriveP1Classifications() {
                 guardsButtonTag: candidate.rpsShortcutGuardByTag,
             },
             currentCandidateVerdict: 'open-under-this-candidate',
-            note: 'A global keydown handler is registered; no evidence of an interactive/dialog guard was found by textual scan. Classification only.',
+            note: `Textual scan ${candidate.rpsSpaceShortcutGlobal ? 'found' : 'did not find'} the shared Space shortcut marker and ${candidate.rpsShortcutGuardByTag ? 'found' : 'did not find'} a button-tag guard marker. Native verification is separate; classification remains open. Classification only.`,
         },
         {
             id: 'QA033', severity: 'P1', hostedRetest: 'Reproduced',

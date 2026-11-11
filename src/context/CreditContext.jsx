@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { readRaw, writeJson, writeRaw } from '../utils/storage'
 
 export const INITIAL_CREDITS = 1000
@@ -6,6 +6,7 @@ export const CREDIT_STORAGE_KEY = 'gampo_credits'
 export const HISTORY_STORAGE_KEY = 'gampo_history'
 
 const CreditContext = createContext(null)
+const HISTORY_WARNING = 'history-write-failure'
 
 export function readNumber(key, fallback) {
     try {
@@ -21,13 +22,13 @@ export function readNumber(key, fallback) {
 function readHistory() {
     try {
         const stored = localStorage.getItem(HISTORY_STORAGE_KEY)
-        if (!stored) return []
+        if (stored === null) return []
         return JSON.parse(stored).map(item => ({
             ...item,
             timestamp: new Date(item.timestamp),
         }))
     } catch {
-        return []
+        return null
     }
 }
 
@@ -40,7 +41,7 @@ function persistCredits(value) {
 }
 
 function persistHistory(history) {
-    writeJson(HISTORY_STORAGE_KEY, history)
+    return writeJson(HISTORY_STORAGE_KEY, history)
 }
 
 
@@ -90,7 +91,8 @@ export function commitPreparedCreditTransactions(prepared, commit, publish) {
 export function CreditProvider({ children }) {
     const [balance, setBalance] = useState(() => readNumber(CREDIT_STORAGE_KEY, INITIAL_CREDITS))
     const [currency, setCurrency] = useState('GC')
-    const [transactions, setTransactions] = useState(readHistory)
+    const [initialHistory] = useState(readHistory)
+    const [transactions, setTransactions] = useState(initialHistory ?? [])
     const [toasts, setToasts] = useState([])
     // Accepted mutations advance immediately, even when a timer retains an
     // earlier consumer callback and React has not rendered the next balance.
@@ -98,46 +100,56 @@ export function CreditProvider({ children }) {
     const transactionsRef = useRef(transactions)
     const toastIdRef = useRef(0)
 
-    // The ref is this document's view and goes stale the moment a peer writes
-    // (nothing subscribes to the `storage` event for these keys). Both the
-    // durable history we append to and the duplicate-id guard therefore read
-    // what is actually stored, so a peer's committed entry is never
-    // overwritten.
-    //
-    // Deliberately NOT unioned with `transactionsRef`. An unconditional union
-    // also re-adds entries that were retired on purpose: `resetBalance` and an
-    // import both replace the list wholesale, and the stale ref would prepend
-    // the old entries straight back (proved: ['bet','bet','reset']). Telling
-    // "storage lost this entry" from "storage dropped it deliberately" needs a
-    // reset epoch, which belongs with the lock wiring. Meanwhile the entry was
-    // never durable, so dropping it is the honest outcome — a refused history
-    // write is already reported by `persistFailedRef` for the balance.
+    // Read storage on each operation to include sequential peer writes, but do
+    // not merge the local ref: a reset or import can replace history wholesale.
+    // ponytail: a refused history write leaves its receipt unsaved; recovering it
+    // safely requires a replacement generation shared with reset and import.
     const readStoredHistory = useCallback(() => readHistory(), [])
 
-    const recordTransaction = useCallback((entry) => {
-        const next = [{
-            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            timestamp: new Date(),
-            ...entry,
-        }, ...readStoredHistory()].slice(0, 100)
-        transactionsRef.current = next
-        setTransactions(next)
-        persistHistory(next)
-    }, [readStoredHistory])
 
     const showToast = useCallback((type, title, description, duration = 3000) => {
         const id = ++toastIdRef.current
-        // Wave 13: dedupe rapid-fire same-title toasts (e.g. autoplay spin spam)
-        // and cap the visible stack at 3 so the screen never fills with messages.
+        // Keep a session warning ahead of ordinary toasts, without allowing it
+        // to consume the remaining two places when rapid game toasts arrive.
         setToasts(prev => {
+            const warning = prev.find(toast => toast.id === HISTORY_WARNING)
             const sameKey = `${type}|${title}`
-            const filtered = prev.filter(t => `${t.type}|${t.title}` !== sameKey).slice(-2)
-            return [...filtered, { id, type, title, description }]
+            const filtered = prev.filter(toast => toast.id !== HISTORY_WARNING && `${toast.type}|${toast.title}` !== sameKey).slice(warning ? -1 : -2)
+            return [...(warning ? [warning] : []), ...filtered, { id, type, title, description }]
         })
         window.setTimeout(() => {
             setToasts(prev => prev.filter(toast => toast.id !== id))
         }, duration)
     }, [])
+
+    useEffect(() => {
+        if (initialHistory === null) {
+            showToast('error', 'Saved credit history unavailable', 'Saved credit history could not be read; it has not been changed.')
+        }
+    }, [initialHistory, showToast])
+    const warnHistoryIncomplete = useCallback(() => {
+        setToasts(prev => prev.some(toast => toast.id === HISTORY_WARNING) ? prev : [
+            { id: HISTORY_WARNING, kind: HISTORY_WARNING, type: 'error', title: 'History may be incomplete', description: 'Some activity was not saved.' },
+            ...prev.slice(-2),
+        ])
+    }, [])
+
+
+    const recordTransaction = useCallback((entry) => {
+        const history = readStoredHistory()
+        if (history === null) {
+            warnHistoryIncomplete()
+            return
+        }
+        const next = [{
+            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            timestamp: new Date(),
+            ...entry,
+        }, ...history].slice(0, 100)
+        transactionsRef.current = next
+        setTransactions(next)
+        if (!persistHistory(next)) warnHistoryIncomplete()
+    }, [readStoredHistory, warnHistoryIncomplete])
 
     // D-1: affordability and the applied delta are decided against the value
     // that is actually stored, never against a tab-local ref. A ref is seeded
@@ -208,7 +220,12 @@ export function CreditProvider({ children }) {
     }, [commitBalance, currentBalance, recordTransaction])
 
     const runCreditTransactionsTransactional = useCallback((entries, commit) => {
-        const prepared = prepareCreditTransactions(currentBalance(), readStoredHistory(), entries)
+        const history = readStoredHistory()
+        if (history === null) {
+            showToast('error', 'Credit history unavailable', 'The transaction was not saved because saved credit history could not be read.')
+            return { ok: false, code: 'history-unavailable' }
+        }
+        const prepared = prepareCreditTransactions(currentBalance(), history, entries)
         return commitPreparedCreditTransactions(prepared, commit, (nextBalance, nextTransactions) => {
             // The durable commit/readback has succeeded before either the
             // authoritative refs or React consumers see the prepared state.
@@ -231,7 +248,7 @@ export function CreditProvider({ children }) {
                 persistHistory(nextTransactions)
             }
         })
-    }, [commitBalance, currentBalance, readStoredHistory])
+    }, [commitBalance, currentBalance, readStoredHistory, showToast])
 
     const placeBetTransactional = useCallback((amount, label, transactionId, commit) => (
         runCreditTransactionsTransactional([{ type: 'bet', label, amount, transactionId }], commit)
