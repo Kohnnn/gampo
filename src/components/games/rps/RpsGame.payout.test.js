@@ -76,4 +76,10 @@ describe('RPS public settlement receipts', () => {
         expect(nodes[0].props.minHeight).toBeUndefined()
         expect(fixture.shell.secondary.props.children).toHaveLength(2)
     })
+    it('push stakes the wallet zero-net and updates history exactly once', async () => {
+        await play(0)
+        expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(7, 'RPS return')
+        expect(fixture.record).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ label: 'Push', profit: 0, betAmount: 7, multiplier: 1 }))
+    })
 })
+

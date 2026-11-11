@@ -2,7 +2,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ states: [], cursor: 0, play: null, settle: null, roll: 0, record: vi.fn() }))
+const fixture = vi.hoisted(() => ({ states: [], cursor: 0, play: null, settle: null, roll: 0, record: vi.fn(), credit: vi.fn() }))
 vi.mock('react', async importOriginal => ({
     ...await importOriginal(),
     useState: initial => {
@@ -11,7 +11,7 @@ vi.mock('react', async importOriginal => ({
         return [fixture.states[index], value => { fixture.states[index] = typeof value === 'function' ? value(fixture.states[index]) : value }]
     },
 }))
-vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 100, placeBet: () => true, addWinnings: () => {}, showToast: () => {} }) }))
+vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 100, placeBet: () => true, addWinnings: fixture.credit, showToast: () => {} }) }))
 vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: () => {} }) }))
 vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: () => {} }) }))
 vi.mock('../../../audio/useBgm', () => ({ useGameBgm: () => {} }))
@@ -53,6 +53,9 @@ describe('Coin Flip landed face', () => {
         expect(settled).toContain(`data-landed-side="${side}"`)
         expect(settled).toContain(`aria-label="Landed ${label}"`)
         expect(settled).toContain(`--coin-landing:${rotation}`)
+        expect(fixture.record).toHaveBeenCalledWith(expect.objectContaining({ profit: side === 'head' ? 4.8 : -5, multiplier: side === 'head' ? 1.96 : 0 }))
+        if (side === 'head') expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(9.8, 'Coin Flip return')
+        else expect(fixture.credit).not.toHaveBeenCalled()
         expect(settled).not.toContain('coin3d-stage flipping')
         expect(render()).toBe(settled)
     })

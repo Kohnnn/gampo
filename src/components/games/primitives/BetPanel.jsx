@@ -126,7 +126,6 @@ export default function BetPanel({
     const autoLeft = useRef(0)
     const autoBaseBet = useRef(initialBet)
     const sessionProfit = useRef(0)
-    // The retained Auto loop must quote and play the same current table ticket.
     const latestAutoPlay = useRef({ onPlay, ticketStake, balance })
     latestAutoPlay.current.onPlay = onPlay
     latestAutoPlay.current.ticketStake = ticketStake

@@ -173,6 +173,45 @@ describe('Pump lesson reads only the live round (QA030)', () => {
     })
 })
 
+describe('Pump cap quotes no risky next step (QA030 P2 #1)', () => {
+    const STEP_RAMP = Number((0.96 / 0.88).toFixed(4))
+    const multiplierAt = pumps => (pumps === 0 ? 1 : Number(Math.pow(STEP_RAMP, pumps).toFixed(4)))
+    const pumpButton = tree => find(tree, node => node.type?.displayName === 'StageActionButton')
+
+    it('quotes no risky next step at the cap', () => {
+        let tree = render(PumpGame)
+        named(tree, 'BetPanel').props.onPlay({ betAmount: 10 })
+        fixture.rolls = new Array(10).fill(0.99)
+        for (let i = 0; i < 10; i += 1) {
+            tree = render(PumpGame)
+            pumpButton(tree).props.onClick()
+        }
+        tree = render(PumpGame)
+        expect(education(tree).conditionalDecision).toBeNull()
+        // The capped press is a deterministic cashout, not an 11th risky pump.
+        pumpButton(tree).props.onClick()
+        expect(fixture.records[0]).toMatchObject({ profit: 13.87, betAmount: 10, multiplier: multiplierAt(10) })
+    })
+
+    it('keeps the 1x reset default at 5 while the edited stake drives the lesson', () => {
+        let tree = render(PumpGame)
+        expect(named(tree, 'BetPanel').props.initialBet).toBe(5)
+        named(tree, 'BetPanel').props.onStakeChange(10)
+        named(tree, 'BetPanel').props.onPlay({ betAmount: 10 })
+        fixture.rolls = [0.99]
+        tree = render(PumpGame)
+        pumpButton(tree).props.onClick()
+        tree = render(PumpGame)
+        named(tree, 'BetPanel').props.onPlayPhaseAction()
+        flush()
+        tree = render(PumpGame)
+        expect(named(tree, 'BetPanel').props.initialBet).toBe(5)
+        expect(education(tree).betAmount).toBe(10)
+        expect(fixture.winnings).toHaveBeenLastCalledWith(10.91, 'Pump return')
+    })
+})
+
+
 describe('Diamonds canonical visible paytable', () => {
     for (const boost of [1, 1 / 0.96]) {
         it(`shows the same match payout that is settled with boost ${boost}`, () => {
