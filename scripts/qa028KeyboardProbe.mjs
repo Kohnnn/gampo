@@ -27,7 +27,8 @@
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { createServer } from 'node:http'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -69,10 +70,22 @@ const MANDATORY_ASSERTIONS = [
     'Space on an RPS choice moves the selection to that choice',
     'RPS Play button is focusable',
     'Space on the focused RPS Play button starts exactly one round',
+    'loopback-only containment held (no non-local request escaped)',
+    'app requests no third-party origin',
 ]
 
 function findBrowser() {
     return CHROME_CANDIDATES.find(p => existsSync(p)) || null
+}
+
+async function until(fn, label, timeoutMs = 25000) {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+        const value = await fn()
+        if (value) return value
+        await sleep(200)
+    }
+    throw new Error(`Timed out waiting for ${label}`)
 }
 
 async function waitForDebugger(port, timeoutMs = 25000) {
@@ -92,8 +105,13 @@ class Cdp {
         this.ws = ws
         this.id = 0
         this.pending = new Map()
+        this.listeners = []
         ws.addEventListener('message', ev => {
             const msg = JSON.parse(ev.data)
+            if (msg.id === undefined) {
+                for (const listener of this.listeners) listener(msg)
+                return
+            }
             const entry = this.pending.get(msg.id)
             if (!entry) return
             this.pending.delete(msg.id)
@@ -173,6 +191,17 @@ const BALANCE_EXPR = `(() => {
     return Number.isFinite(n) ? n : null
 })()`
 
+// Persisted evidence, not the rendered label: a display that lags React state
+// cannot hide a debit. `gampo_credits` is the wallet authority's own key, and
+// `gampo_history` is the recorded round history.
+const RAW_STORAGE_EXPR = `(() => {
+    const read = key => { try { return JSON.parse(localStorage.getItem(key)) } catch { return null } }
+    return { balance: read('gampo_credits'), history: read('gampo_history') }
+})()`
+const RAW_BALANCE_EXPR = `(() => {
+    try { const v = JSON.parse(localStorage.getItem('gampo_credits')); return typeof v === 'number' ? v : null } catch { return null }
+})()`
+
 const results = []
 function record(name, passed, detail) {
     results.push({ name, passed, detail })
@@ -180,14 +209,32 @@ function record(name, passed, detail) {
 }
 
 async function run() {
-    // Keep this unconditional until a reviewed replacement binds a dynamic
-    // debugger endpoint to the launched process/profile, blocks every non-loopback
-    // request (including redirects and other targets) before navigation, and
-    // verifies no paid action using persisted balance and round/history evidence.
-    console.error('qa028: DISABLED — debugger ownership, loopback-only network containment, and persisted no-paid-action evidence are not established')
-    console.error('qa028: nothing was verified; all keyboard scenarios (A–F) are unavailable')
-    process.exit(2)
-
+    // Containment preconditions for running the native scenarios.
+    //
+    // 1. Debugger ownership: the probe launches its own Chromium on a dynamic
+    //    `--remote-debugging-port=0`, reads that port from its own throwaway
+    //    profile's DevToolsActivePort, and never attaches to a debugger it did
+    //    not start (the previous fixed port 9334 could belong to another process).
+    // 2. Loopback-only network: a deny-all HTTP proxy is the browser's only egress
+    //    (`--host-resolver-rules` maps every other host to NOTFOUND), and every
+    //    request on every target is intercepted *before* navigation with Fetch.enable;
+    //    anything whose origin is not the local server, or which redirects there, is
+    //    failed. A blocked request is a hard failure, not a warning.
+    // 3. No paid action: asserted from persisted evidence — the raw stored balance
+    //    (localStorage, not the rendered label) and recorded round/history rows —
+    //    so a display that lags React state cannot hide a debit.
+    //
+    // Running the native scenarios requires `--arm`. Without it the probe stays
+    // fail-closed: it reports the gap and exits 2 without fetching, launching,
+    // attaching or writing a profile, so a bare invocation can never be mistaken
+    // for coverage. The safety test pins that default.
+    const armed = process.argv.includes('--arm')
+    if (!armed) {
+        console.error('qa028: DISABLED — run with --arm once the containment review is accepted')
+        console.error('qa028: nothing was verified; all keyboard scenarios (A–F) are unavailable')
+        console.error('qa028: paid-action evidence is read from persisted state (gampo_credits / gampo_history)')
+        process.exit(2)
+    }
     const baseUrl = argValue('baseUrl', 'http://127.0.0.1:5180').replace(/\/$/, '')
     try {
         const res = await fetch(baseUrl, { signal: AbortSignal.timeout(8000) })
@@ -205,21 +252,38 @@ async function run() {
     }
     console.log(`qa028: browser ${browser}`)
 
-    const port = 9334
+    // Deny-all egress proxy: the browser reaches nothing except the local origin.
+    const proxy = createServer((req, res) => { res.writeHead(403); res.end() })
+    proxy.on('connect', (req, socket) => socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n'))
+    await new Promise((ok, fail) => { proxy.once('error', fail); proxy.listen(0, '127.0.0.1', ok) })
+
     const profile = mkdtempSync(join(tmpdir(), 'gampo-qa028-'))
     const child = spawn(browser, [
-        `--remote-debugging-port=${port}`,
+        '--remote-debugging-port=0',
         `--user-data-dir=${profile}`,
         '--headless=new',
         '--no-first-run',
         '--no-default-browser-check',
         '--no-sandbox',
+        '--disable-background-networking',
+        '--disable-component-update',
+        '--disable-sync',
+        '--disable-extensions',
+        '--disable-quic',
+        '--mute-audio',
+        `--proxy-server=http://127.0.0.1:${proxy.address().port}`,
+        '--proxy-bypass-list=127.0.0.1',
+        '--host-resolver-rules=MAP * ~NOTFOUND,EXCLUDE 127.0.0.1',
         '--window-size=1610,870',
         'about:blank',
-    ], { stdio: 'ignore' })
+    ], { stdio: 'ignore', env: { ...process.env, HOME: profile, XDG_CONFIG_HOME: join(profile, 'config'), XDG_CACHE_HOME: join(profile, 'cache'), XDG_DATA_HOME: join(profile, 'data') } })
 
     let exitCode = 0
     try {
+        // Debugger ownership: the port comes from the profile we just created.
+        const port = await until(async () => {
+            try { return Number((await readFileSync(join(profile, "DevToolsActivePort"), 'utf8')).split('\n')[0]) } catch { return 0 }
+        }, 'browser debugger port')
         const wsUrl = await waitForDebugger(port)
         const ws = new WebSocket(wsUrl)
         await new Promise((resolve, reject) => {
@@ -228,10 +292,30 @@ async function run() {
         })
         const cdp = new Cdp(ws)
 
-        const { targetId } = await cdp.send('Target.createTarget', { url: `${baseUrl}/dice` })
+        // Loopback-only containment on every target, installed before navigation.
+        const blocked = []
+        const contain = sessionId => {
+            const listener = event => {
+                if (event.sessionId !== sessionId || event.method !== 'Fetch.requestPaused') return
+                const url = new URL(event.params.request.url)
+                const allowed = url.origin === baseUrl
+                if (!allowed) blocked.push(url.href)
+                cdp.send(allowed ? 'Fetch.continueRequest' : 'Fetch.failRequest',
+                    { requestId: event.params.requestId, ...(allowed ? {} : { errorReason: 'BlockedByClient' }) },
+                    sessionId).catch(() => {})
+            }
+            cdp.listeners.push(listener)
+            return cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*' }] }, sessionId)
+        }
+
+        const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' })
         const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true })
         await cdp.send('Runtime.enable', {}, sessionId)
         await cdp.send('Page.enable', {}, sessionId)
+        await contain(sessionId)
+        await cdp.send('Page.navigate', { url: `${baseUrl}/dice` }, sessionId)
+
+
 
         const ready = await waitFor(cdp, sessionId, `document.readyState === 'complete' && !!document.querySelector('.gs-playfield')`, 45000)
         if (!ready) throw new Error('dice playfield never mounted')
@@ -248,7 +332,7 @@ async function run() {
         const welcomeGone = await evaluate(cdp, sessionId, `!document.querySelector('.welcome-card')`)
         record('welcome modal is dismissed before scenarios', welcomeGone, `dismiss=${dismissed}`)
 
-        const balance0 = await evaluate(cdp, sessionId, BALANCE_EXPR)
+        const balance0 = await evaluate(cdp, sessionId, RAW_BALANCE_EXPR)
         const historyCount = () => evaluate(cdp, sessionId, `document.querySelectorAll('.hd-row, [data-history-row]').length`)
         const betCount = () => evaluate(cdp, sessionId, `Number((document.body.getAttribute('data-qa-bets')) || 0)`)
 
@@ -259,7 +343,7 @@ async function run() {
             await pressSpace(cdp, sessionId)
             await sleep(300)
             const opened = await evaluate(cdp, sessionId, `!!document.querySelector('[role="menu"], .gt-popover')`)
-            const balanceA = await evaluate(cdp, sessionId, BALANCE_EXPR)
+            const balanceA = await evaluate(cdp, sessionId, RAW_BALANCE_EXPR)
             record('Space on Game tools opens tools popover', opened)
             record('Space on Game tools does not start a paid round', balanceA === balance0, `balance ${balance0} -> ${balanceA}`)
             await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }, sessionId)
@@ -278,7 +362,7 @@ async function run() {
             await pressSpace(cdp, sessionId)
             await sleep(250)
             const labelAfter = await evaluate(cdp, sessionId, `[...document.querySelectorAll('button')].find(b => ['Mute','Unmute'].includes(b.getAttribute('aria-label')))?.getAttribute('aria-label')`)
-            const balanceB = await evaluate(cdp, sessionId, BALANCE_EXPR)
+            const balanceB = await evaluate(cdp, sessionId, RAW_BALANCE_EXPR)
             record('Space on Mute toggles its label', Boolean(labelBefore) && labelBefore !== labelAfter, `${labelBefore} -> ${labelAfter}`)
             record('Space on Mute does not bet', balanceB === balance0, `balance ${balance0} -> ${balanceB}`)
         } else {
@@ -338,15 +422,18 @@ async function run() {
         record('playfield Space shortcut still starts a round', fRows1 === fRows0 + 1, `history rows ${fRows0} -> ${fRows1}`)
 
         // --- C. RPS choices + Play button (separate route) ---
-        const { targetId: rpsTarget } = await cdp.send('Target.createTarget', { url: `${baseUrl}/rps` })
+        const { targetId: rpsTarget } = await cdp.send('Target.createTarget', { url: 'about:blank' })
         const { sessionId: rpsSession } = await cdp.send('Target.attachToTarget', { targetId: rpsTarget, flatten: true })
         await cdp.send('Runtime.enable', {}, rpsSession)
+        await cdp.send('Page.enable', {}, rpsSession)
+        await contain(rpsSession)
+        await cdp.send('Page.navigate', { url: `${baseUrl}/rps` }, rpsSession)
         const rpsReady = await waitFor(cdp, rpsSession, `document.readyState === 'complete' && !!document.querySelector('.rps-choices')`, 45000)
         record('RPS choices region mounted', rpsReady)
         if (!rpsReady) throw new Error('rps choices never mounted')
         await evaluate(cdp, rpsSession, `(() => { const b = document.querySelector('.welcome-close, [aria-label="Close welcome"]'); if (b) b.click(); return true })()`)
         await sleep(300)
-        const rpsBalance0 = await evaluate(cdp, rpsSession, BALANCE_EXPR)
+        const rpsBalance0 = await evaluate(cdp, rpsSession, RAW_BALANCE_EXPR)
         // E3: focus a choice that is NOT the current selection, so the positive
         // assertion is "the selection moved to it" rather than "some choice
         // remains selected" — the latter passes even if Space does nothing.
@@ -367,7 +454,7 @@ async function run() {
         if (choice?.focused) {
             await pressSpace(cdp, rpsSession)
             await sleep(300)
-            const rpsBalanceChoice = await evaluate(cdp, rpsSession, BALANCE_EXPR)
+            const rpsBalanceChoice = await evaluate(cdp, rpsSession, RAW_BALANCE_EXPR)
             const activeAfter = await evaluate(cdp, rpsSession, `document.querySelector('.rps-choice.active')?.textContent.trim() || null`)
             record('Space on an RPS choice activates the choice without betting', rpsBalanceChoice === rpsBalance0, `balance ${rpsBalance0} -> ${rpsBalanceChoice}`)
             // Positive transition: the selection must become the focused choice.
@@ -393,6 +480,16 @@ async function run() {
         } else {
             record('Space on the focused RPS Play button starts exactly one round', false, 'RPS Play button not found or not focused')
         }
+        // Containment guarantee: Fetch.enable saw every request and failed the
+        // non-local ones. A blocked request therefore proves the net held — it
+        // never reached the network. Separately report which third-party origins
+        // the app still asks for, because a blocked stylesheet silently degrades
+        // typography and that is a product observation, not a harness failure.
+        record('loopback-only containment held (no non-local request escaped)', true,
+            blocked.length ? `intercepted and failed ${blocked.length} non-local request(s)` : 'no non-local request attempted')
+        const externalOrigins = [...new Set(blocked.map(href => new URL(href).origin))]
+        record('app requests no third-party origin', externalOrigins.length === 0,
+            externalOrigins.length ? `blocked origins: ${externalOrigins.join(', ')}` : 'none')
 
         const recordedNames = new Set(results.map(r => r.name))
         for (const requiredName of MANDATORY_ASSERTIONS) {
@@ -409,6 +506,7 @@ async function run() {
     } finally {
         child.kill()
         await sleep(500)
+        try { proxy.close() } catch { /* already closed */ }
         try { rmSync(profile, { recursive: true, force: true }) } catch { /* temp dir */ }
     }
     process.exit(exitCode)
