@@ -1,16 +1,15 @@
 // QA027: Dice Auto reconciliation.
 //
 // Historical hosted observation: three 1 GC Dice autoplay losses were recorded
-// but only 1 GC was debited. The root cause in current source is that a
-// rejected Dice bet resolves the same `{profit:0}` shape as an accepted push,
-// and the BetPanel Auto loop counts every resolved round. This file pins:
-//   - deterministic all-loss and mixed fixed-count runs reconcile debit,
-//     payout and history per accepted round;
-//   - rejected-vs-accepted is distinguishable through the six-kind contract
-//     (`{profit:0}` may not mean both rejected and a push);
-//   - current affordability, percentage changes, exhaustion, stop-loss/profit
-//     and "no extra round after stop";
-//   - at least one non-Dice shared BetPanel consumer keeps working.
+// but only 1 GC was debited. The historical root cause is unestablished.
+// These tests exercise Auto reconciliation of supplied results, including:
+//   - accounting state for all-loss and mixed typed-result sequences;
+//   - the six result kinds, typed rejection versus an accepted push, and legacy
+//     result normalization;
+//   - stop flags, a simulated loop break, and mocked BetPanel percentage changes;
+//   - representative non-Dice result shapes in shared accounting.
+// Real wallet debit, payout, history, and mounted Dice/BetPanel paths are not
+// proved here.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const panel = vi.hoisted(() => ({ state: [], refs: [], cursor: 0, refCursor: 0 }))
@@ -55,7 +54,7 @@ const baseState = (over = {}) => ({
     limitProfit: 0, limitLoss: 0, limitBigWin: 0, ...over,
 })
 
-// Reconcile a whole run and return per-accepted-round facts.
+// Reconcile supplied results and collect accepted accounting profits.
 function runFixedCount(results) {
     let state = baseState()
     const acceptedProfits = []
@@ -68,11 +67,11 @@ function runFixedCount(results) {
 }
 
 describe('QA027 rejected-vs-accepted discrimination', () => {
-    it('resolves exactly the six authority kinds', () => {
+    it('lists exactly the six authority kinds', () => {
         expect(RESULT_KINDS).toEqual(['committed', 'rejected', 'not-admitted', 'aborted', 'unknown', 'superseded'])
     })
 
-    it('treats an untyped {profit:0} as accepted (legacy) but a typed rejection as refused', () => {
+    it('treats a typed accepted push as a round and a typed rejection as refused', () => {
         // An accepted push is committed with profit 0.
         const push = accountAutoRound(baseState(), acceptedResult(0))
         expect(push.accepted).toBe(true)
@@ -87,19 +86,19 @@ describe('QA027 rejected-vs-accepted discrimination', () => {
 
 })
 
-describe('QA027 deterministic fixed-count runs', () => {
-    it('reconciles an all-loss run: every ignored round is refused, every loss debited', () => {
-        // 3 accepted 1 GC losses + 0 refusals => 3 accepted, sessionProfit -3.
+describe('QA027 deterministic typed-result accounting sequences', () => {
+    it('counts three supplied losses with no refusals and -3 session profit', () => {
+        // 3 supplied accepted losses + 0 refusals => 3 accepted, sessionProfit -3.
         const { state, acceptedProfits } = runFixedCount([
             acceptedResult(-1), acceptedResult(-1), acceptedResult(-1),
         ])
         expect(state.rounds).toBe(3)
         expect(state.refusals).toBe(0)
-        expect(state.sessionProfit).toBe(-3) // three accepted 1 GC losses
+        expect(state.sessionProfit).toBe(-3) // three supplied accepted losses
         expect(acceptedProfits.every(p => p === -1)).toBe(true)
     })
 
-    it('reconciles a mixed run counting only accepted rounds', () => {
+    it('counts accepted and refused results and sums accepted profit', () => {
         const { state } = runFixedCount([
             acceptedResult(-1),
             rejectedResult('insufficient-funds'),
@@ -112,8 +111,8 @@ describe('QA027 deterministic fixed-count runs', () => {
         expect(state.sessionProfit).toBe(0) // -1 + 2 - 1 across accepted rounds only
     })
 
-    it('does not count a refused round toward exhaustion of the fixed count', () => {
-        // Fixed count of 3 accepted: a refusal must not consume a slot.
+    it('counts three accepted results and one refusal in a supplied stream', () => {
+        // A refusal followed by three accepted losses.
         let state = baseState()
         let accepted = 0
         const stream = [
@@ -157,8 +156,8 @@ describe('QA027 stop conditions use accepted rounds only', () => {
         expect(win.stop).toBe(true)
     })
 
-    it('no extra round after stop: the loop must break once stop is set', () => {
-        // Simulate the loop contract: stop is checked before issuing the next.
+    it('a simulated loop breaks after accountAutoRound signals stop', () => {
+        // Simulate the loop contract: break after accounting signals stop.
         let state = baseState({ limitProfit: 1 })
         const issued = []
         const stream = [acceptedResult(1), acceptedResult(1), acceptedResult(1)]
@@ -191,16 +190,15 @@ describe('QA027 percentage bet changes stay 2dp and clamped', () => {
     })
 })
 
-describe('QA027 regression: a non-Dice shared consumer still reconciles', () => {
-    // Plinko Auto resolves immediately on an accepted drop; RPS resolves a
-    // push as an accepted zero-profit round. Both must stay counted.
-    it('RPS push remains an accepted zero-profit round', () => {
+describe('QA027 regression: representative non-Dice result shapes', () => {
+    // Representative result shapes exercise shared accounting, not mounted games.
+    it('an RPS-shaped push is accepted with zero profit', () => {
         const push = accountAutoRound(baseState(), { profit: 0, kind: 'committed', multiplier: 1 })
         expect(push.accepted).toBe(true)
         expect(push.state.sessionProfit).toBe(0)
     })
 
-    it('a refused Roulette spin (already spinning) is not an accepted round', () => {
+    it('a not-admitted Roulette-shaped result is not an accepted round', () => {
         const refused = accountAutoRound(baseState(), { kind: 'not-admitted', code: 'gate-closed', profit: 0 })
         expect(refused.accepted).toBe(false)
         expect(refused.state.rounds).toBe(0)
