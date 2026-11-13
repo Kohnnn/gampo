@@ -26,8 +26,9 @@ export function shouldHandleShortcut(event, { dialogOpen = false } = {}) {
     if (event.repeat) return false
     const tag = (event.target?.tagName || '').toLowerCase()
     // A focused interactive control owns Space natively (Game tools, Mute,
-    // choices, dialog buttons). Never start a paid round from it.
-    if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a') return false
+    // choices, disclosure <summary>, dialog buttons). Never start a paid round
+    // from it.
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a' || tag === 'summary') return false
     if (event.target?.isContentEditable) return false
     // While a dialog is open its controls own Space; the panel must not start a
     // paid round underneath it.

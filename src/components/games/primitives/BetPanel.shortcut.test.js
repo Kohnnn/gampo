@@ -29,6 +29,13 @@ describe('BetPanel shortcut guard', () => {
         expect(shouldHandleShortcut(key({ target: { tagName: 'DIV', isContentEditable: true } }))).toBe(false)
     })
 
+    it('rejects a keystroke owned by a focused <summary> disclosure', () => {
+        // Space natively opens/closes History (and the paytable/advanced
+        // sections). Without this refusal the same keypress also placed a paid
+        // round underneath the disclosure.
+        expect(shouldHandleShortcut(key({ target: { tagName: 'SUMMARY' } }))).toBe(false)
+    })
+
     it('rejects a keystroke while a dialog is open', () => {
         expect(shouldHandleShortcut(key(), { dialogOpen: true })).toBe(false)
     })
