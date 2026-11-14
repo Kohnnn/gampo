@@ -140,6 +140,70 @@ export function claimCaseSettlement(pendingRound) {
     return true
 }
 
+/**
+ * QA040: settle an accepted Cases round, accounting only.
+ *
+ * Claims the round (idempotent, so a reveal timer and an unmount cannot both
+ * pay), credits the return, records the drops, and writes history plus round
+ * finish. Deliberately free of timers, audio, haptics and React state: the unmount
+ * path calls this after teardown, so anything that scheduled work or touched state
+ * would keep a dead component alive or throw before the credit landed.
+ *
+ * Presentation (results panel, celebration, toast, scroll, sound) stays in the
+ * component's `finishPendingRound`.
+ *
+ * Returns the settlement plus the derived figures the UI needs.
+ */
+export function applyCaseAccounting(pendingRound, {
+    addWinnings, collection, recordProgressCaseDrop, session, machine,
+    skipped = false, newId = () => Math.random().toString(36).slice(2),
+} = {}) {
+    const pending = pendingRound
+    if (!claimCaseSettlement(pending)) return null
+
+    const picks = Array.isArray(pending.picks) ? pending.picks : []
+    const caseData = pending.caseData || {}
+    const stake = Number(pending.stake) || 0
+    const rows = Number(pending.rows) || picks.length
+    const settlement = summarizeCaseSettlement({ picks, stake, rows })
+    const returnAmount = settlement.totalReturn
+    const profit = settlement.profit
+    const averageMultiplier = stake > 0 ? returnAmount / stake : 0
+    const won = profit > 0
+
+    if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')
+    for (const pick of picks) {
+        collection.recordDrop(pick, { caseId: caseData.id, caseName: caseData.name, openPriceGc: pick.openPriceGc })
+        recordProgressCaseDrop(pick)
+    }
+
+    // History is the player's durable round ledger, so it must survive a leave
+    // even though the reveal never was shown.
+    session.record({
+        id: newId(),
+        label: `${caseData.name} x${rows}`,
+        profit, betAmount: stake, multiplier: averageMultiplier,
+        meta: {
+            picks: picks.map(p => ({
+                id: p.skinId, rarity: p.rarity, multiplier: p.multiplier,
+                valueGc: p.valueGc, openPriceGc: p.openPriceGc,
+                wear: p.wear, statTrak: p.statTrak,
+            })),
+        },
+    })
+    machine.finish({
+        kind: won ? 'win' : 'lose',
+        profit,
+        multiplier: averageMultiplier,
+        picks: picks.map(p => p.skinId),
+        // Only teardown and explicit skip pass `skipped`; a completed reveal must
+        // not be reported as a skip.
+        skipped,
+    })
+
+    return { ...settlement, picks, returnAmount, profit, averageMultiplier, won }
+}
+
 export function summarizeCaseSettlement({ picks = [], stake = 0, rows = picks.length } = {}) {
     const safePicks = Array.isArray(picks) ? picks : []
     const totalReturn = Math.max(0, Math.round(safePicks.reduce((sum, pick) => sum + (Number(pick?.valueGc) || 0), 0) * 100) / 100)

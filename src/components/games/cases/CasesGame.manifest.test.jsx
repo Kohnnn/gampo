@@ -590,3 +590,50 @@ describe('Actual Cases controls and visible preparation slot', () => {
         visit.cleanup()
     })
 })
+
+// QA040 (#29): an accepted round must not lose its return when the player leaves
+// mid-reveal. `placeBet` debits at open, and settlement only ever ran from the
+// reveal timers, so unmounting after the debit and before the reveal dropped the
+// return on the floor. The picks are drawn at open time, so the unmount payout is
+// the return already won, not an invented one.
+describe('Cases unmount settlement (QA040)', () => {
+    const playUntilDebited = async () => {
+        fetch.mockResolvedValueOnce(response(fixture()))
+        const visit = mount(CasesGame)
+        await settle(visit)
+        desktop(visit).props.onClick()
+        await settle(visit)
+        expect(h.env.credits.placeBet, 'a paid opening debited the stake').toHaveBeenCalledTimes(1)
+        expect(h.env.credits.addWinnings, 'no return is paid before the reveal lands').not.toHaveBeenCalled()
+        return visit
+    }
+
+    it('pays the frozen return and records it exactly once', async () => {
+        const visit = await playUntilDebited()
+        expect(vi.getTimerCount(), 'reveal timers are pending after a paid opening').toBeGreaterThan(0)
+
+        visit.cleanup()
+
+        expect(h.env.credits.addWinnings, 'the debit is matched by one credit').toHaveBeenCalledTimes(1)
+        expect(h.env.collection.recordDrop, 'one drop recorded').toHaveBeenCalledTimes(1)
+        expect(h.env.progress, 'one lifetime counter write').toHaveBeenCalledTimes(1)
+        expect(h.env.session.record, 'one history write').toHaveBeenCalledTimes(1)
+        // Teardown settles a round the player never saw finish.
+        expect(h.env.machine.finish).toHaveBeenCalledTimes(1)
+        expect(h.env.machine.finish.mock.calls[0][0]).toMatchObject({ skipped: true })
+    })
+
+    it('does not double-pay when the reveal already landed', async () => {
+        const visit = await playUntilDebited()
+        vi.advanceTimersByTime(20000)
+        await settle(visit)
+        expect(h.env.credits.addWinnings, 'the reveal paid once').toHaveBeenCalledTimes(1)
+        // A completed reveal is not a skip.
+        expect(h.env.machine.finish.mock.calls[0][0]).toMatchObject({ skipped: false })
+
+        visit.cleanup()
+
+        expect(h.env.credits.addWinnings, 'teardown cannot claim a settled round').toHaveBeenCalledTimes(1)
+        expect(h.env.session.record, 'history is not written twice').toHaveBeenCalledTimes(1)
+    })
+})
