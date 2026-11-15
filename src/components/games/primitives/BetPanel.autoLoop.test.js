@@ -145,6 +145,36 @@ describe('Auto loop reconciles a resolved round', () => {
         expect(onPlay).toHaveBeenCalledTimes(1)
     })
 
+    it('keeps a stopped run from settling into the Auto run started after it', async () => {
+        let releaseStopped, releaseReplacement
+        const stoppedRound = new Promise(resolve => { releaseStopped = resolve })
+        const replacementRound = new Promise(resolve => { releaseReplacement = resolve })
+        const stoppedPlay = vi.fn(() => stoppedRound)
+        const replacementPlay = vi.fn()
+            .mockImplementationOnce(() => replacementRound)
+            .mockResolvedValue({ kind: 'committed', profit: 1 })
+
+        const stoppedRun = runAuto({ onPlay: stoppedPlay, count: 2 })
+        expect(stoppedPlay).toHaveBeenCalledTimes(1)
+        // Stop while A is pending, then start B through the same control.
+        playButton(render({ onPlay: stoppedPlay })).props.onClick()
+        const replacementRun = playButton(render({ onPlay: replacementPlay })).props.onClick()
+        expect(replacementPlay).toHaveBeenCalledTimes(1)
+        releaseStopped({ kind: 'committed', profit: 5 })
+        await expect(stoppedRun).resolves.toBeUndefined()
+        expect(stoppedPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
+        expect(replacementPlay).toHaveBeenCalledTimes(1)
+        expect(playButton(render({ onPlay: replacementPlay })).props.className).toContain('stop')
+
+        releaseReplacement({ kind: 'committed', profit: 1 })
+        await expect(replacementRun).resolves.toBeUndefined()
+        expect(replacementPlay.mock.calls).toEqual([
+            [{ betAmount: 5, mode: 'auto' }],
+            [{ betAmount: 5, mode: 'auto' }],
+        ])
+        expect(playButton(render({ onPlay: replacementPlay })).props.className).not.toContain('stop')
+    })
+
     it('surfaces a throwing round instead of silently swallowing it', async () => {
         const onPlay = vi.fn(async () => { throw new Error('round exploded') })
         await expect(runAuto({ onPlay, count: 1 })).rejects.toThrow('round exploded')
