@@ -40,6 +40,9 @@ describe('CasesGame settle rounding is handled at source', () => {
     })
 
     it('credits the rounded settlement total', () => {
-        expect(src).toContain("if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')")
+        // The credit moved into `applyCaseAccounting` so unmount can reach it.
+        const anim = readFileSync(new URL('./casesAnimation.js', import.meta.url), 'utf8')
+        expect(anim).toContain("if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')")
+        expect(anim).toContain('const returnAmount = settlement.totalReturn')
     })
 })

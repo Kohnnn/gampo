@@ -60,6 +60,7 @@ import {
     CASE_TILE_PX,
     CASE_VISIBLE_PHASES,
     casePhaseLabel,
+    applyCaseAccounting,
     claimCaseSettlement,
     getCaseReelMetrics,
     getCaseReelStartOffset,
@@ -773,12 +774,29 @@ export default function CasesGame() {
         return id
     }, [])
 
+    // QA040: leaving mid-reveal must not abandon an accepted round. `performPlay`
+    // debits the stake before `pendingRoundRef` is set, and only the reveal timers
+    // reach the settlement, so draining them alone debits the stake and drops the
+    // return. The picks are frozen at debit time, so this pays a return already
+    // won rather than choosing a payout. Accounting only: no timers, no state.
+    const settleOnUnmountRef = useRef(null)
+
+    useEffect(() => {
+        settleOnUnmountRef.current = () => {
+            const pending = pendingRoundRef.current
+            if (!pending) return
+            pendingRoundRef.current = null
+            applyCaseAccounting(pending, { addWinnings, collection, recordProgressCaseDrop, session, machine, skipped: true })
+        }
+    }, [addWinnings, collection, recordProgressCaseDrop, session, machine])
+
     useEffect(() => () => {
         clearRevealTimers()
         cancelHaptics()
         if (autoTimerRef.current) window.clearTimeout(autoTimerRef.current)
         if (celebrationTimerRef.current) window.clearTimeout(celebrationTimerRef.current)
         if (autoRollTimerRef.current) window.clearTimeout(autoRollTimerRef.current)
+        settleOnUnmountRef.current?.()
     }, [clearRevealTimers])
 
     // Bring the spinning reel into view once it renders so mobile players see
@@ -813,7 +831,9 @@ export default function CasesGame() {
 
     const finishPendingRound = useCallback(({ skipped = false } = {}) => {
         const pending = pendingRoundRef.current
-        if (!claimCaseSettlement(pending)) return
+        // `applyCaseAccounting` claims the round, so a second settlement path
+        // (unmount after a reveal, or vice versa) cannot pay twice.
+        if (!pending) return
         clearRevealTimers()
 
         const { caseData, picks, resolve, stake, tracks: pendingTracks, offsets: pendingOffsets, rows: roundRows } = pending
@@ -821,24 +841,18 @@ export default function CasesGame() {
         setTrackOffsets(pendingOffsets)
         setCasePhase('reveal')
 
-        const settlement = summarizeCaseSettlement({ picks, stake, rows: roundRows })
-        const returnAmount = settlement.totalReturn
-        const profit = roundSignedGc(settlement.profit, 0)
-        const averageMultiplier = stake > 0 ? returnAmount / stake : 0
-        if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')
+        // Accounting only. This block must stay free of timers, audio, haptics and
+        // state setters: teardown calls it too, and cleanup that schedules new work
+        // would keep a torn-down component alive.
+        const settlement = applyCaseAccounting(pending, { addWinnings, collection, recordProgressCaseDrop, session, machine, skipped })
+        // Already settled by another path (or unmounted mid-reveal): nothing owed.
+        if (!settlement) return
+        const { returnAmount, profit, averageMultiplier } = settlement
         setResults(picks)
         setSettlementSummary(settlement)
         setFairnessKey(key => key + 1)
-
-        picks.forEach(pick => {
-            collection.recordDrop(pick, {
-                caseId: caseData.id,
-                caseName: caseData.name,
-                openPriceGc: pick.openPriceGc,
-            })
-            recordProgressCaseDrop(pick)
-        })
-
+        // Drops were recorded by `applyCaseAccounting`, so recording them here
+        // again would double-count inventory and progress.
         const won = profit > 0
         const headlineMult = picks.reduce((m, p) => Math.max(m, p.multiplier || 0), 0)
         const rare = picks.some(p => RARE_TIERS.has(p.rarity) || p.statTrak)
@@ -914,19 +928,8 @@ export default function CasesGame() {
             playSound(won ? 'win' : 'loss')
         }
         sfx.play(won ? 'win' : 'lose')
-        session.record({
-            id: crypto.randomUUID(),
-            label: `${caseData.name} x${roundRows}`,
-            profit, betAmount: stake, multiplier: averageMultiplier,
-            meta: { picks: picks.map(p => ({ id: p.skinId, rarity: p.rarity, multiplier: p.multiplier, valueGc: p.valueGc, openPriceGc: p.openPriceGc, wear: p.wear, statTrak: p.statTrak })) },
-        })
-        machine.finish({
-            kind: won ? 'win' : 'lose',
-            profit,
-            multiplier: averageMultiplier,
-            picks: picks.map(p => p.skinId),
-            skipped,
-        })
+        // History and round-finish are data writes rather than presentation, so
+        // they live in `applyCaseAccounting` where teardown can reach them too.
         showToast(won ? 'win' : 'loss', `${caseData.name} ${won ? 'win' : 'miss'}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
         setRunning(false)
         setCasePhase('settled')
