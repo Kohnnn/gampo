@@ -16,7 +16,7 @@ const fixture = vi.hoisted(() => ({
     panel: [], panelCursor: 0, refs: [], refCursor: 0, effects: [],
     // DiceGame state slots.
     states: [], diceCursor: 0, diceRefs: [], diceRefCursor: 0, diceEffects: [],
-    balance: 100, debit: vi.fn(), credit: vi.fn(), record: vi.fn(), toast: vi.fn(), sound: vi.fn(), roll: 0.9,
+    balance: 100, debit: vi.fn(), credit: vi.fn(), record: vi.fn(), toast: vi.fn(), sound: vi.fn(), roll: 0.9, rolls: [],
 }))
 
 // One React mock serves both components: DiceGame uses the `states` slots,
@@ -53,7 +53,7 @@ vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance:
 vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: fixture.sound }) }))
 vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: fixture.sound }) }))
 vi.mock('../../../audio/useBgm', () => ({ useGameBgm: () => {} }))
-vi.mock('../../../utils/fairRng', () => ({ nextRoll: () => ({ roll: fixture.roll }) }))
+vi.mock('../../../utils/fairRng', () => ({ nextRoll: () => ({ roll: fixture.rolls.length ? fixture.rolls.shift() : fixture.roll }) }))
 vi.mock('../resources/useOriginalsPreloader', () => ({ useOriginalsPreloader: () => ({ ready: true }) }))
 
 const { default: BetPanel } = await import('../primitives/BetPanel.jsx')
@@ -115,6 +115,7 @@ beforeEach(() => {
     fixture.panel = []; fixture.refs = []; fixture.effects = []
     fixture.states = []; fixture.diceRefs = []; fixture.diceEffects = []
     fixture.roll = 0.9
+    fixture.rolls = []
     fixture.balance = 100
     fixture.debit.mockImplementation(amount => { if (amount > fixture.balance) return false; fixture.balance -= amount; return true })
     fixture.credit.mockImplementation(amount => { fixture.balance += amount })
@@ -156,9 +157,12 @@ describe('BetPanel Auto drives the real Dice wallet (QA027)', () => {
     })
 
     it('keeps wallet and history consistent across a mixed Auto run', async () => {
-        const rolls = [0.9, 0.1, 0.9] // win, loss, win at Roll Over 50
+        // The click starts the first roll synchronously, so queue the RNG values
+        // first: the DiceGame default is Roll Under 50, so 0.9 loses, 0.1 wins at
+        // 1.98x, 0.9 loses.
+        fixture.rolls = [0.9, 0.1, 0.9]
+        const rounds = fixture.rolls.length
         const onPlay = diceOnPlay()
-        const rounds = rolls.length
 
         let tree = renderPanel({ onPlay })
         tabButton(tree, 'auto').props.onClick()
@@ -167,20 +171,23 @@ describe('BetPanel Auto drives the real Dice wallet (QA027)', () => {
         tree = renderPanel({ onPlay })
 
         const click = playButton(tree).props.onClick()
-        for (const roll of rolls) {
-            fixture.roll = roll
-            await vi.advanceTimersByTimeAsync(2000)
-        }
+        await vi.advanceTimersByTimeAsync(2000 * rounds)
         await vi.runAllTimersAsync()
         await click
+
+        expect(fixture.debit, 'every Auto round is debited 1 GC').toHaveBeenCalledTimes(rounds)
+        expect(fixture.debit.mock.calls.map(([amount]) => amount)).toEqual([1, 1, 1])
+        expect(fixture.record, 'every Auto round is recorded').toHaveBeenCalledTimes(rounds)
+        // Exactly one payout, for the single winning roll.
+        expect(fixture.credit).toHaveBeenCalledTimes(1)
+        expect(fixture.credit).toHaveBeenCalledWith(1.98, 'Dice return')
+        expect(fixture.record.mock.calls.map(([entry]) => entry.profit), 'history profits per round').toEqual([-1, 0.98, -1])
+        expect(fixture.balance, 'wallet settles at 100 - 3 + 1.98').toBeCloseTo(98.98, 2)
 
         const debited = fixture.debit.mock.calls.reduce((sum, [amount]) => sum + amount, 0)
         const credited = fixture.credit.mock.calls.reduce((sum, [amount]) => sum + amount, 0)
         const recordedProfit = fixture.record.mock.calls.reduce((sum, [entry]) => sum + entry.profit, 0)
-
-        expect(fixture.balance).toBeCloseTo(100 - debited + credited, 2)
         // History must reconcile with the wallet, not with the number of clicks.
         expect(recordedProfit).toBeCloseTo(credited - debited, 2)
-        expect(fixture.record).toHaveBeenCalledTimes(fixture.debit.mock.calls.length)
     })
 })
