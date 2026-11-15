@@ -322,3 +322,80 @@ describe('settled slot presentation', () => {
         expect(render().props.definition.rtp).toBe(0.94)
     })
 })
+
+describe('slots Space shortcut guard (QA028)', () => {
+    // The suite runs without a DOM, so `window` is a recording stub. Renders the
+    // real component, executes its recorded effects (registering the shipped
+    // keydown listener) and presses Space on a real Event — no copy of the guard.
+    function mount(id = 'bars') {
+        const listeners = new Map()
+        vi.stubGlobal('window', {
+            setTimeout: (fn, ms) => setTimeout(fn, ms),
+            clearTimeout: id => clearTimeout(id),
+            addEventListener: (type, fn) => listeners.set(type, [...(listeners.get(type) || []), fn]),
+            removeEventListener: (type, fn) => listeners.set(type, (listeners.get(type) || []).filter(entry => entry !== fn)),
+            // The handler only listens; nothing here redispatches through window.
+        })
+        render(id)
+        const cleanups = []
+        for (const entry of fixture.effects) {
+            try {
+                const cleanup = entry.effect()
+                if (typeof cleanup === 'function') cleanups.push(cleanup)
+            } catch { /* effects that need a browser surface are unrelated here */ }
+        }
+        const send = event => {
+            for (const fn of [...(listeners.get('keydown') || [])]) fn(event)
+            return event
+        }
+        const press = (as = {}, target = { tagName: 'DIV', isContentEditable: false, closest: () => null }) => send(Object.defineProperties(new Event('keydown', { cancelable: true }), {
+            key: { value: ' ' }, code: { value: 'Space' }, target: { value: target },
+            repeat: { value: false }, ctrlKey: { value: false }, metaKey: { value: false }, altKey: { value: false }, shiftKey: { value: false },
+            ...as,
+        }))
+        return {
+            press,
+            send,
+            unmount() { cleanups.forEach(cleanup => cleanup()); vi.unstubAllGlobals() },
+        }
+    }
+    const summary = { tagName: 'SUMMARY', isContentEditable: false, closest: () => null }
+
+    it('leaves Space to a focused sidebar summary without placing a paid round', () => {
+        const page = mount()
+        const event = page.press({}, summary)
+        expect(fixture.bet).not.toHaveBeenCalled()
+        // The disclosure's own native toggle keeps the event it owns.
+        expect(event.defaultPrevented).toBe(false)
+        page.unmount()
+    })
+
+    it('still spins once from a plain playfield Space and consumes the scroll default', () => {
+        fixture.outcome = outcome('bars')
+        const page = mount()
+        const event = page.press()
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+        expect(event.defaultPrevented).toBe(true)
+        page.unmount()
+    })
+
+    it('refuses a repeated key and a press another layer already consumed', () => {
+        fixture.outcome = outcome('bars')
+        const page = mount()
+        const held = page.press({ repeat: { value: true } })
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(held.defaultPrevented).toBe(false)
+        // A layer above slots (an open dialog, the hotkey help) already called
+        // preventDefault: the playfield shortcut must yield instead of stacking
+        // a second action on the same keystroke.
+        const consumed = new Event('keydown', { cancelable: true })
+        Object.defineProperties(consumed, {
+            key: { value: ' ' }, code: { value: 'Space' }, repeat: { value: false },
+            target: { value: { tagName: 'DIV', isContentEditable: false, closest: () => null } },
+        })
+        consumed.preventDefault()
+        page.send(consumed)
+        expect(fixture.bet).not.toHaveBeenCalled()
+        page.unmount()
+    })
+})

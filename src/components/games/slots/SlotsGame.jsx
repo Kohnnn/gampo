@@ -1436,6 +1436,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         if (typeof window === 'undefined') return undefined
         const onKey = (e) => {
             if (e.key !== ' ' && e.code !== 'Space') return
+            if (e.defaultPrevented || e.repeat) return
             if (showAutoplayDrawer) return
             if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
             // Skip while a cascade tumble is replaying — slam-stop would strand
@@ -1444,7 +1445,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             if (cascadeReplayRef.current) return
             const el = e.target
             const tag = (el?.tagName || '').toLowerCase()
-            if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+            // A focused native control owns Space: text fields, and a <summary>
+            // disclosure (sidebar Game groups, History/paytable sections), whose
+            // native toggle must not also place a paid round underneath it.
+            if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'summary') return
             if (el?.isContentEditable) return
             // The spin button (button/[role=button]) handles its own Space via
             // native activation — don't double-fire if it's the focused element.
