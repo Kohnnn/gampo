@@ -113,6 +113,21 @@ describe('Auto loop reconciles a resolved round', () => {
         expect(onPlay).toHaveBeenCalledTimes(1)
     })
 
+    it('uses the replacement game callback for the next accepted Auto round', async () => {
+        let resolveFirst
+        const firstRound = new Promise(resolve => { resolveFirst = resolve })
+        const initialPlay = vi.fn(() => firstRound)
+        const replacementPlay = vi.fn(async () => ({ kind: 'committed', profit: 2 }))
+        const autoRun = runAuto({ onPlay: initialPlay, count: 2 })
+        expect(initialPlay).toHaveBeenCalledTimes(1)
+        render({ onPlay: replacementPlay })
+        expect(replacementPlay).not.toHaveBeenCalled()
+        resolveFirst({ kind: 'committed', profit: -5 })
+        await expect(autoRun).resolves.toBeUndefined()
+        expect(initialPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
+        expect(replacementPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
+    })
+
     it('stops the loop on an `aborted` round instead of retrying it forever', async () => {
         const onPlay = vi.fn(async () => ({ kind: 'aborted', profit: 0 }))
         await expect(runAuto({ onPlay, count: 5 })).resolves.toBeUndefined()
