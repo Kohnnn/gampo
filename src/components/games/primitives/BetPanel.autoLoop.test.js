@@ -175,10 +175,13 @@ describe('Auto loop reconciles a resolved round', () => {
         expect(playButton(render({ onPlay: replacementPlay })).props.className).not.toContain('stop')
     })
 
-    it('does not let a stopped refusal retry enter the replacement Auto run', async () => {
-        // Unlike the pending-round test above, A has already been refused and
-        // is waiting to retry. Losing the post-delay runId check would let A
-        // use B's live callback and consume B's shared remaining count.
+    it.each([
+        { boundary: 'refusal retry', stoppedResult: { kind: 'rejected', code: 'active-obligation', profit: 0 } },
+        { boundary: 'accepted cadence', stoppedResult: { kind: 'committed', profit: 5 } },
+    ])('does not let a stopped $boundary enter the replacement Auto run', async ({ stoppedResult }) => {
+        // A has finished its round and registered a retry or accepted-round
+        // cadence. Losing either post-delay runId check would let A use B's
+        // live callback and consume B's shared remaining count.
         const interval = 61387
         const nativeSetTimeout = globalThis.setTimeout
         const scheduled = []
@@ -204,7 +207,8 @@ describe('Auto loop reconciles a resolved round', () => {
         const stoppedRound = new Promise(resolve => { releaseStopped = resolve })
         const replacementRound = new Promise(resolve => { releaseReplacement = resolve })
         const extraPlay = new Promise(resolve => { notifyExtraPlay = resolve })
-        const stoppedPlay = vi.fn(() => stoppedRound)
+        const stoppedSettled = vi.fn(result => result)
+        const stoppedPlay = vi.fn(() => stoppedRound.then(stoppedSettled))
         const replacementPlay = vi.fn()
             .mockImplementationOnce(() => replacementRound)
             .mockImplementation(() => {
@@ -219,15 +223,17 @@ describe('Auto loop reconciles a resolved round', () => {
         tree = render(stoppedProps)
         autoCountInput(tree).props.onChange({ target: { value: '2' } })
         tree = render(stoppedProps)
-        const retryRegistered = nextTimer()
+        const stoppedTimerRegistered = nextTimer()
         const stoppedRun = playButton(tree).props.onClick()
-        const retryWait = waitForTimer(retryRegistered, stoppedRun, 'Stopped run')
+        const stoppedTimerWait = waitForTimer(stoppedTimerRegistered, stoppedRun, 'Stopped run')
         expect(stoppedPlay).toHaveBeenCalledTimes(1)
-        releaseStopped({ kind: 'rejected', code: 'active-obligation', profit: 0 })
-        const releaseRetry = await retryWait
+        releaseStopped(stoppedResult)
+        const releaseStoppedTimer = await stoppedTimerWait
         expect(scheduled).toHaveLength(1)
+        expect(stoppedSettled).toHaveBeenCalledTimes(1)
+        expect(stoppedSettled).toHaveBeenCalledWith(stoppedResult)
 
-        // Stop A only after its retry is registered; B's first round stays pending.
+        // Stop A only after its timer is registered; B's first round stays pending.
         playButton(render(stoppedProps)).props.onClick()
         const replacementRun = playButton(render(replacementProps)).props.onClick()
         const replacementSettled = vi.fn()
@@ -237,9 +243,10 @@ describe('Auto loop reconciles a resolved round', () => {
             stoppedRun.then(() => 'stopped'),
             extraPlay.then(() => 'extra request'),
         ])
-        releaseRetry()
+        releaseStoppedTimer()
         expect(await ownershipResult).toBe('stopped')
         await expect(stoppedRun).resolves.toBeUndefined()
+        expect(stoppedSettled).toHaveBeenCalledTimes(1)
         expect(stoppedPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
         expect(replacementPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
         expect(replacementSettled).not.toHaveBeenCalled()
