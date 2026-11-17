@@ -327,8 +327,20 @@ describe('slots Space shortcut guard (QA028)', () => {
     // The suite runs without a DOM, so `window` is a recording stub. Renders the
     // real component, executes its recorded effects (registering the shipped
     // keydown listener) and presses Space on a real Event — no copy of the guard.
+    const cleanups = []
+    afterEach(() => {
+        const errors = []
+        for (const cleanup of cleanups.splice(0)) {
+            try { cleanup() } catch (error) { errors.push(error) }
+        }
+        if (errors.length) throw new AggregateError(errors, 'Slots effect cleanup failed')
+    })
+
     function mount(id = 'bars') {
         const listeners = new Map()
+        const doc = new EventTarget()
+        doc.body = {}
+        vi.stubGlobal('document', doc)
         vi.stubGlobal('window', {
             setTimeout: (fn, ms) => setTimeout(fn, ms),
             clearTimeout: id => clearTimeout(id),
@@ -337,12 +349,9 @@ describe('slots Space shortcut guard (QA028)', () => {
             // The handler only listens; nothing here redispatches through window.
         })
         render(id)
-        const cleanups = []
         for (const entry of fixture.effects) {
-            try {
-                const cleanup = entry.effect()
-                if (typeof cleanup === 'function') cleanups.push(cleanup)
-            } catch { /* effects that need a browser surface are unrelated here */ }
+            const cleanup = entry.effect()
+            if (typeof cleanup === 'function') cleanups.push(cleanup)
         }
         const send = event => {
             for (const fn of [...(listeners.get('keydown') || [])]) fn(event)
@@ -353,11 +362,7 @@ describe('slots Space shortcut guard (QA028)', () => {
             repeat: { value: false }, ctrlKey: { value: false }, metaKey: { value: false }, altKey: { value: false }, shiftKey: { value: false },
             ...as,
         }))
-        return {
-            press,
-            send,
-            unmount() { cleanups.forEach(cleanup => cleanup()); vi.unstubAllGlobals() },
-        }
+        return { press, send }
     }
     const summary = { tagName: 'SUMMARY', isContentEditable: false, closest: () => null }
 
@@ -367,7 +372,6 @@ describe('slots Space shortcut guard (QA028)', () => {
         expect(fixture.bet).not.toHaveBeenCalled()
         // The disclosure's own native toggle keeps the event it owns.
         expect(event.defaultPrevented).toBe(false)
-        page.unmount()
     })
 
     it('still spins once from a plain playfield Space and consumes the scroll default', () => {
@@ -376,7 +380,6 @@ describe('slots Space shortcut guard (QA028)', () => {
         const event = page.press()
         expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
         expect(event.defaultPrevented).toBe(true)
-        page.unmount()
     })
 
     it('refuses a repeated key and a press another layer already consumed', () => {
@@ -396,6 +399,5 @@ describe('slots Space shortcut guard (QA028)', () => {
         consumed.preventDefault()
         page.send(consumed)
         expect(fixture.bet).not.toHaveBeenCalled()
-        page.unmount()
     })
 })
