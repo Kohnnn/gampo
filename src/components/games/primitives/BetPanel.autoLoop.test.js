@@ -145,6 +145,54 @@ describe('Auto loop reconciles a resolved round', () => {
         expect(onPlay).toHaveBeenCalledTimes(1)
     })
 
+    it('stops at the profit limit after two committed Auto rounds', async () => {
+        const interval = 61387
+        const nativeSetTimeout = globalThis.setTimeout
+        let notifyTimer, notifyExtraTimer
+        const timerRegistered = new Promise(resolve => { notifyTimer = resolve })
+        const extraTimerRegistered = new Promise(resolve => { notifyExtraTimer = resolve })
+        const timerSpy = vi.spyOn(globalThis, 'setTimeout')
+        onTestFinished(() => timerSpy.mockRestore())
+        timerSpy.mockImplementation((callback, delay, ...args) => {
+            if (delay !== interval) return nativeSetTimeout(callback, delay, ...args)
+            if (notifyTimer) {
+                notifyTimer(() => callback(...args))
+                notifyTimer = undefined
+            } else {
+                notifyExtraTimer()
+            }
+            return 0
+        })
+
+        const onPlay = vi.fn(async () => ({ kind: 'committed', profit: 5 }))
+        const props = { onPlay, autoIntervalMs: interval }
+        let tree = render(props)
+        tabButton(tree, 'auto').props.onClick()
+        tree = render(props)
+        autoCountInput(tree).props.onChange({ target: { value: '3' } })
+        find(tree, node => node.type === 'input' && node.props?.id?.endsWith('-stop-profit')).props.onChange({ target: { value: '9' } })
+        tree = render(props)
+        const autoRun = playButton(tree).props.onClick()
+        const releaseCadence = await Promise.race([
+            timerRegistered,
+            autoRun.then(() => { throw new Error('Auto run stopped before its first cadence') }),
+        ])
+        expect(onPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
+        expect(playButton(render(props)).props.className).toContain('stop')
+
+        releaseCadence()
+        expect(await Promise.race([
+            autoRun.then(() => 'stopped'),
+            extraTimerRegistered.then(() => 'unexpected cadence'),
+        ])).toBe('stopped')
+        await expect(autoRun).resolves.toBeUndefined()
+        expect(onPlay.mock.calls).toEqual([
+            [{ betAmount: 5, mode: 'auto' }],
+            [{ betAmount: 5, mode: 'auto' }],
+        ])
+        expect(playButton(render(props)).props.className).not.toContain('stop')
+    })
+
     it('keeps a stopped run from settling into the Auto run started after it', async () => {
         let releaseStopped, releaseReplacement
         const stoppedRound = new Promise(resolve => { releaseStopped = resolve })
@@ -207,8 +255,7 @@ describe('Auto loop reconciles a resolved round', () => {
         const stoppedRound = new Promise(resolve => { releaseStopped = resolve })
         const replacementRound = new Promise(resolve => { releaseReplacement = resolve })
         const extraPlay = new Promise(resolve => { notifyExtraPlay = resolve })
-        const stoppedSettled = vi.fn(result => result)
-        const stoppedPlay = vi.fn(() => stoppedRound.then(stoppedSettled))
+        const stoppedPlay = vi.fn(() => stoppedRound)
         const replacementPlay = vi.fn()
             .mockImplementationOnce(() => replacementRound)
             .mockImplementation(() => {
@@ -230,8 +277,6 @@ describe('Auto loop reconciles a resolved round', () => {
         releaseStopped(stoppedResult)
         const releaseStoppedTimer = await stoppedTimerWait
         expect(scheduled).toHaveLength(1)
-        expect(stoppedSettled).toHaveBeenCalledTimes(1)
-        expect(stoppedSettled).toHaveBeenCalledWith(stoppedResult)
 
         // Stop A only after its timer is registered; B's first round stays pending.
         playButton(render(stoppedProps)).props.onClick()
@@ -246,7 +291,6 @@ describe('Auto loop reconciles a resolved round', () => {
         releaseStoppedTimer()
         expect(await ownershipResult).toBe('stopped')
         await expect(stoppedRun).resolves.toBeUndefined()
-        expect(stoppedSettled).toHaveBeenCalledTimes(1)
         expect(stoppedPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
         expect(replacementPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
         expect(replacementSettled).not.toHaveBeenCalled()
