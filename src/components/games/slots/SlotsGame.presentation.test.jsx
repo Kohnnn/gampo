@@ -75,13 +75,24 @@ async function spin(id) {
     return render(id)
 }
 
+const cleanups = []
 beforeEach(() => {
     vi.useFakeTimers()
     vi.stubGlobal('window', globalThis)
     fixture.state = []; fixture.refs = []; fixture.effects = []; fixture.fun = false; fixture.reduceMotion = false; fixture.animations = true
     fixture.credit.mockClear(); fixture.bet.mockReset().mockReturnValue(true); fixture.record.mockClear(); fixture.dialogOpener = null
 })
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
+afterEach(() => {
+    try {
+        const errors = []
+        for (const cleanup of cleanups.splice(0)) {
+            try { cleanup() } catch (error) { errors.push(error) }
+        }
+        if (errors.length) throw new AggregateError(errors, 'Slots effect cleanup failed')
+    } finally {
+        vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals()
+    }
+})
 
 describe('settled slot presentation', () => {
     it('reviews the same mounted board in native fullscreen and returns focus on exit', async () => {
@@ -327,15 +338,6 @@ describe('slots Space shortcut guard (QA028)', () => {
     // The suite runs without a DOM, so `window` is a recording stub. Renders the
     // real component, executes its recorded effects (registering the shipped
     // keydown listener) and presses Space on a real Event — no copy of the guard.
-    const cleanups = []
-    afterEach(() => {
-        const errors = []
-        for (const cleanup of cleanups.splice(0)) {
-            try { cleanup() } catch (error) { errors.push(error) }
-        }
-        if (errors.length) throw new AggregateError(errors, 'Slots effect cleanup failed')
-    })
-
     function mount(id = 'bars') {
         const listeners = new Map()
         const doc = new EventTarget()
@@ -346,7 +348,10 @@ describe('slots Space shortcut guard (QA028)', () => {
             clearTimeout: id => clearTimeout(id),
             addEventListener: (type, fn) => listeners.set(type, [...(listeners.get(type) || []), fn]),
             removeEventListener: (type, fn) => listeners.set(type, (listeners.get(type) || []).filter(entry => entry !== fn)),
-            // The handler only listens; nothing here redispatches through window.
+            dispatchEvent: event => {
+                for (const fn of [...(listeners.get(event.type) || [])]) fn(event)
+                return !event.defaultPrevented
+            },
         })
         render(id)
         for (const entry of fixture.effects) {
