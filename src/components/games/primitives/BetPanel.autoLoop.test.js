@@ -175,6 +175,92 @@ describe('Auto loop reconciles a resolved round', () => {
         expect(playButton(render({ onPlay: replacementPlay })).props.className).not.toContain('stop')
     })
 
+    it('does not let a stopped refusal retry enter the replacement Auto run', async () => {
+        // Unlike the pending-round test above, A has already been refused and
+        // is waiting to retry. Losing the post-delay runId check would let A
+        // use B's live callback and consume B's shared remaining count.
+        const interval = 61387
+        const nativeSetTimeout = globalThis.setTimeout
+        const scheduled = []
+        let notifyTimer
+        const nextTimer = () => new Promise(resolve => { notifyTimer = resolve })
+        const timerSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation((callback, delay, ...args) => {
+            if (delay !== interval) return nativeSetTimeout(callback, delay, ...args)
+            const release = () => callback(...args)
+            scheduled.push(release)
+            const notify = notifyTimer
+            notifyTimer = undefined
+            if (notify) notify(release)
+            return 0
+        })
+
+        try {
+            let releaseStopped, releaseReplacement, notifyExtraPlay
+            const stoppedRound = new Promise(resolve => { releaseStopped = resolve })
+            const replacementRound = new Promise(resolve => { releaseReplacement = resolve })
+            const extraPlay = new Promise(resolve => { notifyExtraPlay = resolve })
+            const stoppedPlay = vi.fn(() => stoppedRound)
+            const replacementPlay = vi.fn()
+                .mockImplementationOnce(() => replacementRound)
+                .mockImplementation(() => {
+                    notifyExtraPlay()
+                    return Promise.resolve({ kind: 'committed', profit: 1 })
+                })
+            const stoppedProps = { onPlay: stoppedPlay, autoIntervalMs: interval }
+            const replacementProps = { onPlay: replacementPlay, autoIntervalMs: interval }
+
+            let tree = render(stoppedProps)
+            tabButton(tree, 'auto').props.onClick()
+            tree = render(stoppedProps)
+            autoCountInput(tree).props.onChange({ target: { value: '2' } })
+            tree = render(stoppedProps)
+            const retryRegistered = nextTimer()
+            const stoppedRun = playButton(tree).props.onClick()
+            expect(stoppedPlay).toHaveBeenCalledTimes(1)
+            releaseStopped({ kind: 'rejected', code: 'active-obligation', profit: 0 })
+            const releaseRetry = await retryRegistered
+            expect(scheduled).toHaveLength(1)
+
+            // Stop A only after its retry is registered; B's first round stays pending.
+            playButton(render(stoppedProps)).props.onClick()
+            const replacementRun = playButton(render(replacementProps)).props.onClick()
+            const replacementSettled = vi.fn()
+            replacementRun.then(replacementSettled, replacementSettled)
+            expect(replacementPlay).toHaveBeenCalledTimes(1)
+            const ownershipResult = Promise.race([
+                stoppedRun.then(() => 'stopped'),
+                extraPlay.then(() => 'extra request'),
+            ])
+            releaseRetry()
+            expect(await ownershipResult).toBe('stopped')
+            await expect(stoppedRun).resolves.toBeUndefined()
+            expect(stoppedPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
+            expect(replacementPlay.mock.calls).toEqual([[{ betAmount: 5, mode: 'auto' }]])
+            expect(replacementSettled).not.toHaveBeenCalled()
+            expect(playButton(render(replacementProps)).props.className).toContain('stop')
+            expect(scheduled).toHaveLength(1)
+
+            // Subscribe before each accepted-round timer is registered, and
+            // release those timers individually to finish B's configured count.
+            const firstTimerRegistered = nextTimer()
+            releaseReplacement({ kind: 'committed', profit: 1 })
+            const releaseFirstTimer = await firstTimerRegistered
+            const secondTimerRegistered = nextTimer()
+            releaseFirstTimer()
+            const releaseSecondTimer = await secondTimerRegistered
+            expect(scheduled).toHaveLength(3)
+            releaseSecondTimer()
+            await expect(replacementRun).resolves.toBeUndefined()
+            expect(replacementPlay.mock.calls).toEqual([
+                [{ betAmount: 5, mode: 'auto' }],
+                [{ betAmount: 5, mode: 'auto' }],
+            ])
+            expect(playButton(render(replacementProps)).props.className).not.toContain('stop')
+        } finally {
+            timerSpy.mockRestore()
+        }
+    })
+
     it('surfaces a throwing round instead of silently swallowing it', async () => {
         const onPlay = vi.fn(async () => { throw new Error('round exploded') })
         await expect(runAuto({ onPlay, count: 1 })).rejects.toThrow('round exploded')
