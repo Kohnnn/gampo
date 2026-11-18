@@ -2736,6 +2736,10 @@
 .sb-fact-grid dd {
     margin: 0;
     color: var(--sb-ink);
+    /* QA042: `sources.join(', ')` can contain a provider name with no spaces.
+       Wrapping at the flex line is not enough for one unbreakable token, so the
+       value breaks inside itself rather than overflowing onto the status copy. */
+    overflow-wrap: anywhere;
 }
 
 .sb-feed-status.is-stale,
