@@ -64,6 +64,37 @@ export function makeBet(type, params = {}) {
     }
 }
 
+// QA019: phone reachability. The mobile cascade in `roulette.css` lays 1-36 out
+// three per row with a full-width zero, so a number is reachable when the row it
+// sits in fits the viewport without horizontal clipping. Cells are `minmax(0,1fr)`,
+// i.e. they shrink rather than overflow, so the risk is an unusably narrow target
+// rather than a hidden column. `minTouch` is the 44px the outside-bet cells
+// declare, so "reachable" means "tappable", not merely "present in the DOM".
+export const PHONE_BOARD = {
+    columns: 3,
+    gap: 6,
+    boardPadding: 6,
+    border: 3,
+    stagePadding: 10,
+    minTouch: 44,
+}
+
+// Arithmetic only: this is the declared fit, not a native measurement.
+export function roulettePhoneBoard(viewportWidth, metrics = PHONE_BOARD) {
+    const width = Number(viewportWidth) || 0
+    const chrome = 2 * (metrics.stagePadding + metrics.border + metrics.boardPadding)
+    const available = width - chrome
+    const cellWidth = (available - (metrics.columns - 1) * metrics.gap) / metrics.columns
+    return {
+        columns: metrics.columns,
+        // Twelve rows hold 1-36; the zero owns a full row of its own.
+        rows: Math.ceil(36 / metrics.columns) + 1,
+        available,
+        cellWidth,
+        fits: available > 0 && cellWidth >= metrics.minTouch,
+    }
+}
+
 export function buildRouletteCoverage(bets = []) {
     const map = new Map()
     for (const bet of bets || []) {
