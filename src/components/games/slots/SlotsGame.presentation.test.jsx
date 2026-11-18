@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ state: [], refs: [], stateCursor: 0, refCursor: 0, effects: [], outcome: null, fun: false, reduceMotion: false, animations: true, credit: vi.fn(), bet: vi.fn(() => true), record: vi.fn(), dialogOpener: null }))
+const fixture = vi.hoisted(() => ({ state: [], refs: [], stateCursor: 0, refCursor: 0, effects: [], outcome: null, fun: false, reduceMotion: false, animations: true, credit: vi.fn(), bet: vi.fn(() => true), record: vi.fn(), dialogOpener: null, resolverArgs: [] }))
 vi.mock('react', async () => ({
     ...await vi.importActual('react'),
     useState(initial) {
@@ -30,7 +30,7 @@ vi.mock('../primitives', () => {
 vi.mock('./slotFactory', async () => ({
     ...await vi.importActual('./slotFactory'),
     makeInitialGrid: config => Array(config.layout.evaluation === 'megaways' ? config.layout.columnRows.reduce((sum, rows) => sum + rows, 0) : config.layout.rows * config.layout.cols).fill(config.symbols[0]),
-    resolveSlotSpin: () => fixture.outcome,
+    resolveSlotSpin: (_config, args) => { fixture.resolverArgs.push(args); return fixture.outcome },
 }))
 
 import SlotsGame from './SlotsGame'
@@ -80,6 +80,7 @@ beforeEach(() => {
     vi.stubGlobal('window', globalThis)
     fixture.state = []; fixture.refs = []; fixture.effects = []; fixture.fun = false; fixture.reduceMotion = false; fixture.animations = true
     fixture.credit.mockClear(); fixture.bet.mockReset().mockReturnValue(true); fixture.record.mockClear(); fixture.dialogOpener = null
+    fixture.resolverArgs = []
 })
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
@@ -235,6 +236,109 @@ describe('settled slot presentation', () => {
         expect(find(tree, node => node.props?.['aria-label'] === 'Freeze column 1 reels')).not.toBeNull()
     })
 
+    it('never passes manual column freezes into the resolver (QA034)', async () => {
+        // The row of Freeze buttons is animation-only. If a future change starts
+        // feeding `lockedCols` to `resolveSlotSpin`, the outcome would depend on
+        // a player control that has no economics behind it — the finding would
+        // come back, and the payout math would silently change.
+        let tree = render('bars')
+        find(tree, node => node.props?.['aria-label'] === 'Freeze column 1 reels').props.onClick()
+        tree = render('bars')
+        expect(find(tree, node => node.props?.['aria-label'] === 'Unfreeze column 1 reels')).not.toBeNull()
+        fixture.outcome = outcome('bars', { multiplier: 1 })
+        await spin('bars')
+        expect(fixture.resolverArgs).toHaveLength(1)
+        expect(fixture.resolverArgs[0]).not.toHaveProperty('lockedCols')
+        expect(Object.keys(fixture.resolverArgs[0]).sort()).toEqual([
+            'bonusBuy', 'buyTier', 'freeSpin', 'persistentMultiplier', 'stickyWilds',
+        ])
+    })
+
+    it('leaves no Wanted reveal over the board once the next spin runs and settles (QA023)', async () => {
+        // The historical finding: the poster stayed over a settled result. Two
+        // guarantees must both hold — the poster is gone for the whole of the
+        // next spin (it is suppressed while reels run), and it does not come
+        // back when the round settles without a new mystery symbol.
+        fixture.outcome = outcome('wanted-revelation', { mysteryReveal: { id: 'badge', label: 'BADGE' } })
+        let tree = await spin('wanted-revelation')
+        expect(find(tree, node => node.props?.className?.includes('is-wanted-poster'))).not.toBeNull()
+        // Animated path: the mode control is still the `spin()` helper's
+        // 'instant' pick, so switch it back and leave the reels mid-flight well
+        // inside the poster's 1500ms window.
+        tree = render('wanted-revelation')
+        find(tree, node => node.props?.value === 'instant' && typeof node.props?.onChange === 'function').props.onChange('normal')
+        tree = render('wanted-revelation')
+        fixture.outcome = outcome('wanted-revelation', { multiplier: 0 })
+        find(tree, node => node.props?.['data-slot-action'] === 'spin').props.onClick()
+        vi.advanceTimersByTime(1)
+        tree = render('wanted-revelation')
+        expect(find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Skip animation')).not.toBeNull()
+        expect(find(tree, node => node.props?.className?.includes('is-wanted-poster'))).toBeNull()
+        // Settle it and step past the poster lifetime: still nothing over the board.
+        find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Skip animation').props.onClick()
+        vi.advanceTimersByTime(1600)
+        tree = render('wanted-revelation')
+        expect(find(tree, node => node.props?.className?.includes('is-wanted-poster'))).toBeNull()
+    })
+
+    it('keeps the settled grid readable: the reveal is a sibling overlay, never a cell cover (QA023)', async () => {
+        // Structural half of the finding: the poster must never replace or wrap
+        // the settled cells, so the resolved symbols stay in the grid whatever
+        // the reveal is doing. Paint order and lifetime need a real browser.
+        fixture.outcome = outcome('wanted-revelation', { mysteryReveal: { id: 'badge', label: 'BADGE' } })
+        const tree = await spin('wanted-revelation')
+        const frame = find(tree, node => node.props?.className === 'slot-reel-frame-v2')
+        // The poster is a stage overlay, drawn outside the reel frame.
+        expect(find(tree, node => node.props?.className?.includes('is-wanted-poster'))).not.toBeNull()
+        expect(find(frame, node => node.props?.className?.includes('is-wanted-poster'))).toBeNull()
+        const cells = []
+        const collect = node => {
+            if (!node || typeof node !== 'object') return
+            if (node.props?.['data-slot-cell-index'] !== undefined) cells.push(node)
+            ;[node.props?.panel, node.props?.secondary, ...[node.props?.children].flat(Infinity)].forEach(collect)
+        }
+        collect(frame)
+        // 5x4 lines board: every cell still carries its own resolved symbol label.
+        expect(cells).toHaveLength(20)
+        expect(cells.filter(cell => find(cell, node => node.props?.['data-slot-symbol-label'] !== undefined))).toHaveLength(20)
+        // The reveal is drawn outside the grid element, so it cannot occupy a
+        // cell slot; it can only overlay the board while its timer runs.
+        const grid = find(frame, node => node.props?.className === 'slot-reel-grid')
+        expect(find(grid, node => node.props?.className?.includes('is-wanted-poster'))).toBeNull()
+    })
+
+    it('opens Autoplay as a native dialog with a persistent opener for focus return (QA026)', () => {
+        // The dialog element itself is modal (see useNativeDialog.test.js for
+        // Escape/Tab/backdrop). What SlotsGame owes the finding is: a real
+        // <dialog>, an opener ref that outlives the drawer, and closing that
+        // does not start a spin.
+        const opener = { focus: vi.fn(), isConnected: true }
+        let tree = render('mummy-cascade')
+        find(tree, node => node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: opener })
+        tree = render('mummy-cascade')
+        const dialog = find(tree, node => node.type === 'dialog')
+        expect(dialog.props['aria-label']).toBe('Autoplay configuration')
+        expect(fixture.dialogOpener.current).toBe(opener)
+        dialog.props.onCancel({ preventDefault: vi.fn(), stopPropagation: vi.fn() })
+        tree = render('mummy-cascade')
+        expect(find(tree, node => node.type === 'dialog')).toBeNull()
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.credit).not.toHaveBeenCalled()
+    })
+
+    it('states the autoplay counting policy it actually implements (QA035)', () => {
+        // The historical finding was a stop after two rounds. The policy the code
+        // enforces — accepted completed rounds, free spins included, busy
+        // attempts excluded — is only honest if the dialog says so.
+        let tree = render('mummy-cascade')
+        find(tree, node => node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: {} })
+        tree = render('mummy-cascade')
+        const dialog = find(tree, node => node.type === 'dialog')
+        const copy = text(find(dialog, node => node.props?.className === 'slot-panel-note'))
+        expect(copy).toContain('Counts completed rounds, including free spins')
+        expect(copy).toContain('Busy attempts do not count')
+    })
+
     for (const template of [...SLOT_TEMPLATES, { id: undefined, title: 'generic' }]) {
         for (const fun of [false, true]) {
             it(`shares the selected model across every surface: ${template.title}, Fun ${fun}`, () => {
@@ -308,6 +412,111 @@ describe('settled slot presentation', () => {
         expect(fixture.bet).toHaveBeenCalledTimes(1)
         expect(fixture.record).toHaveBeenCalledTimes(10)
         expect(fixture.record.mock.calls.filter(([entry]) => entry.meta.freeSpin)).toHaveLength(9)
+    })
+
+    it('stops autoplay on a rejected debit without consuming a round (QA035)', async () => {
+        // A rejected bet is not an accepted round: it must end the session, leave
+        // the count untouched and pay nothing. The historical finding was the
+        // opposite shape — the count draining without rounds behind it.
+        fixture.bet.mockReturnValue(false)
+        const id = 'mummy-cascade'
+        let tree = render(id)
+        find(tree, node => node.props?.value === 'normal' && node.props?.onChange).props.onChange('instant')
+        tree = render(id)
+        find(tree, node => node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: {} })
+        tree = render(id)
+        find(tree, node => node.props?.className === 'slot-auto-start').props.onClick()
+        fixture.outcome = outcome(id, { multiplier: 1 })
+        render(id)
+        autoplayEffect().effect()
+        await vi.advanceTimersByTimeAsync(221)
+        tree = render(id)
+        expect(fixture.bet).toHaveBeenCalledOnce()
+        expect(fixture.bet).toHaveReturnedWith(false)
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+        expect(find(tree, node => node.props?.className === 'slot-autoplay-pill')).toBeNull()
+    })
+
+    it('honours an armed stop condition after an accepted round, leaving the rest unused (QA035)', async () => {
+        const id = 'mummy-cascade'
+        let tree = render(id)
+        find(tree, node => node.props?.value === 'normal' && node.props?.onChange).props.onChange('instant')
+        tree = render(id)
+        find(tree, node => node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: {} })
+        tree = render(id)
+        const checkboxes = []
+        const collect = node => {
+            if (!node || typeof node !== 'object') return
+            if (node.type === 'input' && node.props?.type === 'checkbox') checkboxes.push(node)
+            ;[node.props?.children].flat(Infinity).forEach(collect)
+        }
+        collect(find(tree, node => node.type === 'dialog'))
+        // First checkbox is "Stop on feature trigger" (see the drawer markup).
+        checkboxes[0].props.onChange({ target: { checked: true } })
+        tree = render(id)
+        // The drawer writes React state; the running session reads a ref that a
+        // sync effect mirrors into it. Nothing in this harness runs effects
+        // automatically, so mirror it explicitly before starting.
+        const stops = fixture.state.find(value => value && typeof value === 'object' && 'stopOnFeature' in value)
+        expect(stops.stopOnFeature).toBe(true)
+        fixture.effects.find(entry => entry.dependencies?.length === 1 && entry.dependencies[0] === stops).effect()
+        find(tree, node => node.props?.className === 'slot-auto-start').props.onClick()
+        fixture.outcome = outcome(id, { multiplier: 0.5, featureEvents: [{ type: 'free-spins', freeSpins: 4, indexes: [] }] })
+        render(id)
+        autoplayEffect().effect()
+        // Settle the instants that finish the round AND let the outcome callback
+        // run, so the stop predicate is evaluated before the assertion.
+        await vi.advanceTimersByTimeAsync(221)
+        await vi.advanceTimersByTimeAsync(0)
+        tree = render(id)
+        // One accepted round settled, then the stop condition ended the session.
+        expect(fixture.credit).toHaveBeenCalledOnce()
+        expect(fixture.record).toHaveBeenCalledOnce()
+        expect(find(tree, node => node.props?.className === 'slot-autoplay-pill')).toBeNull()
+        // The remaining count is not charged against the player: free spins stay.
+        expect(find(tree, node => typeof node.props?.totalAwarded === 'number').props.remaining).toBe(4)
+    })
+
+    it('does not spend a round on an autoplay attempt that lands while a spin is in flight (QA035)', async () => {
+        // The historical early stop: an autoplay tick landing while another spin
+        // owns the lock resolves `{skipped:true}` — no debit, no round, no ledger
+        // entry. The tick must be retried, not charged against the count.
+        const id = 'mummy-cascade'
+        let tree = render(id)
+        find(tree, node => node.props?.value === 'normal' && node.props?.onChange).props.onChange('turbo')
+        tree = render(id)
+        find(tree, node => node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: {} })
+        tree = render(id)
+        find(tree, node => node.props?.className === 'slot-auto-start').props.onClick()
+        fixture.outcome = outcome(id, { multiplier: 1 })
+        render(id)
+        autoplayEffect().effect()
+        // Take a manual spin that is still animating when the 220 ms autoplay
+        // tick fires (turbo reels are mid-flight well past that point).
+        find(render(id), node => node.props?.['data-slot-action'] === 'spin').props.onClick()
+        vi.advanceTimersByTime(0)
+        await vi.advanceTimersByTimeAsync(220)
+        tree = render(id)
+        expect(find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Skip animation')).not.toBeNull()
+        // Rejected busy attempt: no round spent, no credit booked, no ledger row.
+        expect(text(find(tree, node => node.props?.className === 'slot-autoplay-pill'))).toContain('10')
+        expect(fixture.bet).toHaveBeenCalledOnce()
+        expect(fixture.record).not.toHaveBeenCalled()
+
+        // Settle the manual round, then let the retried tick run for real.
+        find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Skip animation').props.onClick()
+        await Promise.resolve()
+        expect(fixture.record).toHaveBeenCalledOnce()
+        render(id)
+        autoplayEffect().effect()
+        await vi.advanceTimersByTimeAsync(220)
+        tree = render(id)
+        find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Skip animation').props.onClick()
+        await Promise.resolve()
+        tree = render(id)
+        expect(text(find(tree, node => node.props?.className === 'slot-autoplay-pill'))).toContain('9')
+        expect(fixture.bet).toHaveBeenCalledTimes(2)
     })
 
     it('updates the selected model immediately after template and mode switches', () => {
