@@ -122,4 +122,65 @@ describe('Dice reveal and settlement share one outcome', () => {
         expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(1.98, 'Dice return')
         mounted.unmount()
     })
+
+    // QA002: the hosted phone receipt showed two recorded outcomes while
+    // `ROLLING…` was still visible, i.e. rapid input slipping past a stale lock.
+    // Input is refused for the whole obligation, including the millisecond the
+    // final number appears, and only the single accepted round is ever booked.
+    it('refuses every rapid repeat through the reveal boundary and books one settlement', async () => {
+        const mounted = mount()
+        const round = play(mounted.tree)({ betAmount: 5 })
+        for (let i = 0; i < 20; i += 1) {
+            await expect(play(render())({ betAmount: 7 })).resolves.toMatchObject({ kind: 'rejected', code: 'active-obligation' })
+        }
+        // Cross the 720 ms reveal boundary one millisecond at a time: a visible
+        // final number must not look like an open round.
+        await vi.advanceTimersByTimeAsync(718)
+        for (let i = 0; i < 4; i += 1) {
+            await expect(play(render())({ betAmount: 7 })).resolves.toMatchObject({ kind: 'rejected', code: 'active-obligation' })
+            await vi.advanceTimersByTimeAsync(1)
+        }
+        // The reveal has landed, so the lock overlay is gone and the number is
+        // readable — the display must not imply the obligation ended.
+        expect(lock(render())).toBe(false)
+        await expect(play(render())({ betAmount: 7 })).resolves.toMatchObject({ kind: 'rejected', code: 'active-obligation' })
+        // 960 ms unlocks input; the obligation itself clears at 980 ms.
+        await vi.advanceTimersByTimeAsync(280)
+
+        expect(fixture.debit).toHaveBeenCalledExactlyOnceWith(5, 'Dice')
+        expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(9.9, 'Dice return')
+        expect(fixture.record).toHaveBeenCalledTimes(1)
+
+        // And the refused input cost nothing: the next accepted round is round two.
+        const second = play(render())({ betAmount: 7 })
+        await vi.runAllTimersAsync(); await second
+        expect(fixture.debit).toHaveBeenCalledTimes(2)
+        await vi.runAllTimersAsync(); await round
+        mounted.unmount()
+    })
+
+    // QA002: reduced/off motion is a presentation preference, never a shortcut
+    // through the round. The coordination timeline is driven by the round event
+    // machine, so the same value, lock length and single settlement hold when
+    // the OS asks for reduced motion.
+    it('keeps the same reveal/settlement coordination under reduced motion', async () => {
+        vi.stubGlobal('window', {
+            setTimeout: globalThis.setTimeout,
+            clearTimeout: globalThis.clearTimeout,
+            matchMedia: () => ({ matches: true }),
+        })
+        const mounted = mount()
+        const round = play(mounted.tree)({ betAmount: 5 })
+        await vi.advanceTimersByTimeAsync(719)
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(lock(render())).toBe(true)
+        await vi.advanceTimersByTimeAsync(1)
+        const settled = render()
+        expect(find(settled, node => node.props?.className === 'dice-big win').props.children).toBe('10.00')
+        expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(9.9, 'Dice return')
+        expect(fixture.record).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ label: '10.00', betAmount: 5 }))
+        await vi.runAllTimersAsync(); await round
+        expect(lock(render())).toBe(false)
+        mounted.unmount()
+    })
 })
