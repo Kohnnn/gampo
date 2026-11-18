@@ -34,6 +34,48 @@ export function measureSlotCells(frame, svg) {
 }
 const HALO_TYPES = new Set(['ways', 'megaways', 'cluster', 'pay-anywhere'])
 
+/**
+ * Derive drawn geometry from measured cell rectangles.
+ *
+ * Pure on purpose: outline alignment is then provable against a synthetic
+ * viewport, which is the only way this repo can check cell-to-outline geometry
+ * (there is no browser in the test environment). `geometry` is exactly what
+ * `measureSlotCells` returns — cell rects already relative to the SVG origin,
+ * so frame padding, borders and grid gaps are baked in by measurement instead
+ * of being re-derived (and re-guessed) here.
+ */
+export function buildWinPathShapes({ wins = [], cellPositions = [], geometry }) {
+    const width = geometry?.w || 0
+    const height = geometry?.h || 0
+    if (!wins.length || !width || !height) return { lines: [], halos: [] }
+    const centers = geometry.cells.map(cell => ({ x: cell.x + cell.w / 2, y: cell.y + cell.h / 2 }))
+
+    const lineOut = []
+    const haloOut = []
+    wins.forEach((win, idx) => {
+        const indexes = (win.indexes || []).filter(i => centers[i])
+        if (!indexes.length) return
+        if (HALO_TYPES.has(win.type)) {
+            indexes.forEach(i => {
+                const cell = geometry.cells[i]
+                haloOut.push({ id: `${idx}-${i}`, ...cell })
+            })
+        } else {
+            // Line win: one cell per column, traced left-to-right.
+            const sorted = indexes.slice().sort((a, b) => {
+                const ca = cellPositions[a]?.col ?? 0
+                const cb = cellPositions[b]?.col ?? 0
+                if (ca !== cb) return ca - cb
+                return (cellPositions[a]?.row ?? 0) - (cellPositions[b]?.row ?? 0)
+            })
+            const points = sorted.map(i => centers[i])
+            const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+            lineOut.push({ id: String(idx), d })
+        }
+    })
+    return { lines: lineOut, halos: haloOut }
+}
+
 export default function WinPathOverlay({ wins = [], cellPositions = [], layout, gridRef, accent = '#ffd166' }) {
     const svgRef = useRef(null)
     const [geometry, setGeometry] = useState({ w: 0, h: 0, cells: [] })
@@ -50,35 +92,10 @@ export default function WinPathOverlay({ wins = [], cellPositions = [], layout, 
         return () => observer.disconnect()
     }, [gridRef, wins, layout, cellPositions])
 
-    const { lines, halos } = useMemo(() => {
-        if (!wins.length || !geometry.w || !geometry.h) return { lines: [], halos: [] }
-        const centers = geometry.cells.map(cell => ({ x: cell.x + cell.w / 2, y: cell.y + cell.h / 2 }))
-
-        const lineOut = []
-        const haloOut = []
-        wins.forEach((win, idx) => {
-            const indexes = (win.indexes || []).filter(i => centers[i])
-            if (!indexes.length) return
-            if (HALO_TYPES.has(win.type)) {
-                indexes.forEach(i => {
-                    const cell = geometry.cells[i]
-                    haloOut.push({ id: `${idx}-${i}`, ...cell })
-                })
-            } else {
-                // Line win: one cell per column, traced left-to-right.
-                const sorted = indexes.slice().sort((a, b) => {
-                    const ca = cellPositions[a]?.col ?? 0
-                    const cb = cellPositions[b]?.col ?? 0
-                    if (ca !== cb) return ca - cb
-                    return (cellPositions[a]?.row ?? 0) - (cellPositions[b]?.row ?? 0)
-                })
-                const points = sorted.map(i => centers[i])
-                const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-                lineOut.push({ id: String(idx), d })
-            }
-        })
-        return { lines: lineOut, halos: haloOut }
-    }, [wins, geometry, cellPositions])
+    const { lines, halos } = useMemo(
+        () => buildWinPathShapes({ wins, cellPositions, geometry }),
+        [wins, geometry, cellPositions],
+    )
 
     return (
         <svg

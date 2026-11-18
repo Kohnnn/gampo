@@ -168,6 +168,65 @@ describe('cases animation helpers', () => {
     })
 })
 
+// QA039: the reel must stop ON the pointer, not merely near it. The track is
+// pinned to the frame's left edge (`cases.css`: `.cases-carousel-track { left:
+// 50% }`) and slid by `finalPrizeOffset`, so measured from the pointer the tile
+// at `targetIndex` spans `[offset + index * stride, + tilePx)`. There is no real
+// layout engine in this suite, so the viewport is synthetic: rendered metrics go
+// in, spans come out, and the assertion is the intersect predicate itself.
+const renderedTile = (tilePx, gapPx) => ({
+    offsetWidth: tilePx, offsetLeft: 0, nextElementSibling: { offsetLeft: tilePx + gapPx },
+})
+const stopSpan = (targetIndex, { tilePx, gapPx }, jitter = 0) => {
+    const start = finalPrizeOffset(jitter, targetIndex, tilePx, gapPx) + targetIndex * (tilePx + gapPx)
+    return { start, end: start + tilePx }
+}
+describe('QA039 reel stop geometry', () => {
+    it.each([[118, 4], [104, 4], [92, 4], [92, 6], [64, 2]])('stops a %ipx winning tile across the pointer with a %ipx gap', (tilePx, gapPx) => {
+        const originalWindow = globalThis.window
+        globalThis.window = { getComputedStyle: () => ({ getPropertyValue: () => `${tilePx}px` }) }
+        try {
+            const metrics = getCaseReelMetrics({ querySelector: () => renderedTile(tilePx, gapPx) })
+            expect(metrics).toEqual({ tilePx, gapPx })
+            const { start, end } = stopSpan(CASE_PRIZE_INDEX, metrics)
+            expect(start, 'pointer sits at or after the winning tile edge').toBeLessThanOrEqual(0)
+            expect(end, 'pointer sits at or before the winning tile edge').toBeGreaterThan(0)
+            // Centred, not just overlapping: the tile midpoint is the pointer.
+            expect(Math.abs((start + end) / 2)).toBeLessThan(0.001)
+        } finally { globalThis.window = originalWindow }
+    })
+
+    it('derives the stop from measurable layout, not the nominal CSS variables', () => {
+        // A 104px tile under a stage that still advertises 118px: the stop must
+        // follow the tile that was actually laid out, or the pointer lands inside
+        // the neighbouring tile while the "winner" is highlighted off-centre.
+        const originalWindow = globalThis.window
+        globalThis.window = { getComputedStyle: () => ({ getPropertyValue: () => '118px' }) }
+        try {
+            const metrics = getCaseReelMetrics({ querySelector: () => renderedTile(104, 4) })
+            const { start, end } = stopSpan(CASE_PRIZE_INDEX, metrics)
+            expect(start).toBeLessThanOrEqual(0)
+            expect(end).toBeGreaterThan(0)
+            // The nominal stop still centres ITS 118px tile, so the two stops
+            // differ by exactly half the tile difference. Half-overlap alone would
+            // not catch that: the winner would just sit 7px off the pointer.
+            const nominal = stopSpan(CASE_PRIZE_INDEX, { tilePx: CASE_TILE_PX, gapPx: CASE_TILE_GAP_PX })
+            expect(Math.abs(start - nominal.start)).toBe((CASE_TILE_PX - metrics.tilePx) / 2)
+        } finally { globalThis.window = originalWindow }
+    })
+
+    it('keeps the winning tile under the pointer across the full jitter range', () => {
+        // `createCaseOpeningRound` offsets each entry by `(roll - 0.5) * 14`, i.e.
+        // at most ±7px, so identical drops do not rest at identical pixels. That is
+        // cosmetic: it must never slide the winning tile off the pointer.
+        for (const jitter of [-7, -3.5, 0, 3.5, 7]) {
+            const { start, end } = stopSpan(CASE_PRIZE_INDEX, { tilePx: 92, gapPx: 4 }, jitter)
+            expect(start).toBeLessThanOrEqual(0)
+            expect(end).toBeGreaterThan(0)
+        }
+    })
+})
+
 describe('Wave 2 rarity stinger dispatch', () => {
     const drop = (rarity) => ({ rarity, valueGc: 1 })
 

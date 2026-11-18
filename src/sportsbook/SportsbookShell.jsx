@@ -29,6 +29,7 @@ import {
     restoreSportsbookTickets,
 } from './sportsbookPersistence'
 import BetSlip from './components/BetSlip'
+import FeedStatus from './components/FeedStatus'
 import EventDetail from './components/EventDetail'
 import EventList from './components/EventList'
 import MobileSportsNav from './components/MobileSportsNav'
@@ -437,13 +438,7 @@ function SportsbookShell() {
                     <button type="button" onClick={refreshFeed} disabled={!feedPresentation.retryable || feedPending} aria-describedby={feedPending ? 'sportsbook-feed-status-copy' : undefined}><RefreshCcw size={15} /> Refresh</button>
                 </header>
 
-                <section className={`sb-feed-status is-${feedPresentation.state}`} role="status" aria-live="polite" aria-atomic="true">
-                    <div><strong>{feedPresentation.heading}</strong><span id="sportsbook-feed-status-copy">{feedPresentation.body}</span></div>
-                    <dl>
-                        <div><dt>Last refresh</dt><dd>{feedPresentation.refreshed}</dd></div>
-                        <div><dt>Sources</dt><dd>{feedPresentation.sources.join(', ') || 'No attributable source'}</dd></div>
-                    </dl>
-                </section>
+                <FeedStatus presentation={feedPresentation} />
                 {restorePresentation.message && !restorePresentation.blocking ? <p className="sb-restore-notice" role="status" aria-live="polite" aria-atomic="true">{restorePresentation.message}</p> : null}
                 <div key={ticketAnnouncementKey} className="sb-ticket-announcement" role="status" aria-live="polite" aria-atomic="true">{ticketAnnouncement}</div>
                 {(feedPresentation.state === 'error' || restorePresentation.blocking) ? <p className="sb-blocking-alert" role="alert" aria-live="assertive">{restorePresentation.blocking ? restorePresentation.message : feedPresentation.error || feedPresentation.body}</p> : null}

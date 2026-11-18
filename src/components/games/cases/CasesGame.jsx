@@ -62,6 +62,7 @@ import {
     casePhaseLabel,
     applyCaseAccounting,
     claimCaseSettlement,
+    finalPrizeOffset,
     getCaseReelMetrics,
     getCaseReelStartOffset,
     hasReachedCasePhase,
@@ -748,8 +749,12 @@ export default function CasesGame() {
             const round = geometryRoundRef.current
             if (!round) return
             const { tilePx, gapPx } = getCaseReelMetrics(stageRef.current)
+            // QA039: one formula for the resting offset. This path (resize /
+            // ResizeObserver) and the land timer both write `round.offsets`, so a
+            // second hand-rolled copy would silently stop the winner under the
+            // pointer as soon as either copy changed.
             round.entries.forEach((entry, index) => {
-                round.offsets[index] = -(entry.targetIndex * (tilePx + gapPx) + tilePx / 2) + entry.jitter
+                round.offsets[index] = finalPrizeOffset(entry.jitter, entry.targetIndex, tilePx, gapPx)
             })
             if (!pendingRoundRef.current || ['land', 'reveal', 'settled'].includes(casePhase)) setTrackOffsets([...round.offsets])
         }
