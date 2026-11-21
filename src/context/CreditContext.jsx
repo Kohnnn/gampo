@@ -162,9 +162,9 @@ export function CreditProvider({ children }) {
     // `persistFailedRef` handles the one case where the stored value is the
     // stale one: a refused write (quota, storage unavailable) leaves storage
     // behind the ref. Continuing to trust storage there would re-offer a
-    // balance already spent and charge the same stake again, so from the first
-    // refused write until a write succeeds, the ref wins. That is the only
-    // state in which the ref is the fresher of the two.
+    // balance already spent. After a refusal the ref wins until a write
+    // succeeds or a transaction confirms persistence by reading back its
+    // exact balance.
     const persistFailedRef = useRef(false)
     const commitBalance = useCallback((nextBalance) => {
         persistFailedRef.current = !persistCredits(nextBalance)
@@ -227,8 +227,8 @@ export function CreditProvider({ children }) {
         }
         const prepared = prepareCreditTransactions(currentBalance(), history, entries)
         return commitPreparedCreditTransactions(prepared, commit, (nextBalance, nextTransactions) => {
-            // The durable commit/readback has succeeded before either the
-            // authoritative refs or React consumers see the prepared state.
+            // The synchronous commit has succeeded, so publish the prepared
+            // state. The callback need not have written the wallet keys.
             balanceRef.current = nextBalance
             transactionsRef.current = nextTransactions
             setBalance(nextBalance)
@@ -243,7 +243,11 @@ export function CreditProvider({ children }) {
             // Making it fail loud belongs with the lock wiring, where a failed
             // write can be reported as one atomic outcome rather than leaving a
             // round shown as committed while its balance is not on disk.
-            if (readNumber(CREDIT_STORAGE_KEY, NaN) !== nextBalance) commitBalance(nextBalance)
+            if (readNumber(CREDIT_STORAGE_KEY, NaN) === nextBalance) {
+                persistFailedRef.current = false
+            } else {
+                commitBalance(nextBalance)
+            }
             if (readRaw(HISTORY_STORAGE_KEY, null) !== JSON.stringify(nextTransactions)) {
                 persistHistory(nextTransactions)
             }
