@@ -42,13 +42,9 @@ export function isInteractiveHotkeyTarget(target) {
     return false
 }
 
-// True when a modal dialog layer is mounted and on screen. Hotkey layers that
-// are not dialog-owned must defer to it: Space/Enter belong to the dialog's
-// own focused control, not to a paid game action behind it.
-export function isOpenDialogPresent(root = typeof document !== 'undefined' ? document : null) {
+export function hasVisibleDialog(selector, root = typeof document !== 'undefined' ? document : null) {
     if (!root) return false
-    const dialogs = root.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open]')
-    for (const dialog of dialogs) {
+    for (const dialog of root.querySelectorAll(selector)) {
         if (dialog.getAttribute('aria-hidden') === 'true') continue
         // Closed mobile sheets stay mounted but cannot receive pointer input.
         // An opening dialog may also be at opacity 0 for its first frame, so
@@ -61,6 +57,10 @@ export function isOpenDialogPresent(root = typeof document !== 'undefined' ? doc
         return true
     }
     return false
+}
+
+export function isOpenDialogPresent(root) {
+    return hasVisibleDialog('[role="dialog"], [aria-modal="true"], dialog[open]', root)
 }
 
 function getEnterPressCode({ key, code, location, keyCode }) {
@@ -142,6 +142,12 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
     }, [isOpen, controlledOpen, onOpenChange])
 
     const onCloseKeyDown = (event) => {
+        if (event.key === ' ') {
+            // Preserve the native click on keyup without dismissing lower overlays.
+            event.stopPropagation()
+            return
+        }
+
         const nativeEvent = event.nativeEvent ?? event
         const code = getEnterPressCode(nativeEvent)
         if (code === null) return
