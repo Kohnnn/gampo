@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { CreditProvider, CREDIT_STORAGE_KEY, HISTORY_STORAGE_KEY, INITIAL_CREDITS, commitPreparedCreditTransactions, prepareCreditTransactions, readNumber, useCredits } from './CreditContext'
+import { commitSportsbookAccounting } from '../sportsbook/sportsbookPersistence'
 
 const observedRender = vi.hoisted(() => ({ states: null, cursor: 0 }))
 vi.mock('react', async original => {
@@ -413,6 +414,89 @@ describe('D-1 successive writes keep peer reads', () => {
         expect(peer.placeBet(950, 'Plinko')).toBe(true)
         expect(storedBalance()).toBe(0)
         expect(tab.placeBet(1, 'Plinko')).toBe(false)
+    })
+})
+
+describe('D-1 transactional balance recovery', () => {
+    const walletSnapshot = () => [CREDIT_STORAGE_KEY, HISTORY_STORAGE_KEY].map(key => localStorage.getItem(key))
+
+    function mountAfterRefusedDebit() {
+        const credits = creditConsumer(1000)
+        const setItem = localStorage.setItem
+        const writes = vi.fn((key, value) => {
+            if (key === CREDIT_STORAGE_KEY) throw new Error('balance write refused')
+            setItem(key, value)
+        })
+        localStorage.setItem = writes
+
+        expect(credits.placeBet(100)).toBe(true)
+        expect(writes).toHaveBeenCalledWith(CREDIT_STORAGE_KEY, '900')
+        expect(storedBalance()).toBe(1000)
+        expect(storedHistory()).toMatchObject([{ type: 'bet', amount: -100, balance: 900 }])
+        writes.mockClear()
+
+        return { credits, writes, allowBalanceWrites: () => writes.mockImplementation(setItem) }
+    }
+
+    it('resumes peer reads after a confirmed transactional balance write', () => {
+        const { credits, writes, allowBalanceWrites } = mountAfterRefusedDebit()
+        allowBalanceWrites()
+        const commit = vi.fn(next => commitSportsbookAccounting({ ...next, tickets: [], savedAt: 0, storage: localStorage }))
+
+        expect(credits.placeBetTransactional(100, 'Ticket', 'ticket:debit', commit)).toEqual({ ok: true, code: null })
+        expect(commit).toHaveBeenCalledWith(expect.objectContaining({ nextBalance: 800 }))
+        expect(writes.mock.calls.filter(([key]) => key === CREDIT_STORAGE_KEY)).toEqual([[CREDIT_STORAGE_KEY, '800']])
+        expect(storedBalance()).toBe(800)
+        expect(storedHistory()[0]).toMatchObject({ id: 'ticket:debit', amount: -100, balance: 800 })
+
+        const peer = mountConsumer()
+        expect(peer.placeBet(750, 'Peer debit')).toBe(true)
+        expect(storedBalance()).toBe(50)
+        const afterPeer = walletSnapshot()
+        writes.mockClear()
+
+        expect(credits.placeBet(51)).toBe(false)
+        expect(writes).not.toHaveBeenCalled()
+        expect(walletSnapshot()).toEqual(afterPeer)
+        expect(credits.placeBet(50)).toBe(true)
+        expect(storedBalance()).toBe(0)
+        expect(storedHistory().map(({ amount, balance }) => [amount, balance])).toEqual([
+            [-50, 0], [-750, 50], [-100, 800], [-100, 900],
+        ])
+    })
+
+    it('keeps the 900-credit fallback when the transactional commit is refused', () => {
+        const { credits, writes, allowBalanceWrites } = mountAfterRefusedDebit()
+        allowBalanceWrites()
+        const before = walletSnapshot()
+        const commit = vi.fn(() => ({ ok: false, code: 'rolled-back' }))
+
+        expect(credits.placeBetTransactional(100, 'Ticket', 'ticket:debit', commit)).toEqual({ ok: false, code: 'rolled-back' })
+        expect(commit).toHaveBeenCalledWith(expect.objectContaining({ nextBalance: 800 }))
+        expect(credits.placeBet(901)).toBe(false)
+        expect(writes).not.toHaveBeenCalled()
+        expect(walletSnapshot()).toEqual(before)
+        expect(credits.placeBet(900)).toBe(true)
+        expect(storedBalance()).toBe(0)
+    })
+
+    it('keeps the prepared 800-credit fallback when balance repair fails', () => {
+        const { credits, writes, allowBalanceWrites } = mountAfterRefusedDebit()
+        const commit = vi.fn(() => ({ ok: true }))
+
+        expect(credits.placeBetTransactional(100, 'Ticket', 'ticket:debit', commit)).toEqual({ ok: true, code: null })
+        expect(commit).toHaveBeenCalledWith(expect.objectContaining({ nextBalance: 800 }))
+        expect(writes.mock.calls.filter(([key]) => key === CREDIT_STORAGE_KEY)).toEqual([[CREDIT_STORAGE_KEY, '800']])
+        expect(storedBalance()).toBe(1000)
+        const afterRepair = walletSnapshot()
+        writes.mockClear()
+        allowBalanceWrites()
+
+        expect(credits.placeBet(801)).toBe(false)
+        expect(writes).not.toHaveBeenCalled()
+        expect(walletSnapshot()).toEqual(afterRepair)
+        expect(credits.placeBet(800)).toBe(true)
+        expect(storedBalance()).toBe(0)
     })
 })
 

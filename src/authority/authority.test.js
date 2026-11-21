@@ -209,6 +209,236 @@ describe('authority/retained finals — bounded coalescing', () => {
     })
 })
 
+describe('authority/settleRound — retained-final capacity', () => {
+    const pending = 'older-pending'
+    // The earlier delivered row sorts AFTER the later one by primary key.
+    const oldest = 'z-earlier-delivered'
+    const newer = 'a-later-delivered'
+    const legacyOlder = 'legacy-65'
+    const legacyNewer = 'legacy-66'
+    const history = [pending, oldest, newer, ...Array.from({ length: 61 }, (_, i) => `history-${i + 1}`)]
+    const historyRequest = { exitKind: 'push', stake: 1, payout: 1 }
+    const historyFinalId = operationId => `e1:round:${operationId}:push`
+    const operationTarget = operationId => ({ type: 'operation', epoch: 'e1', operationId, command: 'settle-round' })
+
+    const replacementRequest = { exitKind: 'win', stake: 5, payout: 9, label: 'Dice' }
+    const replacementResult = {
+        kind: 'committed', target: operationTarget('replacement'), milestone: 'settled-result',
+        sequence: 64, revision: 65, replay: false, delivery: 'pending',
+        value: {
+            operationId: 'replacement', roundId: 'e1:round:replacement', exitKind: 'win',
+            stake: 5, payout: 9, profit: 4, balanceAfter: 104,
+        },
+    }
+    const replacementFinal = {
+        id: 'e1:round:replacement:win', roundId: 'e1:round:replacement', exitKind: 'win',
+        requestBytes: '{"exitKind":"win","label":"Dice","operationId":"replacement","payout":9,"stake":5}',
+        result: replacementResult, createdAt: 64,
+    }
+    const recordLimit = { kind: 'not-admitted', target: null, code: 'record-limit', field: null, observedRevision: null }
+
+    let auth
+    beforeEach(async () => {
+        auth = await freshAuthority()
+        await seedWallet(auth, 100)
+    })
+    afterEach(async () => { await teardown() })
+
+    async function settleHistory(count = 64) {
+        for (const operationId of history.slice(0, count)) {
+            const result = await auth.settleRound(operationId, historyRequest)
+            expect(result.kind, operationId).toBe('committed')
+        }
+    }
+
+    async function markDelivered(...operationIds) {
+        await auth.idb.readwrite(['finals'], async ({ finals }) => {
+            for (const operationId of operationIds) {
+                const row = await finals.get(historyFinalId(operationId))
+                await finals.put({ ...row, delivered: true })
+            }
+        })
+    }
+
+    async function seedLegacyOverflow() {
+        // Bypass admission for the two existing finals beyond the cap.
+        await auth.idb.readwrite(['finals'], async ({ finals }) => {
+            for (const [operationId, sequence] of [[legacyOlder, 64], [legacyNewer, 65]]) {
+                const roundId = `e1:round:${operationId}`
+                const result = committed({
+                    target: operationTarget(operationId), milestone: 'settled-result', sequence, revision: sequence + 1,
+                    value: { operationId, roundId, exitKind: 'push', stake: 1, payout: 1, profit: 0, balanceAfter: 100 },
+                })
+                await finals.put({
+                    id: historyFinalId(operationId), roundId, exitKind: 'push', createdAt: sequence,
+                    requestBytes: canonical(makeSettleRequest(operationId, historyRequest)), result,
+                })
+            }
+        })
+    }
+
+    async function snapshotStores() {
+        const names = ['meta', 'operations', 'rounds', 'finals', 'wallet']
+        return Object.fromEntries(await Promise.all(names.map(async name => [name, await auth.idb.all(name)])))
+    }
+
+    function expectReplacement(before, after, evictedIds) {
+        expect(after).toHaveLength(64)
+        expect(after.find(row => row.id === replacementFinal.id)).toStrictEqual(replacementFinal)
+        expect(after.filter(row => row.id !== replacementFinal.id)).toStrictEqual(
+            before.filter(row => !evictedIds.includes(row.id)),
+        )
+    }
+
+    it('commits the 64th final and repeatedly refuses a 65th with no deliveries', async () => {
+        await settleHistory(63)
+        expect(await auth.idb.all('finals')).toHaveLength(63)
+        const accepted = await auth.settleRound('at-cap', historyRequest)
+        expect(accepted).toMatchObject({ kind: 'committed', milestone: 'settled-result', sequence: 63, revision: 64 })
+        const before = await snapshotStores()
+        expect(before.finals).toHaveLength(64)
+        expect(before.finals.find(row => row.id === historyFinalId('at-cap'))?.result).toStrictEqual(accepted)
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+            expect(await auth.settleRound('replacement', replacementRequest)).toStrictEqual(recordLimit)
+            expect(await snapshotStores()).toStrictEqual(before)
+        }
+    })
+
+    it('admits the 65th settlement by evicting only the oldest delivered final, not an older pending one', async () => {
+        await settleHistory()
+        await markDelivered(oldest, newer)
+        const before = await snapshotStores()
+        expect(before.finals).toHaveLength(64)
+        expect(before.finals.find(row => row.id === historyFinalId(pending))).toMatchObject({
+            createdAt: 0, result: { delivery: 'pending' },
+        })
+        expect(before.finals.find(row => row.id === historyFinalId(oldest))).toMatchObject({ createdAt: 1, delivered: true })
+        expect(before.finals.find(row => row.id === historyFinalId(newer))).toMatchObject({ createdAt: 2, delivered: true })
+
+        expect(await auth.settleRound('replacement', replacementRequest)).toStrictEqual(replacementResult)
+        const after = await snapshotStores()
+        expectReplacement(before.finals, after.finals, [historyFinalId(oldest)])
+        const operation = {
+            id: 'e1\u0000replacement', sequence: 64, requestBytes: replacementFinal.requestBytes,
+            revision: 65, result: replacementResult, roundId: 'e1:round:replacement',
+        }
+        expect(after.operations.find(row => row.id === operation.id)).toStrictEqual(operation)
+        expect(after.operations.filter(row => row.id !== operation.id)).toStrictEqual(before.operations)
+        expect(after.wallet).toStrictEqual([{ id: 'current', balance: 104, revision: 65 }])
+        expect(after.meta).toStrictEqual([{ ...before.meta[0], nextSequence: 65 }])
+    })
+
+    it('restores a legacy store of 66 finals to 64 by evicting exactly three delivered finals', async () => {
+        await settleHistory()
+        await seedLegacyOverflow()
+        await markDelivered(oldest, newer, legacyOlder, legacyNewer)
+        const before = await auth.idb.all('finals')
+        expect(before).toHaveLength(66)
+
+        expect(await auth.settleRound('replacement', replacementRequest)).toStrictEqual(replacementResult)
+        expectReplacement(before, await auth.idb.all('finals'), [oldest, newer, legacyOlder].map(historyFinalId))
+    })
+
+    it('refuses legacy overflow with only two delivered finals, without partially trimming it', async () => {
+        await settleHistory()
+        await seedLegacyOverflow()
+        await markDelivered(oldest, legacyOlder)
+        const before = await snapshotStores()
+        expect(before.finals).toHaveLength(66)
+
+        expect(await auth.settleRound('replacement', replacementRequest)).toStrictEqual(recordLimit)
+        expect(await snapshotStores()).toStrictEqual(before)
+    })
+
+    it.each([[64, 0], [64, 1], [66, 2], [66, 3]])(
+        'keeps both rejections durable with %i finals and %i delivered',
+        async (count, delivered) => {
+            await settleHistory()
+            if (count === 66) await seedLegacyOverflow()
+            if (delivered) await markDelivered(...[oldest, newer, legacyOlder].slice(0, delivered))
+            let before = await snapshotStores()
+            expect(before.finals).toHaveLength(count)
+
+            const requests = [
+                ['insufficient-funds', { exitKind: 'loss', stake: 101 }, '{"exitKind":"loss","label":"Round","operationId":"insufficient-funds","payout":0,"stake":101}'],
+                ['valuation-mismatch', { exitKind: 'win', stake: 1, payout: 1e308 }, '{"exitKind":"win","label":"Round","operationId":"valuation-mismatch","payout":1e+308,"stake":1}'],
+            ]
+            for (const [offset, [code, request, requestBytes]] of requests.entries()) {
+                const sequence = 64 + offset
+                const result = {
+                    kind: 'rejected', target: operationTarget(code), code, sequence, revision: 64,
+                    replay: false, delivery: 'pending',
+                }
+                expect(await auth.settleRound(code, request)).toStrictEqual(result)
+                const after = await snapshotStores()
+                const id = `e1\u0000${code}`
+                expect(after.operations.find(row => row.id === id)).toStrictEqual({
+                    id, sequence, requestBytes, revision: 64, result, roundId: `e1:round:${code}`,
+                })
+                expect(after.operations.filter(row => row.id !== id)).toStrictEqual(before.operations)
+                expect(after.meta).toStrictEqual([{ ...before.meta[0], nextSequence: sequence + 1 }])
+                for (const name of ['wallet', 'rounds', 'finals']) {
+                    expect(JSON.stringify(after[name]), name).toBe(JSON.stringify(before[name]))
+                }
+                before = after
+            }
+        },
+    )
+
+    it.each([['retained', pending], ['evicted', oldest]])(
+        'replays exact bytes and conflicts on changed bytes for a %s final even at capacity',
+        async (status, operationId) => {
+            await settleHistory()
+            const original = await auth.idb.read('operations', `e1\u0000${operationId}`)
+            if (status === 'evicted') {
+                await markDelivered(operationId)
+                expect(await auth.settleRound('replacement', replacementRequest)).toStrictEqual(replacementResult)
+            }
+            const before = await snapshotStores()
+            expect(before.finals).toHaveLength(64)
+            expect(await auth.readFinals(original.roundId)).toHaveLength(status === 'evicted' ? 0 : 1)
+
+            expect(await auth.settleRound(operationId, historyRequest)).toStrictEqual({ ...original.result, replay: true })
+            expect(await snapshotStores()).toStrictEqual(before)
+            expect(await auth.settleRound(operationId, { ...historyRequest, stake: 101 })).toStrictEqual({
+                kind: 'not-admitted', target: null, code: 'id-conflict', field: 'operationId', observedRevision: original.revision,
+            })
+            expect(await snapshotStores()).toStrictEqual(before)
+        },
+    )
+
+    it('actually aborts after observing the eviction and replacement in the live transaction, restoring all five stores', async () => {
+        await settleHistory()
+        await markDelivered(oldest)
+        const before = await snapshotStores()
+        let inFlightFinals
+        let abortObserved = false
+        const readwrite = auth.idb.readwrite
+        auth.idb.readwrite = (names, settle) => readwrite.call(auth.idb, names, async (stores, tx) => {
+            await settle(stores, tx)
+            // Read the completed delete and insert before aborting this same transaction.
+            inFlightFinals = await Promise.all([
+                stores.finals.get(historyFinalId(oldest)),
+                stores.finals.get(replacementFinal.id),
+            ])
+            tx.addEventListener('abort', () => { abortObserved = true }, { once: true })
+            tx.abort()
+        })
+        let result
+        try {
+            result = await auth.settleRound('replacement', replacementRequest)
+        } finally {
+            auth.idb.readwrite = readwrite
+        }
+
+        expect(inFlightFinals).toStrictEqual([undefined, replacementFinal])
+        expect(abortObserved).toBe(true)
+        expect(result).toMatchObject({ kind: 'aborted', code: 'transaction-error' })
+        expect(await snapshotStores()).toStrictEqual(before)
+    })
+})
+
 describe('result contract — closed union', () => {
     it('exposes exactly six kinds', () => {
         expect(RESULT_KINDS).toEqual(['committed', 'rejected', 'not-admitted', 'aborted', 'unknown', 'superseded'])

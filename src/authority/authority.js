@@ -192,12 +192,24 @@ export class Authority {
                     ...(exact.selected === undefined ? {} : { selected: exact.selected }),
                 }
                 const result = committed({ target, milestone: 'settled-result', sequence, revision, value })
+                const final = { id: finalId, roundId, exitKind: exact.exitKind, requestBytes: bytes, result: clone(result), createdAt: sequence }
+
+                // Keep capacity admission and any eviction in the settlement transaction.
+                if (await stores.finals.count() >= RETAINED_FINAL_CAP) {
+                    const rows = await stores.finals.getAll()
+                    const plan = planFinalRetention([...rows, final])
+                    if (plan.refused) {
+                        outcome.result = notAdmitted({ code: 'record-limit' })
+                        return
+                    }
+                    for (const id of plan.evict) await stores.finals.delete(id)
+                }
 
                 // 3. Wallet, operation, round and final commit together.
                 await stores.wallet.put({ id: 'current', balance: nextBalance, revision })
                 await stores.operations.put({ id: key, sequence, requestBytes: bytes, revision, result: clone(result), roundId })
                 await stores.rounds.put({ id: roundId, status: exact.exitKind, exitKind: exact.exitKind, revision })
-                await stores.finals.put({ id: finalId, roundId, exitKind: exact.exitKind, requestBytes: bytes, result: clone(result), createdAt: sequence })
+                await stores.finals.put(final)
                 await stores.meta.put({ ...(meta ?? {}), id: 'current', nextSequence: sequence + 1, epoch, writerSessionId: this.writerSessionId, protocolVersion: PROTOCOL_VERSION })
                 outcome.result = result
             })
