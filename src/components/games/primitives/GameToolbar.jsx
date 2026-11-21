@@ -109,6 +109,11 @@ export default function GameToolbar({ helpHref, definition, balance, odds, betAm
     const openHotkeys = () => { setHotkeyOpen(true); setPopoverOpen(false) }
     const openOdds = () => { setOddsOpen(true); setPopoverOpen(false); recordLearningEvent('odds') }
 
+    // Changing onClose restarts the native dialog effect, which would put an
+    // already-open drawer above Help when opening Help rerenders the toolbar.
+    const closeFairness = useCallback(() => setFairOpen(false), [])
+    const closeOdds = useCallback(() => setOddsOpen(false), [])
+
     // Below 768px the game aside stacks *under* the playfield, so `HistoryDrawer`
     // sits at the bottom of a long scroller and is easy to never find. This jumps
     // the user to it. It is a discoverability affordance only — it moves the
@@ -216,9 +221,9 @@ export default function GameToolbar({ helpHref, definition, balance, odds, betAm
                 </div>
             </div>
             {popover}
-            <FairnessDrawer open={fairOpen} onClose={() => setFairOpen(false)} openerRef={triggerRef} />
+            <FairnessDrawer open={fairOpen} onClose={closeFairness} openerRef={triggerRef} />
             <HotkeyHelp controlledOpen={hotkeyOpen} onOpenChange={setHotkeyOpen} />
-            <OddsPopup open={oddsOpen} onClose={() => setOddsOpen(false)} definition={definition} odds={odds} betAmount={betAmount} balance={balance} openerRef={triggerRef} />
+            <OddsPopup open={oddsOpen} onClose={closeOdds} definition={definition} odds={odds} betAmount={betAmount} balance={balance} openerRef={triggerRef} />
         </>
     )
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ state: [], refs: [], stateCursor: 0, refCursor: 0, effects: [], outcome: null, fun: false, reduceMotion: false, animations: true, credit: vi.fn(), bet: vi.fn(() => true), record: vi.fn(), dialogOpener: null, resolverArgs: [] }))
+const fixture = vi.hoisted(() => ({ state: [], refs: [], stateCursor: 0, refCursor: 0, effects: [], outcome: null, fun: false, reduceMotion: false, animations: true, mobile: false, credit: vi.fn(), bet: vi.fn(() => true), record: vi.fn(), dialogOpener: null, resolverArgs: [] }))
 vi.mock('react', async () => ({
     ...await vi.importActual('react'),
     useState(initial) {
@@ -18,7 +18,7 @@ vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: () => 
 vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: () => {} }) }))
 vi.mock('../../../audio/useBgm', () => ({ useBgm: () => {} }))
 vi.mock('../../../hooks/useSettings', () => ({ useSettings: () => ({ reduceMotion: fixture.reduceMotion, animations: fixture.animations, haptics: false, quickSpin: false }) }))
-vi.mock('../../../hooks/useIsMobileViewport', () => ({ useIsMobileViewport: () => false }))
+vi.mock('../../../hooks/useIsMobileViewport', () => ({ useIsMobileViewport: () => fixture.mobile }))
 vi.mock('../../../hooks/useProgress', () => ({ recordFeatureEvent: () => {} }))
 vi.mock('../../../utils/gameFeedback', () => ({ FEEDBACK_EVENTS: {}, playFeedback: () => {} }))
 vi.mock('../../../utils/funMode', () => ({ FUN_PAYOUT_BOOST: 1.06, useFunMode: () => [fixture.fun], isFunMode: () => fixture.fun }))
@@ -79,7 +79,7 @@ const cleanups = []
 beforeEach(() => {
     vi.useFakeTimers()
     vi.stubGlobal('window', globalThis)
-    fixture.state = []; fixture.refs = []; fixture.effects = []; fixture.fun = false; fixture.reduceMotion = false; fixture.animations = true
+    fixture.state = []; fixture.refs = []; fixture.effects = []; fixture.fun = false; fixture.reduceMotion = false; fixture.animations = true; fixture.mobile = false
     fixture.credit.mockClear(); fixture.bet.mockReset().mockReturnValue(true); fixture.record.mockClear(); fixture.dialogOpener = null
     fixture.resolverArgs = []
 })
@@ -245,6 +245,22 @@ describe('settled slot presentation', () => {
         expect(find(tree, node => node.props?.['aria-label'] === 'Freeze columns')).not.toBeNull()
         expect(find(tree, node => typeof node.props?.['aria-label'] === 'string' && /^(Unlock|Lock) column/.test(node.props['aria-label']))).toBeNull()
         expect(find(tree, node => node.props?.['aria-label'] === 'Freeze column 1 reels')).not.toBeNull()
+    })
+
+    it('exposes each Megaways reel column as a native toggle that cannot start a round', () => {
+        const template = 'phoenix-megaways'
+        const column = () => find(render(template), node => node.props?.className?.split(' ').includes('slot-megaways-col'))
+        const initial = column()
+        expect(initial.type).toBe('button')
+        expect(initial.props).toMatchObject({ type: 'button', disabled: false, 'aria-label': 'Freeze column 1 reels' })
+        initial.props.onClick()
+        const frozen = column()
+        expect(frozen.props['aria-label']).toBe('Unfreeze column 1 reels')
+        frozen.props.onClick()
+        expect(column().props['aria-label']).toBe('Freeze column 1 reels')
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+        expect(fixture.resolverArgs).toHaveLength(0)
     })
 
     it('never passes manual column freezes into the resolver (QA034)', async () => {
@@ -544,13 +560,34 @@ describe('settled slot presentation', () => {
 })
 
 describe('slots Space shortcut guard (QA028)', () => {
+    function matches(selectorList, selectors) {
+        return selectorList.split(',').some(selector => selectors.includes(selector.trim()))
+    }
+
+    function keyboardTarget(tagName, { attributes = {}, selectors = [], parentElement = null, isContentEditable = false } = {}) {
+        const target = {
+            tagName,
+            parentElement,
+            isContentEditable,
+            getAttribute: name => attributes[name] ?? null,
+            closest(selectorList) {
+                return matches(selectorList, [tagName.toLowerCase(), ...selectors])
+                    ? target
+                    : parentElement?.closest(selectorList) ?? null
+            },
+        }
+        return target
+    }
+
     // The suite runs without a DOM, so `window` is a recording stub. Renders the
     // real component, executes its recorded effects (registering the shipped
     // keydown listener) and presses Space on a real Event — no copy of the guard.
-    function mount(id = 'bars') {
+    function mount(prepare) {
         const listeners = new Map()
+        const dialogs = []
         const doc = new EventTarget()
-        doc.body = {}
+        doc.body = { nodeType: 1 }
+        doc.querySelectorAll = selectorList => dialogs.filter(({ selectors }) => matches(selectorList, selectors))
         vi.stubGlobal('document', doc)
         vi.stubGlobal('window', {
             setTimeout: (fn, ms) => setTimeout(fn, ms),
@@ -562,42 +599,158 @@ describe('slots Space shortcut guard (QA028)', () => {
                 return !event.defaultPrevented
             },
         })
-        render(id)
-        for (const entry of fixture.effects) {
-            const cleanup = entry.effect()
-            if (typeof cleanup === 'function') cleanups.push(cleanup)
+        fixture.outcome = outcome('bars')
+        const tree = render('bars')
+        let refreshShortcut
+        for (const [index, entry] of fixture.effects.entries()) {
+            const priorListeners = listeners.get('keydown')
+            let cleanup = entry.effect()
+            if (listeners.get('keydown') !== priorListeners) {
+                refreshShortcut = () => {
+                    cleanup()
+                    cleanup = fixture.effects[index].effect()
+                }
+            }
+            if (typeof cleanup === 'function') cleanups.push(() => cleanup())
+        }
+        if (prepare) {
+            prepare(tree)
+            render('bars')
+            refreshShortcut()
         }
         const send = event => {
             for (const fn of [...(listeners.get('keydown') || [])]) fn(event)
             return event
         }
-        const press = (as = {}, target = { tagName: 'DIV', isContentEditable: false, closest: () => null }) => send(Object.defineProperties(new Event('keydown', { cancelable: true }), {
+        const press = (as = {}, target = keyboardTarget('DIV')) => send(Object.defineProperties(new Event('keydown', { cancelable: true }), {
             key: { value: ' ' }, code: { value: 'Space' }, target: { value: target },
             repeat: { value: false }, ctrlKey: { value: false }, metaKey: { value: false }, altKey: { value: false }, shiftKey: { value: false },
             ...as,
         }))
-        return { press, send }
+        return { press, send, dialogs }
     }
-    const summary = { tagName: 'SUMMARY', isContentEditable: false, closest: () => null }
 
-    it('leaves Space to a focused sidebar summary without placing a paid round', () => {
+    it.each([
+        ['Game tools button', keyboardTarget('BUTTON')],
+        ['icon inside the Mute button', keyboardTarget('svg', { parentElement: keyboardTarget('BUTTON') })],
+        ['sidebar summary', keyboardTarget('SUMMARY')],
+        ['link', keyboardTarget('A', { attributes: { href: '/hub' }, selectors: ['a[href]'] })],
+        ['reel Freeze control', keyboardTarget('DIV', { attributes: { role: 'button' }, selectors: ['[role="button"]'] })],
+        ['Spin button', keyboardTarget('BUTTON', { selectors: ['[data-slot-action="spin"]'] })],
+    ])('leaves Space to the %s without placing a paid round', (_name, target) => {
         const page = mount()
-        const event = page.press({}, summary)
-        expect(fixture.bet).not.toHaveBeenCalled()
-        // The disclosure's own native toggle keeps the event it owns.
+        const event = page.press({}, target)
         expect(event.defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
     })
 
-    it('still spins once from a plain playfield Space and consumes the scroll default', () => {
-        fixture.outcome = outcome('bars')
+    it.each([
+        ['native Game odds dialog', 'dialog[open]'],
+        ['Keyboard shortcuts overlay', '[role="dialog"]'],
+    ])('blocks playfield Space while the %s is open and restores it on close', (_name, selector) => {
         const page = mount()
-        const event = page.press()
+        page.dialogs.push({ selectors: [selector], getAttribute: () => null })
+        expect(page.press({}, keyboardTarget('BUTTON')).defaultPrevented).toBe(false)
+        expect(page.press().defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+
+        page.dialogs.pop()
+        expect(page.press().defaultPrevented).toBe(true)
         expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+    })
+
+    it('releases playfield Space on desktop resize and keeps the paytable closed on return to mobile', () => {
+        fixture.mobile = true
+        const page = mount(tree => {
+            find(tree, node => node.props?.['aria-label'] === 'View paytable and rules').props.onClick()
+        })
+
+        let tree = render('bars')
+        const findPaytable = () => find(tree, node => node.props?.role === 'dialog' && node.props?.['aria-label'] === 'Bars paytable and rules')
+        // Query the rendered sheet, not the viewport: its own display is flex
+        // even when desktop CSS hides the backdrop that contains it.
+        document.querySelectorAll = selectors => {
+            const sheet = findPaytable()
+            if (!sheet || !matches(selectors, ['[role="dialog"]'])) return []
+            return [{
+                getAttribute: name => sheet.props[name] ?? null,
+                ownerDocument: { defaultView: { getComputedStyle: () => ({ display: 'flex', opacity: '1' }) } },
+            }]
+        }
+
+        expect(findPaytable()).not.toBeNull()
+        expect(page.press().defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+
+        fixture.mobile = false
+        tree = render('bars')
+        expect(page.press().defaultPrevented).toBe(true)
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+
+        fixture.mobile = true
+        tree = render('bars')
+        expect(findPaytable()).toBeNull()
+    })
+
+    it.each([
+        keyboardTarget('INPUT'), keyboardTarget('TEXTAREA'), keyboardTarget('SELECT'),
+        keyboardTarget('DIV', { isContentEditable: true }),
+        keyboardTarget('SPAN', { parentElement: keyboardTarget('DIV', { attributes: { role: 'textbox' } }) }),
+    ])('yields Space to the editable target $tagName', target => {
+        const page = mount()
+        expect(page.press({}, target).defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+    })
+
+    it.each(['ctrlKey', 'metaKey', 'altKey', 'shiftKey'])('yields Space with %s held', modifier => {
+        const page = mount()
+        expect(page.press({ [modifier]: { value: true } }).defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+    })
+
+    it('leaves playfield Space alone while the Autoplay drawer is open', () => {
+        const page = mount(tree => {
+            find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: {} })
+        })
+        expect(page.press().defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+    })
+
+    it('spins once from playfield Space and ignores held Space after the round settles', async () => {
+        const page = mount(tree => {
+            find(tree, node => node.props?.value === 'normal' && typeof node.props?.onChange === 'function').props.onChange('instant')
+        })
+        const event = page.press()
         expect(event.defaultPrevented).toBe(true)
+        await vi.advanceTimersByTimeAsync(0)
+        expect(fixture.record).toHaveBeenCalledOnce()
+        expect(page.press({ repeat: { value: true } }).defaultPrevented).toBe(false)
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+        expect(fixture.record).toHaveBeenCalledOnce()
+    })
+
+    it('leaves a running round alone for a button or open dialog and still allows playfield Space to skip', () => {
+        const page = mount(tree => {
+            find(tree, node => node.props?.['aria-label'] === 'Spin').props.onClick()
+        })
+        expect(fixture.bet).toHaveBeenCalledOnce()
+        expect(page.press({ repeat: { value: true } }).defaultPrevented).toBe(false)
+        expect(page.press({}, keyboardTarget('BUTTON')).defaultPrevented).toBe(false)
+        page.dialogs.push({ selectors: ['dialog[open]'], getAttribute: () => null })
+        expect(page.press().defaultPrevented).toBe(false)
+        expect(fixture.record).not.toHaveBeenCalled()
+
+        page.dialogs.pop()
+        expect(page.press().defaultPrevented).toBe(true)
+        expect(fixture.record).toHaveBeenCalledOnce()
+        expect(fixture.bet).toHaveBeenCalledOnce()
     })
 
     it('refuses a repeated key and a press another layer already consumed', () => {
-        fixture.outcome = outcome('bars')
         const page = mount()
         const held = page.press({ repeat: { value: true } })
         expect(fixture.bet).not.toHaveBeenCalled()

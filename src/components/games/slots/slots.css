@@ -713,6 +713,11 @@
     gap: 4px;
     min-width: 0;
     min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
 }
 
 .slot-megaways-col.anticipating,

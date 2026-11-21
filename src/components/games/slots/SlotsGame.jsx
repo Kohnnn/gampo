@@ -26,6 +26,7 @@ import { useSettings } from '../../../hooks/useSettings'
 import { FEEDBACK_EVENTS, playFeedback } from '../../../utils/gameFeedback'
 import { isFunMode, useFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { haptic } from '../../../utils/haptics'
+import { isInteractiveHotkeyTarget, isOpenDialogPresent } from '../primitives/HotkeyHelp'
 import {
     SLOT_TEMPLATES,
     getBuyTiers,
@@ -432,22 +433,21 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     // (win tier + multiplier, or "No win").
     const [liveAnnounce, setLiveAnnounce] = useState('')
     const [showMobileBet, setShowMobileBet] = useState(false)
-    // The mobile sheets below are hidden by CSS below the breakpoint while this
-    // React state stays true, so Escape behaviour is tied to real visibility.
     const isMobile = useIsMobileViewport()
     // Mobile-only: full paytable / feature-contract bottom-sheet modal. On
     // desktop the same content lives inline in the panel (showInfo); on phones
     // that panel reflows off-screen behind the dock, so we surface it as a
     // proper dismissible overlay instead.
     const [showMobileInfo, setShowMobileInfo] = useState(false)
+    // Dismiss on desktop instead of restoring a stale sheet on return to mobile.
+    if (!isMobile && showMobileInfo) setShowMobileInfo(false)
+    // Match the dock's mobile breakpoint: desktop CSS hides only the backdrop,
+    // so the sheet itself must unmount to release the global Space shortcut.
+    const mobileInfoVisible = isMobile && showMobileInfo
     const [showPaylines, setShowPaylines] = useState(false)
     const [dockPortal, setDockPortal] = useState(null)
     useEffect(() => { setDockPortal(document.body) }, [])
-    // Focus management for the mobile paytable modal: remember the element that
-    // opened it, move focus into the sheet on open, restore it on close, and
-    // trap Tab within the sheet while it is open.
     const mobileInfoSheetRef = useRef(null)
-    const mobileInfoReturnRef = useRef(null)
     // Wave 9: sticky wild lock during free-spin sessions and feature cinematics
     const [stickyWilds, setStickyWilds] = useState([])
     const [wheelReveal, setWheelReveal] = useState(null)
@@ -669,12 +669,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         }
     }, [])
 
-    // Mobile paytable modal a11y: focus-trap + Escape-to-close + focus restore.
+    // Mobile paytable modal a11y: focus entry, Tab trap, and focus return.
     useEffect(() => {
-        if (!showMobileInfo) return undefined
-        if (typeof document !== 'undefined') {
-            mobileInfoReturnRef.current = document.activeElement
-        }
+        if (!mobileInfoVisible) return undefined
+        const returnTo = document.activeElement
         // Move focus into the sheet once it mounts.
         const focusTimer = window.setTimeout(() => {
             const sheet = mobileInfoSheetRef.current
@@ -708,16 +706,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         return () => {
             window.clearTimeout(focusTimer)
             document.removeEventListener('keydown', onKey)
-            // Restore focus to the trigger when the sheet closes.
-            const ret = mobileInfoReturnRef.current
-            if (ret && typeof ret.focus === 'function') ret.focus()
+            // The dock's trigger may still be connected but hidden after a resize.
+            if (returnTo?.isConnected && returnTo.getClientRects().length > 0) returnTo.focus?.()
         }
-    }, [showMobileInfo])
+    }, [mobileInfoVisible])
 
-    // The mobile sheets are hidden by CSS below the breakpoint, but their React
-    // state stays true. Tie Escape handling and claims to actual mobile
-    // visibility, otherwise an invisible sheet keeps the claim after a resize
-    // to desktop and swallows the first Escape.
+    // Only visible mobile sheets claim Escape. The bet sheet can stay mounted
+    // when CSS hides it on desktop; the paytable unmounts there.
     //
     // Ownership is a registered HANDLER, not a flag: the router asks the
     // topmost layer first, so with the bet sheet and the shortcuts panel both
@@ -731,12 +726,12 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     }, [showMobileBet, isMobile])
 
     useEffect(() => {
-        if (!showMobileInfo || !isMobile) return undefined
+        if (!mobileInfoVisible) return undefined
         return claimEscape(() => {
             setShowMobileInfo(false)
             return true
         })
-    }, [showMobileInfo, isMobile])
+    }, [mobileInfoVisible])
 
     // QA seam — DEVELOPMENT ONLY.
     //
@@ -1427,33 +1422,20 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         performSpin({ source: 'stage', bet: betAmount, free: canUseFreeSpin, tierId })
     }, [betAmount, canUseFreeSpin, performSpin, running, slamStop])
 
-    // a11y: Space spins (and slam-stops an in-flight animated spin), mirroring
-    // BetPanel's Space handler but scoped to slots. Skips when typing in an
-    // input/textarea/select, when modifiers are held, when autoplay owns the
-    // loop, or when a real spin button is focused (so the button's own click
-    // handles it — no double-fire). preventDefault stops page scroll.
+    // Playfield Space spins or slam-stops; focused controls and dialogs own their input.
     useEffect(() => {
         if (typeof window === 'undefined') return undefined
         const onKey = (e) => {
             if (e.key !== ' ' && e.code !== 'Space') return
             if (e.defaultPrevented || e.repeat) return
-            if (showAutoplayDrawer) return
+            if (showAutoplayDrawer || autoplayActive) return
             if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return
             // Skip while a cascade tumble is replaying — slam-stop would strand
             // the per-step animations. slamStop() itself already short-circuits
             // on this flag, but Space must not start a fresh spin either.
             if (cascadeReplayRef.current) return
-            const el = e.target
-            const tag = (el?.tagName || '').toLowerCase()
-            // A focused native control owns Space: text fields, and a <summary>
-            // disclosure (sidebar Game groups, History/paytable sections), whose
-            // native toggle must not also place a paid round underneath it.
-            if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'summary') return
-            if (el?.isContentEditable) return
-            // The spin button (button/[role=button]) handles its own Space via
-            // native activation — don't double-fire if it's the focused element.
-            if (el?.closest?.('[data-slot-action="spin"]')) return
-            if (autoplayActive) return
+            if (isInteractiveHotkeyTarget(e.target) || e.target?.closest?.('[data-slot-action="spin"]')) return
+            if (isOpenDialogPresent()) return
             e.preventDefault()
             triggerStageSpin()
         }
@@ -2037,7 +2019,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 </div>
             )}
 
-            {showMobileInfo && (
+            {mobileInfoVisible && (
                 <div
                     className="slot-mobile-info-backdrop"
                     onClick={() => setShowMobileInfo(false)}
@@ -2173,13 +2155,13 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                         for (let c = 0; c < col; c += 1) cursor += getColumnRows(config, c)
                                         for (let r = 0; r < colRows; r += 1) cellsInCol.push({ index: cursor + r })
                                         return (
-                                            <div
+                                            <button
                                                 key={`col-${col}`}
+                                                type="button"
                                                 className={`slot-megaways-col ${anticipating && col >= config.layout.cols - 2 ? 'anticipating' : ''} ${!running && wildColumns.has(col) ? 'wild-column' : ''} ${lockedCols.has(col) ? 'is-locked' : ''}`}
-                                                onClick={() => !running && toggleColLock(col)}
-                                                role="button"
+                                                onClick={() => toggleColLock(col)}
+                                                disabled={running}
                                                 aria-label={`${lockedCols.has(col) ? 'Unfreeze' : 'Freeze'} column ${col + 1} reels`}
-                                                tabIndex={running ? -1 : 0}
                                             >
                                                 {cellsInCol.map(({ index }) => {
                                                     const item = displayGrid[index] || config.symbols?.[0]
@@ -2189,7 +2171,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                     const moneyValue = lastResult?.moneyValues?.find(m => m.index === index)?.value
                                                     const orbValue = lastResult?.orbValues?.find(o => o.index === index)?.value
                                                     return (
-                                                        <div
+                                                        <span
                                                             key={`mw-${index}`}
                                                             data-slot-cell-index={index}
                                                             className={`slot-cell type-${item?.type || 'pay'} symbol-${item?.id || 'na'} ${spinning ? 'spinning' : ''} ${winning ? 'winning' : ''} ${popping ? 'cascade-pop' : ''} ${orbValue ? 'orb-active' : ''}`}
@@ -2198,10 +2180,10 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                                             <em data-slot-symbol-label={item?.id}>{item?.label}</em>
                                                             {moneyValue ? <i className="money-chip" aria-label={`Raw prize multiplier ${moneyValue}`}>{moneyValue.toFixed(2)}× raw</i> : null}
                                                             {orbValue ? <i className="orb-chip" aria-hidden>×{orbValue}</i> : null}
-                                                        </div>
+                                                        </span>
                                                     )
                                                 })}
-                                            </div>
+                                            </button>
                                         )
                                     })}
                                 </div>

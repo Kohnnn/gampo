@@ -156,7 +156,7 @@ export function claimCaseSettlement(pendingRound) {
  */
 export function applyCaseAccounting(pendingRound, {
     addWinnings, collection, recordProgressCaseDrop, session, machine,
-    skipped = false, newId = () => Math.random().toString(36).slice(2),
+    skipped = false, newId = () => crypto.randomUUID(),
 } = {}) {
     const pending = pendingRound
     if (!claimCaseSettlement(pending)) return null

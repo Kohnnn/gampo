@@ -61,13 +61,11 @@ import {
     CASE_VISIBLE_PHASES,
     casePhaseLabel,
     applyCaseAccounting,
-    claimCaseSettlement,
     finalPrizeOffset,
     getCaseReelMetrics,
     getCaseReelStartOffset,
     hasReachedCasePhase,
     pickCelebrationDrop,
-    summarizeCaseSettlement,
     getRaritySfxRole,
     pickHighestRarityRole,
     shouldPlayRarityStinger,
@@ -83,7 +81,6 @@ import {
     caseDropOdds,
     casePriceBand,
     filterCasesByCategory,
-    rarityDropWeight,
     roundGc,
     roundSignedGc,
 } from './caseEconomy'
@@ -841,7 +838,7 @@ export default function CasesGame() {
         if (!pending) return
         clearRevealTimers()
 
-        const { caseData, picks, resolve, stake, tracks: pendingTracks, offsets: pendingOffsets, rows: roundRows } = pending
+        const { caseData, picks, resolve, tracks: pendingTracks, offsets: pendingOffsets, rows: roundRows } = pending
         setTracks(pendingTracks)
         setTrackOffsets(pendingOffsets)
         setCasePhase('reveal')
@@ -852,7 +849,7 @@ export default function CasesGame() {
         const settlement = applyCaseAccounting(pending, { addWinnings, collection, recordProgressCaseDrop, session, machine, skipped })
         // Already settled by another path (or unmounted mid-reveal): nothing owed.
         if (!settlement) return
-        const { returnAmount, profit, averageMultiplier } = settlement
+        const { profit } = settlement
         setResults(picks)
         setSettlementSummary(settlement)
         setFairnessKey(key => key + 1)

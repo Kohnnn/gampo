@@ -32,6 +32,9 @@ export default function WelcomeModal() {
 
         const onKey = (e) => {
             if (e.key === 'Escape') { e.preventDefault(); completeOnboarding(); return }
+            // Claim this in capture before Help's bubbling window listener can
+            // open a native dialog above Welcome's Escape handler.
+            if (e.key === '?') { e.preventDefault(); return }
             if (e.key !== 'Tab') return
             const items = focusables()
             if (items.length === 0) return

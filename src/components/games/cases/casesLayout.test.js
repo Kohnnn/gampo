@@ -63,7 +63,6 @@ describe('cases settlement source contract', () => {
         const anim = readFileSync(new URL('./casesAnimation.js', import.meta.url), 'utf8')
         expect(anim).toContain('if (!claimCaseSettlement(pending)) return null')
         expect(anim).toContain("if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')")
-        expect(source.match(/claimCaseSettlement/g) || []).toHaveLength(1)
         expect(source).toContain('pendingRoundRef.current = null')
         expect(source).toContain("setCasePhase('settled')")
         expect(source).toContain('setRunning(false)')

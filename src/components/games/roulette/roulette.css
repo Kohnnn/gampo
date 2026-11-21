@@ -543,12 +543,12 @@
     width: 100%;
     max-width: 840px;
     background:
+        radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 60%),
+        repeating-linear-gradient(0deg, transparent 0 20px, rgba(0, 0, 0, 0.05) 20px 21px),
         url('/images/generated/roulette-felt-rainbet.webp') center/cover,
         linear-gradient(180deg, #075f36, #023f22);
-    background-blend-mode: multiply;
-    background-image:
-        radial-gradient(circle at center, rgba(255, 255, 255, 0.04), transparent 60%),
-        repeating-linear-gradient(0deg, transparent 0 20px, rgba(0, 0, 0, 0.05) 20px 21px);
+    /* Keep the white highlight visible while the stripe and felt multiply into the base. */
+    background-blend-mode: normal, multiply, multiply, normal;
     border: 3px solid #4d2b10;
     border-radius: 16px;
     padding: 9px;

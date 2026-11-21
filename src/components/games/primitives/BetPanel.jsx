@@ -14,26 +14,17 @@ import { formatCredits } from '../../../utils/simulationMath'
 import { withTimeout } from '../../../utils/scheduling'
 import { claimEscape } from '../../../utils/escapeClaims'
 import { accountAutoRound } from './autoAccounting'
-import { isOpenDialogPresent } from './HotkeyHelp'
+import { isInteractiveHotkeyTarget, isOpenDialogPresent } from './HotkeyHelp'
 
 // QA028: a shortcut may only start or change a paid action when the keystroke is
 // a genuine, unheld press aimed at the page itself. Extracted from the effect so
 // the guard can be pinned by a test without mounting a DOM.
 export function shouldHandleShortcut(event, { dialogOpen = false } = {}) {
-    if (!event) return false
+    if (!event || event.defaultPrevented) return false
     if (event.ctrlKey || event.metaKey || event.altKey) return false
     // A held/repeating key must not fire a second paid action.
     if (event.repeat) return false
-    const tag = (event.target?.tagName || '').toLowerCase()
-    // A focused interactive control owns Space natively (Game tools, Mute,
-    // choices, disclosure <summary>, dialog buttons). Never start a paid round
-    // from it.
-    if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a' || tag === 'summary') return false
-    if (event.target?.isContentEditable) return false
-    // While a dialog is open its controls own Space; the panel must not start a
-    // paid round underneath it.
-    if (dialogOpen) return false
-    return true
+    return !dialogOpen && !isInteractiveHotkeyTarget(event.target)
 }
 
 const TABS = ['manual', 'auto', 'strategy']

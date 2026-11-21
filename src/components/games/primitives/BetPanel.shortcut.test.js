@@ -6,10 +6,22 @@ import { describe, expect, it } from 'vitest'
 import { shouldHandleShortcut } from './BetPanel'
 
 const key = (overrides = {}) => ({ key: ' ', target: { tagName: 'DIV' }, ...overrides })
+const target = (tagName, { parentElement, role, isContentEditable } = {}) => ({
+    tagName, parentElement, isContentEditable, getAttribute: name => name === 'role' ? role : null,
+})
 
 describe('BetPanel shortcut guard', () => {
     it('accepts a plain, unheld Space on the page body', () => {
         expect(shouldHandleShortcut(key())).toBe(true)
+    })
+
+    it('accepts Shift with + on a focusable playfield', () => {
+        const playfield = { ...target('DIV', { role: 'region' }), tabIndex: 0 }
+        expect(shouldHandleShortcut(key({ key: '+', shiftKey: true, target: playfield }))).toBe(true)
+    })
+
+    it('defers to a handler that already prevented the keystroke', () => {
+        expect(shouldHandleShortcut(key({ defaultPrevented: true }))).toBe(false)
     })
 
     it('rejects keyboard auto-repeat so a held key cannot fire a second paid round', () => {
@@ -27,6 +39,17 @@ describe('BetPanel shortcut guard', () => {
             expect(shouldHandleShortcut(key({ target: { tagName } }))).toBe(false)
         }
         expect(shouldHandleShortcut(key({ target: { tagName: 'DIV', isContentEditable: true } }))).toBe(false)
+    })
+
+    it.each([
+        ['button ancestor', target('path', { parentElement: target('svg', { parentElement: target('BUTTON') }) })],
+        ['summary ancestor', target('SPAN', { parentElement: target('SUMMARY') })],
+        ['ARIA button', target('DIV', { role: 'button' })],
+        ['ARIA switch ancestor', target('SPAN', { parentElement: target('DIV', { role: 'switch' }) })],
+        ['ARIA textbox ancestor', target('SPAN', { parentElement: target('DIV', { role: 'textbox' }) })],
+        ['editable ancestor', target('SPAN', { parentElement: target('DIV', { isContentEditable: true }) })],
+    ])('rejects a keystroke owned by %s', (_name, eventTarget) => {
+        expect(shouldHandleShortcut(key({ target: eventTarget }))).toBe(false)
     })
 
     it('rejects a keystroke owned by a focused <summary> disclosure', () => {
