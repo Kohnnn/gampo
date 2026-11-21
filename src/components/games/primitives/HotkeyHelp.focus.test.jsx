@@ -206,6 +206,37 @@ it.each(['Space', 'Escape'])('keeps an open autoplay dialog behind Help through 
     expect(ownerDocument.activeElement).toBe(paidControl)
 })
 
+it('closes only Help on native Space release without passing keydown to Big Win', () => {
+    const { ownerDocument, paidControl, closeButton, onOpenChange, render, unmount, press } = setup({ controlled: true })
+    const windowTarget = ownerDocument.defaultView
+    const dismissBigWin = vi.fn()
+    // BigWinOverlay dismisses on Space at window without checking defaultPrevented.
+    const onBigWinKeyDown = event => {
+        if (event.key === ' ') dismissBigWin()
+    }
+    windowTarget.addEventListener('keydown', onBigWinKeyDown)
+    try {
+        render()
+        press('?')
+        render()
+        expect(ownerDocument.activeElement).toBe(closeButton)
+
+        expect(press(' ', { code: 'Space' }).defaultPrevented).toBe(false)
+        expect(dismissBigWin).not.toHaveBeenCalled()
+        expect(onOpenChange.mock.calls).toEqual([[true]])
+        expect(ownerDocument.activeElement).toBe(closeButton)
+
+        expect(press(' ', { type: 'keyup', code: 'Space' }).defaultPrevented).toBe(false)
+        expect(onOpenChange.mock.calls).toEqual([[true], [false]])
+        expect(render().cardNode).toBeUndefined()
+        expect(ownerDocument.activeElement).toBe(paidControl)
+        expect(paidControl.click).not.toHaveBeenCalled()
+    } finally {
+        windowTarget.removeEventListener('keydown', onBigWinKeyDown)
+        unmount()
+    }
+})
+
 it('holds Help and its focus through repeated Enter downs and dismisses once on the matching release', () => {
     const { ownerDocument, paidControl, closeButton, onOpenChange, render, press, autoplayDialog, helpDialog } = setup({ controlled: true, nested: true })
     render()

@@ -579,10 +579,21 @@ describe('slots Space shortcut guard (QA028)', () => {
         return target
     }
 
+    function renderedDialog(node, style = { display: 'flex', opacity: '1' }) {
+        const selectors = (node.props.className?.split(/\s+/) ?? []).map(name => `.${name}`)
+        if (node.props.role === 'dialog') selectors.push('[role="dialog"]')
+        if (node.props['aria-modal'] === 'true') selectors.push('[aria-modal="true"]')
+        return {
+            selectors,
+            getAttribute: name => node.props[name] ?? null,
+            ownerDocument: { defaultView: { getComputedStyle: () => style } },
+        }
+    }
+
     // The suite runs without a DOM, so `window` is a recording stub. Renders the
     // real component, executes its recorded effects (registering the shipped
     // keydown listener) and presses Space on a real Event — no copy of the guard.
-    function mount(prepare) {
+    function mount(prepare, id = 'bars') {
         const listeners = new Map()
         const dialogs = []
         const doc = new EventTarget()
@@ -599,8 +610,8 @@ describe('slots Space shortcut guard (QA028)', () => {
                 return !event.defaultPrevented
             },
         })
-        fixture.outcome = outcome('bars')
-        const tree = render('bars')
+        fixture.outcome = outcome(id)
+        const tree = render(id)
         let refreshShortcut
         for (const [index, entry] of fixture.effects.entries()) {
             const priorListeners = listeners.get('keydown')
@@ -613,10 +624,14 @@ describe('slots Space shortcut guard (QA028)', () => {
             }
             if (typeof cleanup === 'function') cleanups.push(() => cleanup())
         }
+        const rerender = () => {
+            const nextTree = render(id)
+            refreshShortcut()
+            return nextTree
+        }
         if (prepare) {
             prepare(tree)
-            render('bars')
-            refreshShortcut()
+            rerender()
         }
         const send = event => {
             for (const fn of [...(listeners.get('keydown') || [])]) fn(event)
@@ -627,7 +642,7 @@ describe('slots Space shortcut guard (QA028)', () => {
             repeat: { value: false }, ctrlKey: { value: false }, metaKey: { value: false }, altKey: { value: false }, shiftKey: { value: false },
             ...as,
         }))
-        return { press, send, dialogs }
+        return { press, send, dialogs, rerender }
     }
 
     it.each([
@@ -646,11 +661,13 @@ describe('slots Space shortcut guard (QA028)', () => {
     })
 
     it.each([
-        ['native Game odds dialog', 'dialog[open]'],
-        ['Keyboard shortcuts overlay', '[role="dialog"]'],
-    ])('blocks playfield Space while the %s is open and restores it on close', (_name, selector) => {
+        ['native Game odds dialog', ['dialog[open]'], { 'aria-label': 'Game odds and probability' }],
+        ['Keyboard shortcuts overlay', ['[role="dialog"]', '[aria-modal="true"]', 'dialog[open]'], {
+            role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Keyboard shortcuts',
+        }],
+    ])('blocks playfield Space while the %s is open and restores it on close', (_name, selectors, attributes) => {
         const page = mount()
-        page.dialogs.push({ selectors: [selector], getAttribute: () => null })
+        page.dialogs.push({ selectors, getAttribute: name => attributes[name] ?? null })
         expect(page.press({}, keyboardTarget('BUTTON')).defaultPrevented).toBe(false)
         expect(page.press().defaultPrevented).toBe(false)
         expect(fixture.bet).not.toHaveBeenCalled()
@@ -659,6 +676,25 @@ describe('slots Space shortcut guard (QA028)', () => {
         page.dialogs.pop()
         expect(page.press().defaultPrevented).toBe(true)
         expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+    })
+
+    it('spins once from playfield Space with the Volume mixer open but yields to a mixer control', () => {
+        const page = mount()
+        const selectors = ['[role="dialog"]']
+        const mixer = keyboardTarget('DIV', { attributes: { role: 'dialog', 'aria-label': 'Volume mixer' }, selectors })
+        mixer.selectors = selectors
+        const computedStyle = { display: 'block', visibility: 'visible', opacity: '1', pointerEvents: 'auto' }
+        mixer.ownerDocument = { defaultView: { getComputedStyle: () => computedStyle } }
+        page.dialogs.push(mixer)
+
+        document.activeElement = keyboardTarget('BUTTON', { attributes: { 'aria-label': 'Mute music' }, parentElement: mixer })
+        expect(page.press({}, document.activeElement).defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+
+        document.activeElement = keyboardTarget('DIV')
+        const event = page.press({}, document.activeElement)
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+        expect(event.defaultPrevented).toBe(true)
     })
 
     it('releases playfield Space on desktop resize and keeps the paytable closed on return to mobile', () => {
@@ -673,11 +709,9 @@ describe('slots Space shortcut guard (QA028)', () => {
         // even when desktop CSS hides the backdrop that contains it.
         document.querySelectorAll = selectors => {
             const sheet = findPaytable()
-            if (!sheet || !matches(selectors, ['[role="dialog"]'])) return []
-            return [{
-                getAttribute: name => sheet.props[name] ?? null,
-                ownerDocument: { defaultView: { getComputedStyle: () => ({ display: 'flex', opacity: '1' }) } },
-            }]
+            if (!sheet) return []
+            const dialog = renderedDialog(sheet)
+            return matches(selectors, dialog.selectors) ? [dialog] : []
         }
 
         expect(findPaytable()).not.toBeNull()
@@ -718,6 +752,48 @@ describe('slots Space shortcut guard (QA028)', () => {
         })
         expect(page.press().defaultPrevented).toBe(false)
         expect(fixture.bet).not.toHaveBeenCalled()
+    })
+
+    it.each([
+        ['Buy bonus tier', 'vault-rush', 'Vault Rush spin', false, node => text(node).trim() === 'Buy'],
+        ['Adjust bet', 'bars', 'Bars spin', true, node => node.props?.['aria-label'] === 'Edit bet'],
+    ])('blocks playfield Space while %s is open and restores it on close', (label, id, spinLabel, mobile, isOpener) => {
+        fixture.mobile = mobile
+        const page = mount(tree => {
+            find(tree, node => node.type === 'button' && isOpener(node)).props.onClick()
+        }, id)
+        const findDialog = tree => find(tree, node => node.props?.role === 'dialog' && node.props?.['aria-label'] === label)
+        const dialog = findDialog(render(id))
+        expect(dialog).not.toBeNull()
+        page.dialogs.push(renderedDialog(dialog))
+        expect(page.press().defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+
+        find(dialog, node => node.type === 'button' && node.props?.['aria-label'] === 'Close').props.onClick()
+        expect(findDialog(page.rerender())).toBeNull()
+        page.dialogs.pop()
+        expect(page.press().defaultPrevented).toBe(true)
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, spinLabel)
+    })
+
+    it('blocks playfield Space while Adjust bet is visible past the mobile breakpoint', () => {
+        fixture.mobile = true
+        const page = mount(tree => {
+            find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Edit bet').props.onClick()
+        })
+
+        // At 768.5px the mobile hook is false, but CSS hides the sheet only at 769px and up.
+        fixture.mobile = false
+        const sheet = find(page.rerender(), node => node.props?.role === 'dialog' && node.props?.['aria-label'] === 'Adjust bet')
+        expect(sheet).not.toBeNull()
+        const style = { display: 'flex', opacity: '1' }
+        page.dialogs.push(renderedDialog(sheet, style))
+        expect(page.press().defaultPrevented).toBe(false)
+        expect(fixture.bet).not.toHaveBeenCalled()
+
+        style.display = 'none'
+        expect(page.press().defaultPrevented).toBe(true)
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
     })
 
     it('spins once from playfield Space and ignores held Space after the round settles', async () => {

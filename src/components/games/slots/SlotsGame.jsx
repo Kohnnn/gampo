@@ -26,7 +26,7 @@ import { useSettings } from '../../../hooks/useSettings'
 import { FEEDBACK_EVENTS, playFeedback } from '../../../utils/gameFeedback'
 import { isFunMode, useFunMode, FUN_PAYOUT_BOOST } from '../../../utils/funMode'
 import { haptic } from '../../../utils/haptics'
-import { isInteractiveHotkeyTarget, isOpenDialogPresent } from '../primitives/HotkeyHelp'
+import { hasVisibleDialog, isInteractiveHotkeyTarget } from '../primitives/HotkeyHelp'
 import {
     SLOT_TEMPLATES,
     getBuyTiers,
@@ -96,6 +96,9 @@ const FEATURE_LABELS = {
 }
 
 const AUTOPLAY_COUNTS = [10, 25, 50, 100]
+
+// Slots' bet and bonus overlays block while visible; role-only toolbar popovers do not.
+const SPACE_BLOCKING_DIALOG_SELECTOR = '[aria-modal="true"], dialog[open], .slot-mobile-bet-sheet-backdrop, .slot-buy-modal'
 
 // Spin resolve speed cycle: Normal (full animation) → Turbo (sped-up reels) →
 // Instant (no reel animation, immediate result).
@@ -1422,7 +1425,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         performSpin({ source: 'stage', bet: betAmount, free: canUseFreeSpin, tierId })
     }, [betAmount, canUseFreeSpin, performSpin, running, slamStop])
 
-    // Playfield Space spins or slam-stops; focused controls and dialogs own their input.
+    // Playfield Space spins or slam-stops; focused controls and blocking overlays own their input.
     useEffect(() => {
         if (typeof window === 'undefined') return undefined
         const onKey = (e) => {
@@ -1435,7 +1438,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             // on this flag, but Space must not start a fresh spin either.
             if (cascadeReplayRef.current) return
             if (isInteractiveHotkeyTarget(e.target) || e.target?.closest?.('[data-slot-action="spin"]')) return
-            if (isOpenDialogPresent()) return
+            if (hasVisibleDialog(SPACE_BLOCKING_DIALOG_SELECTOR)) return
             e.preventDefault()
             triggerStageSpin()
         }
