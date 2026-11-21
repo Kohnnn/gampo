@@ -76,10 +76,10 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
     const [open, setOpen] = useState(false)
     const dialogRef = useRef(null)
     const closeRef = useRef(null)
-    const enterGuardRef = useRef(null)
+    const pressGuardRef = useRef(null)
     const isOpen = controlledOpen !== undefined ? controlledOpen : open
     const requestOpen = (next) => {
-        if (!next) enterGuardRef.current?.disarm()
+        if (!next) pressGuardRef.current?.disarm()
         if (controlledOpen !== undefined) onOpenChange?.(next)
         else setOpen(next)
     }
@@ -96,9 +96,12 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
         closeRef.current.focus({ preventScroll: true })
 
         return () => {
-            enterGuardRef.current?.disarm()
+            pressGuardRef.current?.disarm()
             const heldFocus = ownerDocument.activeElement === ownerDocument.body || dialog.contains(ownerDocument.activeElement)
-            if (dialog.open) dialog.close?.()
+            if (dialog.open) {
+                if (typeof dialog.close === 'function') dialog.close()
+                else dialog.open = false
+            }
             if (!heldFocus) return
             if (previousFocus?.isConnected && previousFocus !== ownerDocument.body) {
                 previousFocus.focus({ preventScroll: true })
@@ -109,11 +112,11 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
     }, [isOpen])
 
     // The guard can outlive the dialog, but not the component.
-    useLayoutEffect(() => () => enterGuardRef.current?.cleanup(), [])
+    useLayoutEffect(() => () => pressGuardRef.current?.cleanup(), [])
 
     useLayoutEffect(() => {
         // Keep the current controlled callback, without rearming a canceled dismissal.
-        const guard = enterGuardRef.current
+        const guard = pressGuardRef.current
         if (guard) guard.dismiss = dismiss
     })
 
@@ -128,49 +131,35 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
         return () => window.removeEventListener('keydown', onKey)
     }, [isOpen, controlledOpen, onOpenChange])
 
-    // Own Escape while this panel is up. Registering a HANDLER rather than a
-    // flag is what keeps one Escape to one layer: the router asks the topmost
-    // registered layer first, and only that one closes. This effect must not
-    // keep its own Escape branch — with two overlays open, two independent
-    // `window` listeners both saw the same key and both closed.
+    // Keep a routing fallback when focus isn't in Help, but leave another
+    // focused native dialog's Escape default alone.
     useEffect(() => {
         if (!isOpen) return undefined
-        return claimEscape(() => {
-            requestOpen(false)
+        return claimEscape(event => {
+            const dialog = dialogRef.current
+            if (!dialog?.open) return false
+            const target = event?.target ?? dialog.ownerDocument.activeElement
+            const targetDialog = target?.closest?.('dialog[open]')
+            if (targetDialog && targetDialog !== dialog) return false
+            dismissWithEscape(event)
             return true
         })
     }, [isOpen, controlledOpen, onOpenChange])
 
-    const onCloseKeyDown = (event) => {
-        if (event.key === ' ') {
-            // Preserve the native click on keyup without dismissing lower overlays.
-            event.stopPropagation()
-            return
-        }
-
-        const nativeEvent = event.nativeEvent ?? event
-        const code = getEnterPressCode(nativeEvent)
-        if (code === null) return
-        // Native Enter clicks on keydown. Keep focus here until release so a
-        // held key can't repeat on the game control that regains focus.
-        event.preventDefault()
-        event.stopPropagation()
-        if (nativeEvent.repeat) return
-
-        const activeGuard = enterGuardRef.current
+    const guardPress = (code, dismissOnRelease) => {
+        const activeGuard = pressGuardRef.current
         if (activeGuard) {
             activeGuard.codes.add(code)
             // A second key is guarded, but does not take over dismissal.
-            activeGuard.dismissCode ??= code
+            if (dismissOnRelease) activeGuard.dismissCode ??= code
             return
         }
 
         const { ownerDocument } = dialogRef.current
         const { defaultView } = ownerDocument
-        const codes = new Set()
-        codes.add(code)
+        const codes = new Set([code])
         const onPressEvent = (nativeEvent) => {
-            const pressedCode = getEnterPressCode(nativeEvent)
+            const pressedCode = nativeEvent.key === 'Escape' ? 'Escape' : getEnterPressCode(nativeEvent)
             if (!codes.has(pressedCode)) return
             const isRelease = nativeEvent.type === 'keyup'
             if (isRelease || nativeEvent.repeat) {
@@ -193,14 +182,49 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
             ownerDocument.removeEventListener('keydown', onPressEvent, true)
             ownerDocument.removeEventListener('keyup', onPressEvent, true)
             defaultView?.removeEventListener('blur', disarm)
-            enterGuardRef.current = null
+            pressGuardRef.current = null
         }
-        const guard = { codes, dismissCode: code, dismiss, disarm, cleanup }
-        enterGuardRef.current = guard
-        // Capture held Enter keys before they reach a restored focus target.
+        const guard = { codes, dismissCode: dismissOnRelease ? code : null, dismiss, disarm, cleanup }
+        pressGuardRef.current = guard
+        // Capture held keys before they reach the restored focus target.
         ownerDocument.addEventListener('keydown', onPressEvent, true)
         ownerDocument.addEventListener('keyup', onPressEvent, true)
         defaultView?.addEventListener('blur', disarm)
+    }
+
+    const dismissWithEscape = (event) => {
+        // One held Escape must not dismiss the layer that regains focus.
+        if (event?.key === 'Escape') guardPress('Escape', false)
+        if (!event?.repeat) dismiss()
+    }
+
+    const onDialogKeyDown = (event) => {
+        if (event.key !== 'Escape') {
+            containTab(event, dialogRef.current)
+            return
+        }
+        if (event.defaultPrevented) return
+        // The focused native layer takes precedence over registration order.
+        event.preventDefault()
+        event.stopPropagation()
+        dismissWithEscape(event)
+    }
+
+    const onCloseKeyDown = (event) => {
+        if (event.key === ' ') {
+            // Preserve the native click on keyup without dismissing lower overlays.
+            event.stopPropagation()
+            return
+        }
+
+        const nativeEvent = event.nativeEvent ?? event
+        const code = getEnterPressCode(nativeEvent)
+        if (code === null) return
+        // Enter clicks on keydown. Keep focus until release, but don't arm
+        // dismissal for a key that was already held before reaching Close.
+        event.preventDefault()
+        event.stopPropagation()
+        guardPress(code, !nativeEvent.repeat)
     }
 
     return (
@@ -213,7 +237,7 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
                     role="dialog"
                     aria-modal="true"
                     aria-label="Keyboard shortcuts"
-                    onKeyDown={event => containTab(event, dialogRef.current)}
+                    onKeyDown={onDialogKeyDown}
                     onCancel={event => {
                         event.preventDefault()
                         event.stopPropagation()
@@ -227,7 +251,7 @@ export default function HotkeyHelp({ controlledOpen, onOpenChange }) {
                             <button type="button" className="hotkey-close" ref={closeRef} aria-label="Close shortcuts"
                                 onClick={dismiss}
                                 onKeyDown={onCloseKeyDown}
-                                onBlur={() => enterGuardRef.current?.disarm()}
+                                onBlur={() => pressGuardRef.current?.disarm()}
                             >
                                 <X size={14} />
                             </button>

@@ -97,8 +97,18 @@ const FEATURE_LABELS = {
 
 const AUTOPLAY_COUNTS = [10, 25, 50, 100]
 
-// Slots' bet and bonus overlays block while visible; role-only toolbar popovers do not.
-const SPACE_BLOCKING_DIALOG_SELECTOR = '[aria-modal="true"], dialog[open], .slot-mobile-bet-sheet-backdrop, .slot-buy-modal'
+const MOBILE_BET_BACKDROP_SELECTOR = '.slot-mobile-bet-sheet-backdrop'
+const MOBILE_PAYTABLE_BACKDROP_SELECTOR = '.slot-mobile-info-backdrop'
+
+// Check the paytable backdrop, not its inner dialog: the backdrop owns the CSS breakpoint.
+// Role-only toolbar popovers (including the volume mixer) do not block manual play.
+const MANUAL_SPIN_BLOCKING_DIALOG_SELECTOR = [
+    MOBILE_BET_BACKDROP_SELECTOR,
+    MOBILE_PAYTABLE_BACKDROP_SELECTOR,
+    '.slot-buy-modal',
+    '[aria-modal="true"]:not(.slot-mobile-info-sheet)',
+    'dialog[open]',
+].join(', ')
 
 // Spin resolve speed cycle: Normal (full animation) → Turbo (sped-up reels) →
 // Instant (no reel animation, immediate result).
@@ -444,8 +454,6 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [showMobileInfo, setShowMobileInfo] = useState(false)
     // Dismiss on desktop instead of restoring a stale sheet on return to mobile.
     if (!isMobile && showMobileInfo) setShowMobileInfo(false)
-    // Match the dock's mobile breakpoint: desktop CSS hides only the backdrop,
-    // so the sheet itself must unmount to release the global Space shortcut.
     const mobileInfoVisible = isMobile && showMobileInfo
     const [showPaylines, setShowPaylines] = useState(false)
     const [dockPortal, setDockPortal] = useState(null)
@@ -714,8 +722,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         }
     }, [mobileInfoVisible])
 
-    // Only visible mobile sheets claim Escape. The bet sheet can stay mounted
-    // when CSS hides it on desktop; the paytable unmounts there.
+    // CSS can hide either mobile backdrop before React releases its Escape
+    // claim on resize. Check live visibility inside each handler so it yields.
     //
     // Ownership is a registered HANDLER, not a flag: the router asks the
     // topmost layer first, so with the bet sheet and the shortcuts panel both
@@ -723,6 +731,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     useEffect(() => {
         if (!showMobileBet || !isMobile) return undefined
         return claimEscape(() => {
+            if (!hasVisibleDialog(MOBILE_BET_BACKDROP_SELECTOR)) return false
             setShowMobileBet(false)
             return true
         })
@@ -731,6 +740,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     useEffect(() => {
         if (!mobileInfoVisible) return undefined
         return claimEscape(() => {
+            if (!hasVisibleDialog(MOBILE_PAYTABLE_BACKDROP_SELECTOR)) return false
             setShowMobileInfo(false)
             return true
         })
@@ -1232,10 +1242,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         new Promise(resolve => {
             // Synchronous re-entrancy guard. Do NOT rely on `running` state here
             // — it lags a render, so two calls in the same tick would both pass.
-            // cascadeReplayRef blocks EVERY spin entry point (panel/stage/Space/
-            // autoplay) from starting a fresh spin mid-cascade; stage/Space guard
-            // it too, but the panel spin button called performSpin directly and
-            // could cancel an active cascade timeline.
+            // No spin source may start another round while a cascade replays.
             if (spinLockRef.current || running || cascadeReplayRef.current) {
                 resolve({ profit: 0, skipped: true })
                 return
@@ -1419,11 +1426,20 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         finish()
     }, [clearTimers])
 
-    const triggerStageSpin = useCallback(() => {
-        if (running) { slamStop(); return }
-        const tierId = canUseFreeSpin ? null : buyTierIdRef.current
-        performSpin({ source: 'stage', bet: betAmount, free: canUseFreeSpin, tierId })
-    }, [betAmount, canUseFreeSpin, performSpin, running, slamStop])
+    const triggerManualSpin = useCallback((source, shortcutEvent) => {
+        // Read the live overlay styles before debiting a spin or settling a Skip.
+        // Focused buttons use native clicks, so the Space listener alone cannot guard them.
+        const fullscreenStage = typeof document !== 'undefined' && document.fullscreenElement === stageRef.current
+            ? stageRef.current : null
+        // The fullscreen stage covers outside sheets, but native modals can enter the top layer above it.
+        if (hasVisibleDialog(MANUAL_SPIN_BLOCKING_DIALOG_SELECTOR, fullscreenStage ?? undefined)
+            || (fullscreenStage && hasVisibleDialog('dialog:modal'))) return
+        shortcutEvent?.preventDefault()
+        if (running && source !== 'panel') { slamStop(); return }
+        const armedTierId = source === 'panel' ? bonusBuyTierId : buyTierIdRef.current
+        const tierId = canUseFreeSpin ? null : armedTierId
+        return performSpin({ source, bet: betAmount, free: canUseFreeSpin, tierId })
+    }, [betAmount, bonusBuyTierId, canUseFreeSpin, performSpin, running, slamStop])
 
     // Playfield Space spins or slam-stops; focused controls and blocking overlays own their input.
     useEffect(() => {
@@ -1438,13 +1454,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             // on this flag, but Space must not start a fresh spin either.
             if (cascadeReplayRef.current) return
             if (isInteractiveHotkeyTarget(e.target) || e.target?.closest?.('[data-slot-action="spin"]')) return
-            if (hasVisibleDialog(SPACE_BLOCKING_DIALOG_SELECTOR)) return
-            e.preventDefault()
-            triggerStageSpin()
+            triggerManualSpin('stage', e)
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [autoplayActive, showAutoplayDrawer, triggerStageSpin])
+    }, [autoplayActive, showAutoplayDrawer, triggerManualSpin])
 
     const startAutoplay = useCallback(() => {
         if (autoplayActive || running) return
@@ -1722,7 +1736,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     <button
                         className="slot-panel-spin"
                         type="button"
-                        onClick={() => performSpin({ source: 'panel', bet: betAmount, free: canUseFreeSpin, tierId: canUseFreeSpin ? null : bonusBuyTierId })}
+                        onClick={() => triggerManualSpin('panel')}
                         disabled={running || autoplayActive}
                         data-slot-action="spin"
                         data-ux-primary-action
@@ -1959,7 +1973,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 <button
                     type="button"
                     className="slot-mobile-spin"
-                    onClick={triggerStageSpin}
+                    onClick={() => triggerManualSpin('stage')}
                     disabled={autoplayActive}
                     data-slot-action="spin"
                     data-mobile-hit-target="primary"
@@ -2344,7 +2358,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                     <button
                         type="button"
                         className={`slot-control-spin ${running ? 'slam' : ''}`}
-                        onClick={triggerStageSpin}
+                        onClick={() => triggerManualSpin('stage')}
                         disabled={autoplayActive}
                         aria-label={running ? 'Skip animation' : 'Spin'}
                         data-slot-action="spin"
