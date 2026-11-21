@@ -259,7 +259,7 @@ const rawGameDefinitions = [
         path: '/poker',
         category: 'Card room',
         status: 'new',
-        tag: 'Live',
+        tag: 'Practice',
         rtp: 0.97,
         houseEdge: 0.03,
         volatility: 'Skill dependent',

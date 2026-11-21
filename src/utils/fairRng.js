@@ -1,7 +1,8 @@
-// Lightweight provably-fair simulation RNG with seed/nonce.
-// Local-only. Educational only.
-// Uses HMAC-SHA-256 via Web Crypto when available, with a deterministic
-// fallback hash for non-browser test environments.
+// Local simulation RNG with seed/nonce. Reproducible, NOT provably fair.
+// Local-only, educational. No server commitment, no tamper resistance.
+// `hashTo32` is a deterministic non-cryptographic fallback used for the synchronous
+// result; the HMAC digest written by `nextRollAsync` is a SEPARATE annotation and
+// did not choose any synchronous `nextRoll` result.
 
 const STORAGE_KEY = 'gampo_pf_state'
 

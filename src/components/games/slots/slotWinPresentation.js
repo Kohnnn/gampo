@@ -5,6 +5,8 @@
 // BigWinOverlay threshold) still get celebratory framing, and the big tiers
 // stay aligned with BigWinOverlay's own big/huge/mega cutoffs.
 
+import { FUN_PAYOUT_BOOST } from '../../../utils/funMode'
+
 // Single source of truth for the "big win" cutoff (win-to-bet multiplier).
 // Used by BigWinOverlay's `threshold`, the bigwin SFX gate in SlotsGame, and the
 // 'big' WIN_TIERS band below so they can never drift apart.
@@ -85,53 +87,10 @@ export function rollupFrame(target, elapsedMs, durationMs, reduceMotion = false)
     return rollupValue(t, elapsed / dur)
 }
 
-/**
- * Map a template's textual volatility band to an approximate per-spin hit
- * frequency (probability that a spin returns anything > 0). Higher volatility
- * pays less often but bigger. These are sensible presentation defaults — the
- * engine itself doesn't expose a measured hit rate — chosen to bracket typical
- * 90s-style video-slot hit rates (~20%–40%).
- */
-export function volatilityHitFrequency(volatility) {
-    const v = String(volatility || '').toLowerCase()
-    if (v.includes('extreme')) return 0.18
-    if (v.includes('very')) return 0.2
-    // "Medium high" must read between plain medium and plain high — check the
-    // compound band before the single-word ones it contains.
-    if (v.includes('medium') && v.includes('high')) return 0.28
-    if (v.includes('high')) return 0.25
-    if (v.includes('medium') || v.includes('mid')) return 0.32
-    if (v.includes('low')) return 0.4
-    return 0.28 // unknown / variable
-}
-
-/**
- * Derive Probability-Lab inputs (winProbability + payoutMultiplier) from a
- * template's calibrated economics so EducationPanel reflects the ACTIVE game
- * instead of fixed placeholders.
- *
- * Model: long-run RTP ≈ winProbability × payoutMultiplier (average gross return
- * per spin, as a multiple of bet). We anchor winProbability to the volatility-
- * implied hit frequency, then solve payoutMultiplier = rtp / winProbability so
- * the panel's EV stays internally consistent with the stated RTP. When a real
- * spin multiplier is available we blend it in so the panel feels live without
- * letting one outlier spin dominate the headline multiplier.
- *
- * All inputs are defended: missing/garbage config falls back to neutral values.
- */
-export function deriveEducationEv({ rtpTarget, volatility, lastMultiplier } = {}) {
-    const rtp = Number(rtpTarget)
-    const safeRtp = Number.isFinite(rtp) && rtp > 0 ? Math.min(2, rtp) : 0.95
-    const winProbability = Math.min(0.95, Math.max(0.01, volatilityHitFrequency(volatility)))
-    const modelMultiplier = safeRtp / winProbability
-    const live = Number(lastMultiplier)
-    // Blend the model payout with the most recent win multiplier (if it was an
-    // actual win) so the figure tracks play; weight the stable model higher.
-    const payoutMultiplier = Number.isFinite(live) && live > 0
-        ? (modelMultiplier * 0.7) + (live * 0.3)
-        : modelMultiplier
+export function getSlotRtpDisclosure(config, funActive) {
     return {
-        winProbability,
-        payoutMultiplier: Math.max(1.01, payoutMultiplier),
+        rtp: config.rtpTarget * (funActive ? FUN_PAYOUT_BOOST : 1),
+        label: 'Configured nominal RTP',
+        note: `${config.title}: calibrated target${funActive ? ` × ${FUN_PAYOUT_BOOST} Fun payout boost (Fun on)` : ' (Fun off)'}. Nominal long-run return; payout rounding and max-win caps affect realized return. Not a per-spin guarantee.`,
     }
 }

@@ -7,11 +7,11 @@ const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json
 
 describe('browserSmoke CDP route isolation', () => {
     it('uses experimental WebSocket support for Node 20 raw-CDP package scripts', () => {
-        for (const name of ['smoke:browser', 'ux:benchmark', 'audit:a11y', 'audit:contrast', 'verify:betsheet']) {
+        for (const name of ['smoke:browser', 'ux:benchmark', 'audit:a11y', 'audit:contrast', 'verify:betsheet', 'verify:history-jump', 'verify:mobile-nav']) {
             expect(packageJson.scripts[name]).toContain('--experimental-websocket')
         }
         expect(packageJson.scripts['audit:scroll']).not.toContain('--experimental-websocket')
-        expect(packageJson.scripts['audit:all']).toBe('npm run audit:a11y && npm run audit:contrast && npm run audit:scroll && npm run verify:betsheet')
+        expect(packageJson.scripts['audit:all']).toBe('npm run audit:a11y && npm run audit:contrast && npm run audit:scroll && npm run verify:betsheet && npm run verify:history-jump && npm run verify:mobile-nav')
     })
 
     it('creates and closes a fresh target for every route check', () => {

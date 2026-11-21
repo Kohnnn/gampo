@@ -190,6 +190,64 @@
     flex: 0 0 auto;
 }
 
+/* Repaired games opt into one measured primary player; secondary content
+   remains in the shell's scroll flow rather than expanding the stage. */
+.game-shell[data-primary-stage] {
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: calc(var(--gs-bottom-reserve, 0px) + 8px);
+}
+
+.game-shell[data-primary-stage] .gs-layout {
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.game-shell[data-primary-stage] .gs-playfield {
+    height: var(--gs-primary-height, 100%);
+    min-height: 0;
+    flex: 0 0 auto;
+}
+
+.game-shell[data-primary-stage] .gs-playfield > .gs-primary-stage {
+    flex: 1 1 0;
+    height: 100%;
+    min-height: 0 !important;
+}
+
+.game-shell[data-primary-stage] .gs-primary-stage.core-stage {
+    padding-bottom: 0;
+}
+
+.game-shell[data-primary-stage] .gs-primary-stage > .core-stage-body {
+    height: 100%;
+    min-height: 0;
+}
+
+.gs-secondary {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 1480px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+@media (min-width: 769px) {
+    .game-shell[data-primary-stage] .gs-layout {
+        grid-template-rows: var(--gs-primary-height, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1419px) {
+    .game-shell[data-primary-stage] .gs-layout {
+        grid-template-rows: var(--gs-primary-height, minmax(0, 1fr)) auto;
+    }
+}
+
 .gs-aside {
     padding: 10px;
     display: flex;
@@ -1517,6 +1575,28 @@ input:focus-visible,
     border-color: rgba(255, 255, 255, 0.12);
 }
 
+/* S6: History jump. Below 768px the game aside stacks under the playfield and
+   `HistoryDrawer` ends up at the bottom of a long scroller (measured at scroll
+   top ~2000 of a ~2280px area vs in-viewport on desktop), so it is reachable but
+   effectively undiscoverable. This control exists to make that path findable.
+   Hidden on desktop, where the aside already sits beside the stage. Also hidden
+   for games whose aside has no HistoryDrawer at all (e.g. Cases, which keeps its
+   own `view === 'history'` tab) so the button never promises a drawer that is
+   not there. */
+.gt-btn-history {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .game-shell:not(:has(.gs-aside .hd-panel)) .gt-btn-history {
+        display: none;
+    }
+
+    .game-shell:has(.gs-aside .hd-panel) .gt-btn-history {
+        display: inline-flex;
+    }
+}
+
 .gt-popover {
     position: absolute;
     top: calc(100% + 8px);
@@ -2118,13 +2198,28 @@ dialog.odds-popup-backdrop::backdrop {
         scrollbar-width: thin;
     }
     .gs-titlebar {
-        grid-template-columns: 1fr auto;
-        gap: 10px;
-        padding: 8px 10px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 4px 8px;
+        padding: 5px 8px;
     }
     .gs-titlebar small { display: none; }
     .gs-titlebar h1 { font-size: 16px; line-height: 1.1; }
-    .gs-titlebar-extras { grid-row: 2; grid-column: 1 / -1; justify-content: flex-start; display: flex; }
+    .gs-titlebar-extras {
+        grid-row: 2;
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 6px;
+        display: flex;
+    }
+    .gs-titlebar-extras .gt-group { padding: 0; }
+    .gs-titlebar-extras .gt-toolbar { gap: 4px; }
+    .gs-titlebar-extras .gt-btn,
+    .gs-titlebar-extras .audio-toggle {
+        width: 44px;
+        height: 44px;
+    }
     .gs-balance { grid-row: 1; grid-column: 2; }
     .gs-layout {
         display: flex !important;
@@ -2310,46 +2405,15 @@ dialog.odds-popup-backdrop::backdrop {
         text-align: center;
         white-space: normal;
     }
-    .bp-mobile-settings.nudge {
-        color: var(--text-primary);
-        border-color: color-mix(in srgb, var(--accent), transparent 35%);
-        background: color-mix(in srgb, var(--accent), transparent 86%);
-        animation: bpSettingsNudge 1.7s ease-in-out infinite;
-    }
-    @keyframes bpSettingsNudge {
-        0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent), transparent 70%); }
-        50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent), transparent 88%); }
-    }
-    .bp-mobile-setup-hint {
-        position: fixed;
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: calc(var(--mobile-nav-height, 0px) + var(--mobile-action-height, 74px) + max(8px, env(safe-area-inset-bottom)) + 14px);
-        z-index: calc(var(--z-mobile-action, 1400) + 1);
-        appearance: none;
-        padding: 7px 14px;
-        border: 1px solid color-mix(in srgb, var(--accent), transparent 40%);
-        border-radius: 999px;
-        background: linear-gradient(180deg, rgba(15, 33, 46, 0.98), rgba(20, 39, 51, 0.98));
-        color: #ffe6a8;
-        font-size: 10px;
-        font-weight: 950;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
-        pointer-events: auto;
-        animation: bpSetupHintRise 1.9s ease-in-out infinite;
-    }
-    @keyframes bpSetupHintRise {
-        0%, 100% { transform: translate(-50%, 0); }
-        50% { transform: translate(-50%, -3px); }
-    }
-    :root.gampo-reduce-motion .bp-mobile-settings.nudge,
-    :root.gampo-reduce-motion .bp-mobile-setup-hint,
-    .gampo-reduce-motion .bp-mobile-settings.nudge,
-    .gampo-reduce-motion .bp-mobile-setup-hint {
-        animation: none;
-    }
+
+/* P1: the Rebet disabled reason must be visible and programmatically
+   associated with the disabled control, not carried only in `title`. */
+.bp-disabled-reason {
+    margin: 6px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-secondary, #b1bad3);
+}
     .bp-mobile-summary {
         min-width: 0;
         display: flex;
@@ -2495,6 +2559,98 @@ dialog.odds-popup-backdrop::backdrop {
         font-size: 12px;
         letter-spacing: 0.03em;
     }
+}
+
+/* On short phones, keep controls beside the player instead of stacking
+   title, tools and two fixed docks over its height. */
+@media (min-width: 561px) and (max-width: 768px) and (max-height: 520px) and (orientation: landscape) {
+    .game-shell[data-primary-stage] {
+        display: grid;
+        grid-template-columns: minmax(0, min(38%, 280px)) minmax(0, 1fr);
+        grid-template-rows: minmax(var(--gs-primary-height, 0px), auto) auto;
+        align-content: start;
+        align-items: start;
+        gap: 8px;
+    }
+    .game-shell[data-primary-stage] .gs-titlebar {
+        grid-column: 1;
+        grid-row: 1;
+        width: 100%;
+        padding: 4px 6px;
+        gap: 4px;
+    }
+    .game-shell[data-primary-stage] .gs-titlebar h1 { font-size: 14px; }
+    .game-shell[data-primary-stage] .gs-titlebar-extras { gap: 4px; }
+    .game-shell[data-primary-stage] .gs-layout {
+        grid-column: 2;
+        grid-row: 1;
+        min-width: 0;
+    }
+    .game-shell[data-primary-stage] .gs-panel {
+        transform: none;
+        max-height: none;
+    }
+    .game-shell[data-primary-stage] .gs-panel::before { content: none; }
+    .game-shell[data-primary-stage] .gs-aside > * { min-width: 0; }
+    .game-shell[data-primary-stage] .gs-secondary {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    [data-primary-landscape-dock][data-mobile-action-dock],
+    [data-primary-landscape-dock][data-slot-mobile-dock] {
+        left: var(--gs-controls-left);
+        right: auto;
+        bottom: var(--gs-controls-bottom);
+        width: var(--gs-controls-width);
+        padding: 6px;
+        gap: 6px;
+    }
+    [data-primary-landscape-dock][data-mobile-action-dock] {
+        grid-template-columns: 64px minmax(0, 1fr) minmax(90px, 1fr);
+    }
+    [data-primary-landscape-dock][data-slot-mobile-dock] {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px;
+    }
+    [data-primary-landscape-dock][data-slot-mobile-dock] .slot-mobile-icon,
+    [data-primary-landscape-dock][data-slot-mobile-dock] .slot-mobile-spin {
+        min-height: 44px;
+    }
+    [data-primary-landscape-dock][data-slot-mobile-dock] .slot-mobile-spin {
+        grid-column: 2 / 4;
+    }
+    [data-primary-landscape-dock][data-slot-mobile-dock] .slot-mobile-readout {
+        padding: 4px 6px;
+    }
+
+    /* The options dialog owns the viewport while open. Its own scrolling
+       keeps every labeled field reachable above the navigation band. */
+    .bp-mobile-layer.mobile-open .bp-content {
+        top: 8px;
+        bottom: calc(var(--mobile-nav-height, 0px) + max(8px, env(safe-area-inset-bottom)));
+        max-height: none;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-content: start;
+        scroll-padding-block: 8px;
+    }
+    .bp-mobile-layer.mobile-open .bp-mobile-close {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--bg-secondary);
+    }
+    .bp-mobile-layer.mobile-open .bp-tabs {
+        grid-column: 1;
+        grid-row: 1;
+    }
+    .bp-mobile-layer.mobile-open .bp-mobile-close {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+    }
+    .bp-mobile-layer.mobile-open .bp-section { min-width: 0; }
+    .bp-mobile-layer.mobile-open .bp-bet-input { font-size: 16px; }
 }
 
 /* === In-round CTA on bp-play === */

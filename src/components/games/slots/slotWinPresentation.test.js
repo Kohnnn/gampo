@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { winTier, winTierId, rollupValue, rollupDurationMs, rollupFrame, ROLLUP_TIER_MS, WIN_TIERS, SLOT_BIG_WIN_THRESHOLD, deriveEducationEv, volatilityHitFrequency } from './slotWinPresentation'
+import { winTier, winTierId, rollupValue, rollupDurationMs, rollupFrame, ROLLUP_TIER_MS, WIN_TIERS, SLOT_BIG_WIN_THRESHOLD, getSlotRtpDisclosure } from './slotWinPresentation'
+describe('slot RTP disclosure', () => {
+    it('uses the selected template target rather than the generic slot catalog', () => {
+        const disclosure = getSlotRtpDisclosure({ title: 'Bass Bayou Collect', rtpTarget: 0.945 }, false)
+        expect(disclosure.rtp).toBe(0.945)
+        expect(disclosure.label).toBe('Configured nominal RTP')
+        expect(disclosure.note).toContain('Bass Bayou Collect')
+        expect(disclosure.note).toContain('Fun off')
+    })
+
+    it('discloses the actual Fun payout boost without applying the unrelated 100% cap', () => {
+        const disclosure = getSlotRtpDisclosure({ title: 'Bars', rtpTarget: 0.95 }, true)
+        expect(disclosure.rtp).toBeCloseTo(1.007, 10)
+        expect(disclosure.note).toContain('Fun on')
+        expect(disclosure.note).toContain('rounding and max-win caps')
+    })
+})
 
 describe('slotWinPresentation', () => {
     it('returns none tier for losses / zero / invalid', () => {
@@ -77,47 +93,5 @@ describe('slotWinPresentation', () => {
         // The constant is exactly the boundary: just under is 'great', at/over is 'big'.
         expect(winTierId(SLOT_BIG_WIN_THRESHOLD)).toBe('big')
         expect(winTierId(SLOT_BIG_WIN_THRESHOLD - 0.01)).toBe('great')
-    })
-})
-
-describe('deriveEducationEv', () => {
-    it('maps volatility bands to descending hit frequencies', () => {
-        expect(volatilityHitFrequency('Low')).toBeGreaterThan(volatilityHitFrequency('Medium high'))
-        expect(volatilityHitFrequency('Medium high')).toBeGreaterThan(volatilityHitFrequency('High'))
-        expect(volatilityHitFrequency('High')).toBeGreaterThan(volatilityHitFrequency('Very high'))
-    })
-
-    it('derives RTP-consistent inputs (prob x mult ≈ rtp) with no live spin', () => {
-        const { winProbability, payoutMultiplier } = deriveEducationEv({ rtpTarget: 0.94, volatility: 'High' })
-        expect(winProbability).toBeGreaterThan(0)
-        expect(winProbability).toBeLessThanOrEqual(1)
-        expect(winProbability * payoutMultiplier).toBeCloseTo(0.94, 5)
-    })
-
-    it('higher volatility yields a bigger payout multiplier for the same RTP', () => {
-        const high = deriveEducationEv({ rtpTarget: 0.95, volatility: 'High' })
-        const low = deriveEducationEv({ rtpTarget: 0.95, volatility: 'Low' })
-        expect(high.payoutMultiplier).toBeGreaterThan(low.payoutMultiplier)
-        expect(high.winProbability).toBeLessThan(low.winProbability)
-    })
-
-    it('blends in a live win multiplier when present', () => {
-        const base = deriveEducationEv({ rtpTarget: 0.94, volatility: 'High' })
-        const withLive = deriveEducationEv({ rtpTarget: 0.94, volatility: 'High', lastMultiplier: 50 })
-        expect(withLive.payoutMultiplier).toBeGreaterThan(base.payoutMultiplier)
-    })
-
-    it('falls back to safe values for garbage config', () => {
-        const { winProbability, payoutMultiplier } = deriveEducationEv({})
-        expect(winProbability).toBeGreaterThan(0)
-        expect(winProbability).toBeLessThanOrEqual(1)
-        expect(payoutMultiplier).toBeGreaterThanOrEqual(1.01)
-        expect(Number.isFinite(payoutMultiplier)).toBe(true)
-    })
-
-    it('ignores a losing/zero live multiplier', () => {
-        const base = deriveEducationEv({ rtpTarget: 0.94, volatility: 'High' })
-        const withZero = deriveEducationEv({ rtpTarget: 0.94, volatility: 'High', lastMultiplier: 0 })
-        expect(withZero.payoutMultiplier).toBeCloseTo(base.payoutMultiplier, 5)
     })
 })

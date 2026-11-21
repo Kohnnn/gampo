@@ -13,6 +13,7 @@ import {
     isSfxMuted, setSfxMuted,
     unlockAudio, subscribeAudio,
 } from '../../../audio/audioContext'
+import { claimEscape } from '../../../utils/escapeClaims'
 
 export default function VolumeMixer() {
     const [open, setOpen] = useState(false)
@@ -67,13 +68,24 @@ export default function VolumeMixer() {
             if (trigger && trigger.contains(e.target)) return
             setOpen(false)
         }
-        const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
         window.addEventListener('mousedown', onDown)
-        window.addEventListener('keydown', onKey)
         return () => {
             window.removeEventListener('mousedown', onDown)
-            window.removeEventListener('keydown', onKey)
         }
+    }, [open])
+
+    // Escape-to-close is registered with the Escape-claim registry rather than
+    // handled by a second window listener. The mixer popover is portaled to the
+    // body, so it is not a DOM descendant of any layer that would otherwise
+    // notice it: as a bare window listener it dismissed alongside the mobile
+    // drawer, so one Escape closed both. Registering a handler makes it the
+    // single owner when it is the topmost layer.
+    useEffect(() => {
+        if (!open) return undefined
+        return claimEscape(() => {
+            setOpen(false)
+            return true
+        })
     }, [open])
 
     const onChange = (bus) => (e) => {

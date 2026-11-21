@@ -7,17 +7,17 @@ import { formatCredits, round2 } from '../../../utils/simulationMath'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { nextRoll } from '../../../utils/fairRng'
 import { funBoostedRtp } from '../../../utils/funMode'
-import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, Asset, ResultToast, ActionLockOverlay } from '../primitives'
+import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast, ActionLockOverlay } from '../primitives'
+import { acceptedResult, rejectedResult } from '../primitives/autoAccounting'
 import { Particles } from '../../fx'
 import EducationPanel from '../../EducationPanel'
 import './rps.css'
 import { useGameBgm } from '../../../audio/useBgm'
-import { resolveImage } from '../../../utils/assetPaths'
 
 const OPTIONS = [
-    { id: 'rock', label: 'Rock', img: resolveImage('/assets/games/rps/rps-rock.png'), emoji: '🪨', beats: 'scissors' },
-    { id: 'paper', label: 'Paper', img: resolveImage('/assets/games/rps/rps-paper.png'), emoji: '📄', beats: 'rock' },
-    { id: 'scissors', label: 'Scissors', img: resolveImage('/assets/games/rps/rps-scissors.png'), emoji: '✂️', beats: 'paper' },
+    { id: 'rock', label: 'Rock', hand: '✊', beats: 'scissors' },
+    { id: 'paper', label: 'Paper', hand: '✋', beats: 'rock' },
+    { id: 'scissors', label: 'Scissors', hand: '✌️', beats: 'paper' },
 ]
 
 export default function RpsGame() {
@@ -45,7 +45,10 @@ export default function RpsGame() {
     const payout = round2(effectiveRtp * 3 - 1)
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (!placeBet(betAmount, 'RPS')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve({ profit: 0 }); return }
+        // A round is already in flight: the handler-level guard stops the key
+        // path from starting a second paid round that the button already blocks.
+        if (phase === 'slamming') { resolve(rejectedResult('active-obligation')); return }
+        if (!placeBet(betAmount, 'RPS')) { showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`); resolve(rejectedResult('insufficient-funds')); return }
         setLastBet(betAmount)
         const player = OPTIONS.find(o => o.id === choice)
         const dealer = OPTIONS[Math.floor(nextRoll('rps').roll * 3)]
@@ -53,6 +56,7 @@ export default function RpsGame() {
         const won = player.beats === dealer.id
         const returnAmount = push ? betAmount : won ? round2(betAmount * payout) : 0
         const profit = round2(returnAmount - betAmount)
+        const multiplier = push ? 1 : won ? payout : 0
         playSound('tick')
         setToast(null)
         setPhase('slamming')
@@ -72,18 +76,18 @@ export default function RpsGame() {
             }
             setToast({
                 kind: won ? 'win' : push ? 'push' : 'lose',
-                multiplier: won ? payout : null,
+                multiplier,
                 amount: profit,
                 message: push ? 'Push — stake returned' : won ? 'RPS win' : 'RPS miss',
             })
             session.record({
                 id: crypto.randomUUID(),
                 label: push ? 'Push' : won ? 'Win' : 'Miss',
-                profit, betAmount, multiplier: won ? payout : 0,
+                profit, betAmount, multiplier,
                 meta: { player: player.id, dealer: dealer.id },
             })
             showToast(won ? 'win' : push ? 'bet' : 'loss', push ? 'Push' : won ? 'RPS win' : 'RPS miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
-            resolve({ profit })
+            resolve(acceptedResult(profit, { multiplier, outcome: push ? 'push' : won ? 'win' : 'loss' }))
         }, 600)
     })
 
@@ -95,6 +99,11 @@ export default function RpsGame() {
             balance={balance}
             accent="#ef476f"
             backdrop="/assets/games/backdrops/backdrop-neon-grid.png"
+            primaryStage
+            secondary={<>
+                <RecentResultsStrip results={session.stats.lastResults} />
+                <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={1 / 3} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
+            </>}
             panel={
                 <BetPanel balance={balance} initialBet={5} runningRound={phase === 'slamming'} actionLabel="Play Round" mobilePlayLabel="Play" onPlay={performPlay} lastBet={lastBet}>
                     <div className="bp-section">
@@ -102,7 +111,7 @@ export default function RpsGame() {
                         <div className="rps-choices">
                             {OPTIONS.map(o => (
                                 <button key={o.id} className={`rps-choice ${choice === o.id ? 'active' : ''}`} disabled={phase === 'slamming'} onClick={() => setChoice(o.id)}>
-                                    <Asset src={o.img} fallback={<span style={{ fontSize: 28 }}>{o.emoji}</span>} />
+                                    <span className="rps-hand" aria-hidden="true">{o.hand}</span>
                                     <span>{o.label}</span>
                                 </button>
                             ))}
@@ -113,9 +122,8 @@ export default function RpsGame() {
             }
             aside={<><StatsOverlay stats={session.stats} definition={definition} effectiveRtp={effectiveRtp} /><HistoryDrawer history={session.history} onClear={session.clear} /></>}
         >
-            <CoreStageFrame minHeight={520} maxWidth={780} mobileScrollable className="rps-stage-frame">
+            <CoreStageFrame maxWidth={780} className="rps-stage-frame gs-primary-stage">
             <div className={`rps-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
-                <RecentResultsStrip results={session.stats.lastResults} />
                 <div className="rps-stage-choices" data-mobile-critical-surface>
                     {OPTIONS.map(o => (
                         <button
@@ -125,7 +133,7 @@ export default function RpsGame() {
                             disabled={phase === 'slamming'}
                             onClick={() => setChoice(o.id)}
                         >
-                            <Asset src={o.img} fallback={<span>{o.emoji}</span>} />
+                            <span className="rps-hand" aria-hidden="true">{o.hand}</span>
                             <strong>{o.label}</strong>
                         </button>
                     ))}
@@ -133,12 +141,12 @@ export default function RpsGame() {
                 <div className={`rps-versus phase-${phase}`}>
                     <div className={`rps-side player ${phase === 'won' ? 'winner' : phase === 'lost' ? 'loser' : ''}`}>
                         <span>You</span>
-                        <Asset src={OPTIONS.find(o => o.id === choice).img} fallback={<span style={{ fontSize: 60 }}>{OPTIONS.find(o => o.id === choice).emoji}</span>} />
+                        <span className="rps-hand" role="img" aria-label={OPTIONS.find(o => o.id === choice).label}>{OPTIONS.find(o => o.id === choice).hand}</span>
                     </div>
                     <strong className={`rps-vs ${phase === 'push' ? 'fx-shake' : ''}`}>VS</strong>
                     <div className={`rps-side dealer ${phase === 'lost' ? 'winner' : phase === 'won' ? 'loser' : ''}`}>
                         <span>Lab</span>
-                        {house ? <Asset src={house.img} fallback={<span style={{ fontSize: 60 }}>{house.emoji}</span>} /> : <span style={{ fontSize: 60, opacity: 0.4 }}>?</span>}
+                        {house ? <span className="rps-hand" role="img" aria-label={house.label}>{house.hand}</span> : <span style={{ fontSize: 60, opacity: 0.4 }}>?</span>}
                     </div>
                 </div>
                 {lastWon && burstKey > 0 && <Particles key={burstKey} count={14} color="#00e701" />}
@@ -147,7 +155,6 @@ export default function RpsGame() {
             </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('rps')} />
-            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={1 / 3} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

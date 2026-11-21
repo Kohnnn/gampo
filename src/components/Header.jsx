@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Settings as SettingsIcon } from 'lucide-react'
+import { Settings as SettingsIcon, Menu } from 'lucide-react'
 import { useCredits } from '../context/CreditContext'
 import { fullGameCatalog } from '../data/casinoCatalog'
+import { SLOT_TEMPLATE_ROUTES } from '../data/slotRoutes'
+import { useSidebarUI } from '../context/SidebarUIContext'
 import { searchGames } from '../utils/gameSearch'
 
 const GAME_PATHS = [
@@ -45,6 +47,7 @@ const CreditIcon = ({ size = 20, fontSize = 11 }) => (
 function Header() {
     const location = useLocation()
     const navigate = useNavigate()
+    const { isSidebarOpen, toggleSidebar } = useSidebarUI()
     const {
         balance,
         grantPracticeCredits,
@@ -61,6 +64,7 @@ function Header() {
     const searchRef = useRef(null)
 
     const isPlaySurface = GAME_PATHS.some(path => location.pathname.startsWith(path))
+        || SLOT_TEMPLATE_ROUTES.some(route => location.pathname === route.path)
     const searchResults = useMemo(() => searchGames(fullGameCatalog, searchQuery, 8), [searchQuery])
     const formattedBalance = balance.toLocaleString('en-US', {
         minimumFractionDigits: 2,
@@ -108,6 +112,17 @@ function Header() {
 
     const handleSearchKeyDown = (event) => {
         if (event.key === 'Escape') {
+            // The suggestions list only owns Escape while it is actually
+            // RENDERED, so gate on the same condition that renders it rather
+            // than on `searchOpen` alone. `onFocus` sets `searchOpen` true even
+            // for an empty query, which renders no list; gating on the flag
+            // swallowed Escape with nothing open to dismiss.
+            //
+            // Marking the key handled is what keeps one Escape to one layer:
+            // the drawer's registry router now runs on every viewport, so an
+            // unhandled Escape would dismiss an open overlay too.
+            if (!searchOpen || searchQuery.trim().length === 0) return
+            event.preventDefault()
             setSearchOpen(false)
             setActiveSearchIndex(0)
             return
@@ -133,10 +148,20 @@ function Header() {
     return (
         <header className={`header ${isPlaySurface ? 'header-play-surface' : ''}`} data-ux-surface="shell">
             <div className="header-left">
+                <button
+                    type="button"
+                    className="icon-btn header-menu-btn"
+                    onClick={toggleSidebar}
+                    aria-label="Open navigation menu"
+                    aria-expanded={isSidebarOpen}
+                    title="Open navigation menu"
+                >
+                    <Menu size={20} />
+                </button>
                 <Link to="/" className="logo-link" aria-label="GamPo home">
                     <span className="logo">GamPo</span>
                 </Link>
-                <span className="header-mode">Live</span>
+                <span className="header-mode">Practice</span>
             </div>
 
             <div className="header-center">
@@ -190,8 +215,8 @@ function Header() {
             </div>
 
             <div className="header-right" ref={dropdownRef}>
-            <div className="live-wins-badge" title="Recent big wins">
-                <span>Live Wins</span>
+            <div className="live-wins-badge" title="Local practice credits received — no real players or cash">
+                <span>Practice Credits</span>
             </div>
             <div className="header-toggles">
                 <Link
@@ -289,9 +314,9 @@ function Header() {
                 </div>
 
                 {toasts.length > 0 && (
-                    <div className="credit-toast-container">
+                    <div className={`credit-toast-container${toasts.some(toast => toast.kind === 'history-write-failure') ? ' credit-toast-container-with-history-warning' : ''}`}>
                         {toasts.map(toast => (
-                            <div key={toast.id} className={`credit-toast credit-toast-${toast.type}`}>
+                            <div key={toast.id} className={`credit-toast credit-toast-${toast.type}${toast.kind === 'history-write-failure' ? ' credit-toast-history-warning' : ''}`} role={toast.kind === 'history-write-failure' ? 'alert' : undefined}>
                                 <div className="credit-toast-icon">
                                     <CreditIcon size={20} />
                                 </div>

@@ -29,6 +29,7 @@ import {
     restoreSportsbookTickets,
 } from './sportsbookPersistence'
 import BetSlip from './components/BetSlip'
+import FeedStatus from './components/FeedStatus'
 import EventDetail from './components/EventDetail'
 import EventList from './components/EventList'
 import MobileSportsNav from './components/MobileSportsNav'
@@ -75,7 +76,7 @@ function filterEvents(events, viewState) {
 }
 
 function titleForView(viewState, sports) {
-    if (viewState.view === 'live') return 'Live Events'
+    if (viewState.view === 'live') return 'In-Play'
     if (viewState.view === 'starting') return 'Starting Soon'
     if (viewState.view === 'all') return 'All Events'
     if (viewState.view === 'sport') return sports.find(sport => sport.id === viewState.sportId)?.label || 'Sport'
@@ -265,6 +266,37 @@ function SportsbookShell() {
         if (!mobileSlipOpen && dialog.open) dialog.close()
     }, [mobileSlipOpen])
 
+    // Mark Escape handled on the dialog element itself; see SearchOverlay for
+    // why `onCancel` alone is too late to stop window-level Escape owners.
+    useEffect(() => {
+        const dialog = mobileSlipRef.current
+        if (!dialog || !mobileSlipOpen) return undefined
+        // Escape anywhere inside this dialog - including from its children -
+        // must be marked handled here, because window-level owners (ChatDock)
+        // listen in the bubble phase on `window` and would otherwise minimize
+        // the chat while the slip closes: two layers for one press.
+        //
+        // Marking it handled suppresses the native `cancel`, so the close is
+        // done explicitly. A nested dialog (the odds coach) raises its own
+        // Escape; that press belongs to the coach, so the slip must not also
+        // close - otherwise one press collapses both layers.
+        const onKeyDown = (event) => {
+            if (event.key !== 'Escape') return
+            if (event.defaultPrevented) return
+            // The odds coach nests inside this dialog: a press raised within it
+            // belongs to the coach, which closes itself. Closing the slip too
+            // would collapse two layers on one press. Anything else inside the
+            // slip - its inputs, its close button, its coach *trigger* - is a
+            // slip control, so the slip owns that press and closes.
+            const coach = dialog.querySelector('.sb-coach-backdrop')
+            if (coach && coach.open && coach.contains(event.target)) return
+            event.preventDefault()
+            setMobileSlipOpen(false)
+        }
+        dialog.addEventListener('keydown', onKeyDown, true)
+        return () => dialog.removeEventListener('keydown', onKeyDown, true)
+    }, [mobileSlipOpen])
+
     const navigateSportsbook = (next) => {
         const nextState = {
             view: next.view || 'home',
@@ -406,13 +438,7 @@ function SportsbookShell() {
                     <button type="button" onClick={refreshFeed} disabled={!feedPresentation.retryable || feedPending} aria-describedby={feedPending ? 'sportsbook-feed-status-copy' : undefined}><RefreshCcw size={15} /> Refresh</button>
                 </header>
 
-                <section className={`sb-feed-status is-${feedPresentation.state}`} role="status" aria-live="polite" aria-atomic="true">
-                    <div><strong>{feedPresentation.heading}</strong><span id="sportsbook-feed-status-copy">{feedPresentation.body}</span></div>
-                    <dl>
-                        <div><dt>Last refresh</dt><dd>{feedPresentation.refreshed}</dd></div>
-                        <div><dt>Sources</dt><dd>{feedPresentation.sources.join(', ') || 'No attributable source'}</dd></div>
-                    </dl>
-                </section>
+                <FeedStatus presentation={feedPresentation} />
                 {restorePresentation.message && !restorePresentation.blocking ? <p className="sb-restore-notice" role="status" aria-live="polite" aria-atomic="true">{restorePresentation.message}</p> : null}
                 <div key={ticketAnnouncementKey} className="sb-ticket-announcement" role="status" aria-live="polite" aria-atomic="true">{ticketAnnouncement}</div>
                 {(feedPresentation.state === 'error' || restorePresentation.blocking) ? <p className="sb-blocking-alert" role="alert" aria-live="assertive">{restorePresentation.blocking ? restorePresentation.message : feedPresentation.error || feedPresentation.body}</p> : null}
@@ -479,8 +505,19 @@ function SportsbookShell() {
                 ref={mobileSlipRef}
                 className="sb-mobile-slip"
                 aria-labelledby="mobile-bet-slip-heading"
-                onCancel={() => setMobileSlipOpen(false)}
-                onClose={() => {
+                onCancel={(event) => {
+                    // Mark the key handled so app-level Escape owners (ChatDock)
+                    // do not also dismiss on the same press; see SearchOverlay.
+                    event.preventDefault()
+                    setMobileSlipOpen(false)
+                }}
+                onClose={(event) => {
+                    // A nested <dialog> (the odds coach) bubbles its own `close`
+                    // event up to this one. React's onClose therefore fires for
+                    // the child too, and a single Escape would collapse both the
+                    // coach and the slip - two layers for one press. Only this
+                    // dialog's own close should dismiss it.
+                    if (event.target !== event.currentTarget) return
                     setMobileSlipOpen(false)
                     mobileSlipOpenerRef.current?.focus()
                 }}

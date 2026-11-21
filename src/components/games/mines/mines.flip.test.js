@@ -1,19 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-// Mines payout = (C(N, k)) / (C(N - bombs, k)) * (1 - house edge) where N=25.
-// Replicates the formula in MinesGame.jsx so the multiplier ladder stays sane.
-
-const GRID = 25
-const HOUSE_EDGE = 0.01
-
-function multiplierFor(picks, bombs) {
-    if (picks <= 0) return 1
-    let m = 1
-    for (let i = 0; i < picks; i++) {
-        m *= (GRID - i) / (GRID - bombs - i)
-    }
-    return Number((m * (1 - HOUSE_EDGE)).toFixed(4))
-}
+import { multiplierFor } from './MinesGame'
 
 describe('mines multiplier ladder', () => {
     it('stays at ~1× before any picks', () => {
@@ -44,5 +31,10 @@ describe('mines multiplier ladder', () => {
         const m = multiplierFor(1, 1)
         expect(m).toBeLessThan(fair)
         expect(m).toBeGreaterThan(fair * 0.985)
+    })
+
+    it('returns null instead of Infinity when picks exceed safe cells', () => {
+        expect(multiplierFor(2, 24)).toBeNull()
+        expect(multiplierFor(1, 24)).toBe(24.75)
     })
 })

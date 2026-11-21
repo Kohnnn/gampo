@@ -1,78 +1,96 @@
-import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { round2 } from '../../../utils/simulationMath'
 
-const source = readFileSync(new URL('./LotteryGame.jsx', import.meta.url), 'utf8')
-
-// Mirror of the component's settle math.
-function settle({ multiplier, betAmount }) {
-    const returnAmount = round2(betAmount * multiplier)
-    const profit = round2(returnAmount - betAmount)
-    return { returnAmount, profit }
+const fixture = vi.hoisted(() => ({ states: [], cursor: 0, panel: null, tree: null, education: null, timers: [], drawn: [], credit: vi.fn(), record: vi.fn(), debit: vi.fn(() => true) }))
+vi.mock('react', async original => ({ ...await original(), useState: initial => {
+    const index = fixture.cursor++
+    if (!(index in fixture.states)) fixture.states[index] = typeof initial === 'function' ? initial() : initial
+    return [fixture.states[index], value => { fixture.states[index] = typeof value === 'function' ? value(fixture.states[index]) : value }]
+} }))
+vi.mock('../../../utils/simulationMath', async original => ({ ...await original(), sampleUniqueNumbers: () => fixture.drawn }))
+vi.mock('../../../context/CreditContext', () => ({ useCredits: () => ({ balance: 100, placeBet: fixture.debit, addWinnings: fixture.credit, showToast: () => {} }) }))
+vi.mock('../../../audio/AudioProvider', () => ({ useAudio: () => ({ play: () => {} }) }))
+vi.mock('../../../audio/useSfx', () => ({ useSfx: () => ({ play: () => {} }) }))
+vi.mock('../../../audio/useBgm', () => ({ useGameBgm: () => {} }))
+vi.mock('../../../hooks/useScrollActionIntoView', () => ({ useScrollActionIntoView: () => {} }))
+vi.mock('../resources/useOriginalsPreloader', () => ({ useOriginalsPreloader: () => ({ ready: true }) }))
+vi.mock('../../../utils/scheduling', () => ({ useCancellableTimeouts: () => ({ schedule: callback => { fixture.timers.push(callback); return fixture.timers.length } }) }))
+vi.mock('../../EducationPanel', () => ({ default: props => { fixture.education = props; return null } }))
+vi.mock('../../fx', () => ({ Particles: () => null }))
+vi.mock('../primitives', () => {
+    const Empty = () => null
+    return {
+        ROUND_EVENTS: {}, buildEvents: build => { build({ push: () => {} }); return [] },
+        useRoundMachine: () => ({ start: () => {}, finish: () => {} }), getBigWinThreshold: () => 5,
+        useGameSession: () => ({ history: [], stats: { lastResults: [] }, record: fixture.record }),
+        GameShell: ({ panel, children }) => { fixture.tree = children; return React.createElement(React.Fragment, null, panel, children) },
+        BetPanel: props => { fixture.panel = props; return props.children },
+        CoreStageFrame: ({ children }) => children,
+        BigWinOverlay: Empty, HistoryDrawer: Empty, RecentResultsStrip: Empty, StatsOverlay: Empty,
+        MultiplierBadge: Empty, ResultToast: Empty, ActionLockOverlay: Empty, SimBetStrip: Empty,
+        makeInitialSimBetRows: () => [], makeSimBetRow: () => ({}), prependSimBetRow: () => [],
+    }
+})
+import LotteryGame from './LotteryGame.jsx'
+function render() { fixture.cursor = 0; return renderToStaticMarkup(React.createElement(LotteryGame)) }
+function buttons(node = fixture.tree) {
+    const out = [], stack = [node]
+    for (let child; (child = stack.pop()) !== undefined;) {
+        if (Array.isArray(child)) { stack.push(...child.slice().reverse()); continue }
+        if (!React.isValidElement(child)) continue
+        if (child.type === 'button') out.push(child)
+        if (child.props?.children !== undefined) stack.push(child.props.children)
+    }
+    return out
 }
-
-const MULTIPLIERS = [0,1.1,2.2,3.5,12,0.2]
-const STAKES = [1, 2, 3, 5, 7, 10, 25, 100, 137]
-const TWO_DP = /^-?\d+(\.\d{1,2})?$/
-
-describe('lottery payout rounding', () => {
-    it('books a 2dp-clean profit and return for every stake and multiplier', () => {
-        for (const m of MULTIPLIERS) {
-            for (const stake of STAKES) {
-                const { returnAmount, profit } = settle({ multiplier: m, betAmount: stake })
-                expect(String(profit)).toMatch(TWO_DP)
-                expect(String(returnAmount)).toMatch(TWO_DP)
-            }
-        }
-    })
-
-    it('would drift without the rounding', () => {
-        // Guards against the rounding quietly becoming a no-op: at least one
-        // of the real multipliers must produce a raw value that is not 2dp.
-        const drifted = MULTIPLIERS.some(m => STAKES.some(stake => !TWO_DP.test(String(stake * m - stake))))
-        expect(drifted).toBe(true)
-    })
-
-    it('loses exactly the stake when the round pays nothing', () => {
-        const m = 0
-        const stake = 5
-        const { returnAmount, profit } = settle({ multiplier: m, betAmount: stake })
-        expect(returnAmount).toBe(0)
-        expect(profit).toBe(-5)
-    })
-
-    it('keeps the credited return and the booked profit consistent', () => {
-        for (const m of MULTIPLIERS) {
-            for (const stake of STAKES) {
-                const { returnAmount, profit } = settle({ multiplier: m, betAmount: stake })
-                expect(round2(returnAmount - stake)).toBe(profit)
-            }
-        }
-    })
+beforeEach(() => {
+    fixture.states = []; fixture.cursor = 0; fixture.timers = []; fixture.education = null
+    vi.clearAllMocks(); fixture.debit.mockReturnValue(true)
 })
-
-describe('lottery is pinned to the component', () => {
-    it('rounds the return and the profit', () => {
-        expect(source).toContain("const returnAmount = round2(betAmount * multiplier)")
-        expect(source).toContain("const profit = round2(returnAmount - betAmount)")
+describe('Lottery production settlement and live disclosure', () => {
+    for (let hits = 0; hits <= 5; hits += 1) {
+        it('settles the actual ' + hits + '-hit outcome at the rounded production return', async () => {
+            const selected = [3,9,14,21,32]
+            fixture.drawn = [...selected.slice(0, hits), ...Array.from({ length: 5 - hits }, (_, i) => 40 - i)]
+            render()
+            const multiplier = [0, 0, 4, 25, 250, 5000][hits]
+            const stake = 7.13
+            const returned = round2(stake * multiplier)
+            const pending = fixture.panel.onPlay({ betAmount: stake })
+            while (fixture.timers.length) fixture.timers.shift()()
+            await expect(pending).resolves.toEqual({ profit: round2(returned - stake) })
+            expect(fixture.debit).toHaveBeenCalledWith(stake, 'Lottery')
+            if (returned > 0) expect(fixture.credit).toHaveBeenCalledWith(returned, 'Lottery return')
+            else expect(fixture.credit).not.toHaveBeenCalled()
+            expect(fixture.record).toHaveBeenCalledWith(expect.objectContaining({ multiplier, betAmount: stake, profit: round2(returned - stake) }))
+        })
+    }
+    it('quotes the live selected stake and refuses an invalid selection', () => {
+        render()
+        fixture.panel.onStakeChange(0.33)
+        const html = render()
+        expect(fixture.education.betAmount).toBe(0.33)
+        expect(fixture.education.expectedGrossMultiplier).toBe(fixture.education.effectiveRtp)
+        expect(fixture.education.payoutMultiplier).toBeUndefined()
+        expect(fixture.education.winProbability).toBeUndefined()
+        expect(html).toContain('Paying probability:')
+        expect(html).toContain('20-play funding risk:')
+        expect(html).toContain('no deposits, withdrawals')
+        for (const number of [3]) {
+            buttons().find(button => button.props.children === number).props.onClick()
+            render()
+        }
+        fixture.education = null
+        expect(render()).toContain('to see a payout quote')
+        expect(fixture.education).toBeNull()
     })
-
-    it('imports round2 from the shared money helpers', () => {
-        expect(source).toMatch(/import \{[^}]*\bround2\b[^}]*\} from '(\.\.\/)+utils\/simulationMath'/)
-    })
-
-    it('routes its timers through the cancellable scheduler', () => {
-        expect(source).toContain("import { useCancellableTimeouts } from '../../../utils/scheduling'")
-        expect(source).toContain('const { schedule } = useCancellableTimeouts()')
-    })
-})
-
-describe('lottery component parses', () => {
-    // The tests above read the component as text, so a syntax error would not
-    // fail them. Importing makes a broken component fail here rather than only
-    // in `npm run build`.
-    it('imports without a syntax or module-resolution error', async () => {
-        const mod = await import('./LotteryGame.jsx')
-        expect(typeof mod.default).toBe('function')
+    it('does not settle or credit a refused debit', async () => {
+        render(); fixture.debit.mockReturnValue(false)
+        await expect(fixture.panel.onPlay({ betAmount: 5 })).resolves.toEqual({ profit: 0 })
+        expect(fixture.timers).toHaveLength(0)
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
     })
 })

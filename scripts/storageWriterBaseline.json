@@ -1,0 +1,8 @@
+{
+    "src/audio/audioContext.js": 2,
+    "src/components/ChatDock.jsx": 1,
+    "src/components/games/primitives/useGameSession.js": 1,
+    "src/context/SidebarUIContext.jsx": 1,
+    "src/utils/fairRng.js": 4,
+    "src/utils/funMode.js": 1
+}

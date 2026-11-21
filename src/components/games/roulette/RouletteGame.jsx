@@ -9,12 +9,13 @@ import { useCancellableFrames, useCancellableTimeouts } from '../../../utils/sch
 import { useScrollActionIntoView } from '../../../hooks/useScrollActionIntoView'
 import { resolveImage } from '../../../utils/assetPaths'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession, ResultToast } from '../primitives'
-import { BOARD_NUMBERS, WHEEL_ORDER, buildRouletteCoverage, colorOf, makeBet } from './layout'
+import { WHEEL_ORDER, buildRouletteCoverage, colorOf, makeBet, resolveRouletteTicket } from './layout'
 import EducationPanel from '../../EducationPanel'
 import './roulette.css'
 import { useGameBgm } from '../../../audio/useBgm'
 
 const CHIP_VALUES = [1, 5, 25, 100, 500]
+const BOARD_NUMBERS = Array.from({ length: 36 }, (_, index) => index + 1)
 const SIM_NAMES = ['Kira', 'Reno', 'Mika', 'Jules', 'Vex', 'Nia', 'Sable', 'Ozzy', 'Tess', 'Rune', 'Bex', 'Cy', 'Dax', 'Fenn', 'Gio', 'Hux', 'Indi', 'Jax', 'Kol', 'Lux', 'Moss', 'Nox', 'Oda', 'Pia', 'Roux', 'Sol']
 const BETTING_OPEN_MS = 6000
 
@@ -167,17 +168,15 @@ export default function RouletteGame() {
         cancelAll()
         cancelFrames()
         // If auto-loop or rebet fired without chips on the felt, restore the last snapshot.
-        let activeBets = bets
-        if (!activeBets.length && lastChips.length && (mode === 'auto' || mode === 'manual')) {
-            activeBets = lastChips.map(b => ({ ...b, id: crypto.randomUUID() }))
-            setBets(activeBets)
-        }
+        const ticket = resolveRouletteTicket(bets, lastChips, mode)
+        const activeBets = ticket.bets === bets ? bets : ticket.bets.map(b => ({ ...b, id: crypto.randomUUID() }))
+        if (activeBets !== bets) setBets(activeBets)
         if (!activeBets.length) {
             showToast('error', 'No bets', 'Place at least one chip on the board')
             resolve({ profit: 0 })
             return
         }
-        const stake = activeBets.reduce((sum, b) => sum + b.amount, 0)
+        const stake = ticket.stake
         if (!placeBet(stake, 'Roulette')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(stake)}`)
             resolve({ profit: 0 })
@@ -356,8 +355,9 @@ export default function RouletteGame() {
                 <BetPanel
                     balance={balance}
                     initialBet={5}
+                    ticketStake={({ mode }) => resolveRouletteTicket(bets, lastChips, mode).stake}
                     runningRound={roundLocked}
-                    actionLabel={`Spin (${formatCredits(totalStake)} on ${bets.length} bets)`}
+                    actionLabel="Spin"
                     mobilePlayLabel="Spin"
                     onPlay={performPlay}
                     disableAuto={false}
@@ -460,7 +460,7 @@ export default function RouletteGame() {
                         )}
                     </div>
                     <div className="rou-feed-col">
-                        <div className="rou-live-head"><span>Live table</span><strong>{simPlayers.length} bettors</strong></div>
+                        <div className="rou-live-head"><span>Sim table</span><strong>{simPlayers.length} bots</strong></div>
                         <ul className="rou-player-feed" aria-label="Simulated roulette players">
                             {simPlayers.map(p => (
                                 <li key={p.id} className={p.won === null ? 'pending' : p.won ? 'won' : 'lost'}>
@@ -493,25 +493,26 @@ export default function RouletteGame() {
                 </div>
 
                 <div className="rou-board" id="roulette-bet-board" aria-label="Roulette betting table" data-mobile-critical-surface>
-                    <div className={cellClassName(0, 'zero')} data-bet={cellBet(0) || ''}
+                    <button type="button" className={cellClassName(0, 'zero')} data-bet={cellBet(0) || ''}
                         data-cover={cellCoverage(0)?.coverCount || ''}
                         data-cover-label={cellCoverLabel(cellCoverage(0))}
-                        title={cellTitle(0)}
+                        title={cellTitle(0)} aria-label={cellTitle(0)}
+                        aria-pressed={cellBet(0) > 0} disabled={roundLocked}
                         onClick={() => addBet('straight', { n: 0 })}
                         data-has={cellBet(0) ? 'yes' : ''}
-                    >0</div>
+                    >0</button>
                     <div className="rou-bottom">
-                        {[0, 1, 2].map(rowIdx => (
-                            BOARD_NUMBERS[rowIdx].map(n => (
-                                <div key={n}
-                                    className={cellClassName(n)}
-                                    data-bet={cellBet(n) || ''}
-                                    data-cover={cellCoverage(n)?.coverCount || ''}
-                                    data-cover-label={cellCoverLabel(cellCoverage(n))}
-                                    title={cellTitle(n)}
-                                    onClick={() => addBet('straight', { n })}
-                                >{n}</div>
-                            ))
+                        {BOARD_NUMBERS.map(n => (
+                            <button key={n} type="button"
+                                className={cellClassName(n)}
+                                style={{ '--rou-column': Math.ceil(n / 3), '--rou-row': 3 - ((n - 1) % 3) }}
+                                data-bet={cellBet(n) || ''}
+                                data-cover={cellCoverage(n)?.coverCount || ''}
+                                data-cover-label={cellCoverLabel(cellCoverage(n))}
+                                title={cellTitle(n)} aria-label={cellTitle(n)}
+                                aria-pressed={cellBet(n) > 0} disabled={roundLocked}
+                                onClick={() => addBet('straight', { n })}
+                            >{n}</button>
                         ))}
                     </div>
                 </div>
@@ -527,10 +528,11 @@ export default function RouletteGame() {
                             { type: 'col2', label: 'Col 2' },
                             { type: 'col3', label: 'Col 3' },
                         ].map(row => (
-                            <div key={row.type}
+                            <button key={row.type} type="button"
                                 className={`rou-extra-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
+                                aria-label={betLabel(row.type)} aria-pressed={betTotal(row.type) > 0} disabled={roundLocked}
                                 onClick={() => addBet(row.type)}
-                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
+                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</button>
                         ))}
                     </div>
                     <div className="rou-extra-row">
@@ -542,10 +544,11 @@ export default function RouletteGame() {
                             { type: 'odd', label: 'Odd' },
                             { type: 'high', label: '19-36' },
                         ].map(row => (
-                            <div key={row.type}
+                            <button key={row.type} type="button"
                                 className={`rou-extra-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
+                                aria-label={betLabel(row.type)} aria-pressed={betTotal(row.type) > 0} disabled={roundLocked}
                                 onClick={() => addBet(row.type)}
-                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
+                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</button>
                         ))}
                     </div>
                     <div className="rou-racetrack">
@@ -555,10 +558,11 @@ export default function RouletteGame() {
                             { type: 'orphelins', label: 'Orphelins 8' },
                             { type: 'zeroNeighbours', label: 'Zero 7' },
                         ].map(row => (
-                            <div key={row.type}
+                            <button key={row.type} type="button"
                                 className={`rou-track-cell ${betTotal(row.type) ? 'has-bet' : ''}`}
+                                aria-label={betLabel(row.type)} aria-pressed={betTotal(row.type) > 0} disabled={roundLocked}
                                 onClick={() => addBet(row.type)}
-                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</div>
+                            >{row.label}{betTotal(row.type) ? ` · ${formatCredits(betTotal(row.type))}` : ''}</button>
                         ))}
                     </div>
                 </details>

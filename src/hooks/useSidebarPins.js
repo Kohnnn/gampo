@@ -11,22 +11,46 @@
 // in sync without prop drilling.
 
 import { useEffect, useState } from 'react'
-import { readJson, writeJson, removeKey } from '../utils/storage'
+import { readRaw, writeJson, removeKey } from '../utils/storage'
 
 const KEY = 'gampo_pinned_games'
 const MAX_PINS = 12
 
 const listeners = new Set()
-let pins = read()
+const initial = read()
+let pins = initial.pins
+// A persisted value that needed repairing (malformed JSON, wrong type,
+// duplicates, over MAX_PINS) is written back so storage matches what the UI
+// renders. This is a plain rewrite of the same key, not a migration.
+if (initial.changed) writeJson(KEY, pins)
 
 function read() {
-    const parsed = readJson(KEY, [])
-    return Array.isArray(parsed) ? parsed.filter(p => typeof p === 'string') : []
+    // Distinguish "absent" (legitimately empty) from "present but unusable".
+    // readJson collapses both to the fallback, which would leave corrupt bytes
+    // in storage while the UI renders an empty list.
+    const rawString = readRaw(KEY, null)
+    let parsed
+    let usable = true
+    if (rawString == null) {
+        parsed = []
+    } else {
+        try { parsed = JSON.parse(rawString) } catch { parsed = null }
+        if (!Array.isArray(parsed)) { parsed = []; usable = false }
+    }
+    // Normalize: drop non-strings and duplicates, then keep the most recent
+    // MAX_PINS in stored order, matching the FIFO the toggle path enforces.
+    const seen = new Set()
+    const distinct = []
+    for (const p of parsed) {
+        if (typeof p !== 'string' || seen.has(p)) continue
+        seen.add(p)
+        distinct.push(p)
+    }
+    const pins = distinct.slice(-MAX_PINS)
+    const changed = !usable || pins.length !== parsed.length || pins.some((p, i) => p !== parsed[i])
+    return { pins, changed }
 }
 
-function write() {
-    writeJson(KEY, pins)
-}
 
 function notify() {
     listeners.forEach(fn => fn())
@@ -34,16 +58,14 @@ function notify() {
 
 export function togglePin(path) {
     if (!path) return
-    if (pins.includes(path)) {
-        pins = pins.filter(p => p !== path)
-    } else {
-        if (pins.length >= MAX_PINS) {
-            pins = [...pins.slice(1), path]
-        } else {
-            pins = [...pins, path]
-        }
-    }
-    write()
+    const next = pins.includes(path)
+        ? pins.filter(p => p !== path)
+        : (pins.length >= MAX_PINS ? [...pins.slice(1), path] : [...pins, path])
+    // Commit only if the write actually persisted. Mutating the module state
+    // before a failed write would leave the UI showing a pin that storage does
+    // not have — a phantom pin that survives until the next reload.
+    if (!writeJson(KEY, next)) return
+    pins = next
     notify()
 }
 

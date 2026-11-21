@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Header from './Header'
 import Sidebar from './Sidebar'
@@ -12,8 +12,7 @@ import FooterDisclaimer from './FooterDisclaimer'
 import { useMenuBgm } from '../audio/useBgm'
 import { playSample } from '../audio/audioContext'
 import { useSettings } from '../hooks/useSettings'
-
-const SIDEBAR_KEY = 'gampo_sidebar_open'
+import { SidebarUIProvider, useSidebarUI } from '../context/SidebarUIContext'
 
 // Lobby/menu surfaces that should play the menu loop. Anything not in this
 // set is treated as an in-game route (which plays its own BGM via useBgm /
@@ -23,17 +22,8 @@ const LOBBY_PATHS = new Set([
     '/learn', '/activity', '/verify', '/race', '/promotions', '/collections',
 ])
 
-function readInitialSidebar() {
-    try {
-        const raw = localStorage.getItem(SIDEBAR_KEY)
-        if (raw === '0') return false
-        if (raw === '1') return true
-    } catch { /* ignore */ }
-    return true
-}
-
-function Layout() {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(readInitialSidebar)
+function LayoutShell() {
+    const { isSidebarOpen, toggleSidebar, closeSidebar } = useSidebarUI()
     const location = useLocation()
 
     // Subscribe to display settings so accent/density/reduce-motion stay applied
@@ -43,9 +33,14 @@ function Layout() {
     // Play lobby music only on menu surfaces; in-game routes own their BGM.
     useMenuBgm(LOBBY_PATHS.has(location.pathname))
 
+    // Close the mobile drawer on navigation so it never covers a game. The
+    // desktop sidebar is a different surface driven by the same flag: collapsing
+    // it here would override the user's persisted rail preference on every
+    // route change and on reload. Only the overlay dismisses itself.
     useEffect(() => {
-        try { localStorage.setItem(SIDEBAR_KEY, isSidebarOpen ? '1' : '0') } catch { /* ignore */ }
-    }, [isSidebarOpen])
+        if (typeof window === 'undefined') return
+        if (window.matchMedia('(max-width: 768px)').matches) closeSidebar()
+    }, [location.pathname, closeSidebar])
 
     // Lobby UI click feedback. Delegated listener plays a soft click when a
     // button/link/tile is activated on menu surfaces. Honors SFX/master mute
@@ -60,10 +55,6 @@ function Layout() {
         document.addEventListener('click', onClick)
         return () => document.removeEventListener('click', onClick)
     }, [location.pathname])
-
-    const toggleSidebar = () => {
-        setIsSidebarOpen(value => !value)
-    }
 
     return (
         <div className="app-layout" data-ux-surface="shell">
@@ -82,6 +73,16 @@ function Layout() {
             <WelcomeModal />
             <FooterDisclaimer />
         </div>
+    )
+}
+
+// The provider owns the sidebar state so both the Sidebar and the Header's
+// mobile menu button can reach it.
+function Layout() {
+    return (
+        <SidebarUIProvider>
+            <LayoutShell />
+        </SidebarUIProvider>
     )
 }
 

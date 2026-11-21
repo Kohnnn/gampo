@@ -5,6 +5,7 @@
 import { Ball, pad, unpad } from './Ball';
 import { BIN_PAYOUTS } from './constants';
 import { loadOutcomes, getCachedOutcomes } from './plinkoOutcomesLoader';
+import { clampDpr } from '../frameSize';
 
 const WIDTH = 760;
 const HEIGHT = 570;
@@ -79,17 +80,55 @@ class PlinkoEngine {
     }
 
     _setupCanvasHDPI() {
-        const dpr = window.devicePixelRatio || 1;
-        // The backing store is fixed for deterministic coordinates. Display
-        // size is controlled by CSS so mobile layouts can keep payout bins in
-        // view without changing physics math.
-        this.canvas.width = WIDTH * dpr;
-        this.canvas.height = HEIGHT * dpr;
-        this.canvas.style.width = '';
-        this.canvas.style.height = '';
+        // QA008: the backing store must track the *rendered* CSS box, not a
+        // fixed model size. Model coordinates stay 760x570 (WIDTH/HEIGHT); the
+        // context is scaled to fill whatever frame CSS gives us, with DPR as an
+        // extra crispness multiplier. Sizing once at mount left the buffer at
+        // its mount size after a resize / orientation change, so balls, pegs
+        // and buckets drifted outside the visual frame.
+        this._applyCanvasSize();
+    }
 
-        // Normalize coordinate system to use css pixels
-        this.ctx.scale(dpr, dpr);
+    // Current CSS box of the canvas; falls back to the model size when the
+    // element is not laid out yet (hidden tab, headless, pre-paint).
+    _cssBox() {
+        const el = this.canvas;
+        const rect = el?.getBoundingClientRect?.();
+        const width = rect?.width > 0 ? rect.width : (el?.clientWidth > 0 ? el.clientWidth : WIDTH);
+        const height = rect?.height > 0 ? rect.height : (el?.clientHeight > 0 ? el.clientHeight : HEIGHT);
+        return { width, height };
+    }
+
+    _applyCanvasSize() {
+        const { width, height } = this._cssBox();
+        const ratio = clampDpr(window.devicePixelRatio || 1);
+        const targetWidth = Math.max(1, Math.round(width * ratio));
+        const targetHeight = Math.max(1, Math.round(height * ratio));
+        if (this.canvas.width === targetWidth && this.canvas.height === targetHeight) return false;
+
+        // Assigning width/height clears the backing store. Keep the current
+        // frame so a resize mid-drop does not blink the board.
+        let previous = null;
+        try {
+            if (this.canvas.width > 0 && this.canvas.height > 0) previous = this.canvas;
+        } catch { previous = null; }
+
+        this.canvas.width = targetWidth;
+        this.canvas.height = targetHeight;
+        this.view = { scaleX: targetWidth / WIDTH, scaleY: targetHeight / HEIGHT };
+        this.ctx.setTransform?.(this.view.scaleX, 0, 0, this.view.scaleY, 0, 0);
+
+        if (previous) {
+            try {
+                this.ctx.drawImage(previous, 0, 0, WIDTH, HEIGHT);
+            } catch { /* detached or tainted canvas: the next frame repaints anyway */ }
+        }
+        return true;
+    }
+
+    // Called by the React host from a ResizeObserver and on DPR changes.
+    handleResize() {
+        return this._applyCanvasSize();
     }
 
     static get WIDTH() { return WIDTH; }

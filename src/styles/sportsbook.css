@@ -2694,7 +2694,7 @@
 .sb-feed-status,
 .sb-fact-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
     gap: 16px;
     border: 1px solid var(--sb-line);
     background: var(--sb-panel);
@@ -2706,6 +2706,9 @@
 .sb-fact-grid div {
     display: grid;
     gap: 3px;
+    /* QA042: a grid child defaults to `min-width: auto`, which lets a long
+       unbreakable token push its `minmax(0, 1fr)` track open. */
+    min-width: 0;
 }
 
 .sb-feed-status span,
@@ -2719,14 +2722,24 @@
 
 .sb-feed-status dl {
     display: flex;
+    flex-wrap: wrap;
     gap: 18px;
     margin: 0;
+    /* QA042: the metadata column is `auto` in the parent grid, so it sizes to its
+       longest unbreakable child. `sources.join(', ')` is a single long token, which
+       inflated that column and squeezed the status text to zero width. Allowing the
+       list to wrap and shrink is what keeps the reading column nonzero. */
+    min-width: 0;
 }
 
 .sb-feed-status dd,
 .sb-fact-grid dd {
     margin: 0;
     color: var(--sb-ink);
+    /* QA042: `sources.join(', ')` can contain a provider name with no spaces.
+       Wrapping at the flex line is not enough for one unbreakable token, so the
+       value breaks inside itself rather than overflowing onto the status copy. */
+    overflow-wrap: anywhere;
 }
 
 .sb-feed-status.is-stale,

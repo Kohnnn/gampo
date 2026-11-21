@@ -16,6 +16,7 @@ import { nextRoll } from '../../../utils/fairRng'
 import { useCancellableTimeouts } from '../../../utils/scheduling'
 import { getBigWinThreshold, BetPanel, BigWinOverlay, CoreStageFrame, GameShell, HistoryDrawer, RecentResultsStrip, StatsOverlay, useGameSession } from '../primitives'
 import { Particles } from '../../fx'
+import { nextStepQuote } from '../primitives/autoAccounting'
 import EducationPanel from '../../EducationPanel'
 import DinoEngine from './engine/DinoEngine'
 import './dino.css'
@@ -50,6 +51,7 @@ export default function DinoGame() {
     const [phase, setPhase] = useState('idle') // idle | running | crashed | cashed
     const [steps, setSteps] = useState(0)
     const [stake, setStake] = useState(0)
+    const [selectedStake, setSelectedStake] = useState(5)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [burstKey, setBurstKey] = useState(0)
     const [lastBet, setLastBet] = useState(null)
@@ -58,6 +60,15 @@ export default function DinoGame() {
     const config = PRESETS[difficulty]
     const multiplier = Number(Math.pow(config.growth, steps).toFixed(2))
     const inRound = phase === 'running'
+    const nextMultiplier = Number(Math.pow(config.growth, inRound ? steps + 1 : 1).toFixed(2))
+    // QA030: the lesson states what the next jump pays in the state the player is
+    // in. The old `{ settled: true }` arm dropped the conditional quote as soon as
+    // a round ended, so the panel lost the very numbers it exists to teach.
+    const educationDecision = nextStepQuote({
+        probability: config.safe,
+        payoutMultiplier: nextMultiplier,
+        cashoutMultiplier: inRound && steps > 0 ? multiplier : undefined,
+    })
 
     // Mount engine
     useEffect(() => {
@@ -161,6 +172,7 @@ export default function DinoGame() {
                     onPlay={performPlay}
                     disableAuto
                     lastBet={lastBet}
+                    onStakeChange={setSelectedStake}
                     playPhase={inRound && steps > 0 ? 'in-round' : null}
                     playLabel={inRound && steps > 0 ? `Cashout ${multiplier.toFixed(2)}×` : 'Start Run'}
                     onPlayPhaseAction={cashOut}
@@ -197,7 +209,7 @@ export default function DinoGame() {
             </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('dino')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={config.safe} payoutMultiplier={multiplier || config.growth} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} betAmount={inRound ? stake : selectedStake} conditionalDecision={educationDecision} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

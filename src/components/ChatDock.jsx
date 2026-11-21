@@ -117,6 +117,12 @@ function ChatDock() {
     useEffect(() => {
         const onKeyDown = (event) => {
             if (event.key !== 'Escape') return
+            // One Escape dismisses one interface. The drawer routes the key to
+            // the topmost registered overlay, and whichever layer acts calls
+            // `preventDefault()`. So this listener only honours that signal: it
+            // must not test ownership itself, because it may run before or
+            // after those handlers depending on registration order.
+            if (event.defaultPrevented) return
             if (stateRef.current === 'open') {
                 transientDockRef.current = false
                 setState('minimized')

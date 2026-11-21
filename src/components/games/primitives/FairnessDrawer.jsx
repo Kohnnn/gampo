@@ -20,7 +20,7 @@ import {
     maskSeed,
 } from '../../../utils/fairRng'
 
-export default function FairnessDrawer({ open, onClose }) {
+export default function FairnessDrawer({ open, onClose, openerRef }) {
     const [state, setState] = useState(() => getProvablyFair())
     const [recent, setRecent] = useState(() => getRecentRolls())
     const [draftClient, setDraftClient] = useState(state.clientSeed)
@@ -36,7 +36,7 @@ export default function FairnessDrawer({ open, onClose }) {
 
     // Native <dialog> owns focus entry, containment and Escape; the hook
     // restores focus to the control that opened us on close.
-    const dialogRef = useNativeDialog(open, onClose)
+    const dialogRef = useNativeDialog(open, onClose, openerRef)
 
     const masked = useMemo(() => maskSeed(state.serverSeed), [state.serverSeed])
 

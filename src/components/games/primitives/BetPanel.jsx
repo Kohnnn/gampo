@@ -12,6 +12,20 @@ import { createPortal } from 'react-dom'
 import { Play, Pause, ChevronsRight, Settings, Sliders, RotateCcw } from 'lucide-react'
 import { formatCredits } from '../../../utils/simulationMath'
 import { withTimeout } from '../../../utils/scheduling'
+import { claimEscape } from '../../../utils/escapeClaims'
+import { accountAutoRound } from './autoAccounting'
+import { isInteractiveHotkeyTarget, isOpenDialogPresent } from './HotkeyHelp'
+
+// QA028: a shortcut may only start or change a paid action when the keystroke is
+// a genuine, unheld press aimed at the page itself. Extracted from the effect so
+// the guard can be pinned by a test without mounting a DOM.
+export function shouldHandleShortcut(event, { dialogOpen = false } = {}) {
+    if (!event || event.defaultPrevented) return false
+    if (event.ctrlKey || event.metaKey || event.altKey) return false
+    // A held/repeating key must not fire a second paid action.
+    if (event.repeat) return false
+    return !dialogOpen && !isInteractiveHotkeyTarget(event.target)
+}
 
 const TABS = ['manual', 'auto', 'strategy']
 
@@ -21,6 +35,9 @@ export default function BetPanel({
     maxBet = 10000,
     initialBet = 5,
     fixedBetAmount = null,
+    // Table games quote the complete next ticket; the amount input remains the
+    // independent selection/Auto amount. A resolver preserves repeat semantics.
+    ticketStake = null,
     betLabel = 'Bet Amount',
     onPlay,
     onStop,
@@ -33,6 +50,10 @@ export default function BetPanel({
     dockExtras = null, // optional compact controls rendered inside the portaled mobile dock
     autoChildren, // optional extra auto controls
     lastBet = null,
+    // Reports the *currently selected* stake upward so shell-level surfaces that
+    // explain the bet (e.g. the odds popup's EV / risk) use what the player is
+    // editing now, not the amount of the previous settled round.
+    onStakeChange = null,
     // Mid-round CTA support: when playPhase is set, BetPanel hides the bet input
     // controls (or marks them disabled) and the bp-play button becomes the in-round
     // primary action ("Climb", "Cashout", "Draw", etc).
@@ -48,11 +69,9 @@ export default function BetPanel({
     playButtonProps = {},
 }) {
     const panelId = useId()
+    const rebetReasonId = `${panelId}-rebet-reason`
     const [tab, setTab] = useState('manual')
     const [mobileControlsOpen, setMobileControlsOpen] = useState(false)
-    // Tracks whether the mobile betting sheet has been opened at least once so
-    // we can nudge first-time users toward game setup (chips, decks, rules).
-    const [mobileOpenedOnce, setMobileOpenedOnce] = useState(false)
     const [portalRoot, setPortalRoot] = useState(null)
     // Canonical mobile breakpoint (matches index.css nav metrics + browserSmoke
     // + SportsbookShell). On mobile the betting sheet must be portaled to <body>
@@ -66,8 +85,10 @@ export default function BetPanel({
     const panelRef = useRef(null)
     const [betAmount, setBetAmount] = useState(initialBet)
     // Auto state
+    const [autoActive, setAutoActive] = useState(false)
     const [autoCount, setAutoCount] = useState(10)
     const [autoInfinite, setAutoInfinite] = useState(false)
+    const [autoBetAmount, setAutoBetAmount] = useState(null)
     const [stopProfit, setStopProfit] = useState('')
     const [stopLoss, setStopLoss] = useState('')
     const [stopBigWin, setStopBigWin] = useState('')
@@ -79,11 +100,28 @@ export default function BetPanel({
     const [strategy, setStrategy] = useState('flat')
     const hasFixedBet = Number.isFinite(Number(fixedBetAmount)) && Number(fixedBetAmount) > 0
     const effectiveBetAmount = hasFixedBet ? Number(fixedBetAmount) : betAmount
+    const quotedBetAmount = tab === 'auto' && autoBetAmount !== null ? autoBetAmount : effectiveBetAmount
+    const hasTicketStake = ticketStake !== null
+    const quotedTicketStake = typeof ticketStake === 'function'
+        ? ticketStake({ mode: tab, betAmount: quotedBetAmount })
+        : ticketStake
+    const ticketIsFunded = Number.isFinite(quotedTicketStake) && quotedTicketStake > 0
+        && Number.isFinite(balance) && quotedTicketStake <= balance
+
+    // Publish the live selection so the shell can describe the *current* bet.
+    useEffect(() => {
+        onStakeChange?.(effectiveBetAmount)
+    }, [effectiveBetAmount, onStakeChange])
 
     const autoRunning = useRef(false)
+    const autoRunId = useRef(0)
     const autoLeft = useRef(0)
     const autoBaseBet = useRef(initialBet)
     const sessionProfit = useRef(0)
+    const latestAutoPlay = useRef({ onPlay, ticketStake, balance })
+    latestAutoPlay.current.onPlay = onPlay
+    latestAutoPlay.current.ticketStake = ticketStake
+    latestAutoPlay.current.balance = balance
 
     const half = useCallback(() => setBetAmount(v => Math.max(minBet, Number((v / 2).toFixed(2)))), [minBet])
     const double = useCallback(() => setBetAmount(v => Math.min(maxBet, Number((v * 2).toFixed(2)))), [maxBet])
@@ -99,9 +137,12 @@ export default function BetPanel({
     }, [lastBet, maxBet, minBet])
 
     const stopAuto = useCallback(() => {
+        autoRunId.current += 1
         autoRunning.current = false
+        setAutoActive(false)
         autoLeft.current = 0
         sessionProfit.current = 0
+        setAutoBetAmount(null)
         if (onStop) onStop()
     }, [onStop])
 
@@ -110,6 +151,9 @@ export default function BetPanel({
             if (onPlayPhaseAction) await onPlayPhaseAction()
             return
         }
+        // A locked round blocks a fresh paid start for every game, not only the
+        // ticket games. The Auto loop is the one caller allowed through.
+        if (!(tab === 'auto' && autoRunning.current) && (runningRound || (hasTicketStake && !ticketIsFunded))) return
         if (tab === 'manual') {
             if (!onPlay) return
             await onPlay({ betAmount: effectiveBetAmount, mode: 'manual' })
@@ -125,17 +169,25 @@ export default function BetPanel({
             stopAuto()
             return
         }
+        const runId = ++autoRunId.current
         autoRunning.current = true
+        setAutoActive(true)
         autoLeft.current = autoInfinite ? Infinity : Math.max(1, Number(autoCount) || 1)
         autoBaseBet.current = effectiveBetAmount
         sessionProfit.current = 0
+        // One reconciliation state for the whole loop. Only a `committed`
+        // round counts and moves session profit; a refusal must not consume
+        // the configured count or trip a stop threshold.
+        let autoState = { rounds: 0, refusals: 0, sessionProfit: 0, lastProfit: 0, lastKind: null, limitProfit: Number(stopProfit), limitLoss: Number(stopLoss), limitBigWin: Number(stopBigWin) }
+        if (hasTicketStake) setAutoBetAmount(effectiveBetAmount)
         let currentBet = effectiveBetAmount
-        const limitProfit = Number(stopProfit)
-        const limitLoss = Number(stopLoss)
-        const limitBigWin = Number(stopBigWin)
         while (autoRunning.current && autoLeft.current > 0) {
-            // safety: stop if balance can't cover bet
-            if ((balance || 0) < currentBet) {
+            // Every consumer must use the latest callback and affordability.
+            const { onPlay: livePlay, ticketStake: liveTicketStake, balance: liveBalance } = latestAutoPlay.current
+            const charge = typeof liveTicketStake === 'function'
+                ? liveTicketStake({ mode: 'auto', betAmount: currentBet })
+                : hasTicketStake ? liveTicketStake : currentBet
+            if ((hasTicketStake && (!Number.isFinite(charge) || charge <= 0 || !Number.isFinite(liveBalance))) || (liveBalance || 0) < charge) {
                 stopAuto()
                 break
             }
@@ -143,23 +195,36 @@ export default function BetPanel({
             // can't hang the autoplay loop. The game's own state should
             // recover on its next render; we just unblock the loop.
             const raced = await withTimeout(
-                Promise.resolve(onPlay({ betAmount: currentBet, mode: 'auto' })),
+                Promise.resolve(livePlay({ betAmount: currentBet, mode: 'auto' })),
                 autoTimeoutMs,
             )
+            if (runId !== autoRunId.current) return
             if (raced.timedOut) {
                 // eslint-disable-next-line no-console
                 console.warn('[BetPanel] autoplay round timed out after', autoTimeoutMs, 'ms')
                 stopAuto()
                 break
             }
-            const result = raced.value || {}
-            const profit = Number(result?.profit) || 0
-            sessionProfit.current += profit
-            // stop conditions
-            if (Number.isFinite(limitProfit) && limitProfit > 0 && sessionProfit.current >= limitProfit) { stopAuto(); break }
-            if (Number.isFinite(limitLoss) && limitLoss > 0 && sessionProfit.current <= -limitLoss) { stopAuto(); break }
-            if (Number.isFinite(limitBigWin) && limitBigWin > 0 && profit >= limitBigWin) { stopAuto(); break }
-            // bet adjust
+            // Reconcile through the shared six-kind contract. A refused round
+            // (insufficient funds, in-round, gate-closed) resolves a
+            // non-`committed` kind and must neither consume the count nor move
+            // session profit — `{profit:0}` alone is ambiguous.
+            const step = accountAutoRound(autoState, raced.value)
+            autoState = step.state
+            // The destructured `sessionProfit` is a NUMBER; the ref of the same
+            // name is what the shell reads. Shadowing them made this line assign
+            // a property on a primitive and throw on every resolved Auto round.
+            const { lastKind, lastProfit: profit, sessionProfit: sessionProfitNow } = autoState
+            sessionProfit.current = sessionProfitNow
+            if (step.stop) { stopAuto(); break }
+            if (!step.accepted) {
+                // Retry temporary refusals; terminal refusals stop without consuming a round.
+                if (raced.value?.stopAuto === true || raced.value?.code === 'insufficient-funds' || lastKind === 'unknown' || lastKind === 'aborted') { stopAuto(); break }
+                await new Promise(res => setTimeout(res, autoIntervalMs))
+                if (runId !== autoRunId.current) return
+                continue
+            }
+            // bet adjust on the accepted result only
             if (profit > 0) {
                 if (onWinReset) currentBet = autoBaseBet.current
                 else if (onWinPct) currentBet = Math.max(minBet, Number((currentBet * (1 + onWinPct / 100)).toFixed(2)))
@@ -168,16 +233,21 @@ export default function BetPanel({
                 else if (onLossPct) currentBet = Math.max(minBet, Number((currentBet * (1 + onLossPct / 100)).toFixed(2)))
             }
             currentBet = Math.min(maxBet, currentBet)
+            if (hasTicketStake) setAutoBetAmount(currentBet)
             if (autoLeft.current !== Infinity) autoLeft.current -= 1
             // Configurable cadence between rounds. Plinko uses 500 so balls
             // drop in a continuous shower. Default 120 keeps every other game
             // feeling snappy.
             await new Promise(res => setTimeout(res, autoIntervalMs))
+            if (runId !== autoRunId.current) return
         }
+        if (runId !== autoRunId.current) return
         autoRunning.current = false
-    }, [tab, onPlay, effectiveBetAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs])
+        setAutoActive(false)
+        if (hasTicketStake) setAutoBetAmount(null)
+    }, [tab, onPlay, effectiveBetAmount, autoInfinite, autoCount, stopProfit, stopLoss, stopBigWin, onWinPct, onWinReset, onLossPct, onLossReset, balance, maxBet, minBet, strategy, stopAuto, playPhase, onPlayPhaseAction, autoIntervalMs, autoTimeoutMs, ticketStake, hasTicketStake, ticketIsFunded, runningRound])
 
-    useEffect(() => () => { autoRunning.current = false }, [])
+    useEffect(() => () => { autoRunId.current += 1; autoRunning.current = false }, [])
 
     useEffect(() => {
         setPortalRoot(document.body)
@@ -230,10 +300,7 @@ export default function BetPanel({
     // (ctrl/cmd/alt) are held, and when an auto round is in progress to keep things safe.
     useEffect(() => {
         const onKey = (e) => {
-            if (e.ctrlKey || e.metaKey || e.altKey) return
-            const tag = (e.target?.tagName || '').toLowerCase()
-            if (tag === 'input' || tag === 'textarea' || tag === 'select') return
-            if (e.target?.isContentEditable) return
+            if (!shouldHandleShortcut(e, { dialogOpen: isOpenDialogPresent() })) return
             switch (e.key) {
                 case ' ': // Space: play / stop autobet / in-round CTA
                     e.preventDefault()
@@ -281,7 +348,7 @@ export default function BetPanel({
         return () => window.removeEventListener('keydown', onKey)
     }, [handlePlay, stopAuto, lastBet, rebet, half, double, maxBet, minBet])
 
-    const isAutoLive = tab === 'auto' && autoRunning.current
+    const isAutoLive = tab === 'auto' && autoActive
     const inRound = playPhase === 'in-round'
     const playButtonLabel = (() => {
         if (inRound) return playLabel || 'Continue'
@@ -290,30 +357,38 @@ export default function BetPanel({
     })()
     const dockSummary = inRound
         ? 'Round action'
-        : hasFixedBet
-            ? 'Fixed stake'
-            : `${tab.charAt(0).toUpperCase()}${tab.slice(1)} stake`
+        : hasTicketStake
+            ? 'Ticket stake'
+            : hasFixedBet
+                ? 'Fixed stake'
+                : `${tab.charAt(0).toUpperCase()}${tab.slice(1)} stake`
     const dockValue = inRound
         ? playButtonLabel
-        : formatCredits(effectiveBetAmount)
-    const playDisabled = runningRound && !isAutoLive && !inRound
+        : formatCredits(hasTicketStake ? quotedTicketStake : effectiveBetAmount)
+    const playDisabled = !isAutoLive && !inRound && (runningRound || (hasTicketStake && !ticketIsFunded))
     const mobileButtonLabel = mobilePlayLabel || playButtonLabel
     const playContent = isAutoLive ? <><Pause size={16} /> Stop Autobet</> : <><Play size={16} /> {playButtonLabel}</>
     const mobilePlayContent = isAutoLive ? <><Pause size={16} /> Stop</> : <><Play size={16} /> {mobileButtonLabel}</>
 
-    // Game-specific setup controls (chips, decks, rules) live in the manual tab
-    // body. When they exist we surface a clearer "Bet & options" affordance and
-    // a one-time hint so mobile users discover the settings sheet.
+    // The dock's labeled opener exposes every game-specific setup control.
     const hasSetupControls = Boolean(children)
     const settingsLabel = hasSetupControls ? 'Bet & options' : 'Bet settings'
-    const showSetupNudge = hasSetupControls && !mobileControlsOpen && !mobileOpenedOnce && !inRound
-    const openMobileControls = () => {
-        setMobileControlsOpen(true)
-        setMobileOpenedOnce(true)
-    }
+    const openMobileControls = () => setMobileControlsOpen(true)
 
     const sheetRef = useRef(null)
     const sheetTriggerRef = useRef(null)
+
+    // While the mobile sheet is open it owns Escape, so the mobile drawer
+    // beneath it defers rather than consuming the key and stranding the sheet.
+    useEffect(() => {
+        if (!isMobile || !mobileControlsOpen) return undefined
+        // Registered as a handler, not a flag, so only the topmost layer acts
+        // on one Escape. The sheet's own listener below handles the Tab trap.
+        return claimEscape(() => {
+            setMobileControlsOpen(false)
+            return true
+        })
+    }, [isMobile, mobileControlsOpen])
 
     // Accessibility for the portaled mobile sheet: trap Tab focus inside the
     // open sheet, close on Escape, move focus into the sheet on open, and
@@ -332,11 +407,10 @@ export default function BetPanel({
         if (first) first.focus()
 
         const onKey = (e) => {
-            if (e.key === 'Escape') {
-                e.preventDefault()
-                setMobileControlsOpen(false)
-                return
-            }
+            // Escape is routed through the claim registry (see the claim effect
+            // above), so this listener handles only the Tab focus trap. A second
+            // Escape branch here would close this sheet and, independently,
+            // whichever layer was registered above it.
             if (e.key !== 'Tab') return
             const items = focusables()
             if (items.length === 0) return
@@ -407,10 +481,16 @@ export default function BetPanel({
                         disabled={hasFixedBet || !lastBet}
                         title={!lastBet ? 'Place your first bet to enable Rebet' : hasFixedBet ? 'Rebet is locked during this round' : 'Repeat last bet amount'}
                         data-disabled-reason={!lastBet ? 'Place your first bet to enable Rebet' : hasFixedBet ? 'Rebet is locked during this round' : undefined}
+                        aria-describedby={!lastBet || hasFixedBet ? rebetReasonId : undefined}
                     >
                         <RotateCcw size={11} style={{ marginRight: 3 }} />Rebet
                     </button>
                 </div>
+                {(!lastBet || hasFixedBet) && (
+                    <p className="bp-disabled-reason" id={rebetReasonId} role="note">
+                        {!lastBet ? 'Place your first bet to enable Rebet' : 'Rebet is locked during this round'}
+                    </p>
+                )}
                 <div className="bp-bal-line">
                     <span>Balance</span>
                     <strong>{formatCredits(balance || 0)}</strong>
@@ -492,7 +572,7 @@ export default function BetPanel({
             <div className="bp-mobile-dock" data-mobile-action-dock data-ux-surface="dock">
                 <button
                     type="button"
-                    className={`bp-mobile-settings ${showSetupNudge ? 'nudge' : ''}`}
+                    className="bp-mobile-settings"
                     onClick={openMobileControls}
                     ref={sheetTriggerRef}
                     aria-expanded={mobileControlsOpen}
@@ -525,17 +605,6 @@ export default function BetPanel({
                     </div>
                 )}
             </div>
-
-            {showSetupNudge && (
-                <button
-                    type="button"
-                    className="bp-mobile-setup-hint"
-                    onClick={openMobileControls}
-                    data-mobile-setup-hint
-                >
-                    Set bet &amp; options ↑
-                </button>
-            )}
 
             {mobileControlsOpen && (
                 <button

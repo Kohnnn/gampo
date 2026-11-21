@@ -57,8 +57,12 @@ describe('cases x10 layout contract', () => {
 })
 
 describe('cases settlement source contract', () => {
-    it('guards finishPendingRound so animation and skip can only settle once', () => {
-        expect(source).toContain('if (!claimCaseSettlement(pending)) return')
+    it('guards settlement so animation, skip and unmount can only settle once', () => {
+        // The claim moved into `applyCaseAccounting` so teardown can reach it too.
+        // Behavioural proof: CasesGame.manifest.test.jsx "Cases unmount settlement".
+        const anim = readFileSync(new URL('./casesAnimation.js', import.meta.url), 'utf8')
+        expect(anim).toContain('if (!claimCaseSettlement(pending)) return null')
+        expect(anim).toContain("if (returnAmount > 0) addWinnings(returnAmount, 'Cases return')")
         expect(source).toContain('pendingRoundRef.current = null')
         expect(source).toContain("setCasePhase('settled')")
         expect(source).toContain('setRunning(false)')

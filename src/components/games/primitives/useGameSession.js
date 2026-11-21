@@ -1,7 +1,7 @@
 // Per-game session state stored in localStorage. History (last 200 results)
 // + derived live stats (totals, win rate, biggest hit, RTP, streaks).
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { recordPnl } from '../../../hooks/useGlobalPnl'
 import { recordRound as recordProgressRound } from '../../../hooks/useProgress'
 import { recordMissionRound } from '../../../hooks/useMissions'
@@ -29,14 +29,16 @@ function writeArr(key, value) {
 export default function useGameSession(gameId) {
     const key = `gampo_history_${gameId}`
     const [history, setHistory] = useState(() => readArr(key))
+    const historyRef = useRef(history)
 
     const record = useCallback((entry) => {
         // entry: { id, label, profit, betAmount, multiplier?, meta? }
-        setHistory(prev => {
-            const next = [{ ...entry, ts: Date.now() }, ...prev].slice(0, HISTORY_LIMIT)
-            writeArr(key, next)
-            return next
-        })
+        const next = [{ ...entry, ts: Date.now() }, ...historyRef.current].slice(0, HISTORY_LIMIT)
+        historyRef.current = next
+        // A deferred receipt may flush during unmount; persistence cannot depend
+        // on React running a state updater after the consumer has gone away.
+        writeArr(key, next)
+        setHistory(next)
         // Mirror to the global PnL aggregator so StatsPanel can show
         // session/game/all-time profit without each game re-implementing it.
         try {
@@ -84,6 +86,7 @@ export default function useGameSession(gameId) {
     }, [key, gameId])
 
     const clear = useCallback(() => {
+        historyRef.current = []
         writeArr(key, [])
         setHistory([])
     }, [key])
@@ -145,7 +148,11 @@ export default function useGameSession(gameId) {
 
     useEffect(() => {
         const onStorage = (e) => {
-            if (e.key === key) setHistory(readArr(key))
+            if (e.key === key) {
+                const next = readArr(key)
+                historyRef.current = next
+                setHistory(next)
+            }
         }
         window.addEventListener('storage', onStorage)
         return () => window.removeEventListener('storage', onStorage)

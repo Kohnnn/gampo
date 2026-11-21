@@ -9,7 +9,7 @@ import {
     Volume2, VolumeX,
     Eye, EyeOff,
     Maximize2, Minimize2,
-    Shield, HelpCircle, BarChart3, Wrench, X,
+    Shield, HelpCircle, BarChart3, Wrench, X, History,
 } from 'lucide-react'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useReduceMotion } from '../../fx'
@@ -18,8 +18,9 @@ import HotkeyHelp from './HotkeyHelp'
 import OddsPopup from './OddsPopup'
 import { recordLearningEvent } from '../../../hooks/useProgress'
 import VolumeMixer from './VolumeMixer'
+import { claimEscape } from '../../../utils/escapeClaims'
 
-export default function GameToolbar({ helpHref, definition }) {
+export default function GameToolbar({ helpHref, definition, balance, odds, betAmount }) {
     const { muted, toggle: toggleMute } = useAudio()
     const [reduceMotion, setReduceMotion] = useReduceMotion()
     const [fullscreen, setFullscreen] = useState(() => Boolean(document.fullscreenElement))
@@ -75,15 +76,23 @@ export default function GameToolbar({ helpHref, definition }) {
             if (trigger && trigger.contains(e.target)) return
             setPopoverOpen(false)
         }
-        const onKey = (e) => {
-            if (e.key === 'Escape') setPopoverOpen(false)
-        }
         window.addEventListener('mousedown', onDown)
-        window.addEventListener('keydown', onKey)
         return () => {
             window.removeEventListener('mousedown', onDown)
-            window.removeEventListener('keydown', onKey)
         }
+    }, [popoverOpen])
+
+    // Escape-to-close is registered with the Escape-claim registry rather than
+    // handled by a second window listener. As a bare listener it dismissed at
+    // the same time as the mobile drawer, so one Escape closed both the popover
+    // and the drawer; registering a handler makes it the single owner when it is
+    // the topmost layer.
+    useEffect(() => {
+        if (!popoverOpen) return undefined
+        return claimEscape(() => {
+            setPopoverOpen(false)
+            return true
+        })
     }, [popoverOpen])
 
     const toggleFullscreen = useCallback(() => {
@@ -99,6 +108,33 @@ export default function GameToolbar({ helpHref, definition }) {
     const openFairness = () => { setFairOpen(true); setPopoverOpen(false) }
     const openHotkeys = () => { setHotkeyOpen(true); setPopoverOpen(false) }
     const openOdds = () => { setOddsOpen(true); setPopoverOpen(false); recordLearningEvent('odds') }
+
+    // Changing onClose restarts the native dialog effect, which would put an
+    // already-open drawer above Help when opening Help rerenders the toolbar.
+    const closeFairness = useCallback(() => setFairOpen(false), [])
+    const closeOdds = useCallback(() => setOddsOpen(false), [])
+
+    // Below 768px the game aside stacks *under* the playfield, so `HistoryDrawer`
+    // sits at the bottom of a long scroller and is easy to never find. This jumps
+    // the user to it. It is a discoverability affordance only — it moves the
+    // existing scroll container, renders nothing, and changes no game state.
+
+    const jumpToHistory = () => {
+        const aside = document.querySelector('.gs-aside')
+        const panel = aside?.querySelector('.hd-panel')
+        if (!aside || !panel) return
+        // The <details> is collapsed by default; open it so the destination is
+        // actually useful once the user arrives.
+        if ('open' in panel) panel.open = true
+        const summary = panel.querySelector('summary')
+        const reduceMotionNow = typeof window !== 'undefined'
+            && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        aside.scrollIntoView({ behavior: reduceMotionNow ? 'auto' : 'smooth', block: 'start' })
+        // Move focus with the viewport, otherwise a keyboard user is left on a
+        // toolbar button near the top and Tab continues from there instead of
+        // entering the history they just revealed.
+        summary?.focus?.()
+    }
 
     const popover = popoverOpen && pos.ready && createPortal(
         <div
@@ -173,12 +209,21 @@ export default function GameToolbar({ helpHref, definition }) {
                     >
                         <Wrench size={14} />
                     </button>
+                    <button
+                        className="gt-btn gt-btn-history"
+                        aria-label="Jump to game history"
+                        title="Jump to game history"
+                        data-gt-history
+                        onClick={jumpToHistory}
+                    >
+                        <History size={14} />
+                    </button>
                 </div>
             </div>
             {popover}
-            <FairnessDrawer open={fairOpen} onClose={() => setFairOpen(false)} />
+            <FairnessDrawer open={fairOpen} onClose={closeFairness} openerRef={triggerRef} />
             <HotkeyHelp controlledOpen={hotkeyOpen} onOpenChange={setHotkeyOpen} />
-            <OddsPopup open={oddsOpen} onClose={() => setOddsOpen(false)} definition={definition} />
+            <OddsPopup open={oddsOpen} onClose={closeOdds} definition={definition} odds={odds} betAmount={betAmount} balance={balance} openerRef={triggerRef} />
         </>
     )
 }

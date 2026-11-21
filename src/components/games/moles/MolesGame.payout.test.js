@@ -64,7 +64,7 @@ describe('moles is pinned to the component', () => {
 
     it('routes its timers through the cancellable scheduler', () => {
         expect(source).toContain("import { useCancellableTimeouts } from '../../../utils/scheduling'")
-        expect(source).toContain('const { schedule } = useCancellableTimeouts()')
+        expect(source).toMatch(/const \{ schedule[^}]*\} = useCancellableTimeouts\(\)/)
     })
 })
 

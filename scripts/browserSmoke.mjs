@@ -607,8 +607,8 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
       return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
     });
   };
-  const clickTarget = selector => {
-    const el = findTarget(selector);
+  const clickTarget = (selector, target = null) => {
+    const el = target || findTarget(selector);
     if (!el) return { clicked: false, missing: true, selector };
      // A real user scrolls to a control before tapping it. On short landscape
      // viewports the target is often rendered correctly but below the fold, which
@@ -640,7 +640,7 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
     const click = clickTarget('[data-slot-mobile-dock] [data-slot-action="spin"]');
     if (!click.clicked) return fail('slot spin target was not clickable', click);
     await sleep(700);
-    const cells = document.querySelectorAll('.slot-reel-grid .slot-cell, .slot-reel-grid .slot-symbol-card').length;
+    const cells = document.querySelectorAll('[data-slot-cell-index], .slot-reel-grid .slot-cell, .slot-reel-grid .slot-symbol-card').length;
     const active = Boolean(document.querySelector('.slot-stage-v2[data-slot-spinning="true"], .slot-stage-v2.spinning, .slot-mobile-spin:disabled, .slot-result-banner'));
     return cells > 0 && active ? ok('slot spin entered active state', { cells }) : fail('slot spin did not mutate visible state', { cells, active });
   }
@@ -701,15 +701,67 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
   }
 
   if (route === '/baccarat') {
-    const chip = clickTarget('.bac-bet-cell.banker, .bac-bet-cell.player');
-    if (!chip.clicked) return fail('baccarat bet cell was not clickable', chip);
+    const beforeLedger = new Set(JSON.parse(localStorage.getItem('gampo_history') || '[]').map(entry => entry.id));
+    const beforeRounds = new Set(JSON.parse(localStorage.getItem('gampo_history_baccarat') || '[]').map(entry => entry.id));
+    findTarget('.bac-bet-cell.banker')?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
     await sleep(150);
-    const stakeReady = Boolean(document.querySelector('.bac-ticket-chip')) || /banker|player/i.test(document.body.innerText || '');
+    const banker = clickTarget('.bac-bet-cell.banker');
+    if (!banker.clicked) return fail('baccarat banker wager was not clickable', banker);
+    const options = clickTarget('.bp-mobile-settings');
+    if (!options.clicked) return fail('baccarat options were not clickable', options);
+    await sleep(150);
+    const denomination = Array.from(document.querySelectorAll('.bp-bet-btn')).find(el => el.textContent.trim() === '25');
+    if (!denomination) return fail('baccarat 25 GC chip was missing');
+    const chip = clickTarget('.bp-bet-btn', denomination);
+    if (!chip.clicked) return fail('baccarat 25 GC chip was not clickable', chip);
+    clickTarget('.bp-mobile-close');
+    await sleep(150);
+    const tieCell = findTarget('.bac-bet-cell.tie');
+    tieCell?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    await sleep(150);
+    const tie = clickTarget('.bac-bet-cell.tie', tieCell);
+    if (!tie.clicked) return fail('baccarat tie wager was not clickable', tie);
+    clickTarget('.bp-mobile-settings');
+    await sleep(150);
+    const autoTab = Array.from(document.querySelectorAll('.bp-tab')).find(el => el.textContent.trim().toLowerCase() === 'auto');
+    if (!autoTab) return fail('baccarat Auto tab was missing');
+    const auto = clickTarget('.bp-tab', autoTab);
+    if (!auto.clicked) return fail('baccarat Auto tab was not clickable', auto);
+    // React commits the Auto tab after the click handler returns; its input is conditional.
+    let count = null;
+    for (let i = 0; i < 40; i += 1) {
+      await sleep(50);
+      const activeTab = document.querySelector('.bp-tab.active');
+      count = activeTab?.textContent.trim().toLowerCase() === 'auto'
+        ? document.querySelector('input[id$="-auto-count"]')
+        : null;
+      if (count) break;
+    }
+    if (!count) return fail('baccarat Auto count input was missing after Auto tab transition');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(count, '2');
+    count.dispatchEvent(new Event('input', { bubbles: true }));
+    count.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(150);
+    clickTarget('.bp-mobile-close');
+    const quote = () => Number((document.querySelector('.bp-mobile-summary strong')?.textContent || '').replace(/[^0-9.]/g, ''));
+    const initialQuote = quote();
     const deal = clickTarget(primary);
-    if (!deal.clicked) return fail('baccarat deal target was not clickable', deal);
-    await sleep(900);
-    const road = Boolean(document.querySelector('.bac-road-cell.latest, .bac-road-cell'));
-    return stakeReady && road ? ok('baccarat bet/deal updated road') : fail('baccarat did not record visible result', { stakeReady, road });
+    if (!deal.clicked) return fail('baccarat Auto play target was not clickable', deal);
+    const quotes = [];
+    let rounds = [];
+    let debits = [];
+    for (let i = 0; i < 80; i += 1) {
+      await sleep(100);
+      const currentQuote = quote();
+      if (quotes.at(-1) !== currentQuote) quotes.push(currentQuote);
+      rounds = JSON.parse(localStorage.getItem('gampo_history_baccarat') || '[]').filter(entry => !beforeRounds.has(entry.id)).reverse();
+      debits = JSON.parse(localStorage.getItem('gampo_history') || '[]').filter(entry => !beforeLedger.has(entry.id) && entry.type === 'bet' && entry.label === 'Baccarat').reverse();
+      if (rounds.length >= 2 && !/stop/i.test(document.querySelector('.bp-mobile-play')?.textContent || '')) break;
+    }
+    const details = { initialQuote, quotes, debits: debits.map(entry => -entry.amount), stakes: rounds.map(entry => entry.betAmount), finalQuote: quote() };
+    const matched = initialQuote === 30 && details.debits.length === 2 && details.debits[0] === 30 && details.debits[1] === 5
+      && details.stakes.length === 2 && details.stakes[0] === 30 && details.stakes[1] === 5 && details.finalQuote === 5;
+    return matched ? ok('baccarat real Auto rounds charged quoted 30 then 5 GC', details) : fail('baccarat Auto charges differed from live ticket quote', details);
   }
 
   if (route === '/blackjack') {
@@ -780,7 +832,21 @@ async function runMobileInteraction(client, sessionId, route, viewport) {
     return active ? ok('crash entered round state') : fail('crash did not enter round state');
   }
 
-  if (['/sicbo', '/roulette', '/dice', '/limbo', '/plinko', '/mines', '/dino'].includes(route)) {
+  if (route === '/sicbo' || route === '/roulette') {
+    // An empty table ticket correctly disables play; place a native wager first.
+    const wagerSelector = route === '/sicbo' ? '.sb-cell' : '.rou-cell.zero';
+    findTarget(wagerSelector)?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+    await sleep(150);
+    const wager = clickTarget(wagerSelector);
+    if (!wager.clicked) return fail('table wager target was not clickable', wager);
+    await sleep(150);
+    const click = clickTarget(primary);
+    if (!click.clicked) return fail('funded table ticket did not enable play', click);
+    await sleep(500);
+    return ok('table ticket accepted wager and play pointer hits', { wager, play: click });
+  }
+
+  if (['/dice', '/limbo', '/plinko', '/mines', '/dino'].includes(route)) {
     const click = clickTarget(primary);
     if (!click.clicked) return fail('primary target was not clickable', click);
     await sleep(500);

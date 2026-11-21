@@ -4,6 +4,7 @@ import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useGameBgm } from '../../../audio/useBgm'
 import { formatCredits } from '../../../utils/simulationMath'
+import { claimEscape } from '../../../utils/escapeClaims'
 import { applyAction, createInitialState, dealNext, legalActions, startHand } from '../../../poker/engine/Game'
 import { icmEquity } from '../../../poker/icm'
 import HeuristicBot from '../../../poker/bots/HeuristicBot'
@@ -179,6 +180,19 @@ export default function PokerGame() {
     const [bubbles, setBubbles] = useState({})
     const [confirmCashout, setConfirmCashout] = useState(false)
     const [pendingExit, setPendingExit] = useState(null)
+    // While the exit guard is up it owns Escape. It must CONSUME the key, not
+    // merely claim it: a claim with no handler blocks the drawer and leaves the
+    // user with a key that does nothing. Escape dismisses the guard exactly like
+    // its "Stay seated" control, which is the safe default — an accidental
+    // Escape must never abandon table chips.
+    useEffect(() => {
+        if (!pendingExit) return undefined
+        return claimEscape(() => {
+            setPendingExit(null)
+            return true
+        })
+    }, [pendingExit])
+
     const [rotationLog, setRotationLog] = useState([])
     const [rebuyPrompt, setRebuyPrompt] = useState(false)
     const [chipMotions, setChipMotions] = useState([])
@@ -729,7 +743,7 @@ export default function PokerGame() {
             <div className="poker-page" data-ux-surface="shell">
             <div className="poker-titlebar" data-ux-surface="shell">
                 <Link to="/" className="poker-back" onClick={leaveToHub}>‹ Hub</Link>
-                <h1>Live Poker (No-Limit Hold'em, 6-max)</h1>
+                <h1>Practice Poker (No-Limit Hold'em, 6-max)</h1>
                 <div className="poker-balance"><span>Balance</span><strong>{formatCredits(balance)}</strong></div>
             </div>
 
@@ -910,7 +924,7 @@ export default function PokerGame() {
 
                     <div className="poker-layout" ref={tableRef}>
                         <div className="poker-table" data-ux-surface="stage">
-                            <div className="pk-table-status" aria-label="Live poker table status">
+                            <div className="pk-table-status" aria-label="Simulated poker table status">
                                 <div>
                                     <span>Street</span>
                                     <strong>{prettyStreet(state.street)}</strong>

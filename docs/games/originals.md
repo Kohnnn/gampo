@@ -2,6 +2,14 @@
 
 GamPo originals are arcade-style simulators with transparent math. Every game shows its expected value via the shared `EducationPanel`. RTPs noted below are targets, not guarantees; observed values drift in small samples.
 
+Dice, Limbo, Plinko, Wheel, and Rock Paper Scissors use a viewport-bounded primary stage with space reserved for fixed controls and navigation. Supporting results, simulated-player feeds, and education remain secondary rather than expanding that stage.
+
+## Cases
+
+- Cases loads its playable roster on each visit. A failed HTTP, JSON or unusable-roster response shows “Cases are unavailable. Try again.” with a keyboard-accessible Retry control; retry stays on the current page and announces loading.
+- Open, Auto and long-press arming remain unavailable until both the roster and existing stage preparation are ready. Loading and retry do not change practice credits, history, drops, Pokedex or Cases statistics.
+- A successful retry retains a valid requested case selection. Inventory/Pokedex still loads the separate collection only when that view is opened; retry does not preload it. Bounded local production replay passed both sizes, including visible Retry, pending-disabled status, unchanged credits/history and return of keyboard focus to Open. The selected reliability report owns exact receipts/limits; this is not a hosted-release claim.
+
 ## Crash
 
 - Multiplier curve climbs from 1.00x with a hidden bust point.
@@ -10,31 +18,35 @@ GamPo originals are arcade-style simulators with transparent math. Every game sh
 
 ## Plinko
 
-- Matter.js physics with configurable rows (8 to 16) and risk preset (Low, Medium, High).
+- A deterministic canvas engine renders configurable rows (8 to 16) and risk presets (Low, Medium, High).
 - Payout buckets are symmetric; tail buckets carry rare large multipliers.
-- Strategy lesson: more rows centralize the distribution; risk preset shifts payout shape, not RTP, which stays at 99%.
+- Expected value uses the complete weighted payout distribution and the selected ball's charged cost. Rounded buckets can differ slightly from the nominal 99% RTP.
 
 ## Mines
 
 - Configurable mines count on a 5x5 grid.
 - Each safe pick increases payout by `(remaining_safe_total) / (remaining_safe - 1)` proportionally; cashout settles current multiplier.
 - Strategy lesson: cumulative survival probability falls fast with more picks.
+- After bust, cashout, or the last safe pick, there is no next-pick quote.
 
 ## Dino Run
 
-- Phaser-based runner adapted into a wagering surface.
-- Each obstacle pass uses a difficulty-derived survival probability.
-- Strategy lesson: long survival streaks compound risk faster than intuition suggests.
+- A canvas runner presents difficulty-derived survival decisions.
+- Education quotes the actual next jump's probability and gross return for the selected or active round stake, compared with cashout when available.
+- Settled rounds do not retain an actionable next-jump quote.
 
 ## Dice
 
 - `dicePayout(winChance, rtp)` returns `rtp / winChance`.
 - Strategy lesson: lowering win chance raises payout linearly but EV stays at `-houseEdge * stake` per spin.
+- The final numerical roll is displayed before result history, toast, and sound publication. Navigation preserves a pending settlement without replaying its visual effects.
 
 ## Limbo
 
 - Pick a target multiplier `m`; simulate a multiplier with hit probability `rtp / m`.
 - Strategy lesson: target compresses the entire risk choice into one slider.
+- Only the decorative ring rotates; the primary result stays upright.
+- Target, hit chance, gauge, and the full result ring come before recent results, simulated bets, and education. The ring scales to the available primary-stage height.
 
 ## Keno
 
@@ -48,8 +60,8 @@ GamPo originals are arcade-style simulators with transparent math. Every game sh
 
 ## Tower
 
-- 8-row tower with `safeChance = 0.7` and `growth = 1.28x` per safe step.
-- Strategy lesson: each safe step compounds risk; cashing out is the EV decision.
+- An 8-row tower with difficulty-specific survival probabilities and RTP-locked growth.
+- Education compares the next climb's conditional return with the current cashout, using the actual round stake.
 
 ## Chicken Cross
 
@@ -69,11 +81,12 @@ GamPo originals are arcade-style simulators with transparent math. Every game sh
 
 - 50/50 outcome at 1.96x payout.
 - Strategy lesson: even fair-feeling 50/50 games lose value once edge is added.
+- The settled coin face remains bound to the recorded heads/tails outcome.
 
 ## Rock Paper Scissors
 
-- 1/3 win, 1/3 push, 1/3 loss; payout 2.91x.
-- Strategy lesson: pushes feel close but EV is fixed.
+- 1/3 win, 1/3 push, 1/3 loss. The base win payout is 1.91×; applied Fun Mode changes the effective payout.
+- A push returns the stake and reports a gross 1.00× in the result and history.
 
 ## Guess Number
 
@@ -84,3 +97,9 @@ GamPo originals are arcade-style simulators with transparent math. Every game sh
 
 - Pick 5 of 36; payout table awards rare full matches.
 - Strategy lesson: jackpot games concentrate value into rare outcomes; near-misses feel meaningful but pay 0.
+
+## Diamonds and Tome of Life
+
+- Diamonds' visible paytable derives from the same payout map, scale, and applied Fun setting as settlement.
+- Tome starts at zero. Sun adds 0.60× and Moon adds 0.93×; Star doubles only the next page's contribution and does not stack.
+- Tome's settled result is the credited gross return divided by the stake, including 0.00× busts and sub-stake cashouts. It remains visible after the round resets.

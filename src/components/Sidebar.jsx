@@ -1,10 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Pin, PinOff } from 'lucide-react'
 import { useSidebarPins } from '../hooks/useSidebarPins'
 import { sidebarPaths } from '../data/sidebarIcons'
 import { slotPath } from '../data/slotRoutes'
 import { sportsbookPathForView } from '../sportsbook/sportsbookRoutes'
+import { dispatchEscape } from '../utils/escapeClaims'
 
 // ---- Casino sidebar data (unchanged from prior waves) ----
 const navSections = [
@@ -14,7 +15,7 @@ const navSections = [
             { icon: 'home', label: 'Lobby', path: '/' },
             { icon: 'originals', label: 'Originals', path: '/originals' },
             { icon: 'slotsLobby', label: 'Slots Lobby', path: '/slots-lobby' },
-            { icon: 'live', label: 'Live Studio', path: '/live' },
+            { icon: 'live', label: 'Studio Simulations', path: '/live' },
             { icon: 'sports', label: 'Sportsbook', path: '/sportsbook' },
         ],
     },
@@ -22,17 +23,17 @@ const navSections = [
         title: 'Rewards',
         items: [
             { icon: 'gift', label: 'Promotions', path: '/promotions' },
-            { icon: 'mission', label: 'Challenges', path: '/missions' },
+            { icon: 'mission', label: 'Missions', path: '/missions' },
             { icon: 'vip', label: 'VIP Club', path: '/vip' },
-            { icon: 'academy', label: 'Rakeback', path: '/learn' },
-            { icon: 'barChart', label: 'Challenges', path: '/sandbox' },
+            { icon: 'academy', label: 'Probability Lab', path: '/learn' },
+            { icon: 'barChart', label: 'Strategy Sandbox', path: '/sandbox' },
             { icon: 'pnl', label: 'Stats', path: '/insights' },
         ],
     },
     {
         title: 'Profile',
         items: [
-            { icon: 'verify', label: 'Provably Fair', path: '/verify' },
+            { icon: 'verify', label: 'Local Result Log', path: '/verify' },
             { icon: 'race', label: 'Race', path: '/race' },
             { icon: 'activity', label: 'Activity', path: '/activity' },
             { icon: 'progress', label: 'Settings', path: '/settings' },
@@ -58,7 +59,7 @@ const sidebarActions = [
 // ---- Sportsbook sidebar data (Wave 22) ----
 const sportsViews = [
     { id: 'home', icon: 'sports', label: 'Sportsbook Home', view: 'home' },
-    { id: 'live', icon: 'radio', label: 'Live Events', view: 'live' },
+    { id: 'live', icon: 'radio', label: 'In-Play', view: 'live' },
     { id: 'starting', icon: 'clock', label: 'Starting Soon', view: 'starting' },
     { id: 'all', icon: 'grid', label: 'All Events', view: 'all' },
     { id: 'my-bets', icon: 'list', label: 'My Bets', view: 'my-bets' },
@@ -89,7 +90,7 @@ const sportsEsports = [
 
 // ---- Casino games (unchanged) ----
 const gameItems = [
-    { group: 'Featured', icon: 'poker', label: 'Live Poker', path: '/poker' },
+    { group: 'Featured', icon: 'poker', label: 'Practice Poker', path: '/poker' },
     { group: 'Featured', icon: 'crash', label: 'Crash', path: '/crash' },
     { group: 'Featured', icon: 'plinko', label: 'Plinko', path: '/plinko' },
     { group: 'Featured', icon: 'mines', label: 'Mines', path: '/mines' },
@@ -243,6 +244,7 @@ function GameRow({ item, isPinned, onPinToggle }) {
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPinToggle(item.path) }}
                 title={isPinned ? 'Unpin from sidebar' : 'Pin to sidebar'}
                 aria-label={isPinned ? `Unpin ${item.label}` : `Pin ${item.label}`}
+                aria-pressed={isPinned}
             >
                 {isPinned ? <PinOff size={12} /> : <Pin size={12} />}
             </button>
@@ -290,9 +292,9 @@ function CasinoSidebar({ search, setSearch }) {
             ))}
 
             <div className="sidebar-rakeback-widget">
-                <span>Rakeback</span>
-                <strong>10%</strong>
-                <small>Weekly — updates every Monday</small>
+                <span>Practice Mode</span>
+                <strong>GC</strong>
+                <small>Local fake credits — no real money, no cash-out</small>
             </div>
 
             <div className="nav-section compact">
@@ -444,11 +446,126 @@ function Sidebar({ isOpen, toggleSidebar }) {
     const [gameSearch, setGameSearch] = useState('')
     const location = useLocation()
     const isSportsRoute = location.pathname.startsWith('/sportsbook') || location.pathname.startsWith('/sports')
+    const sidebarRef = useRef(null)
+    const mobileDrawerOpen = useRef(false)
+    // Why the drawer last closed. Focus is restored ONLY after a dismissal the
+    // user actually performed (Escape, backdrop tap). This is recorded rather
+    // than inferred from DOM state: rounds 2-4 each defeated an inference — a
+    // closed-but-mounted BetPanel dialog, an open shortcuts overlay with no
+    // `aria-modal`, and a returning player whose drawer is auto-closed on route
+    // entry. No selector arrangement separates those from a real dismissal,
+    // because the difference is intent, not markup. The closer states it here.
+    const closedByUser = useRef(false)
+
+    // Below 769px the drawer behaves as an overlay, so it owes the same keyboard
+    // contract as a dialog: Escape dismisses it, focus moves into it on open, and
+    // focus returns to the trigger on close. Above that width the sidebar is
+    // ordinary page furniture and none of this should apply.
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined
+        const isMobile = () => window.matchMedia('(max-width: 768px)').matches
+
+        if (isOpen && isMobile()) {
+            mobileDrawerOpen.current = true
+            const first = sidebarRef.current?.querySelector('a, button')
+            first?.focus?.()
+        } else if (!isOpen) {
+            // The drawer is closed. Consume any intent recorded while it was
+            // closing, whether or not this component tracked it as an open
+            // mobile drawer: on a desktop→phone resize the sidebar can be
+            // closed from its own toggle without `mobileDrawerOpen` ever having
+            // been set, which would otherwise leave the flag pending and fire
+            // on a later, unrelated automatic close.
+            const restoreFocus = mobileDrawerOpen.current && closedByUser.current
+            mobileDrawerOpen.current = false
+            closedByUser.current = false
+            // Restore focus only after a dismissal the user performed. A
+            // programmatic close (route entry, first-visit auto-close) leaves
+            // focus alone: the page is about to be used, so stealing focus to
+            // the menu button both strands a keyboard user mid-page and yanks
+            // focus out of any overlay that is opening at the same time.
+            if (restoreFocus) {
+                document.querySelector('.header-menu-btn')?.focus?.()
+            }
+        }
+
+        const onKeyDown = (event) => {
+            if (event.key !== 'Escape') return
+            // Respect an Escape another layer already handled. The welcome
+            // modal binds in the capture phase and the native <dialog> overlays
+            // (fairness, odds) own the key in the top layer; both call
+            // `preventDefault()`, and neither registers a handler here.
+            if (event.defaultPrevented) return
+            // Route Escape to a registered overlay FIRST, on every viewport and
+            // whether or not the drawer is open. Registered overlays no longer
+            // keep their own listeners, so gating this behind the drawer's
+            // mobile/open/focus checks left Escape doing nothing for them: the
+            // shortcuts panel could not be closed on desktop, and a focused
+            // BetPanel sheet could not be closed with the drawer shut.
+            //
+            // Ownership is declared, not inferred. Three inference attempts
+            // failed: matching mounted nodes broke on a closed-but-portaled
+            // BetPanel, matching class names missed the slots bet sheet, and
+            // comparing z-index or paint order is invalid because a computed
+            // z-index inside a stacking context says nothing about real
+            // stacking (slots' sheet computes 1500 inside a z-index:1
+            // ancestor, so it paints *below* the drawer).
+            if (dispatchEscape(event)) {
+                event.preventDefault()
+                return
+            }
+            // No overlay took it. Only now does the drawer's own Escape contract
+            // apply, and only in the states it governs: below 769px the drawer
+            // is an off-canvas overlay, so Escape dismisses it, and only when
+            // focus is actually inside it.
+            if (!isMobile()) return
+            if (!isOpen) return
+            const active = document.activeElement
+            if (!sidebarRef.current?.contains(active)) return
+            event.preventDefault()
+            closedByUser.current = true
+            toggleSidebar()
+        }
+        document.addEventListener('keydown', onKeyDown)
+        return () => document.removeEventListener('keydown', onKeyDown)
+    }, [isOpen, toggleSidebar])
+
+    // A dismissal the user performed. Records intent before closing so the
+    // effect above knows to restore focus to the menu button.
+    const dismissDrawer = () => {
+        closedByUser.current = true
+        toggleSidebar()
+    }
+
 
     return (
-        <aside className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''} ${isSportsRoute ? 'app-sidebar-sports' : 'app-sidebar-casino'}`} data-ux-surface="shell">
+        <>
+            {/* Below 769px the sidebar is an off-canvas drawer, so a tap outside
+                it must close it. This MUST stay a sibling of <aside>, not a child:
+                the drawer is a transformed element with its own z-index, so a
+                child backdrop is trapped in that stacking context and paint over
+                the drawer's own links instead of sitting behind it. */}
+            {isOpen && (
+                <button
+                    type="button"
+                    className="sidebar-backdrop"
+                    aria-label="Close navigation"
+                    onClick={dismissDrawer}
+                    tabIndex={-1}
+                />
+            )}
+            <aside
+                className={`app-sidebar ${!isOpen ? 'app-sidebar-hidden' : ''} ${isSportsRoute ? 'app-sidebar-sports' : 'app-sidebar-casino'}`}
+                data-ux-surface="shell"
+                id="app-sidebar"
+                ref={sidebarRef}
+            >
             <div className="sidebar-header">
-                <button className="icon-btn sidebar-toggle" onClick={toggleSidebar} aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
+                {/* The in-drawer toggle is an ordinary user dismissal, so it
+                    must record intent like Escape and the backdrop — otherwise
+                    closing the drawer from its own button drops focus to the
+                    body while other dismissal paths restore it. */}
+                <button className="icon-btn sidebar-toggle" onClick={dismissDrawer} aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'} title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2z"></path></svg>
                 </button>
                 <div className="sidebar-switcher">
@@ -466,7 +583,8 @@ function Sidebar({ isOpen, toggleSidebar }) {
                     ? <SportsbookSidebar />
                     : <CasinoSidebar search={gameSearch} setSearch={setGameSearch} />}
             </nav>
-        </aside>
+            </aside>
+        </>
     )
 }
 

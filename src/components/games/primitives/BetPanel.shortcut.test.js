@@ -1,0 +1,65 @@
+// QA028 (#30): the shared bet-panel shortcut must never start or change a paid
+// action from a key the player did not deliberately press at the page. The guard
+// was previously inline in the effect; it is extracted so each refusal can be
+// pinned without mounting a DOM (the suite runs under `environment: 'node'`).
+import { describe, expect, it } from 'vitest'
+import { shouldHandleShortcut } from './BetPanel'
+
+const key = (overrides = {}) => ({ key: ' ', target: { tagName: 'DIV' }, ...overrides })
+const target = (tagName, { parentElement, role, isContentEditable } = {}) => ({
+    tagName, parentElement, isContentEditable, getAttribute: name => name === 'role' ? role : null,
+})
+
+describe('BetPanel shortcut guard', () => {
+    it('accepts a plain, unheld Space on the page body', () => {
+        expect(shouldHandleShortcut(key())).toBe(true)
+    })
+
+    it('accepts Shift with + on a focusable playfield', () => {
+        const playfield = { ...target('DIV', { role: 'region' }), tabIndex: 0 }
+        expect(shouldHandleShortcut(key({ key: '+', shiftKey: true, target: playfield }))).toBe(true)
+    })
+
+    it('defers to a handler that already prevented the keystroke', () => {
+        expect(shouldHandleShortcut(key({ defaultPrevented: true }))).toBe(false)
+    })
+
+    it('rejects keyboard auto-repeat so a held key cannot fire a second paid round', () => {
+        expect(shouldHandleShortcut(key({ repeat: true }))).toBe(false)
+    })
+
+    it('rejects shortcuts carrying a modifier', () => {
+        for (const modifier of ['ctrlKey', 'metaKey', 'altKey']) {
+            expect(shouldHandleShortcut(key({ [modifier]: true }))).toBe(false)
+        }
+    })
+
+    it('rejects a keystroke owned by a focused interactive control', () => {
+        for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A']) {
+            expect(shouldHandleShortcut(key({ target: { tagName } }))).toBe(false)
+        }
+        expect(shouldHandleShortcut(key({ target: { tagName: 'DIV', isContentEditable: true } }))).toBe(false)
+    })
+
+    it.each([
+        ['button ancestor', target('path', { parentElement: target('svg', { parentElement: target('BUTTON') }) })],
+        ['summary ancestor', target('SPAN', { parentElement: target('SUMMARY') })],
+        ['ARIA button', target('DIV', { role: 'button' })],
+        ['ARIA switch ancestor', target('SPAN', { parentElement: target('DIV', { role: 'switch' }) })],
+        ['ARIA textbox ancestor', target('SPAN', { parentElement: target('DIV', { role: 'textbox' }) })],
+        ['editable ancestor', target('SPAN', { parentElement: target('DIV', { isContentEditable: true }) })],
+    ])('rejects a keystroke owned by %s', (_name, eventTarget) => {
+        expect(shouldHandleShortcut(key({ target: eventTarget }))).toBe(false)
+    })
+
+    it('rejects a keystroke owned by a focused <summary> disclosure', () => {
+        // Space natively opens/closes History (and the paytable/advanced
+        // sections). Without this refusal the same keypress also placed a paid
+        // round underneath the disclosure.
+        expect(shouldHandleShortcut(key({ target: { tagName: 'SUMMARY' } }))).toBe(false)
+    })
+
+    it('rejects a keystroke while a dialog is open', () => {
+        expect(shouldHandleShortcut(key(), { dialogOpen: true })).toBe(false)
+    })
+})

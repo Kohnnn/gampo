@@ -24,9 +24,13 @@ describe('game accessibility contract', () => {
         expect(isEditableHotkeyTarget(target('SPAN', { parentElement: target('DIV', { isContentEditable: true }) }))).toBe(true)
         expect(isEditableHotkeyTarget(target('BUTTON'))).toBe(false)
         expect(hotkeySource).toContain('requestOpen(!isOpen)')
-        expect(hotkeySource).toContain("e.key === '?'")
+        expect(hotkeySource).toContain("if (e.key !== '?') return")
         expect(hotkeySource).toContain('e.repeat || e.ctrlKey || e.metaKey || e.altKey')
-        expect(hotkeySource).toContain("e.key === 'Escape' && isOpen")
+        // Escape is no longer handled by this component's own listener: it
+        // registers a handler with the Escape-claim registry so only the
+        // topmost layer acts per keypress. Assert the contract accordingly.
+        expect(hotkeySource).toContain('claimEscape')
+        expect(hotkeySource).toContain('requestOpen(false)')
         expect(hotkeySource).toContain('<button type="button" className="hotkey-close"')
         expect(hotkeySource.match(/window\.addEventListener\('keydown', onKey\)/g)).toHaveLength(1)
     })

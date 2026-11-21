@@ -8,7 +8,7 @@
 // Distinct from Mines: Mines is sequential reveal with cashout, this
 // is a single-batch reveal where the math is hypergeometric.
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -103,6 +103,8 @@ function placeMoles(count) {
     return out
 }
 
+
+
 export default function MolesGame() {
     useGameBgm('moles', 'idle')
     const definition = findGameDefinition('moles') || { name: 'Moles', category: 'Arcade originals' }
@@ -120,7 +122,10 @@ export default function MolesGame() {
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
     const [toast, setToast] = useState(null)
-    const { schedule } = useCancellableTimeouts()
+    const inFlightRef = useRef(false)
+    const settleTimerRef = useRef(null)
+    const resetTimerRef = useRef(null)
+    const { schedule, cancel } = useCancellableTimeouts()
     const funBoost = funBoostFactor(MOLES_RTP)
     const effectiveRtp = MOLES_RTP * funBoost
 
@@ -132,13 +137,20 @@ export default function MolesGame() {
     }
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (running) { resolve({ profit: 0 }); return }
+        // `running` is React state and flushes late, so it alone cannot stop two
+        // calls in the same tick. The ref decides admission: without it the second
+        // call would charge and then cancel the first round's payment timer.
+        if (inFlightRef.current || running) { resolve({ profit: 0 }); return }
         if (picks.length === 0) { showToast('error', 'No picks', 'Tap holes to pick first'); resolve({ profit: 0 }); return }
         if (!placeBet(betAmount, 'Moles')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`)
             resolve({ profit: 0 })
             return
         }
+        inFlightRef.current = true
+        // Cancel only the pending post-round reset, so the board does not clear
+        // under a reveal that is still settling. Never cancel the settle timer.
+        if (resetTimerRef.current) { cancel(resetTimerRef.current); resetTimerRef.current = null }
         setLastBet(betAmount)
         setToast(null)
         setRevealed(false)
@@ -159,7 +171,7 @@ export default function MolesGame() {
             { index: 2, type: ROUND_EVENTS.BET_ACCEPTED, payload: { betAmount }, at: 0 },
         ], { autoFinish: false })
 
-        schedule(() => {
+        settleTimerRef.current = schedule(() => {
             setMoles(placed)
             setRevealed(true)
             sfx.play('reveal')
@@ -186,9 +198,10 @@ export default function MolesGame() {
                 meta: { hits, picks, moleCount },
             })
             showToast(profit >= 0 ? 'win' : 'loss', `Moles ${hits}/${picks.length}`, `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+            inFlightRef.current = false
             setRunning(false)
             // Next round resets after settling
-            schedule(() => {
+            resetTimerRef.current = schedule(() => {
                 setRevealed(false)
                 setPicks([])
                 setMoles(null)

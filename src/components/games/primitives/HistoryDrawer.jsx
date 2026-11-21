@@ -9,6 +9,11 @@ export function historyRowKey(item = {}, index = 0) {
 export default function HistoryDrawer({ history, onClear }) {
     return (
         <details className="hd-panel">
+            {/* No tabIndex: a native <summary> is already in the tab order and
+                is the only interactive control on desktop, where the mobile
+                jump button is hidden. Forcing tabIndex={-1} removed History
+                from sequential keyboard navigation entirely. The toolbar jump
+                can still focus the summary programmatically without it. */}
             <summary className="hd-header">
                 <span>History</span>
                 <strong>{history.length}</strong>

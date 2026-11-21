@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>D-1 cross-document probe</title></head>
+<body>
+<div id="root"></div>
+<script type="module">
+    // Temporary probe scaffold. Two real browser documents mount the real
+    // CreditProvider against the same origin so a stake in each exercises the
+    // actual cross-document localStorage behaviour, which a single-heap unit
+    // test cannot reach. Deleted after the run.
+    import { createElement } from 'react'
+    import { createRoot } from 'react-dom/client'
+    import { CreditProvider, useCredits } from '/src/context/CreditContext.jsx'
+
+    let credits
+    function Capture() {
+        credits = useCredits()
+        return null
+    }
+    createRoot(document.getElementById('root')).render(
+        createElement(CreditProvider, null, createElement(Capture)),
+    )
+
+    window.__probe = {
+        ready: () => typeof credits === 'object' && credits !== null,
+        placeBet: (amount, label) => credits.placeBet(amount, label),
+        addWinnings: (amount, label) => credits.addWinnings(amount, label),
+        stored: () => localStorage.getItem('gampo_credits'),
+        history: () => localStorage.getItem('gampo_history'),
+        // Fire at an absolute wall-clock instant so two documents really do
+        // overlap their read-modify-write, rather than running one after the
+        // other as separate awaited CDP calls.
+        betAt: (at, amount, label) => new Promise(resolve => {
+            const wait = Math.max(0, at - Date.now())
+            setTimeout(() => resolve(credits.placeBet(amount, label)), wait)
+        }),
+        seed: (value) => {
+            localStorage.setItem('gampo_credits', String(value))
+            localStorage.setItem('gampo_history', '[]')
+        },
+    }
+</script>
+</body>
+</html>

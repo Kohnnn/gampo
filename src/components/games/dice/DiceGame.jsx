@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCredits } from '../../../context/CreditContext'
 import { useAudio } from '../../../audio/AudioProvider'
 import { useSfx } from '../../../audio/useSfx'
@@ -27,6 +27,7 @@ import { getBigWinThreshold,
     buildEvents,
     useRoundMachine,
 } from '../primitives'
+import { acceptedResult, rejectedResult } from '../primitives/autoAccounting'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { createRoundRng } from '../../../utils/roundRng'
 import { NumberRoll, Particles } from '../../fx'
@@ -59,14 +60,24 @@ export default function DiceGame() {
     const [burstKey, setBurstKey] = useState(0)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    // Live stake owned by BetPanel; mirrored here only so the odds popup can
+    // explain the bet the player is currently editing.
+    const [stake, setStake] = useState(null)
     const [toast, setToast] = useState(null)
     const [simFeed, setSimFeed] = useState(() => makeInitialSimBetRows('dice', { count: 9, cap: 10 }))
     const { schedule } = useCancellableTimeouts()
     const simSeqRef = useRef(0)
+    const pendingRoundsRef = useRef(new Map())
+    const currentRoundIdRef = useRef(null)
+
+    useEffect(() => () => {
+        currentRoundIdRef.current = null
+        for (const pending of pendingRoundsRef.current.values()) pending.finish()
+    }, [])
     const payout = dicePayout(winChance / 100)
 
     const handleEvent = useCallback((ev) => {
-        if (!ev) return
+        if (!ev || ev.payload?.roundId !== currentRoundIdRef.current) return
         switch (ev.type) {
             case ROUND_EVENTS.INPUT_LOCK:
                 setRunning(true)
@@ -84,6 +95,7 @@ export default function DiceGame() {
                 const { roll, won, profit, multiplier } = ev.payload || {}
                 if (Number.isFinite(roll)) setLastRoll(roll)
                 setLastWon(!!won)
+                pendingRoundsRef.current.get(ev.payload.roundId)?.record()
                 setBurstKey(k => k + 1)
                 setToast({
                     kind: won ? (multiplier >= 5 ? 'win' : 'win') : 'lose',
@@ -92,6 +104,17 @@ export default function DiceGame() {
                     message: won ? 'Dice hit' : 'Dice miss',
                 })
                 if (won) sfx.play('win'); else sfx.play('lose')
+                if (won) {
+                    if (multiplier >= 5) {
+                        playSound('bigwin')
+                        setBigWin({ trigger: Date.now(), profit, multiplier })
+                    } else playSound('win')
+                } else playSound('loss')
+                showToast(won ? 'win' : 'loss', won ? 'Dice hit' : 'Dice miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
+                simSeqRef.current += 1
+                setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('dice', {
+                    seed: `dice:${simSeqRef.current}:${roll.toFixed(2)}:${ev.payload.winChance}:${ev.payload.rollMode}`,
+                }), 10))
                 break
             }
             case ROUND_EVENTS.INPUT_UNLOCK:
@@ -100,17 +123,23 @@ export default function DiceGame() {
             default:
                 break
         }
-    }, [sfx])
+    }, [sfx, playSound, showToast])
 
     const machine = useRoundMachine({ onEvent: handleEvent })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
+        if (currentRoundIdRef.current !== null) {
+            resolve(rejectedResult('active-obligation'))
+            return
+        }
         if (!placeBet(betAmount, 'Dice')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`)
-            resolve({ profit: 0 })
+            resolve(rejectedResult('insufficient-funds', { betAmount }))
             return
         }
         setLastBet(betAmount)
+        setRunning(true)
+        setToast(null)
         setLastWon(null)
         sfx.play('roll')
         playSound('tick')
@@ -121,20 +150,38 @@ export default function DiceGame() {
         const won = rollMode === 'under' ? roll < winChance : roll > (100 - winChance)
         const returnAmount = won ? round2(betAmount * payout) : 0
         const profit = round2(returnAmount - betAmount)
-        if (won) addWinnings(returnAmount, 'Dice return')
+        const entry = { id: crypto.randomUUID(), label: roll.toFixed(2), profit, betAmount, multiplier: won ? payout : 0, meta: { winChance, rollMode } }
+        let recorded = false
+        const pending = {
+            record: () => {
+                if (recorded) return
+                recorded = true
+                if (returnAmount > 0) addWinnings(returnAmount, 'Dice return')
+                session.record(entry)
+            },
+            finish: () => {
+                if (!pendingRoundsRef.current.delete(entry.id)) return
+                if (currentRoundIdRef.current === entry.id) currentRoundIdRef.current = null
+                pending.record()
+                resolve(acceptedResult(profit, { id: entry.id, betAmount }))
+            },
+        }
+        pendingRoundsRef.current.set(entry.id, pending)
+        currentRoundIdRef.current = entry.id
 
         // Pre-roll ticks -> reveal -> result. Drives both visuals and SFX
         // from a single deterministic event list.
         const events = buildEvents(api => {
             api.push(ROUND_EVENTS.ROUND_START, { seed: rng.seed }, 0)
-            api.push(ROUND_EVENTS.INPUT_LOCK, {}, 0)
+            api.push(ROUND_EVENTS.INPUT_LOCK, { roundId: entry.id }, 0)
             api.push(ROUND_EVENTS.BET_ACCEPTED, { betAmount, mode: rollMode, target: winChance }, 16)
             const ticks = 6
             for (let i = 1; i <= ticks; i += 1) {
-                api.push(ROUND_EVENTS.ANIMATION_CHECKPOINT, { tick: i }, Math.round(DICE_ROLL_DURATION_MS * (i / (ticks + 1))))
+                api.push(ROUND_EVENTS.ANIMATION_CHECKPOINT, { roundId: entry.id, tick: i }, Math.round(DICE_ROLL_DURATION_MS * (i / (ticks + 1))))
             }
-            api.push(ROUND_EVENTS.RNG_REVEAL, { roll }, DICE_ROLL_DURATION_MS - 80)
+            api.push(ROUND_EVENTS.RNG_REVEAL, { roundId: entry.id, roll }, DICE_ROLL_DURATION_MS - 80)
             api.push(ROUND_EVENTS.ROUND_RESULT, {
+                roundId: entry.id,
                 roll,
                 won,
                 profit,
@@ -143,34 +190,11 @@ export default function DiceGame() {
                 rollMode,
             }, DICE_ROLL_DURATION_MS)
             api.push(ROUND_EVENTS.PAYOUT_PREVIEW, { amount: returnAmount }, DICE_ROLL_DURATION_MS + 16)
-            api.push(ROUND_EVENTS.INPUT_UNLOCK, {}, DICE_ROLL_DURATION_MS + 240)
+            api.push(ROUND_EVENTS.INPUT_UNLOCK, { roundId: entry.id }, DICE_ROLL_DURATION_MS + 240)
         })
         machine.start(events, { autoFinish: false })
 
-        // Big-win overlay still uses the existing flow.
-        if (won) {
-            const tier = payout >= 50 ? 'mega' : payout >= 15 ? 'huge' : payout >= 5 ? 'big' : null
-            if (tier) {
-                playSound('bigwin')
-                setBigWin({ trigger: Date.now(), profit, multiplier: payout })
-            } else {
-                playSound('win')
-            }
-        } else {
-            playSound('loss')
-        }
-
-        // Session record + toast still fire immediately so totals stay accurate
-        // even if the user navigates away during the animation.
-        session.record({ id: crypto.randomUUID(), label: roll.toFixed(2), profit, betAmount, multiplier: won ? payout : 0, meta: { winChance, rollMode } })
-        showToast(won ? 'win' : 'loss', won ? 'Dice hit' : 'Dice miss', `${profit >= 0 ? '+' : ''}${formatCredits(profit)}`)
-        simSeqRef.current += 1
-        setSimFeed(prev => prependSimBetRow(prev, makeSimBetRow('dice', {
-            seed: `dice:${simSeqRef.current}:${roll.toFixed(2)}:${winChance}:${rollMode}`,
-        }), 10))
-
-        // Resolve to the BetPanel autoplay loop after the animation budget.
-        schedule(() => resolve({ profit }), DICE_ROLL_DURATION_MS + 260)
+        schedule(pending.finish, DICE_ROLL_DURATION_MS + 260)
     })
 
     const recentProfit = session.history.slice(0, 12).reduce((sum, item) => sum + (item.profit || 0), 0)
@@ -183,6 +207,37 @@ export default function DiceGame() {
             accent="#00e701"
             backdrop="/assets/games/backdrops/backdrop-felt-navy.png"
             variant="stake"
+            primaryStage
+            secondary={
+                <>
+                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
+                    <div className="dice-pips" aria-label="Last 4 rolls">
+                        {Array.from({ length: 4 }, (_, i) => {
+                            const item = session.history[i]
+                            const empty = !item
+                            const won = !empty && (item.profit || 0) >= 0
+                            const label = empty ? '?' : (item.label || '—')
+                            return (
+                                <div key={i} className={`dice-pip ${empty ? 'empty' : won ? 'won' : 'lost'}`}>
+                                    <span className="dice-pip-label">{label}</span>
+                                    <span className="dice-pip-tag">{empty ? 'roll' : won ? 'win' : 'loss'}</span>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    <SimBetStrip rows={simFeed} title="Sim dice" />
+                    <EducationPanel definition={definition} betAmount={stake} winProbability={winChance / 100} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
+                </>
+            }
+            // Dice owns the authoritative under/over + win chance, so it states
+            // them explicitly. Without this the odds popup would fall back to a
+            // fabricated hit chance instead of the player's actual selection.
+            odds={{
+                winChance: winChance / 100,
+                payoutMultiplier: payout,
+                label: `${rollMode === 'under' ? 'Roll under' : 'Roll over'} ${targetValue}`,
+            }}
+            betAmount={stake}
             panel={
                 <BetPanel
                     balance={balance}
@@ -190,6 +245,7 @@ export default function DiceGame() {
                     runningRound={running}
                     actionLabel="Roll Dice"
                     onPlay={performPlay}
+                    onStakeChange={setStake}
                     lastBet={lastBet}
                 >
                     <div className="bp-section">
@@ -220,27 +276,13 @@ export default function DiceGame() {
                 </>
             }
         >
-            <CoreStageFrame minHeight={460} maxWidth={920} loading={!preloader.ready} className="dice-stage-frame">
+            <CoreStageFrame maxWidth={920} loading={!preloader.ready} className="dice-stage-frame gs-primary-stage">
                 <div className={`dice-stage ${lastWon === true ? 'win-flash' : lastWon === false ? 'loss-flash' : ''}`}>
-                    <RecentResultsStrip results={session.stats.lastResults} mode="multiplier" />
-                    <SimBetStrip rows={simFeed} title="Sim dice" />
-                    <div className="dice-pips" aria-label="Last 4 rolls">
-                        {Array.from({ length: 4 }, (_, i) => {
-                            const item = session.history[i]
-                            const empty = !item
-                            const won = !empty && (item.profit || 0) >= 0
-                            const label = empty ? '?' : (item.label || '—')
-                            return (
-                                <div key={i} className={`dice-pip ${empty ? 'empty' : won ? 'won' : 'lost'}`}>
-                                    <span className="dice-pip-label">{label}</span>
-                                    <span className="dice-pip-tag">{empty ? 'roll' : won ? 'win' : 'loss'}</span>
-                                </div>
-                            )
-                        })}
-                    </div>
                     <div className="dice-outcome-wrap">
                         <div className={`dice-big ${lastWon === true ? 'win' : lastWon === false ? 'loss' : ''}`}>
-                            <NumberRoll value={lastRoll === null ? 0 : Number(lastRoll.toFixed(2))} format={v => lastRoll === null ? '--.--' : v.toFixed(2)} />
+                            {lastWon === null
+                                ? <NumberRoll value={lastRoll === null ? 0 : Number(lastRoll.toFixed(2))} format={v => lastRoll === null ? '--.--' : v.toFixed(2)} />
+                                : lastRoll.toFixed(2)}
                         </div>
                         {lastWon && burstKey > 0 && <Particles key={burstKey} count={20} color="#00e701" />}
                     </div>
@@ -262,12 +304,11 @@ export default function DiceGame() {
                         </div>
                         <MultiplierBadge label="Multiplier" value={payout} state={running ? 'active' : (lastWon === true ? 'win' : lastWon === false ? 'bust' : 'idle')} size="md" />
                     </div>
-                    <ActionLockOverlay active={running} label="Rolling..." />
+                    <ActionLockOverlay active={running && lastWon === null} label="Rolling..." />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('dice')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={winChance / 100} payoutMultiplier={payout} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

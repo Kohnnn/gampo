@@ -12,7 +12,6 @@ import {
     fullGameCatalog,
     liveStudioTables,
     lobbyStats,
-    missions,
 } from '../data/casinoCatalog'
 import { formatCredits, rolloverProgress } from '../utils/simulationMath'
 import { deriveSessionRecap } from '../utils/sessionRecap'
@@ -40,6 +39,27 @@ const VOLATILITY_ABBR = {
 function abbreviateVolatility(volatility) {
     if (!volatility) return 'Variable'
     return VOLATILITY_ABBR[volatility] || volatility
+}
+
+// Catalogue cover art. `alt` is empty on purpose: the game name is rendered as
+// a heading beside the art, so the image is decorative and a non-empty alt
+// would double-announce it. The name-initials fallback already covered a
+// missing `image` prop, but not a source that 404s — that left an empty box
+// with no identity. The error handler closes that gap.
+function GameArt({ image, name }) {
+    const [failed, setFailed] = useState(false)
+    if (!image || failed) return <span>{name.slice(0, 2)}</span>
+    return (
+        <img
+            src={image}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            width="320"
+            height="320"
+            onError={() => setFailed(true)}
+        />
+    )
 }
 
 const labelToGameId = {
@@ -122,10 +142,10 @@ function HomePage() {
                 <div className="casino-hero-copy" data-ux-surface="stage">
                     <span className="casino-kicker">
                         <span className="ticker-dot" />
-                        Live Casino
+                        Practice Casino
                     </span>
                     <h1>GamPo</h1>
-                    <p>Originals, slots, live tables, and sportsbook — all in one premium casino experience. No real money, no accounts, just pure play.</p>
+                    <p>Originals, slots, table games, and sportsbook — all in one premium casino experience. No real money, no accounts, just pure play.</p>
                     <div className="casino-actions">
                         <button className="casino-action primary" onClick={() => grantPracticeCredits(500)} data-ux-primary-action>
                             <Plus size={16} />
@@ -141,7 +161,7 @@ function HomePage() {
                         </Link>
                         <Link className="casino-action" to="/verify">
                             <ShieldCheck size={16} />
-                            Provably Fair
+                            Local Result Log
                         </Link>
                     </div>
                 </div>
@@ -215,7 +235,7 @@ function HomePage() {
                     <GameGrid games={games} />
                 </main>
                 <aside className="casino-rail">
-                    <RailBlock icon={<Flame size={16} />} title="Live Studio">
+                    <RailBlock icon={<Flame size={16} />} title="Studio Simulations">
                         {liveStudioTables.slice(0, 3).map(table => (
                             <Link key={table.id} to={table.gamePath} className="rail-link">
                                 <span>{table.name}</span>
@@ -224,12 +244,14 @@ function HomePage() {
                         ))}
                     </RailBlock>
                     <RailBlock icon={<Trophy size={16} />} title="Missions">
-                        {(liveMissions.length > 0 ? liveMissions : missions.slice(0, 3)).map(mission => (
+                        {liveMissions.length > 0 ? liveMissions.map(mission => (
                             <div key={mission.id} className="mini-progress">
                                 <span>{mission.title}</span>
                                 <div><i style={{ width: `${Math.min(1, mission.ratio ?? mission.progress ?? 0) * 100}%` }} /></div>
                             </div>
-                        ))}
+                        )) : (
+                            <p className="muted">No unclaimed practice missions right now — open Missions to review or reset progress.</p>
+                        )}
                     </RailBlock>
                     <RailBlock icon={<Flame size={16} />} title="Daily Momentum">
                         <div className="activity-mini">
@@ -297,7 +319,7 @@ function CategoryRow({ icon, title, link, games }) {
                 {games.map(game => (
                     <Link key={game.id} to={game.path} className="category-card" style={{ '--accent': game.accent || '#00e701' }} data-ux-surface="card">
                         <div className="category-art">
-                            {game.image ? <img src={game.image} alt="" loading="lazy" decoding="async" width="320" height="320" /> : <span>{game.name.slice(0, 2)}</span>}
+                            <GameArt image={game.image} name={game.name} />
                             {game.tag ? <span className="casino-game-tag">{game.tag}</span> : null}
                             <i className="category-glow" />
                         </div>
@@ -333,7 +355,7 @@ export function GameGrid({ games = [] }) {
                 return (
                     <Link key={game.id} to={game.path} className="casino-game-card" style={{ '--accent': game.accent || '#00e701' }} data-ux-surface="card">
                         <div className="casino-game-art">
-                            {game.image ? <img src={game.image} alt="" loading="lazy" decoding="async" width="320" height="320" /> : <span>{game.name.slice(0, 2)}</span>}
+                            <GameArt image={game.image} name={game.name} />
                             {game.tag ? <span className="casino-game-tag">{game.tag}</span> : null}
                             <div className="casino-game-titlemark">
                                 <span>{game.category?.split(' ')[0] || 'Game'}</span>

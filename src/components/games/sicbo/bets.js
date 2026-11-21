@@ -1,5 +1,15 @@
 // Sic Bo bet definitions and payouts. Standard 3-dice (216 outcomes).
 
+export function resolveSicBoTicket(bets = {}, lastChips = {}, mode) {
+    let activeBets = bets
+    let stake = Object.values(activeBets).reduce((sum, amount) => sum + amount, 0)
+    if (stake <= 0 && (mode === 'manual' || mode === 'auto')) {
+        activeBets = lastChips
+        stake = Object.values(activeBets).reduce((sum, amount) => sum + amount, 0)
+    }
+    return { bets: activeBets, stake }
+}
+
 export function rollDice(rng) {
     return [Math.floor(rng() * 6) + 1, Math.floor(rng() * 6) + 1, Math.floor(rng() * 6) + 1]
 }

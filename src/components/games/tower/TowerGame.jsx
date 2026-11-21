@@ -25,6 +25,7 @@ import { getBigWinThreshold,
 } from '../primitives'
 import { useOriginalsPreloader } from '../../games/resources/useOriginalsPreloader'
 import { Particles } from '../../fx'
+import { nextStepQuote } from '../primitives/autoAccounting'
 import EducationPanel from '../../EducationPanel'
 import './tower.css'
 import { useGameBgm } from '../../../audio/useBgm'
@@ -53,6 +54,7 @@ export default function TowerGame() {
     const [risk, setRisk] = useState('medium')
     const [level, setLevel] = useState(0)
     const [activeBet, setActiveBet] = useState(0)
+    const [selectedStake, setSelectedStake] = useState(5)
     const [phase, setPhase] = useState('idle') // idle | climbing
     const stageRef = useRef(null)
     // Bring the tower into view when a climb starts (mobile reachability).
@@ -69,6 +71,14 @@ export default function TowerGame() {
 
     const config = PRESETS[risk]
     const multiplier = Number(Math.pow(config.growth, level).toFixed(2))
+    const nextMultiplier = Number(Math.pow(config.growth, phase === 'climbing' ? level + 1 : 1).toFixed(2))
+    // QA030: quote the climb the player faces now — level 1 while idle, the next
+    // level while climbing — plus the banked multiplier as the cash-out option.
+    const educationDecision = nextStepQuote({
+        probability: config.safe,
+        payoutMultiplier: nextMultiplier,
+        cashoutMultiplier: phase === 'climbing' && level > 0 ? multiplier : undefined,
+    })
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
         if (phase === 'climbing') { resolve({ profit: 0 }); return }
@@ -168,6 +178,7 @@ export default function TowerGame() {
                     onPlay={performPlay}
                     disableAuto
                     lastBet={lastBet}
+                    onStakeChange={setSelectedStake}
                     playPhase={phase === 'climbing' && level > 0 ? 'in-round' : null}
                     playLabel={phase === 'climbing' && level > 0 ? `Cashout ${multiplier.toFixed(2)}×` : 'Start Tower'}
                     onPlayPhaseAction={cashout}
@@ -220,7 +231,7 @@ export default function TowerGame() {
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('tower')} />
-            <EducationPanel definition={definition} betAmount={5} winProbability={Math.pow(config.safe, Math.max(1, level + 1))} payoutMultiplier={Math.max(1.28, multiplier)} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} betAmount={phase === 'climbing' ? activeBet : selectedStake} conditionalDecision={educationDecision} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

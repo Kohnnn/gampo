@@ -32,6 +32,9 @@ export default function WelcomeModal() {
 
         const onKey = (e) => {
             if (e.key === 'Escape') { e.preventDefault(); completeOnboarding(); return }
+            // Claim this in capture before Help's bubbling window listener can
+            // open a native dialog above Welcome's Escape handler.
+            if (e.key === '?') { e.preventDefault(); return }
             if (e.key !== 'Tab') return
             const items = focusables()
             if (items.length === 0) return
@@ -72,23 +75,26 @@ export default function WelcomeModal() {
                 >
                     <X size={16} />
                 </button>
-                <span className="welcome-kicker"><GraduationCap size={16} /> Welcome to GamPo</span>
-                <h2 id="welcome-title">Premium casino experience</h2>
-                <p className="welcome-lead">
-                    GamPo is a probability simulator. It looks like a casino, plays like a casino,
-                    and runs the same odds — all in pure entertainment mode.
-                </p>
-                <ul className="welcome-points">
-                    {POINTS.map(p => (
-                        <li key={p.title}>
-                            <span className="welcome-point-icon">{p.icon}</span>
-                            <div>
-                                <strong>{p.title}</strong>
-                                <span>{p.text}</span>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
+                <div className="welcome-content" role="region" aria-label="Welcome details" tabIndex={0}>
+                    <span className="welcome-kicker"><GraduationCap size={16} /> Welcome to GamPo</span>
+                    <h2 id="welcome-title">Premium casino experience</h2>
+                    <p className="welcome-lead">
+                        GamPo is a probability simulator. It looks like a casino, plays like a casino,
+                        and runs the same odds — all in pure entertainment mode.
+                    </p>
+                    <ul className="welcome-points">
+                        {POINTS.map(p => (
+                            <li key={p.title}>
+                                <span className="welcome-point-icon">{p.icon}</span>
+                                <div>
+                                    <strong>{p.title}</strong>
+                                    <span>{p.text}</span>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="welcome-fineprint">You can replay this intro anytime from Settings.</p>
+                </div>
                 <button
                     type="button"
                     className="welcome-cta"
@@ -97,7 +103,6 @@ export default function WelcomeModal() {
                 >
                     Start exploring
                 </button>
-                <p className="welcome-fineprint">You can replay this intro anytime from Settings.</p>
             </div>
         </div>
     )

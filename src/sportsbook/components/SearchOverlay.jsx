@@ -17,6 +17,26 @@ function SearchOverlay({ open, query, category, events, sports, leagues, onQuery
         if (!open && dialog.open) dialog.close()
     }, [open])
 
+    // Mark Escape handled on the dialog element itself. A native <dialog> closes
+    // on Escape via `cancel`, but that fires after the keydown has already
+    // reached window listeners, so `onCancel` alone is too late: ChatDock would
+    // minimize on the same press. This listener runs first and sets
+    // `defaultPrevented`, which every downstream Escape owner honours.
+    useEffect(() => {
+        const dialog = dialogRef.current
+        if (!dialog || !open) return undefined
+        const onKeyDown = (event) => {
+            if (event.key !== 'Escape') return
+            // Prevent the native <dialog> cancel and close explicitly instead.
+            // Marking the key handled stops window-level owners (ChatDock) from
+            // also dismissing; closing here keeps the dialog's own behaviour.
+            event.preventDefault()
+            onClose()
+        }
+        dialog.addEventListener('keydown', onKeyDown)
+        return () => dialog.removeEventListener('keydown', onKeyDown)
+    }, [open])
+
     const close = () => dialogRef.current?.close()
     const q = query.trim().toLowerCase()
     const leagueMap = new Map(leagues.map(league => [league.id, league]))
@@ -33,7 +53,15 @@ function SearchOverlay({ open, query, category, events, sports, leagues, onQuery
             ref={dialogRef}
             className="sb-search-overlay"
             aria-labelledby="sportsbook-search-heading"
-            onCancel={onClose}
+            onCancel={(event) => {
+                // Mark the key handled so the app-level Escape owners (ChatDock
+                // in particular) do not also dismiss on the same press. A
+                // native <dialog> closes on Escape via `cancel`; without this
+                // the event keeps bubbling and one Escape dismisses two
+                // interfaces.
+                event.preventDefault()
+                onClose()
+            }}
             onClose={() => {
                 onClose()
                 openerRef.current?.isConnected && openerRef.current.focus()

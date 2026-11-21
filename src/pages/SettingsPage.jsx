@@ -12,7 +12,7 @@ import '../styles/settings.css'
 
 export default function SettingsPage() {
     const settings = useSettings()
-    const { exportSave, importSave, keyCount } = useLocalSave()
+    const { exportSave, importSave } = useLocalSave()
     const guard = useSessionGuard()
     const onboarding = useOnboarding()
     const [, setReduceMotionFx] = useReduceMotion()
@@ -26,8 +26,13 @@ export default function SettingsPage() {
     }
 
     const onExport = () => {
-        exportSave()
-        setNotice({ tone: 'ok', text: `Exported ${keyCount} saved items to a JSON file.` })
+        try {
+            const json = exportSave()
+            const count = JSON.parse(json).keyCount
+            setNotice({ tone: 'ok', text: `Exported ${count} saved items to a JSON file.` })
+        } catch (err) {
+            setNotice({ tone: 'err', text: err.message || 'Could not export your save.' })
+        }
     }
 
     const onPickFile = () => fileRef.current?.click()
@@ -36,7 +41,14 @@ export default function SettingsPage() {
         const file = e.target.files?.[0]
         if (!file) return
         try {
-            const result = await importSave(file, { reload: false })
+            const result = await importSave(file, {
+                reload: false,
+                confirmRemoval: (removedKeys, addedKeys) => window.confirm(`Replace saved data?\nRemoved keys: ${removedKeys.join(', ') || '(none)'}\nAdded keys: ${addedKeys.join(', ') || '(none)'}`),
+            })
+            if (result.declined) {
+                setNotice({ tone: 'ok', text: 'Import cancelled. Your save was not changed.' })
+                return
+            }
             setNotice({ tone: 'ok', text: `Restored ${result.restored} items. Reloading…` })
             setTimeout(() => { if (typeof window !== 'undefined') window.location.reload() }, 900)
         } catch (err) {
@@ -245,7 +257,7 @@ export default function SettingsPage() {
                 <section className="settings-card" data-ux-surface="controls">
                     <h2><Download size={16} /> Save data</h2>
                     <p className="settings-help">
-                        No account needed. Export your progress ({keyCount} items: credits, XP, achievements,
+                        No account needed. Export your progress (credits, XP, achievements,
                         collections, settings) to a file, and import it on any device or browser.
                     </p>
                     <div className="settings-actions">

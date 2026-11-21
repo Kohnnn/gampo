@@ -803,6 +803,26 @@ body {
     white-space: nowrap;
 }
 
+.credit-toast-container-with-history-warning {
+    width: min(420px, calc(100% - 24px));
+}
+
+.credit-toast-history-warning {
+    width: 100%;
+    flex-shrink: 0;
+    pointer-events: none;
+    animation: none;
+    white-space: normal;
+}
+
+.credit-toast-history-warning .credit-toast-content {
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    overflow-wrap: anywhere;
+}
+
 @keyframes creditToastSlide {
     from {
         opacity: 0;
@@ -1192,7 +1212,15 @@ body {
     transition: opacity 0.15s, color 0.15s, background 0.15s;
 }
 .nav-row:hover .nav-pin { opacity: 1; }
+/* Reveal on keyboard focus too: `.nav-row:hover` alone leaves a focused pin
+   invisible, which fails WCAG 2.4.11/1.4.11 (focus not visible). */
+.nav-row:focus-within .nav-pin,
+.nav-pin:focus-visible { opacity: 1; }
 .nav-pin.is-pinned {
+    opacity: 1;
+    color: var(--accent-yellow, #ffcf5a);
+}
+.nav-pin[aria-pressed='true'] {
     opacity: 1;
     color: var(--accent-yellow, #ffcf5a);
 }
@@ -1894,6 +1922,21 @@ body {
     }
 }
 
+/* Mobile menu button. Hidden on desktop, where the sidebar is laid out beside
+   the content and needs no toggle. Below 769px it is the only visible way to
+   open the off-canvas drawer. */
+.header-menu-btn {
+    display: none;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 10px;
+}
+
+.sidebar-backdrop {
+    display: none;
+}
+
 @media (max-width: 768px) {
     :root {
         --mobile-nav-height: 64px;
@@ -1901,6 +1944,48 @@ body {
         --mobile-safe-bottom: calc(var(--mobile-nav-height) + var(--mobile-action-height) + max(8px, env(safe-area-inset-bottom)));
         /* P4: bottom-sheet safe area — used by mobile bet sheet and other overlays */
         --sheet-safe-bottom: calc(var(--mobile-nav-height) + max(8px, env(safe-area-inset-bottom)));
+    }
+
+    .header-menu-btn {
+        display: inline-flex;
+    }
+
+    /* The bottom nav is fixed, so anything the page puts in its band is
+       covered. `.main-content` is `overflow: hidden` here, so an overlapping
+       last element cannot be scrolled clear — at short landscape heights the
+       home hero CTA sat 27px under the dock and was unclickable. Reserve the
+       nav band on the scroll container.
+       Pages that already reserve the nav band on their own scrolling container
+       must skip this rule or it double-reserves and costs real viewport:
+       `.game-shell` (nav + action dock via --mobile-safe-bottom), and the
+       `.settings-page` / `.insights-page` / `.sandbox-page` / `.sb-main`
+       scrollers (each sets its own nav reserve). */
+    .main-content:not(:has(.game-shell)):not(:has(.settings-page)):not(:has(.insights-page)):not(:has(.sandbox-page)):not(:has(.sb-main)) {
+        padding-bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
+    }
+
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: calc(var(--z-mobile-sheet) - 1);
+        background: rgba(0, 0, 0, 0.55);
+        border: 0;
+        padding: 0;
+    }
+
+    /* The 1200px rule collapses the sidebar to an icon rail, which is correct
+       for the shrunken desktop rail but wrong for the open mobile drawer: a
+       300px drawer of unlabelled icons makes the destinations that only exist
+       here (sandbox, vip, insights, verify, settings, promotions)
+       indistinguishable. Restore labels whenever the drawer is actually open. */
+    .app-sidebar:not(.app-sidebar-hidden) .nav-item span:not(.nav-icon),
+    .app-sidebar:not(.app-sidebar-hidden) .nav-title {
+        display: inline;
+    }
+
+    .app-sidebar:not(.app-sidebar-hidden) .nav-item {
+        justify-content: flex-start;
     }
 
     .header {
@@ -1924,20 +2009,34 @@ body {
         text-overflow: ellipsis;
     }
 
+    /* The sidebar becomes an off-canvas drawer below 769px instead of
+       `display:none`. It carries destinations with no other mobile entry point
+       (sandbox, vip, insights, race, verify, settings, promotions), so hiding it
+       left them unreachable. Driven by the same `isOpen` state the desktop
+       collapse already uses — no second navigation model. */
     .app-sidebar {
-        display: none;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: min(84vw, 300px);
+        z-index: var(--z-mobile-sheet);
+        transform: translateX(0);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Closed drawer slides off-screen; `.app-sidebar-hidden` is the existing
+       collapsed signal, reused. */
+    .app-sidebar.app-sidebar-hidden {
+        width: min(84vw, 300px);
+        transform: translateX(-105%);
+        box-shadow: none;
+        visibility: hidden;
     }
 
     .game-container {
         flex-direction: column;
-    }
-
-    .betting-panel {
-        width: 100%;
-    }
-
-    .main-content {
-        padding-bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
     }
 
     .mobile-bottom-nav {
@@ -1948,7 +2047,12 @@ body {
         z-index: var(--z-mobile-nav);
         min-height: calc(var(--mobile-nav-height) - 8px);
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        /* Six items (Home, Games, Sports, Learn, Missions, Chat). `auto-fit` let
+           the grid wrap to a second row at 375px because only five 56px tracks
+           fit, so the dock grew to ~114px while --mobile-nav-height still
+           reserved 64px — the extra row painted over page content. Six explicit
+           flexible tracks keep a single row at every supported width. */
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 4px;
         padding: 6px;
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -2078,7 +2182,36 @@ body {
     }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 560px), (min-width: 561px) and (max-width: 768px) and (max-height: 520px) and (orientation: landscape) {
+    .header.header-play-surface {
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+        height: auto;
+        min-height: 52px;
+        padding: 4px 8px;
+        gap: 8px;
+    }
+
+    .header.header-play-surface .live-wins-badge {
+        display: none;
+    }
+
+    .header.header-play-surface .header-menu-btn,
+    .header.header-play-surface .header-toggle,
+    .header.header-play-surface .credit-pill {
+        min-height: 44px;
+    }
+
+    .header.header-play-surface .header-menu-btn,
+    .header.header-play-surface .header-toggle {
+        width: 44px;
+    }
+
+    .header.header-play-surface .header-left { gap: 6px; }
+    .header.header-play-surface .header-right { gap: 6px; }
+    .header.header-play-surface .header-toggles { margin-right: 0; }
+    .header.header-play-surface .logo { font-size: 26px; }
+
     .header.header-play-surface .header-mode,
     .header.header-play-surface .header-center {
         display: none;

@@ -5,9 +5,10 @@ export default function SimBetStrip({ rows = [], title = 'Sim players', cap = SI
     const visibleRows = clampSimRows(rows, cap)
     if (!visibleRows.length) return null
     return (
-        <section className="sim-bet-strip" aria-label={title}>
+        <section className="sim-bet-strip" aria-label={`${title} — simulated bot players, not real users`}>
             <div className="sim-bet-head">
                 <span>{title}</span>
+                <em className="sim-bet-badge" data-simulated-label>BOTS · SIMULATED</em>
                 <strong>{visibleRows.length}</strong>
             </div>
             <ul>

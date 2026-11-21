@@ -38,6 +38,7 @@ import EducationPanel from '../../EducationPanel'
 import CrashChart from './CrashChart'
 import { rollCrashMultiplier } from './crashMath'
 import './crash.css'
+import { notAdmittedResult, rejectedResult } from '../primitives/autoAccounting'
 import { useGameBgm } from '../../../audio/useBgm'
 
 const HOUSE_EDGE = 0.01
@@ -210,10 +211,12 @@ export default function CrashGame() {
     }, [phase])
 
     const performPlay = ({ betAmount }) => new Promise(resolve => {
-        if (phase === 'running' || phase === 'cashed' || phase === 'betting') { resolve({ profit: 0 }); return }
+        // QA021: a refusal must be distinguishable from a settled round, or Auto
+        // counts a declined stake as a completed one and drifts its P/L.
+        if (phase === 'running' || phase === 'cashed' || phase === 'betting') { resolve(notAdmittedResult('in-round')); return }
         if (!placeBet(betAmount, 'Crash')) {
             showToast('error', 'Not enough credits', `Need ${formatCredits(betAmount)}`)
-            resolve({ profit: 0 }); return
+            resolve(rejectedResult('insufficient-funds')); return
         }
         cancelAll()
         setLastBet(betAmount)
@@ -512,9 +515,9 @@ export default function CrashGame() {
                             </div>
                             {burstKey > 0 && phase === 'cashed' && !reduceMotion && <Particles key={burstKey} count={20} color="#ff7ab6" />}
                         </div>
-                        <aside className="crash-side-rail" aria-label="Live crash players">
+                        <aside className="crash-side-rail" aria-label="Simulated bot players — not real users">
                             <div className="crash-rail-head">
-                                <span>Live bets</span>
+                                <span>Bots · Simulated</span>
                                 <strong>{players.length}</strong>
                             </div>
                             <ul>
@@ -532,7 +535,7 @@ export default function CrashGame() {
                                                 {isBetting ? 'queued'
                                                     : state === 'cashed' ? `+${(p.bet * (p.cashedAt - 1)).toFixed(2)}`
                                                     : state === 'busted' ? `-${p.bet.toFixed(2)}`
-                                                    : 'live'}
+                                                    : 'in play'}
                                             </strong>
                                         </li>
                                     )
@@ -542,7 +545,7 @@ export default function CrashGame() {
                     </div>
                     <div className="crash-meta">
                         <MultiplierBadge label="Target" value={target} state={inRound ? 'active' : 'idle'} size="sm" />
-                        <span>{phase === 'betting' ? `Round opens in ${bettingSeconds}s` : phase === 'crashed' ? `Last bust ${crashedAt?.toFixed(2)}×` : phase === 'cashed' ? `Cashed ${cashedAt?.toFixed(2)}×` : phase === 'running' ? `Live ${multiplier.toFixed(2)}×` : 'Stable'}</span>
+                        <span>{phase === 'betting' ? `Round opens in ${bettingSeconds}s` : phase === 'crashed' ? `Last bust ${crashedAt?.toFixed(2)}×` : phase === 'cashed' ? `Cashed ${cashedAt?.toFixed(2)}×` : phase === 'running' ? `Running ${multiplier.toFixed(2)}×` : 'Stable'}</span>
                     </div>
                     <ActionLockOverlay active={phase === 'crashed'} label="Bust" />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />

@@ -2,11 +2,12 @@
 // Ported from example/stake-originals-clone CrashGame/GameChart.jsx but
 // trimmed to GamPo's needs: no antd chrome, no countdown text, accepts a
 // `phase` of 'idle' | 'running' | 'crashed' | 'cashed', plus the live
-// `multiplier` and `elapsedTime`. When phase==='idle' it loops a low-opacity
-// "ghost" preview curve so the screen is never empty.
+// `multiplier` and `elapsedTime`. Idle uses a ghost curve unless motion is
+// suppressed, when a static informative curve is drawn instead.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { resolveImage } from '../../../utils/assetPaths'
+import { useSettings } from '../../../hooks/useSettings'
 
 // Resolved at module scope: the build prunes raster originals once their WebP
 // sibling ships, so the literal `.png` path no longer exists on disk.
@@ -15,6 +16,9 @@ const EXHAUST_SRC   = '/images/exhaust/exhaust02_preview.gif'
 const EXPLOSION_SRC = '/images/explosions/normal_explosion.gif'
 
 export default function CrashChart({ phase, multiplier, elapsedTime, players = [] }) {
+    const { reduceMotion, animations } = useSettings()
+    const [osReduced, setOsReduced] = useState(() => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches))
+    const motionSuppressed = reduceMotion || !animations || osReduced
     const canvasRef = useRef(null)
     const rocketRef = useRef(null)
     const exhaustRef = useRef(null)
@@ -24,136 +28,121 @@ export default function CrashChart({ phase, multiplier, elapsedTime, players = [
     const bustEndpointRef = useRef(null)
     const ghostTickRef = useRef({ raf: 0, t: 0 })
     const explosionTickRef = useRef({ raf: 0, t: 0 })
+    const redrawRef = useRef(() => {})
     const [, forceRender] = useState(0)
 
     const maxTime = useMemo(() => Math.max(elapsedTime + 2, 8), [elapsedTime])
     const maxMult = useMemo(() => Math.max(multiplier * 1.3, 2), [multiplier])
 
-    // DPI-aware resize
+    // Keep one observer; multiplier updates must not reset the backing store.
     useEffect(() => {
         const canvas = canvasRef.current
         if (!canvas) return
+        const redraw = () => {
+            const { width, height, dpr } = sizeRef.current
+            canvas.width = Math.max(1, Math.round(width * dpr))
+            canvas.height = Math.max(1, Math.round(height * dpr))
+            redrawRef.current()
+        }
         const observer = new ResizeObserver(entries => {
             for (const entry of entries) {
                 const dpr = window.devicePixelRatio || 1
-                const { width, height } = entry.contentRect
-                canvas.width = Math.max(1, Math.round(width * dpr))
-                canvas.height = Math.max(1, Math.round(height * dpr))
-                sizeRef.current = { width, height, dpr }
+                sizeRef.current = { width: entry.contentRect.width, height: entry.contentRect.height, dpr }
+                redraw()
             }
         })
         observer.observe(canvas)
-        const r = canvas.getBoundingClientRect()
-        const dpr = window.devicePixelRatio || 1
-        canvas.width = Math.max(1, Math.round(r.width * dpr))
-        canvas.height = Math.max(1, Math.round(r.height * dpr))
-        sizeRef.current = { width: r.width, height: r.height, dpr }
+        const rect = canvas.getBoundingClientRect()
+        sizeRef.current = { width: rect.width, height: rect.height, dpr: window.devicePixelRatio || 1 }
+        redraw()
         return () => observer.disconnect()
     }, [])
 
-    // Idle loop: animate a faint ghost curve so the canvas isn't blank.
     useEffect(() => {
-        if (phase !== 'idle') {
+        const query = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+        if (!query) return
+        setOsReduced(query.matches)
+        const update = event => setOsReduced(event.matches)
+        if (query.addEventListener) query.addEventListener('change', update)
+        else query.addListener?.(update)
+        return () => {
+            if (query.removeEventListener) query.removeEventListener('change', update)
+            else query.removeListener?.(update)
+        }
+    }, [])
+    useEffect(() => {
+        redrawRef.current = () => {
+            if (phase === 'idle') {
+                if (rocketRef.current) rocketRef.current.style.display = 'none'
+                if (exhaustRef.current) exhaustRef.current.style.display = 'none'
+                if (explosionRef.current) explosionRef.current.style.display = 'none'
+                drawCanvas({ canvas: canvasRef.current, size: sizeRef.current, phase: 'idle', multiplier: Math.exp(0.4), elapsedTime: 4, maxTime: 8, maxMult: 4 })
+            }
+            else drawCanvas({ canvas: canvasRef.current, size: sizeRef.current, phase, multiplier, elapsedTime, maxTime, maxMult, rocketRef, exhaustRef, explosionRef, endpointRef, bustEndpointRef, bustDecay: motionSuppressed ? 1.4 : explosionTickRef.current.t })
+            if (phase !== 'idle') forceRender(v => (v + 1) % 100000)
+        }
+        redrawRef.current()
+    }, [phase, multiplier, elapsedTime, maxTime, maxMult, motionSuppressed])
+
+    useEffect(() => {
+        if (phase !== 'idle' || motionSuppressed) {
             cancelAnimationFrame(ghostTickRef.current.raf)
             ghostTickRef.current.raf = 0
+            redrawRef.current()
             return
         }
         const start = performance.now()
         const step = () => {
             const t = ((performance.now() - start) / 1000) % 6
             ghostTickRef.current.t = t
-            drawCanvas({
-                canvas: canvasRef.current,
-                size: sizeRef.current,
-                phase: 'idle',
-                multiplier: Math.pow(Math.E, 0.1 * t),
-                elapsedTime: t,
-                maxTime: 8,
-                maxMult: 4,
-            })
+            drawCanvas({ canvas: canvasRef.current, size: sizeRef.current, phase: 'idle', multiplier: Math.exp(0.1 * t), elapsedTime: t, maxTime: 8, maxMult: 4 })
             ghostTickRef.current.raf = requestAnimationFrame(step)
         }
         ghostTickRef.current.raf = requestAnimationFrame(step)
-        return () => cancelAnimationFrame(ghostTickRef.current.raf)
-    }, [phase])
+        return () => { cancelAnimationFrame(ghostTickRef.current.raf); ghostTickRef.current.raf = 0 }
+    }, [phase, motionSuppressed])
 
-    // Active draw on multiplier change.
-    useEffect(() => {
-        if (phase === 'idle') return
-        drawCanvas({
-            canvas: canvasRef.current,
-            size: sizeRef.current,
-            phase, multiplier, elapsedTime, maxTime, maxMult,
-            rocketRef, exhaustRef, explosionRef, endpointRef,
-            bustEndpointRef,
-        })
-        forceRender(v => (v + 1) % 100000)
-    }, [phase, multiplier, elapsedTime, maxTime, maxMult])
-
-    // Crash phase: lock the explosion endpoint and run a small decay rAF
-    // so the canvas keeps animating instead of freezing on the last frame.
     useEffect(() => {
         if (phase !== 'crashed') {
             cancelAnimationFrame(explosionTickRef.current.raf)
             explosionTickRef.current.raf = 0
+            explosionTickRef.current.t = 0
             return
         }
-        // Snapshot endpoint at the moment of bust.
-        if (endpointRef.current && (!bustEndpointRef.current || bustEndpointRef.current.lockedFor !== 'crash')) {
-            bustEndpointRef.current = { ...endpointRef.current, lockedFor: 'crash' }
+        if (endpointRef.current) bustEndpointRef.current = { ...endpointRef.current, lockedFor: 'crash' }
+        if (motionSuppressed) {
+            cancelAnimationFrame(explosionTickRef.current.raf)
+            explosionTickRef.current.raf = 0
+            drawCanvas({ canvas: canvasRef.current, size: sizeRef.current, phase: 'crashed', multiplier, elapsedTime, maxTime, maxMult, rocketRef, exhaustRef, explosionRef, endpointRef, bustEndpointRef, bustDecay: 1.4 })
+            return
         }
         const start = performance.now()
         const step = () => {
             const t = (performance.now() - start) / 1000
             explosionTickRef.current.t = t
-            drawCanvas({
-                canvas: canvasRef.current,
-                size: sizeRef.current,
-                phase: 'crashed',
-                multiplier,
-                elapsedTime,
-                maxTime,
-                maxMult,
-                rocketRef,
-                exhaustRef,
-                explosionRef,
-                endpointRef,
-                bustEndpointRef,
-                bustDecay: t,
-            })
+            drawCanvas({ canvas: canvasRef.current, size: sizeRef.current, phase: 'crashed', multiplier, elapsedTime, maxTime, maxMult, rocketRef, exhaustRef, explosionRef, endpointRef, bustEndpointRef, bustDecay: t })
             if (t < 1.4) explosionTickRef.current.raf = requestAnimationFrame(step)
+            else explosionTickRef.current.raf = 0
         }
         explosionTickRef.current.raf = requestAnimationFrame(step)
-        return () => cancelAnimationFrame(explosionTickRef.current.raf)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [phase])
+        return () => { cancelAnimationFrame(explosionTickRef.current.raf); explosionTickRef.current.raf = 0 }
+        // Multiplier/time are final on entry; preference changes restart only this decoration.
+    }, [phase, motionSuppressed])
 
-    // Reset bust endpoint snapshot when leaving crashed state so next round
-    // starts cleanly.
     useEffect(() => {
         if (phase === 'idle') bustEndpointRef.current = null
     }, [phase])
-
     const endpoint = endpointRef.current
-    const livePopups = phase !== 'idle' ? players.filter(p => p.cashed && multiplier >= p.target && multiplier - p.target < 0.22) : []
+    const livePopups = !motionSuppressed && phase !== 'idle' ? players.filter(p => p.cashed && multiplier >= p.target && multiplier - p.target < 0.22) : []
 
     return (
         <div className="crash-chart-wrap">
             <canvas ref={canvasRef} className="crash-canvas" />
-            <img ref={rocketRef}    src={ROCKET_SRC}    alt="" className="crash-rocket"    />
-            <img ref={exhaustRef}   src={EXHAUST_SRC}   alt="" className="crash-exhaust"   />
-            <img ref={explosionRef} src={EXPLOSION_SRC} alt="" className="crash-explosion" />
+            <img ref={rocketRef} src={ROCKET_SRC} alt="" className="crash-rocket" />
+            {!motionSuppressed && <img ref={exhaustRef} src={EXHAUST_SRC} alt="" className="crash-exhaust" />}
+            {!motionSuppressed && <img ref={explosionRef} src={EXPLOSION_SRC} alt="" className="crash-explosion" />}
             {livePopups.map((p, index) => (
-                <span
-                    key={`${p.id}-${p.target}`}
-                    className="crash-cash-pop"
-                    style={{
-                        left: `${endpoint.x}px`,
-                        top: `${endpoint.y}px`,
-                        '--pop-index': index,
-                        '--pop-color': p.color,
-                    }}
-                >
+                <span key={`${p.id}-${p.target}`} className="crash-cash-pop" style={{ left: `${endpoint.x}px`, top: `${endpoint.y}px`, '--pop-index': index, '--pop-color': p.color }}>
                     {p.name} +{(p.bet * (p.cashedAt - 1)).toFixed(2)}
                 </span>
             ))}
@@ -161,7 +150,7 @@ export default function CrashChart({ phase, multiplier, elapsedTime, players = [
     )
 }
 
-function drawCanvas({ canvas, size, phase, multiplier, elapsedTime, maxTime, maxMult, rocketRef, exhaustRef, explosionRef, endpointRef, bustEndpointRef, bustDecay = 0 }) {
+function drawCanvas({ canvas, size, phase, elapsedTime, maxTime, maxMult, rocketRef, exhaustRef, explosionRef, endpointRef, bustEndpointRef, bustDecay = 0 }) {
     if (!canvas) return
     const { width, height, dpr } = size
     if (!width || !height) return

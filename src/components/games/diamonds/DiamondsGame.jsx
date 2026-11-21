@@ -38,7 +38,7 @@ import { useGameBgm } from '../../../audio/useBgm'
 const REVEAL_MS = 600
 
 // Gems sorted by descending rarity.
-const GEMS = [
+export const GEMS = [
     { sym: '💎', label: 'Diamond', weight: 1 },
     { sym: '🔷', label: 'Sapphire', weight: 2 },
     { sym: '🔶', label: 'Topaz', weight: 3 },
@@ -50,7 +50,7 @@ const GEMS = [
 // Raw payout shape per match-count (relative). Calibrated below so realized
 // RTP equals DIAMONDS_RTP — previously these raw values gave ~258% RTP because
 // a near-certain 2-match paid 1.1x.
-function rawPayoutFor(matchCount, gemIndex) {
+export function rawPayoutFor(matchCount, gemIndex) {
     if (matchCount < 2) return 0
     const gemBonus = (5 - gemIndex) * 0.5 // Diamond +2.5, Citrine +0
     if (matchCount === 5) return 80 + gemBonus * 4
@@ -59,13 +59,13 @@ function rawPayoutFor(matchCount, gemIndex) {
     return 1.1 + gemBonus * 0.1
 }
 
-const DIAMONDS_RTP = 0.96
-const GEM_WEIGHTS = [1, 2, 3, 4, 6, 8]
+export const DIAMONDS_RTP = 0.96
+export const GEM_WEIGHTS = [1, 2, 3, 4, 6, 8]
 
 // One-time Monte-Carlo calibration: measure the mean return of the raw shape
 // and derive a single scalar that locks RTP to the target. Deterministic via a
 // seeded RNG so the scalar is stable across loads.
-const DIAMONDS_SCALE = (() => {
+export const DIAMONDS_SCALE = (() => {
     const total = GEM_WEIGHTS.reduce((s, w) => s + w, 0)
     let seed = 0x9e3779b9
     const rng = () => {
@@ -92,8 +92,15 @@ const DIAMONDS_SCALE = (() => {
     return meanReturn > 0 ? DIAMONDS_RTP / meanReturn : 1
 })()
 
-function payoutFor(matchCount, gemIndex, funBoost = 1) {
+export function payoutFor(matchCount, gemIndex, funBoost = 1) {
     return round2(rawPayoutFor(matchCount, gemIndex) * DIAMONDS_SCALE * funBoost)
+}
+
+export function diamondsReturn(betAmount, multiplier) {
+    const won = multiplier > 0
+    const returnAmount = won ? round2(betAmount * multiplier) : 0
+    const profit = round2(returnAmount - betAmount)
+    return { won, returnAmount, profit }
 }
 
 function pickGem() {
@@ -122,6 +129,7 @@ export default function DiamondsGame() {
     const [running, setRunning] = useState(false)
     const [bigWin, setBigWin] = useState({ trigger: 0, profit: 0, multiplier: 0 })
     const [lastBet, setLastBet] = useState(null)
+    const [selectedStake, setSelectedStake] = useState(5)
     const [toast, setToast] = useState(null)
     const [lastMultiplier, setLastMultiplier] = useState(0)
     const funBoost = funBoostFactor(DIAMONDS_RTP)
@@ -186,9 +194,7 @@ export default function DiamondsGame() {
             }
         })
         const multiplier = payoutFor(bestCount, bestIdx === -1 ? GEMS.length - 1 : bestIdx, funBoost)
-        const won = multiplier > 0
-        const returnAmount = won ? round2(betAmount * multiplier) : 0
-        const profit = round2(returnAmount - betAmount)
+        const { won, returnAmount, profit } = diamondsReturn(betAmount, multiplier)
         const matchedGemIndex = won ? bestIdx : null
 
         const events = buildEvents(api => {
@@ -244,6 +250,7 @@ export default function DiamondsGame() {
                     actionLabel="Reveal Gems"
                     onPlay={performPlay}
                     lastBet={lastBet}
+                    onStakeChange={setSelectedStake}
                 >
                     <p className="bp-hint">Best match across 5 gems pays. Diamond is rarest.</p>
                     {Number.isFinite(lastMultiplier) && lastMultiplier > 0 && (
@@ -273,18 +280,20 @@ export default function DiamondsGame() {
                             )
                         })}
                     </div>
-                    <div className="diamonds-paytable">
-                        <span>5x <strong>80×</strong></span>
-                        <span>4x <strong>12×</strong></span>
-                        <span>3x <strong>2.2×</strong></span>
-                        <span>2x <strong>1.1×</strong></span>
-                    </div>
+                    <table className="diamonds-paytable" aria-label="Gross payout multipliers by gem and match count">
+                        <caption>Best match pays · RTP-normalized gross return{funBoost !== 1 ? ' · Fun Mode applied' : ''}</caption>
+                        <thead><tr><th scope="col">Gem</th>{[2, 3, 4, 5].map(count => <th key={count} scope="col">{count} match</th>)}</tr></thead>
+                        <tbody>{GEMS.map((gem, gemIndex) => <tr key={gem.label}>
+                            <th scope="row">{gem.sym} {gem.label}</th>
+                            {[2, 3, 4, 5].map(count => <td key={count} data-gem-index={gemIndex} data-match-count={count}>{`${payoutFor(count, gemIndex, funBoost).toFixed(2)}×`}</td>)}
+                        </tr>)}</tbody>
+                    </table>
                     <ActionLockOverlay active={running} label="Revealing..." />
                     <ResultToast result={toast} onDismiss={() => setToast(null)} />
                 </div>
             </CoreStageFrame>
             <BigWinOverlay trigger={bigWin.trigger} profit={bigWin.profit} multiplier={bigWin.multiplier} threshold={getBigWinThreshold('diamonds')} />
-            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={5} winProbability={0.32} payoutMultiplier={1.5} balance={balance} recentProfit={recentProfit} />
+            <EducationPanel definition={definition} effectiveRtp={effectiveRtp} betAmount={selectedStake} expectedGrossMultiplier={effectiveRtp} balance={balance} recentProfit={recentProfit} />
         </GameShell>
     )
 }

@@ -15,7 +15,7 @@ function SportsHome({ events, sports, leagues, feedSource = 'fallback', selected
 
             <nav className="sb-subnav" aria-label="Sportsbook sections">
                 <button type="button" className="is-active" aria-current="page" onClick={() => onNavigate({ view: 'home' })}>Sports Home</button>
-                <button type="button" onClick={() => onNavigate({ view: 'live' })}>Live</button>
+                <button type="button" onClick={() => onNavigate({ view: 'live' })}>In-Play</button>
                 <button type="button" onClick={() => onNavigate({ view: 'my-bets' })}>My Bets</button>
                 <button type="button" onClick={() => onNavigate({ view: 'starting' })}>Starting Soon</button>
             </nav>

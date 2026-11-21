@@ -5,8 +5,8 @@
 //   wins        Array of win objects from `resolveSlotSpin`. Each must have
 //               `indexes` (cell indexes into the grid), `type`, and `multiplier`.
 //   cellPositions  Array of { col, row } per cell index, from getCellPositions.
-//   layout      { cols, rows, evaluation } slot layout config.
-//   gridRef     ref to the grid DOM element so we can size the SVG to match.
+//   layout      Slot layout config; changes trigger a fresh measurement.
+//   gridRef     ref to the frame containing indexed slot-cell DOM elements.
 //   accent      hex string used for the line/halo color.
 //
 // Behavior:
@@ -15,98 +15,93 @@
 //   - Ways / megaways / cluster / pay-anywhere wins highlight EACH winning cell
 //     with a rounded halo rect (these wins span many cells per column, so a
 //     single polyline would zig-zag through the wrong cells).
-//   - The index ordering now matches the engine: getCellPositions is row-major
-//     for non-megaways and column-major for megaways, so centers[i] is the cell
-//     the engine actually paid.
+//   - Cell rectangles are measured relative to the SVG itself, including frame
+//     borders, column controls, padding, gaps and variable megaways row heights.
 //   - Honors `prefers-reduced-motion` via CSS.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 
-const FADE_MS = 1600
+export function measureSlotCells(frame, svg) {
+    const origin = svg.getBoundingClientRect()
+    const cells = []
+    frame.querySelectorAll('[data-slot-cell-index]').forEach(cell => {
+        const index = Number(cell.dataset.slotCellIndex)
+        if (!Number.isInteger(index) || index < 0) return
+        const rect = cell.getBoundingClientRect()
+        cells[index] = { x: rect.left - origin.left, y: rect.top - origin.top, w: rect.width, h: rect.height }
+    })
+    return { w: origin.width, h: origin.height, cells }
+}
 const HALO_TYPES = new Set(['ways', 'megaways', 'cluster', 'pay-anywhere'])
 
-export default function WinPathOverlay({ wins = [], cellPositions = [], layout, gridRef, accent = '#ffd166' }) {
-    const [size, setSize] = useState({ w: 0, h: 0 })
-    const [tick, setTick] = useState(0)
+/**
+ * Derive drawn geometry from measured cell rectangles.
+ *
+ * Pure on purpose: outline alignment is then provable against a synthetic
+ * viewport, which is the only way this repo can check cell-to-outline geometry
+ * (there is no browser in the test environment). `geometry` is exactly what
+ * `measureSlotCells` returns — cell rects already relative to the SVG origin,
+ * so frame padding, borders and grid gaps are baked in by measurement instead
+ * of being re-derived (and re-guessed) here.
+ */
+export function buildWinPathShapes({ wins = [], cellPositions = [], geometry }) {
+    const width = geometry?.w || 0
+    const height = geometry?.h || 0
+    if (!wins.length || !width || !height) return { lines: [], halos: [] }
+    const centers = geometry.cells.map(cell => ({ x: cell.x + cell.w / 2, y: cell.y + cell.h / 2 }))
 
-    useEffect(() => {
-        if (!gridRef?.current) return undefined
-        const el = gridRef.current
-        const ro = new ResizeObserver(() => {
-            const rect = el.getBoundingClientRect()
-            setSize({ w: rect.width, h: rect.height })
-        })
-        ro.observe(el)
-        const rect = el.getBoundingClientRect()
-        setSize({ w: rect.width, h: rect.height })
-        return () => ro.disconnect()
-    }, [gridRef])
-
-    useEffect(() => {
-        if (!wins.length) return undefined
-        setTick(t => t + 1)
-        const id = window.setTimeout(() => setTick(t => t + 1), FADE_MS + 50)
-        return () => window.clearTimeout(id)
-    }, [wins])
-
-    const { lines, halos } = useMemo(() => {
-        if (!wins.length || !size.w || !size.h || !layout) return { lines: [], halos: [] }
-        const cols = layout.cols
-        const cellW = size.w / cols
-        // Per-column row counts (megaways has variable rows per column).
-        const colRows = []
-        for (let c = 0; c < cols; c += 1) {
-            let count = 0
-            for (let i = 0; i < cellPositions.length; i += 1) {
-                if (cellPositions[i].col === c) count += 1
-            }
-            colRows.push(count || layout.rows)
+    const lineOut = []
+    const haloOut = []
+    wins.forEach((win, idx) => {
+        const indexes = (win.indexes || []).filter(i => centers[i])
+        if (!indexes.length) return
+        if (HALO_TYPES.has(win.type)) {
+            indexes.forEach(i => {
+                const cell = geometry.cells[i]
+                haloOut.push({ id: `${idx}-${i}`, ...cell })
+            })
+        } else {
+            // Line win: one cell per column, traced left-to-right.
+            const sorted = indexes.slice().sort((a, b) => {
+                const ca = cellPositions[a]?.col ?? 0
+                const cb = cellPositions[b]?.col ?? 0
+                if (ca !== cb) return ca - cb
+                return (cellPositions[a]?.row ?? 0) - (cellPositions[b]?.row ?? 0)
+            })
+            const points = sorted.map(i => centers[i])
+            const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+            lineOut.push({ id: String(idx), d })
         }
-        const cellHFor = col => size.h / (colRows[col] || layout.rows)
-        const centers = cellPositions.map(({ col, row }) => ({
-            x: col * cellW + cellW / 2,
-            y: row * cellHFor(col) + cellHFor(col) / 2,
-        }))
+    })
+    return { lines: lineOut, halos: haloOut }
+}
 
-        const lineOut = []
-        const haloOut = []
-        wins.forEach((win, idx) => {
-            const indexes = (win.indexes || []).filter(i => centers[i])
-            if (!indexes.length) return
-            if (HALO_TYPES.has(win.type)) {
-                indexes.forEach(i => {
-                    const { col } = cellPositions[i]
-                    const cellH = cellHFor(col)
-                    haloOut.push({
-                        id: `${tick}-${idx}-${i}`,
-                        x: centers[i].x - cellW / 2,
-                        y: centers[i].y - cellH / 2,
-                        w: cellW,
-                        h: cellH,
-                    })
-                })
-            } else {
-                // Line win: one cell per column, traced left-to-right.
-                const sorted = indexes.slice().sort((a, b) => {
-                    const ca = cellPositions[a]?.col ?? 0
-                    const cb = cellPositions[b]?.col ?? 0
-                    if (ca !== cb) return ca - cb
-                    return (cellPositions[a]?.row ?? 0) - (cellPositions[b]?.row ?? 0)
-                })
-                const points = sorted.map(i => centers[i])
-                const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-                lineOut.push({ id: `${tick}-${idx}`, d })
-            }
-        })
-        return { lines: lineOut, halos: haloOut }
-    }, [wins, size, cellPositions, layout, tick])
+export default function WinPathOverlay({ wins = [], cellPositions = [], layout, gridRef, accent = '#ffd166' }) {
+    const svgRef = useRef(null)
+    const [geometry, setGeometry] = useState({ w: 0, h: 0, cells: [] })
 
-    if (!lines.length && !halos.length) return null
+    useLayoutEffect(() => {
+        const frame = gridRef?.current
+        const svg = svgRef.current
+        if (!frame || !svg) return undefined
+        const measure = () => setGeometry(measureSlotCells(frame, svg))
+        measure()
+        const observer = new ResizeObserver(measure)
+        observer.observe(frame)
+        frame.querySelectorAll('[data-slot-cell-index]').forEach(cell => observer.observe(cell))
+        return () => observer.disconnect()
+    }, [gridRef, wins, layout, cellPositions])
+
+    const { lines, halos } = useMemo(
+        () => buildWinPathShapes({ wins, cellPositions, geometry }),
+        [wins, geometry, cellPositions],
+    )
 
     return (
         <svg
+            ref={svgRef}
             className="slot-winpath-overlay"
-            viewBox={`0 0 ${size.w} ${size.h}`}
+            viewBox={`0 0 ${geometry.w || 1} ${geometry.h || 1}`}
             preserveAspectRatio="none"
             aria-hidden
         >

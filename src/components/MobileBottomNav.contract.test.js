@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { isGamePath } from './MobileBottomNav'
+import { isGamePath, navItems } from './MobileBottomNav'
 import { gameDefinitions } from '../data/gameDefinitions'
 import { SLOT_TEMPLATE_ROUTES } from '../data/slotRoutes'
 
@@ -18,11 +18,24 @@ describe('Mobile bottom navigation contract', () => {
         expect(source).toContain("gampo:open-chat")
     })
 
-    it('reserves mobile safe space without changing desktop layout', () => {
-        expect(css).toContain('--mobile-nav-height: 64px')
-        expect(css).toContain('--mobile-action-height: 74px')
-        expect(css).toContain('.mobile-bottom-nav')
-        expect(css).toContain('grid-template-columns: repeat(5, minmax(0, 1fr))')
+    it('highlights exactly one destination per route, with no lying active state', () => {
+        // Regression: `/missions`, `/vip` and `/sandbox` used to light up the
+        // "Learn" tab (which points at `/learn`) because its match predicate
+        // over-claimed those prefixes. A truthful nav highlights the tab whose
+        // own destination the user is actually on.
+        const activeFor = pathname =>
+            navItems.filter(item => item.match(pathname)).map(item => item.id)
+
+        for (const pathname of ['/missions', '/vip', '/sandbox']) {
+            const active = activeFor(pathname)
+            expect(active).toEqual(['missions'])
+            // and the highlighted tab must point at the route the user is on
+            const tab = navItems.find(item => item.id === active[0])
+            if (pathname === '/missions') expect(tab.path).toBe('/missions')
+        }
+        for (const pathname of ['/learn', '/learn/any-topic', '/originals', '/crash', '/dice', '/sportsbook/event/1', '/']) {
+            expect(activeFor(pathname)).toHaveLength(1)
+        }
     })
 
     it('should mark Games current only for the exact canonical game route set', () => {

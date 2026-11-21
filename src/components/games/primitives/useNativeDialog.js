@@ -19,44 +19,11 @@
 // modal path.
 
 import { useEffect, useRef } from 'react'
+import { containTab, focusableWithin } from './focusContainment'
 
-const FOCUSABLE = [
-    'a[href]',
-    'button:not([disabled])',
-    'input:not([disabled])',
-    'select:not([disabled])',
-    'textarea:not([disabled])',
-    '[tabindex]:not([tabindex="-1"])',
-].join(',')
-
-function focusableWithin(dialog) {
-    if (!dialog) return []
-    return [...dialog.querySelectorAll(FOCUSABLE)].filter(
-        (el) => el.offsetWidth > 0 || el.offsetHeight > 0 || el === document.activeElement,
-    )
-}
-
-/**
- * Forward/reverse Tab containment for a container.
- *
- * Exported and unit-tested. The modal path relies on `showModal()` instead;
- * this is the explicit boundary rule the AC5 contract names.
- */
-export function containTab(event, dialog) {
-    if (!dialog || event.key !== 'Tab') return
-    const items = focusableWithin(dialog)
-    if (!items.length) return
-    const first = items[0]
-    const last = items[items.length - 1]
-    const active = document.activeElement
-    if (event.shiftKey && (active === first || !dialog.contains(active))) {
-        event.preventDefault()
-        last.focus()
-    } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-        event.preventDefault()
-        first.focus()
-    }
-}
+// Re-exported so existing importers (the AC5 contract test, and any overlay
+// that needs the rule without the hook) keep a single canonical source.
+export { containTab, focusableWithin }
 
 /**
  * Bind a native <dialog> element to an `open` flag.
@@ -79,7 +46,16 @@ export default function useNativeDialog(open, onClose, openerRef) {
         // Remember where focus came from before the dialog takes it. Read it
         // synchronously: by the time the effect runs the opener may already be
         // unmounting, so `document.activeElement` is the last reliable source.
+        // A popover item opener is detached by the time the dialog closes, so
+        // the caller's `openerRef` (a persistent trigger) is the better target.
         const returnTo = document.activeElement
+        const restoreFocus = () => {
+            const candidates = [openerRef?.current, returnTo]
+            const target = candidates.find(
+                (node) => node && typeof node.focus === 'function' && document.contains(node)
+            )
+            if (target) target.focus()
+        }
 
         if (!dialog.open) {
             if (typeof dialog.showModal === 'function') dialog.showModal()
@@ -101,6 +77,12 @@ export default function useNativeDialog(open, onClose, openerRef) {
         }
         dialog.addEventListener('keydown', onKey)
 
+        // Escape drops focus to <body> before this effect's cleanup runs, so
+        // restoring there loses the player's place. The `close` event fires
+        // after the dialog has actually closed, which is the reliable point.
+        const onCloseEvent = () => restoreFocus()
+        dialog.addEventListener('close', onCloseEvent)
+
         // Backdrop click: the <dialog> element itself receives clicks outside
         // the inner card, which is the dismissal surface.
         const onClick = (event) => {
@@ -110,12 +92,10 @@ export default function useNativeDialog(open, onClose, openerRef) {
 
         return () => {
             dialog.removeEventListener('keydown', onKey)
+            dialog.removeEventListener('close', onCloseEvent)
             dialog.removeEventListener('click', onClick)
             if (dialog.open) dialog.close()
-            const target = returnTo || openerRef?.current
-            if (target && typeof target.focus === 'function' && document.contains(target)) {
-                target.focus()
-            }
+            restoreFocus()
         }
     }, [open, onClose, openerRef])
 
