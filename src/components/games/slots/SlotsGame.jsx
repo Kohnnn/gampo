@@ -61,7 +61,7 @@ import { describePaylines } from './slotPaylines'
 import { createOutcomeQueue, validateFreeSpinSession } from './slotQaSeam'
 import { buildSparkline } from './slotSparkline'
 import FreeSpinCounter from './FreeSpinCounter'
-import { applyFreeSpinAward, shouldStopAutoplay } from './slotAccounting'
+import { applyFreeSpinAward, getAutoplayStopReason } from './slotAccounting'
 import SlotSymbol from './SlotSymbol'
 import './slots.css'
 
@@ -96,6 +96,22 @@ const FEATURE_LABELS = {
 }
 
 const AUTOPLAY_COUNTS = [10, 25, 50, 100]
+const AUTOPLAY_COUNT_COMPLETE = 'selected round count completed.'
+
+function autoplayLimitMessage(reason, stops, outcome) {
+    switch (reason) {
+        case 'feature': {
+            const feature = FEATURE_LABELS[outcome.featureEvents[0]?.type]
+            return feature ? `feature triggered (${feature}).` : 'feature triggered.'
+        }
+        case 'big-win': return `win multiplier reached ${stops.bigWinThreshold}×.`
+        case 'loss-percent': return `balance loss limit reached (${stops.lossPercent}%).`
+        case 'gain-percent': return `balance gain limit reached (${stops.gainPercent}%).`
+        case 'loss-credits': return `net loss limit reached (${formatCredits(stops.lossAbs)}).`
+        case 'gain-credits': return `net gain limit reached (${formatCredits(stops.gainAbs)}).`
+        case 'single-win': return `single-spin profit limit reached (${formatCredits(stops.singleWinAbs)}).`
+    }
+}
 
 const MOBILE_BET_BACKDROP_SELECTOR = '.slot-mobile-bet-sheet-backdrop'
 const MOBILE_PAYTABLE_BACKDROP_SELECTOR = '.slot-mobile-info-backdrop'
@@ -405,6 +421,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     const [autoplayInfinite, setAutoplayInfinite] = useState(false)
     const [autoplayActive, setAutoplayActive] = useState(false)
     const [autoplayRemaining, setAutoplayRemaining] = useState(0)
+    const [autoplayStopMessage, setAutoplayStopMessage] = useState(null)
     const [advancedStops, setAdvancedStops] = useState({
         stopOnFeature: false,
         stopOnBigWin: false,
@@ -481,6 +498,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     // Slam-stop: holds the in-flight round so a second tap can resolve it now.
     const pendingFinishRef = useRef(null)
     const autoplayBaselineRef = useRef(null)
+    const autoplayRunRef = useRef(null)
     const autoplayRemainingRef = useRef(0)
     const autoplayInfiniteRef = useRef(false)
     const autoplayPendingRef = useRef(false)
@@ -610,6 +628,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     }, [])
 
     const resetSlotTemplate = useCallback((nextConfig, { clearStats = false } = {}) => {
+        autoplayRunRef.current = null
         clearTimers()
         // Release the synchronous spin lock and drop any captured finish so a
         // template switch mid-spin can never wedge the machine or settle the
@@ -630,6 +649,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setShowIntro(Boolean(nextConfig.features?.introOverlay))
         setAutoplayActive(false)
         setAutoplayRemaining(0)
+        setAutoplayStopMessage(null)
         autoplayRemainingRef.current = 0
         autoplayInfiniteRef.current = false
         autoplayPendingRef.current = false
@@ -657,6 +677,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     useEffect(() => () => {
         clearTimers()
+        autoplayRunRef.current = null
         if (autoplayTimerRef.current) {
             clearTimeout(autoplayTimerRef.current)
             autoplayTimerRef.current = null
@@ -1261,6 +1282,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 resolve({ profit: 0, error: 'balance' })
                 return
             }
+            if (source !== 'auto') setAutoplayStopMessage(null)
 
             clearTimers()
             // Fun Mode (free-play only) inflates the calibrated scalar so wins
@@ -1462,6 +1484,8 @@ export default function SlotsGame({ initialTemplateId } = {}) {
 
     const startAutoplay = useCallback(() => {
         if (autoplayActive || running) return
+        autoplayRunRef.current = Symbol('autoplay run')
+        setAutoplayStopMessage(null)
         autoplayBaselineRef.current = balance
         autoplayInfiniteRef.current = autoplayInfinite
         autoplayRemainingRef.current = autoplayInfinite ? Infinity : autoplayCount
@@ -1471,7 +1495,11 @@ export default function SlotsGame({ initialTemplateId } = {}) {
         setShowAutoplayDrawer(false)
     }, [autoplayActive, autoplayCount, autoplayInfinite, balance, running])
 
-    const stopAutoplay = useCallback(() => {
+    const stopAutoplay = useCallback(message => {
+        autoplayRunRef.current = null
+        setAutoplayStopMessage(`Autoplay stopped: ${message}`)
+        // A native modal would obscure the stage status and make it inert.
+        setShowAutoplayDrawer(false)
         setAutoplayActive(false)
         setAutoplayRemaining(0)
         autoplayRemainingRef.current = 0
@@ -1484,6 +1512,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
             autoplayTimerRef.current = null
         }
     }, [])
+    const stopAutoplayManually = () => stopAutoplay('you pressed Stop.')
 
     // Compact list of the currently-armed stop conditions, surfaced on the dock
     // pill (not only inside the drawer) so a running session shows its guardrails.
@@ -1501,22 +1530,31 @@ export default function SlotsGame({ initialTemplateId } = {}) {
     }, [advancedStops])
 
     useEffect(() => {
-        if (!autoplayActive || running || cascadeReplayRef.current || autoplayPendingRef.current) return
+        // A template reset effect can invalidate the run before this render's
+        // captured autoplayActive state changes. A reset is not count completion.
+        const run = autoplayRunRef.current
+        if (!run || !autoplayActive || running || cascadeReplayRef.current || autoplayPendingRef.current) return
         if (autoplayRemainingRef.current === Infinity) {
             // continue
         } else if (autoplayRemainingRef.current <= 0) {
-            stopAutoplay()
+            stopAutoplay(AUTOPLAY_COUNT_COMPLETE)
             return
         }
         autoplayPendingRef.current = true
         const tierId = canUseFreeSpin ? null : buyTierIdRef.current
         if (autoplayTimerRef.current) clearTimeout(autoplayTimerRef.current)
         autoplayTimerRef.current = setTimeout(() => {
+            if (run !== autoplayRunRef.current) return
             autoplayTimerRef.current = null
             performSpin({ source: 'auto', bet: betAmount, free: canUseFreeSpin, tierId }).then(outcome => {
+                // Stop/reset may leave this accepted round to settle, but its
+                // result must not replace the stop message or count in a new run.
+                if (run !== autoplayRunRef.current) return
                 autoplayPendingRef.current = false
-                if (!autoplayActive) return
-                if (outcome.error) { stopAutoplay(); return }
+                if (outcome.error) {
+                    stopAutoplay(outcome.error === 'balance' ? 'not enough credits.' : 'a spin error occurred.')
+                    return
+                }
                 if (outcome.skipped) { setAutoplayRetry(value => value + 1); return }
                 if (autoplayRemainingRef.current !== Infinity) {
                     autoplayRemainingRef.current = Math.max(0, autoplayRemainingRef.current - 1)
@@ -1525,8 +1563,14 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                 const stops = stopsRef.current
                 const baseline = autoplayBaselineRef.current ?? balance
                 const settledBalance = balance + outcome.profit
-                if (shouldStopAutoplay({ baseline, settledBalance, outcome, stops })) stopAutoplay()
-                else if (autoplayRemainingRef.current <= 0 && autoplayRemainingRef.current !== Infinity) stopAutoplay()
+                const reason = getAutoplayStopReason({ baseline, settledBalance, outcome, stops })
+                if (reason) stopAutoplay(autoplayLimitMessage(reason, stops, outcome))
+                else if (autoplayRemainingRef.current <= 0 && autoplayRemainingRef.current !== Infinity) stopAutoplay(AUTOPLAY_COUNT_COMPLETE)
+            }, error => {
+                console.error('Slots autoplay spin failed', error)
+                if (run !== autoplayRunRef.current) return
+                // An unexpected rejection may follow a debit. Leave spin admission closed.
+                stopAutoplay('a spin error occurred.')
             })
         }, 220)
     }, [autoplayActive, autoplayRetry, betAmount, balance, canUseFreeSpin, cascadeStepIndex, performSpin, running, stopAutoplay])
@@ -2126,6 +2170,9 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             <span>{stageFullscreen ? 'Exit fullscreen' : 'Fullscreen'}</span>
                         </button>
                     )}
+                    <p className="slot-autoplay-status" role="status" aria-live="polite" aria-atomic="true">
+                        {autoplayStopMessage}
+                    </p>
                 </header>
 
                 <div
@@ -2690,7 +2737,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                             <button type="button" className="slot-auto-start" onClick={startAutoplay} disabled={autoplayActive}>
                                 <Play size={14} /> Start
                             </button>
-                            <button type="button" className="slot-auto-stop" onClick={stopAutoplay} disabled={!autoplayActive}>
+                            <button type="button" className="slot-auto-stop" onClick={stopAutoplayManually} disabled={!autoplayActive}>
                                 <Square size={14} /> Stop
                             </button>
                         </div>
@@ -2708,7 +2755,7 @@ export default function SlotsGame({ initialTemplateId } = {}) {
                                 {activeStopChips.join(' · ')}
                             </span>
                         )}
-                        <button type="button" onClick={stopAutoplay} aria-label="Stop autoplay"><Square size={12} /></button>
+                        <button type="button" onClick={stopAutoplayManually} aria-label="Stop autoplay"><Square size={12} /></button>
                     </div>
                 )}
 

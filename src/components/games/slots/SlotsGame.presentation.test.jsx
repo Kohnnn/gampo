@@ -30,12 +30,12 @@ vi.mock('../primitives', () => {
 vi.mock('./slotFactory', async () => ({
     ...await vi.importActual('./slotFactory'),
     makeInitialGrid: config => Array(config.layout.evaluation === 'megaways' ? config.layout.columnRows.reduce((sum, rows) => sum + rows, 0) : config.layout.rows * config.layout.cols).fill(config.symbols[0]),
-    resolveSlotSpin: (_config, args) => { fixture.resolverArgs.push(args); return fixture.outcome },
+    resolveSlotSpin: vi.fn((_config, args) => { fixture.resolverArgs.push(args); return fixture.outcome }),
 }))
 
 import SlotsGame from './SlotsGame'
 import EducationPanel from '../../EducationPanel'
-import { SLOT_TEMPLATES, getSlotTemplate } from './slotFactory'
+import { SLOT_TEMPLATES, getSlotTemplate, resolveSlotSpin } from './slotFactory'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { buildCascadeTimeline, cascadeTimelineDurationMs } from './slotsMotion'
 import { claimEscape, dispatchEscape } from '../../../utils/escapeClaims'
@@ -61,6 +61,17 @@ function text(node) {
     if (typeof node !== 'object') return String(node)
     return [node.props?.children].flat(Infinity).map(text).join('')
 }
+
+function autoplayStatus(tree) {
+    return text(find(tree, node => node.props?.role === 'status' && node.props?.className === 'slot-autoplay-status'))
+}
+
+function startAutoplay(id) {
+    const tree = render(id)
+    find(tree, node => node.props?.['aria-label'] === 'Autoplay').props.onClick({ currentTarget: {} })
+    find(render(id), node => node.props?.className === 'slot-auto-start').props.onClick()
+    return render(id)
+}
 function outcome(id, extra = {}) {
     const config = getSlotTemplate(id)
     return { cells: Array(config.layout.rows * config.layout.cols).fill(config.symbols[0]), wins: [], winningIndexes: [], featureEvents: [], multiplier: 0, cascadeSteps: 0, coinHits: 0, triggeredFreeSpins: 0, ...extra }
@@ -82,6 +93,7 @@ beforeEach(() => {
     fixture.state = []; fixture.refs = []; fixture.effects = []; fixture.fun = false; fixture.reduceMotion = false; fixture.animations = true; fixture.mobile = false
     fixture.credit.mockClear(); fixture.bet.mockReset().mockReturnValue(true); fixture.record.mockClear(); fixture.dialogOpener = null
     fixture.resolverArgs = []
+    vi.mocked(resolveSlotSpin).mockReset()
 })
 afterEach(() => {
     try {
@@ -435,6 +447,7 @@ describe('settled slot presentation', () => {
         }
         tree = render(id)
         expect(find(tree, node => node.props?.className === 'slot-autoplay-pill')).toBeNull()
+        expect(autoplayStatus(tree)).toBe('Autoplay stopped: selected round count completed.')
         expect(find(tree, node => node.props?.totalAwarded === 20).props.remaining).toBe(11)
         expect(fixture.bet).toHaveBeenCalledTimes(1)
         expect(fixture.record).toHaveBeenCalledTimes(10)
@@ -463,9 +476,125 @@ describe('settled slot presentation', () => {
         expect(fixture.credit).not.toHaveBeenCalled()
         expect(fixture.record).not.toHaveBeenCalled()
         expect(find(tree, node => node.props?.className === 'slot-autoplay-pill')).toBeNull()
+        expect(autoplayStatus(tree)).toBe('Autoplay stopped: not enough credits.')
     })
 
-    it('honours an armed stop condition after an accepted round, leaving the rest unused (QA035)', async () => {
+    it('reports an unexpected spin error separately from insufficient credits (QA035)', async () => {
+        const id = 'mummy-cascade'
+        const reportError = vi.spyOn(console, 'error').mockImplementation(() => {})
+        cleanups.push(() => reportError.mockRestore())
+        fixture.bet.mockImplementationOnce(() => { throw new Error('Spin failed') })
+        startAutoplay(id)
+        autoplayEffect().effect()
+        await vi.advanceTimersByTimeAsync(220)
+        const tree = render(id)
+        expect(find(tree, node => node.props?.className === 'slot-autoplay-pill')).toBeNull()
+        expect(autoplayStatus(tree)).toBe('Autoplay stopped: a spin error occurred.')
+        expect(fixture.record).not.toHaveBeenCalled()
+    })
+
+    it('does not accept another spin after resolution throws following a debit (QA035)', async () => {
+        const id = 'mummy-cascade'
+        const reportError = vi.spyOn(console, 'error').mockImplementation(() => {})
+        cleanups.push(() => reportError.mockRestore())
+        vi.mocked(resolveSlotSpin).mockImplementationOnce(() => { throw new Error('Outcome resolution failed') })
+        fixture.outcome = outcome(id, { multiplier: 1 })
+        startAutoplay(id)
+        autoplayEffect().effect()
+        await vi.advanceTimersByTimeAsync(220)
+
+        const tree = render(id)
+        expect(fixture.bet).toHaveBeenCalledOnce()
+        expect(fixture.bet).toHaveReturnedWith(true)
+        expect(resolveSlotSpin).toHaveBeenCalledOnce()
+        expect(autoplayStatus(tree)).toBe('Autoplay stopped: a spin error occurred.')
+        find(tree, node => node.props?.['aria-label'] === 'Spin').props.onClick()
+        await vi.advanceTimersByTimeAsync(2500)
+        expect(fixture.bet).toHaveBeenCalledOnce()
+        expect(resolveSlotSpin).toHaveBeenCalledOnce()
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+        expect(autoplayStatus(render(id))).toBe('Autoplay stopped: a spin error occurred.')
+    })
+
+    it('cancels the queued autoplay spin when Stop is pressed during the gap (QA035)', async () => {
+        const id = 'mummy-cascade'
+        const message = 'Autoplay stopped: you pressed Stop.'
+        fixture.outcome = outcome(id, { multiplier: 1 })
+        startAutoplay(id)
+        autoplayEffect().effect()
+        await vi.advanceTimersByTimeAsync(110)
+
+        const tree = render(id)
+        find(tree, node => node.props?.['aria-label'] === 'Stop autoplay').props.onClick()
+        expect(autoplayStatus(render(id))).toBe(message)
+
+        await vi.advanceTimersByTimeAsync(2500)
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+        expect(autoplayStatus(render(id))).toBe(message)
+    })
+
+    it('does not report count completion when a template switch resets active autoplay (QA035)', async () => {
+        const id = 'mummy-cascade'
+        const nextId = 'bars'
+        fixture.outcome = outcome(id)
+        startAutoplay(id)
+        autoplayEffect().effect()
+
+        // Drive a route template change through the prop, not the disabled selector.
+        render(nextId)
+        fixture.effects.find(({ dependencies }) => dependencies?.length === 1 && dependencies[0] === nextId).effect()
+        const switched = render(nextId)
+        expect(switched.props.definition.name).toBe('Bars')
+        expect(find(switched, node => node.props?.className === 'slot-autoplay-pill')).not.toBeNull()
+
+        // Both effects belong to the same render; the scheduler still sees active state.
+        fixture.effects.find(({ dependencies }) => dependencies?.[0]?.id === nextId && typeof dependencies[1] === 'function').effect()
+        autoplayEffect().effect()
+        await vi.advanceTimersByTimeAsync(221)
+
+        const tree = render(nextId)
+        expect(find(tree, node => node.props?.className === 'slot-autoplay-pill')).toBeNull()
+        expect(autoplayStatus(tree)).toBe('')
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+    })
+
+    it.each(['settlement', 'restart'])('keeps the manual stop reason from being overwritten by pending %s (QA035)', async next => {
+        const id = 'mummy-cascade'
+        fixture.outcome = outcome(id, { multiplier: 1 })
+        startAutoplay(id)
+        autoplayEffect().effect()
+        await vi.advanceTimersByTimeAsync(220)
+        let tree = render(id)
+        find(tree, node => node.props?.['aria-label'] === 'Stop autoplay').props.onClick()
+        tree = render(id)
+        expect(autoplayStatus(tree)).toBe('Autoplay stopped: you pressed Stop.')
+        expect(fixture.record).not.toHaveBeenCalled()
+
+        // Stop leaves the accepted round's Skip control and settlement intact.
+        find(tree, node => node.props?.['aria-label'] === 'Skip animation').props.onClick()
+        if (next === 'restart') startAutoplay(id)
+        await Promise.resolve()
+        tree = render(id)
+        expect(fixture.bet).toHaveBeenCalledOnce()
+        expect(fixture.record).toHaveBeenCalledOnce()
+        if (next === 'restart') {
+            expect(autoplayStatus(tree)).toBe('')
+            expect(text(find(tree, node => node.props?.className === 'slot-autoplay-pill'))).toContain('10')
+        } else {
+            expect(autoplayStatus(tree)).toBe('Autoplay stopped: you pressed Stop.')
+            find(tree, node => node.props?.['aria-label'] === 'Spin').props.onClick()
+            expect(autoplayStatus(render(id))).toBe('')
+        }
+    })
+
+    it.each([
+        ['feature', [0, 1], { multiplier: 10, featureEvents: [{ type: 'free-spins', freeSpins: 4, indexes: [] }] }, 'feature triggered (Free spins).', 4],
+        ['net gain limit', [5], { multiplier: 41 }, 'net gain limit reached (GC 200.00).', 0],
+    ])('reports the configured %s after an accepted round (QA035)', async (_label, armed, result, message, awarded) => {
         const id = 'mummy-cascade'
         let tree = render(id)
         find(tree, node => node.props?.value === 'normal' && node.props?.onChange).props.onChange('instant')
@@ -479,17 +608,16 @@ describe('settled slot presentation', () => {
             ;[node.props?.children].flat(Infinity).forEach(collect)
         }
         collect(find(tree, node => node.type === 'dialog'))
-        // First checkbox is "Stop on feature trigger" (see the drawer markup).
-        checkboxes[0].props.onChange({ target: { checked: true } })
+        // The feature case also hits the big-win threshold; feature has priority.
+        for (const index of armed) checkboxes[index].props.onChange({ target: { checked: true } })
         tree = render(id)
         // The drawer writes React state; the running session reads a ref that a
         // sync effect mirrors into it. Nothing in this harness runs effects
         // automatically, so mirror it explicitly before starting.
         const stops = fixture.state.find(value => value && typeof value === 'object' && 'stopOnFeature' in value)
-        expect(stops.stopOnFeature).toBe(true)
         fixture.effects.find(entry => entry.dependencies?.length === 1 && entry.dependencies[0] === stops).effect()
         find(tree, node => node.props?.className === 'slot-auto-start').props.onClick()
-        fixture.outcome = outcome(id, { multiplier: 0.5, featureEvents: [{ type: 'free-spins', freeSpins: 4, indexes: [] }] })
+        fixture.outcome = outcome(id, result)
         render(id)
         autoplayEffect().effect()
         // Settle the instants that finish the round AND let the outcome callback
@@ -501,8 +629,9 @@ describe('settled slot presentation', () => {
         expect(fixture.credit).toHaveBeenCalledOnce()
         expect(fixture.record).toHaveBeenCalledOnce()
         expect(find(tree, node => node.props?.className === 'slot-autoplay-pill')).toBeNull()
+        expect(autoplayStatus(tree)).toBe(`Autoplay stopped: ${message}`)
         // The remaining count is not charged against the player: free spins stay.
-        expect(find(tree, node => typeof node.props?.totalAwarded === 'number').props.remaining).toBe(4)
+        if (awarded) expect(find(tree, node => typeof node.props?.totalAwarded === 'number').props.remaining).toBe(awarded)
     })
 
     it('does not spend a round on an autoplay attempt that lands while a spin is in flight (QA035)', async () => {
@@ -528,6 +657,7 @@ describe('settled slot presentation', () => {
         expect(find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Skip animation')).not.toBeNull()
         // Rejected busy attempt: no round spent, no credit booked, no ledger row.
         expect(text(find(tree, node => node.props?.className === 'slot-autoplay-pill'))).toContain('10')
+        expect(autoplayStatus(tree)).toBe('')
         expect(fixture.bet).toHaveBeenCalledOnce()
         expect(fixture.record).not.toHaveBeenCalled()
 

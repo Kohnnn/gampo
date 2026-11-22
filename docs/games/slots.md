@@ -32,6 +32,7 @@
 - Animation-count measurements prompted removal of per-cell idle shine/bob loops. Static cell backgrounds, borders, and shadows retain symbol framing; stage atmosphere and gameplay, win, and bonus motion remain.
 - Autoplay configuration uses a native modal dialog: Escape closes it, background interaction is blocked, and focus returns to the opener.
 - A selected autoplay count is spent by accepted, completed rounds only — free rounds included. An attempt rejected by the spin lock or a refused debit settles no round, appears in no history row, and spends nothing; a refused debit ends the session.
+- Slots shows why Autoplay stopped without covering the settled reels. The message stays until the next accepted manual spin, new Autoplay run, or template change. Stopping does not cancel a round already accepted.
 - Manual Freeze-column controls affect reel animation only. The resolved outcome is drawn fresh each spin, so a frozen column never carries symbols forward.
 - Existing spin eligibility, free-spin caps, bonus rules, and autoplay stop policy remain unchanged.
 
