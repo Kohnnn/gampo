@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyFreeSpinAward, shouldStopAutoplay } from './slotAccounting'
+import { applyFreeSpinAward, getAutoplayStopReason } from './slotAccounting'
 
 describe('applyFreeSpinAward', () => {
     it('caps an initial raw award at the session limit', () => {
@@ -23,7 +23,7 @@ describe('applyFreeSpinAward', () => {
     })
 })
 
-describe('shouldStopAutoplay', () => {
+describe('getAutoplayStopReason', () => {
     const disabledStops = {
         stopOnFeature: false,
         stopOnBigWin: false,
@@ -35,59 +35,59 @@ describe('shouldStopAutoplay', () => {
     }
 
     it('uses settled balance for percentage and absolute monetary stops', () => {
-        expect(shouldStopAutoplay({
+        expect(getAutoplayStopReason({
             baseline: 100,
             settledBalance: 70,
             outcome: { profit: -30 },
             stops: { ...disabledStops, stopOnLoss: true, lossPercent: 30 },
-        })).toBe(true)
-        expect(shouldStopAutoplay({
+        })).toBe('loss-percent')
+        expect(getAutoplayStopReason({
             baseline: 100,
             settledBalance: 150,
             outcome: { profit: 50 },
             stops: { ...disabledStops, stopOnGain: true, gainPercent: 50 },
-        })).toBe(true)
-        expect(shouldStopAutoplay({
+        })).toBe('gain-percent')
+        expect(getAutoplayStopReason({
             baseline: 100,
             settledBalance: 90,
             outcome: { profit: -10 },
             stops: { ...disabledStops, stopOnLossAbs: true, lossAbs: 10 },
-        })).toBe(true)
-        expect(shouldStopAutoplay({
+        })).toBe('loss-credits')
+        expect(getAutoplayStopReason({
             baseline: 100,
             settledBalance: 115,
             outcome: { profit: 15 },
             stops: { ...disabledStops, stopOnGainAbs: true, gainAbs: 15 },
-        })).toBe(true)
+        })).toBe('gain-credits')
     })
 
     it('keeps feature, big-win, and single-win stops unchanged', () => {
-        expect(shouldStopAutoplay({
+        expect(getAutoplayStopReason({
             baseline: 100,
             settledBalance: 100,
             outcome: { profit: 0, featureEvents: [{ type: 'free-spins' }], multiplier: 0 },
             stops: { ...disabledStops, stopOnFeature: true },
-        })).toBe(true)
-        expect(shouldStopAutoplay({
+        })).toBe('feature')
+        expect(getAutoplayStopReason({
             baseline: 100,
             settledBalance: 100,
             outcome: { profit: 0, featureEvents: [], multiplier: 10 },
             stops: { ...disabledStops, stopOnBigWin: true, bigWinThreshold: 10 },
-        })).toBe(true)
-        expect(shouldStopAutoplay({
+        })).toBe('big-win')
+        expect(getAutoplayStopReason({
             baseline: 100,
             settledBalance: 100,
             outcome: { profit: 25, featureEvents: [], multiplier: 0 },
             stops: { ...disabledStops, stopOnSingleWin: true, singleWinAbs: 25 },
-        })).toBe(true)
+        })).toBe('single-win')
     })
 
     it('does not stop when no configured condition is met', () => {
-        expect(shouldStopAutoplay({
+        expect(getAutoplayStopReason({
             baseline: 100,
             settledBalance: 105,
             outcome: { profit: 5, featureEvents: [], multiplier: 1 },
             stops: { ...disabledStops, stopOnGain: true, gainPercent: 10 },
-        })).toBe(false)
+        })).toBe(null)
     })
 })

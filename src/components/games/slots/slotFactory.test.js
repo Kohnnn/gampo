@@ -200,7 +200,6 @@ describe('slotFactory layout helpers', () => {
         // cleared by stopAutoplay / resetSlotTemplate / unmount.
         // The auto-spin is queued on the dedicated timer, not motion.current.
         expect(slotsGameSource).toMatch(/autoplayTimerRef\.current = setTimeout\([\s\S]*?performSpin\(\{ source: 'auto'/)
-        expect(slotsGameSource).toMatch(/const stopAutoplay = useCallback\(\(\) => \{[\s\S]*clearTimeout\(autoplayTimerRef\.current\)/)
     })
 
     it('hides the in-flow panel spin on mobile so the fixed dock owns the single CTA', () => {

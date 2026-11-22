@@ -1806,6 +1806,38 @@
     place-items: center;
 }
 
+.slot-autoplay-status {
+    grid-column: 1 / -1;
+    justify-self: start;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    margin: 0;
+    padding: 4px 10px;
+    border: 1px solid var(--slot-rail-strong);
+    border-radius: 10px;
+    background: #0f1c2c;
+    color: var(--slot-text);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Keep the live region mounted without taking up a grid row while empty. */
+.slot-autoplay-status:empty {
+    position: absolute;
+    padding: 0;
+    border: 0;
+}
+
+/* Lift only the stop message above the bonus veil, not the stage controls. */
+.slot-stage-v2:has(> .slot-bonus-cine) > .slot-stage-header:has(> .slot-autoplay-status:not(:empty)) {
+    z-index: auto;
+}
+
+.slot-stage-v2:has(> .slot-bonus-cine) .slot-autoplay-status:not(:empty) {
+    position: relative;
+    z-index: 41;
+}
+
 /* ---------- Buy modal ---------- */
 
 .slot-buy-modal p {
