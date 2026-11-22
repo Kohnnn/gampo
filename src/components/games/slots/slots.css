@@ -4812,8 +4812,8 @@
     overflow-x: auto;
 }
 
-/* Bet sheet is a mobile affordance only. */
-@media (min-width: 769px) {
+/* Both mobile backdrops hide at the exact complement of the dock breakpoint. */
+@media not all and (max-width: 768px) {
     .slot-mobile-bet-sheet-backdrop { display: none; }
     .slot-mobile-info-backdrop { display: none; }
 }

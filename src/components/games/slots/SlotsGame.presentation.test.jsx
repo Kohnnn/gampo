@@ -38,7 +38,7 @@ import EducationPanel from '../../EducationPanel'
 import { SLOT_TEMPLATES, getSlotTemplate } from './slotFactory'
 import WinPathOverlay from '../primitives/WinPathOverlay'
 import { buildCascadeTimeline, cascadeTimelineDurationMs } from './slotsMotion'
-import { claimEscape } from '../../../utils/escapeClaims'
+import { claimEscape, dispatchEscape } from '../../../utils/escapeClaims'
 
 function render(id) {
     fixture.stateCursor = 0; fixture.refCursor = 0; fixture.effects = []
@@ -47,7 +47,7 @@ function render(id) {
 function find(node, predicate) {
     if (!node || typeof node !== 'object') return null
     if (predicate(node)) return node
-    for (const child of [node.props?.panel, node.props?.secondary, ...[node.props?.children].flat(Infinity)]) {
+    for (const child of [node.props?.panel, node.props?.secondary, ...[node.props?.children, node.children].flat(Infinity)]) {
         const match = find(child, predicate)
         if (match) return match
     }
@@ -559,9 +559,23 @@ describe('settled slot presentation', () => {
     })
 })
 
-describe('slots Space shortcut guard (QA028)', () => {
+describe('slots manual Spin and Space guard', () => {
     function matches(selectorList, selectors) {
-        return selectorList.split(',').some(selector => selectors.includes(selector.trim()))
+        return selectorList.split(',').some(selector => {
+            const [base, excluded] = selector.trim().split(':not(')
+            return selectors.includes(base) && (!excluded || !selectors.includes(excluded.slice(0, -1)))
+        })
+    }
+
+    function spinButton(tree, surface) {
+        return find(tree, node => node.props?.['data-slot-action'] === 'spin' && node.props.className.split(' ').includes(surface))
+    }
+
+    function expectNoRound() {
+        expect(fixture.bet).not.toHaveBeenCalled()
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(fixture.resolverArgs).toHaveLength(0)
+        expect(fixture.record).not.toHaveBeenCalled()
     }
 
     function keyboardTarget(tagName, { attributes = {}, selectors = [], parentElement = null, isContentEditable = false } = {}) {
@@ -697,35 +711,112 @@ describe('slots Space shortcut guard (QA028)', () => {
         expect(event.defaultPrevented).toBe(true)
     })
 
-    it('releases playfield Space on desktop resize and keeps the paytable closed on return to mobile', () => {
+    it.each([
+        ['Adjust Bet', 'Edit bet', 'slot-mobile-bet-sheet-backdrop'],
+        ['paytable', 'View paytable and rules', 'slot-mobile-info-backdrop'],
+    ])('lets the fullscreen stage Spin above an open %s but not a native modal', async (_label, opener, backdropClass) => {
+        fixture.mobile = true
+        const page = mount(tree => find(tree, node => node.props?.['aria-label'] === opener).props.onClick())
+        document.fullscreenEnabled = true
+        let tree = page.rerender()
+        const stage = () => tree.props.children
+        const fullscreenButton = label => find(stage(), node => node.props?.['aria-label'] === label)
+        const backdrop = find(tree.props.secondary, node => node.props?.className === backdropClass)
+        page.dialogs.push(renderedDialog(backdrop))
+        expect(page.press().defaultPrevented).toBe(false)
+        expectNoRound()
+
+        const stageNode = {
+            querySelector: () => null,
+            querySelectorAll: () => [], // Neither the dock sheet nor the portaled modal is a stage descendant.
+            async requestFullscreen() {
+                document.fullscreenElement = stageNode
+                document.dispatchEvent(new Event('fullscreenchange'))
+            },
+        }
+        stage().ref.current = stageNode
+        await fullscreenButton('Enter reel fullscreen').props.onClick()
+        tree = page.rerender()
+        expect(fullscreenButton('Exit reel fullscreen')).not.toBeNull()
+        expect(find(tree.props.secondary, node => node.props?.className === backdropClass)).not.toBeNull()
+
+        const spin = spinButton(stage(), 'slot-control-spin')
+        expect(spin.props.disabled).toBe(false)
+        page.dialogs.push({ selectors: ['dialog[open]', 'dialog:modal'], getAttribute: () => null })
+        spin.props.onClick()
+        expect(page.press().defaultPrevented).toBe(false)
+        expectNoRound()
+
+        page.dialogs.pop()
+        spin.props.onClick()
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+        expect(fixture.resolverArgs).toHaveLength(1)
+        expect(fixture.record).not.toHaveBeenCalled()
+        page.rerender()
+        expect(page.press().defaultPrevented).toBe(true)
+        expect(fixture.record).toHaveBeenCalledOnce()
+        expect(fixture.bet).toHaveBeenCalledOnce()
+    })
+
+    it('blocks dock Spin behind the paytable and uses backdrop visibility before the resize hook updates', () => {
         fixture.mobile = true
         const page = mount(tree => {
-            find(tree, node => node.props?.['aria-label'] === 'View paytable and rules').props.onClick()
+            find(tree, node => node.props?.['aria-label'] === 'Edit bet').props.onClick()
         })
-
-        let tree = render('bars')
-        const findPaytable = () => find(tree, node => node.props?.role === 'dialog' && node.props?.['aria-label'] === 'Bars paytable and rules')
-        // Query the rendered sheet, not the viewport: its own display is flex
-        // even when desktop CSS hides the backdrop that contains it.
-        document.querySelectorAll = selectors => {
-            const sheet = findPaytable()
-            if (!sheet) return []
-            const dialog = renderedDialog(sheet)
-            return matches(selectors, dialog.selectors) ? [dialog] : []
-        }
-
-        expect(findPaytable()).not.toBeNull()
+        let tree = page.rerender()
+        const findBackdrop = () => find(tree, node => node.props?.className === 'slot-mobile-info-backdrop')
+        find(tree, node => node.props?.className === 'slot-mobile-bet-info').props.onClick()
+        tree = page.rerender()
+        const backdrop = findBackdrop()
+        expect(backdrop).not.toBeNull()
+        expect(find(tree, node => node.props?.['aria-label'] === 'Adjust bet')).toBeNull()
+        const style = { display: 'flex', opacity: '1' }
+        page.dialogs.push(renderedDialog(backdrop, style))
+        // The inner dialog still computes display:flex when its backdrop is hidden.
+        page.dialogs.push(renderedDialog(find(backdrop, node => node.props?.['aria-label'] === 'Bars paytable and rules')))
+        spinButton(tree, 'slot-mobile-spin').props.onClick()
         expect(page.press().defaultPrevented).toBe(false)
-        expect(fixture.bet).not.toHaveBeenCalled()
+        expectNoRound()
 
-        fixture.mobile = false
-        tree = render('bars')
+        style.display = 'none'
         expect(page.press().defaultPrevented).toBe(true)
         expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+        expect(fixture.resolverArgs).toHaveLength(1)
 
+        fixture.mobile = false
+        tree = page.rerender()
+        expect(findBackdrop()).toBeNull()
         fixture.mobile = true
-        tree = render('bars')
-        expect(findPaytable()).toBeNull()
+        tree = page.rerender()
+        expect(findBackdrop()).toBeNull()
+    })
+
+    it.each([
+        ['Adjust Bet', 'Edit bet', 'slot-mobile-bet-sheet-backdrop'],
+        ['paytable', 'View paytable and rules', 'slot-mobile-info-backdrop'],
+    ])('routes Escape past the CSS-hidden %s before resize cleanup', (_label, opener, backdropClass) => {
+        fixture.mobile = true
+        const lowerClaim = vi.fn(() => true)
+        cleanups.push(claimEscape(lowerClaim))
+        // Mount with the sheet open so its actual Escape effect registers above the lower claim.
+        find(render('bars'), node => node.props?.['aria-label'] === opener).props.onClick()
+        const page = mount()
+        const findBackdrop = tree => find(tree, node => node.props?.className === backdropClass)
+        const style = { display: 'flex', opacity: '1' }
+        page.dialogs.push(renderedDialog(findBackdrop(page.rerender()), style))
+        const escape = () => Object.defineProperty(new Event('keydown', { cancelable: true }), 'key', { value: 'Escape' })
+
+        // Model CSS hiding the backdrop before React observes the resize or releases the claim.
+        style.display = 'none'
+        const duringResize = escape()
+        expect(dispatchEscape(duringResize)).toBe(true)
+        expect(lowerClaim).toHaveBeenCalledExactlyOnceWith(duringResize)
+        expect(findBackdrop(page.rerender())).not.toBeNull()
+
+        style.display = 'flex'
+        expect(dispatchEscape(escape())).toBe(true)
+        expect(lowerClaim).toHaveBeenCalledOnce()
+        expect(findBackdrop(page.rerender())).toBeNull()
     })
 
     it.each([
@@ -755,45 +846,82 @@ describe('slots Space shortcut guard (QA028)', () => {
     })
 
     it.each([
-        ['Buy bonus tier', 'vault-rush', 'Vault Rush spin', false, node => text(node).trim() === 'Buy'],
-        ['Adjust bet', 'bars', 'Bars spin', true, node => node.props?.['aria-label'] === 'Edit bet'],
-    ])('blocks playfield Space while %s is open and restores it on close', (label, id, spinLabel, mobile, isOpener) => {
-        fixture.mobile = mobile
+        ['dock', 'Adjust bet', 'bars', 'Bars spin', 'slot-mobile-spin', node => node.props?.['aria-label'] === 'Edit bet'],
+        ['in-stage', 'Buy bonus tier', 'vault-rush', 'Vault Rush spin', 'slot-control-spin', node => text(node).trim() === 'Buy'],
+        ['panel', 'Buy bonus tier', 'vault-rush', 'Vault Rush spin', 'slot-panel-spin', node => text(node).trim() === 'Buy'],
+    ])('blocks %s Spin behind %s and restores it on close', (_name, label, id, spinLabel, surface, isOpener) => {
+        fixture.mobile = id === 'bars'
         const page = mount(tree => {
+            find(tree, node => node.props?.value === 'normal' && node.props.onChange).props.onChange('instant')
             find(tree, node => node.type === 'button' && isOpener(node)).props.onClick()
         }, id)
         const findDialog = tree => find(tree, node => node.props?.role === 'dialog' && node.props?.['aria-label'] === label)
-        const dialog = findDialog(render(id))
-        expect(dialog).not.toBeNull()
-        page.dialogs.push(renderedDialog(dialog))
+        const tree = page.rerender()
+        const dialog = findDialog(tree)
+        const layer = renderedDialog(dialog, { display: 'flex', opacity: fixture.mobile ? '0' : '1' })
+        if (fixture.mobile) {
+            // The Adjust Bet backdrop blocks even in the first frame of its fade-in.
+            layer.getAnimations = () => [{ playState: 'running', effect: { getKeyframes: () => [{ opacity: 0 }, { opacity: 1 }] } }]
+        }
+        page.dialogs.push(layer)
+        const spin = spinButton(tree, surface)
+        expect(spin.props.disabled).toBe(false)
+        // This is the click boundary (shared by pointer and native button activation).
+        spin.props.onClick()
         expect(page.press().defaultPrevented).toBe(false)
-        expect(fixture.bet).not.toHaveBeenCalled()
+        expectNoRound()
 
         find(dialog, node => node.type === 'button' && node.props?.['aria-label'] === 'Close').props.onClick()
-        expect(findDialog(page.rerender())).toBeNull()
+        const closedTree = page.rerender()
+        expect(findDialog(closedTree)).toBeNull()
         page.dialogs.pop()
-        expect(page.press().defaultPrevented).toBe(true)
+        spinButton(closedTree, surface).props.onClick()
+        vi.advanceTimersByTime(0)
         expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, spinLabel)
+        expect(fixture.resolverArgs).toHaveLength(1)
+        expect(fixture.record).toHaveBeenCalledOnce()
     })
 
-    it('blocks playfield Space while Adjust bet is visible past the mobile breakpoint', () => {
+    it('allows playfield Space with Adjust Bet still mounted but hidden', () => {
         fixture.mobile = true
         const page = mount(tree => {
-            find(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Edit bet').props.onClick()
+            find(tree, node => node.props?.['aria-label'] === 'Edit bet').props.onClick()
         })
-
-        // At 768.5px the mobile hook is false, but CSS hides the sheet only at 769px and up.
-        fixture.mobile = false
-        const sheet = find(page.rerender(), node => node.props?.role === 'dialog' && node.props?.['aria-label'] === 'Adjust bet')
-        expect(sheet).not.toBeNull()
+        const sheet = find(page.rerender(), node => node.props?.['aria-label'] === 'Adjust bet')
         const style = { display: 'flex', opacity: '1' }
         page.dialogs.push(renderedDialog(sheet, style))
         expect(page.press().defaultPrevented).toBe(false)
-        expect(fixture.bet).not.toHaveBeenCalled()
+        expectNoRound()
 
         style.display = 'none'
+        fixture.mobile = false
+        page.rerender()
         expect(page.press().defaultPrevented).toBe(true)
         expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+    })
+
+    it('arms a selected Buy Bonus tier without a round until Spin is pressed', () => {
+        const id = 'vault-rush'
+        const page = mount(tree => {
+            find(tree, node => node.props?.value === 'normal' && node.props.onChange).props.onChange('instant')
+            find(tree, node => node.type === 'button' && text(node).trim() === 'Buy').props.onClick()
+        }, id)
+        const findBuy = tree => find(tree, node => node.props?.['aria-label'] === 'Buy bonus tier')
+        const buy = findBuy(page.rerender())
+        page.dialogs.push(renderedDialog(buy))
+        find(buy, node => node.type === 'button' && text(node).startsWith('Lite Buy')).props.onClick()
+        const armedTree = page.rerender()
+        expect(findBuy(armedTree)).toBeNull()
+        expectNoRound()
+
+        page.dialogs.pop()
+        const spin = spinButton(armedTree, 'slot-panel-spin')
+        expect(text(spin)).toBe('Buy 30x')
+        spin.props.onClick()
+        vi.advanceTimersByTime(0)
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(150, 'Vault Rush bonus buy')
+        expect(fixture.resolverArgs).toEqual([expect.objectContaining({ bonusBuy: true, buyTier: expect.objectContaining({ id: 'lite' }) })])
+        expect(fixture.record).toHaveBeenCalledOnce()
     })
 
     it('spins once from playfield Space and ignores held Space after the round settles', async () => {
@@ -807,6 +935,47 @@ describe('slots Space shortcut guard (QA028)', () => {
         expect(page.press({ repeat: { value: true } }).defaultPrevented).toBe(false)
         expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
         expect(fixture.record).toHaveBeenCalledOnce()
+    })
+
+    it.each([
+        ['dock', 'slot-mobile-spin'],
+        ['in-stage', 'slot-control-spin'],
+    ])('refuses %s Skip behind the paytable without settling the running spin', (_name, surface) => {
+        fixture.mobile = true
+        const page = mount()
+        fixture.outcome = outcome('bars', { multiplier: 2 })
+        spinButton(page.rerender(), 'slot-mobile-spin').props.onClick()
+        let tree = page.rerender()
+        find(tree, node => node.props?.['aria-label'] === 'View paytable and rules').props.onClick()
+        tree = page.rerender()
+        const backdrop = find(tree, node => node.props?.className === 'slot-mobile-info-backdrop')
+        page.dialogs.push(renderedDialog(backdrop))
+        const skip = spinButton(tree, surface)
+        expect(skip.props['aria-label'] ?? text(skip)).toMatch(/^Skip/)
+        expect(skip.props.disabled).toBe(false)
+        skip.props.onClick()
+        expect(page.press().defaultPrevented).toBe(false)
+        vi.advanceTimersByTime(0)
+        expect(fixture.bet).toHaveBeenCalledExactlyOnceWith(5, 'Bars spin')
+        expect(fixture.resolverArgs).toHaveLength(1)
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(fixture.record).not.toHaveBeenCalled()
+        expect(find(page.rerender(), node => node.props?.['data-slot-spinning'] === 'true')).not.toBeNull()
+
+        find(backdrop, node => node.props?.['aria-label'] === 'Close').props.onClick()
+        tree = page.rerender()
+        expect(find(tree, node => node.props?.className === 'slot-mobile-info-backdrop')).toBeNull()
+        page.dialogs.pop()
+        const panel = spinButton(tree, 'slot-panel-spin')
+        expect(panel.props.disabled).toBe(true)
+        panel.props.onClick()
+        expect(fixture.record).not.toHaveBeenCalled()
+
+        spinButton(tree, surface).props.onClick()
+        expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(10, 'Bars return')
+        expect(fixture.record).toHaveBeenCalledOnce()
+        expect(fixture.resolverArgs).toHaveLength(1)
+        expect(fixture.bet).toHaveBeenCalledOnce()
     })
 
     it('leaves a running round alone for a button or open dialog and still allows playfield Space to skip', () => {
