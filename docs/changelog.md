@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Overlapping sportsbook feed requests in the same server runtime now share one provider refresh. The five-minute cache window and feed response format are unchanged.
+
 ## 2026-05 - Phase 9: BigWinOverlay full coverage + ESC dismiss + screen-shake
 
 Build mode: yes. Compliance: still fake-credit only.

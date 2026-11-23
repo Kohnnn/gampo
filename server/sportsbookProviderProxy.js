@@ -37,6 +37,8 @@ const API_SPORTS_MULTI_SPORTS = [
 ]
 
 let cachedFeed = null
+// Like the cache, this slot belongs to one runtime with stable provider configuration.
+let pendingFeed = null
 const PROVIDER_KEY_COOLDOWN = new Map()
 
 function envValue(env, names) {
@@ -318,7 +320,19 @@ async function loadApiFootball(keys) {
 export async function loadProviderFeed(env) {
     const now = Date.now()
     if (cachedFeed && now - cachedFeed.ts < CACHE_TTL_MS) return { ...cachedFeed.value, cached: true }
+    if (pendingFeed) return pendingFeed
 
+    pendingFeed = aggregateProviderFeed(env)
+    try {
+        const value = await pendingFeed
+        cachedFeed = { ts: now, value }
+        return value
+    } finally {
+        pendingFeed = null
+    }
+}
+
+async function aggregateProviderFeed(env) {
     const tokens = {
         sportsGameOdds: envValue(env, ['SPORTSGAMEODDS_TOKEN', 'SportsGameOdds_token', 'sportsGameOdds_token']),
         pandascore: envValues(env, ['PANDASCORE_TOKEN', 'pandascore_token']),
@@ -333,7 +347,7 @@ export async function loadProviderFeed(env) {
         loadApiFootball(tokens.apiFootball),
     ])
 
-    const value = {
+    return {
         generatedAt: new Date().toISOString(),
         cached: false,
         sources: {
@@ -385,9 +399,6 @@ export async function loadProviderFeed(env) {
             ...apiFootball.errors,
         ].filter(Boolean),
     }
-
-    cachedFeed = { ts: now, value }
-    return value
 }
 
 function sendJson(res, status, value) {
