@@ -41,7 +41,19 @@ The base above is an inspection snapshot, not a permanent working branch. Refres
 
 ## Offline setup and verification
 
-For docs-only work, start at the repository root with Git; no Node install or dependency install is needed. Set `base` to the agreed review-base SHA. Confirm the branch and scope with `git status --short` and `git diff --name-status "$base"`. Use `git ls-files --error-unmatch -- README.md SWARM_READY.md package.json package-lock.json .github/workflows/ci.yml docs/agents/issue-tracker.md` to check the entry paths, resolve the changed relative links and headings locally, and require `git diff --check "$base"` to pass.
+For docs-only work, no Node install is needed. From the repository root, set `base` and `candidate` to the agreed review-base and candidate SHAs. Record the checkout branch and dirty state separately; review the changed paths and relative links against the candidate tree, not the index or working tree.
+
+```sh
+set -eu
+export GIT_ALLOW_PROTOCOL=
+git status --short --branch
+git diff --no-renames --name-status "$base" "$candidate" --
+git diff --no-renames --no-ext-diff --no-textconv --check "$base" "$candidate" --
+for path in README.md SWARM_READY.md package.json package-lock.json \
+  .github/workflows/ci.yml docs/agents/issue-tracker.md; do
+  test "$(git ls-tree --full-tree --format='%(objecttype)' "$candidate" -- "$path")" = blob
+done
+```
 
 For separately authorized app work, [Run Locally](README.md#run-locally) gives the setup. [The package manifest](package.json) declares Node 24.x; [CI](.github/workflows/ci.yml) uses Node 24 and `npm ci` against the [lockfile](package-lock.json). The install is not part of offline review. The table below lists source-declared app checks, not steps to run for a docs-only task.
 
