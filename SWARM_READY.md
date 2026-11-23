@@ -11,7 +11,7 @@ Give the working agent this prompt:
 
 ```text
 swarm ready: <one measurable repository objective>
-Read SWARM_READY.md and the applicable AGENTS.md. Continue the current owned
+Read SWARM_READY.md and the repository's issue-tracker guide. Continue the current owned
 work or ready issue, establish the baseline and acceptance check, then prepare
 a bounded worker handoff. Use existing authorized tools and capacity. Report
 what is documented, implemented, tested, and observed separately.
@@ -21,9 +21,7 @@ If a `swarm-ready` skill is installed, load it. Otherwise execute the documented
 
 ## Repository starting point
 
-Read: [README.md](README.md), [DESIGN.md](DESIGN.md), [package.json](package.json), [docs](docs), [scripts](scripts), [.github](.github).
-
-Continue an existing approved issue or a clearly scoped user objective after inspecting the source map below. If none is selected, return the smallest useful improvement and its verifier as the handoff; do not begin a portfolio-wide rewrite.
+Read the [GitHub issue-tracker guide](docs/agents/issue-tracker.md), [README](README.md), and [design notes](DESIGN.md). Continue the existing assigned issue or scoped work order; for a new slice, record the outcome and verifier before editing. Do not take over an unrelated QA or Wayfinder ticket.
 
 Start with one writer. Add workers only for disjoint changes or independent experiments whose results can be checked separately. Keep shared interfaces and final integration with one owner.
 
@@ -41,17 +39,21 @@ The base above is an inspection snapshot, not a permanent working branch. Refres
 6. **Verify and integrate.** Verify the exact returned commit independently in a clean environment. Recheck the final integrated revision when changes interact. Follow existing review, merge and deployment rules; a green worker report alone cannot override them. Use the narrowest checks that resolve a concrete risk.
 7. **Checkpoint and finish.** Save candidate SHA, evidence, measured outcome, remaining blockers and a precise next action before context/lease expiry. Reconcile lost or duplicate completions before retrying. Release only the run's owned resources after preserving evidence. Stop when the requested outcome is met or a concrete blocker prevents the next required action.
 
-## Verification starting point
+## Offline setup and verification
+
+For docs-only work, start at the repository root with Git; no Node install or dependency install is needed. Set `base` to the agreed review-base SHA. Confirm the branch and scope with `git status --short` and `git diff --name-status "$base"`. Use `git ls-files --error-unmatch -- README.md SWARM_READY.md package.json package-lock.json .github/workflows/ci.yml docs/agents/issue-tracker.md` to check the entry paths, resolve the changed relative links and headings locally, and require `git diff --check "$base"` to pass.
+
+For separately authorized app work, [Run Locally](README.md#run-locally) gives the setup. [The package manifest](package.json) declares Node 24.x; [CI](.github/workflows/ci.yml) uses Node 24 and `npm ci` against the [lockfile](package-lock.json). The install is not part of offline review. The table below lists source-declared app checks, not steps to run for a docs-only task.
 
 | Declared command | Working directory | Source and limit |
 | --- | --- | --- |
-| `npm run test` | `.` | package.json; full Vitest run |
+| `npm test` | `.` | package.json; full Vitest run |
 | `npm run typecheck:core` | `.` | package.json; core TypeScript checks |
-| `npm run lint` | `.` | package.json; ESLint |
+| `npm run lint:ratchet` | `.` | package.json and CI; lint ratchet |
 | `npm run build` | `.` | package.json; Vite build |
 | `npm run test:ci:fast` | `.` | package.json; excludes slotFactory.test.js and slotRtp.test.js; not full-suite evidence |
 
-These commands were read from the pinned source, not executed for this documentation change. A declared script is not a passing baseline. Confirm the current environment and hooks, select the checks relevant to the scoped change, and record the exact candidate SHA and evidence. For a documentation-only task, review factual anchors, links and whitespace; do not run unrelated application builds.
+For app changes, consult [required verification](README.md#required-verification) and the CI workflow for the full sequence and browser-check scope. None of these app commands was run for this documentation change. A passing offline review is not permission to push or merge: confirm that the specific branch update will not trigger an out-of-scope preview or deployment.
 
 ## Required handoff result
 
