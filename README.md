@@ -17,8 +17,10 @@ Production: [https://gampo-educational-simulator.netlify.app](https://gampo-educ
 
 ## Run Locally
 
+For app development, use Node.js 24.x and npm, matching [CI](.github/workflows/ci.yml). For a docs-only task, use the [offline swarm-ready checks](SWARM_READY.md#offline-setup-and-verification) instead of installing dependencies or starting the app.
+
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
