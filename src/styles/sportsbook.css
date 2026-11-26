@@ -2701,6 +2701,11 @@
     padding: 12px 14px;
 }
 
+/* QA042 (#37): prevent long source lists from consuming the status copy track. */
+.sb-feed-status {
+    grid-template-columns: minmax(0, 1fr) minmax(0, min(40%, 22rem));
+}
+
 .sb-feed-status > div,
 .sb-feed-status dl div,
 .sb-fact-grid div {
@@ -2709,6 +2714,11 @@
     /* QA042: a grid child defaults to `min-width: auto`, which lets a long
        unbreakable token push its `minmax(0, 1fr)` track open. */
     min-width: 0;
+}
+
+/* Keep short status copy with its heading beside tall wrapped metadata. */
+.sb-feed-status > div {
+    align-content: start;
 }
 
 .sb-feed-status span,
@@ -2725,10 +2735,7 @@
     flex-wrap: wrap;
     gap: 18px;
     margin: 0;
-    /* QA042: the metadata column is `auto` in the parent grid, so it sizes to its
-       longest unbreakable child. `sources.join(', ')` is a single long token, which
-       inflated that column and squeezed the status text to zero width. Allowing the
-       list to wrap and shrink is what keeps the reading column nonzero. */
+    /* The parent bounds this track; allow its metadata and values to wrap within it. */
     min-width: 0;
 }
 

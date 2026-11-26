@@ -20,8 +20,9 @@ function ruleBody(selector) {
 // that token's min-content, and a grid child defaults to `min-width: auto`, so
 // the `minmax(0, 1fr)` text column was squeezed to nothing.
 //
-// No browser exists on this host, so this pins the declarations that make the
-// squeeze impossible. It is a source contract, not a measurement.
+// These original source invariants are retained as automated CI coverage. They
+// do not by themselves prove the column cannot squeeze; the mounted native
+// geometry probe is the regression that proves rendered readable width.
 describe('sportsbook feed status layout (QA042)', () => {
     it('lets the metadata column shrink instead of sizing to its longest token', () => {
         const body = ruleBody('.sb-feed-status')
