@@ -92,6 +92,7 @@ const viewports = [{ width: 1610, height: 870, mobile: false }, { width: 1024, h
 const fonts = new Set(['fonts.googleapis.com', 'fonts.gstatic.com'])
 const mimeTypes = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.ico': 'image/x-icon' }
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+const round2 = value => Number.isFinite(value) ? Math.round(value * 100) / 100 : value
 
 async function bounded(promise, ms, label) {
     let timer
@@ -283,7 +284,26 @@ try {
                 const hasReadableText = el => Boolean(el.textContent.trim())
                     && getComputedStyle(el).visibility === 'visible'
                     && rectsOf(el).some(r => r.right > r.left && r.bottom > r.top)
-                const a = box(copy), b = box(metadata)
+                const a = box(copy), b = box(metadata), grid = box(root)
+                // QA042: compare the rendered metadata box against both desktop
+                // limits. Percentages use the grid content box and rem uses the
+                // computed document root font size.
+                const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+                const gridStyle = getComputedStyle(root)
+                const gridContentWidth = grid.width
+                    - parseFloat(gridStyle.borderLeftWidth) - parseFloat(gridStyle.borderRightWidth)
+                    - parseFloat(gridStyle.paddingLeft) - parseFloat(gridStyle.paddingRight)
+                const metadataRemCap = rootFontSize * 22
+                const metadataShareCap = gridContentWidth * 0.4
+                const metadataCap = Math.min(metadataRemCap, metadataShareCap)
+                const metadataWidth = b.width
+                const metadataLimit = !Number.isFinite(metadataCap) ? 'invalid' : metadataRemCap <= metadataShareCap ? '22rem' : '40%'
+                const metadataBoundValid = gridStyle.display === 'grid'
+                    && metadata.parentElement === root
+                    && Number.isFinite(rootFontSize) && rootFontSize > 0
+                    && Number.isFinite(gridContentWidth) && gridContentWidth > 0
+                    && Number.isFinite(metadataWidth) && metadataWidth > 0
+                    && Number.isFinite(metadataCap) && metadataCap > 0
                 const rects = [heading, body, ...fields].flatMap(rectsOf)
                 return {
                     viewport: { width: innerWidth, height: innerHeight }, state: root.className,
@@ -294,12 +314,14 @@ try {
                     stageOwned: Boolean(root.closest('.sb-main[data-ux-surface="stage"]')) && document.querySelectorAll('.sb-feed-status').length === 1,
                     headingBodyGap: box(body).top - box(heading).bottom,
                     overlap: a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5,
-                    outsideBanner: rects.some(r => r.right > box(root).right + 1 || r.left < box(root).left - 1),
+                    outsideBanner: rects.some(r => r.right > grid.right + 1 || r.left < grid.left - 1),
                     contained: rects.every(r => r.left >= -0.5 && r.right <= innerWidth + 0.5),
                     sourceLines: new Set(rectsOf(fields[3]).map(r => Math.round(r.top))).size,
                     clipped: fields.some(field => field.scrollWidth > field.clientWidth + 1),
                     documentScrollWidth: document.documentElement.scrollWidth,
                     welcomeAtMeasurement: !!document.querySelector('.welcome-card[role="dialog"]'),
+                    metadataWidth, metadataCap, metadataRemCap, metadataShareCap, metadataLimit, metadataBoundValid,
+                    rootFontSize, gridContentWidth,
                 }
             })()`)
             rows.push({
@@ -332,6 +354,13 @@ try {
             failures.push(`${label}: full source text missing`)
         }
         if ((row.scenario === 'long-list' || row.scenario === 'unbroken') && row.sourceLines < 2) failures.push(`${label}: no wrap (${row.sourceLines})`)
+        if (!stacked) {
+            // QA042 (#37): the desktop split must keep the metadata track at or
+            // under min(40% of the grid content box, 22rem of the computed root
+            // font size). One CSS px of slack covers sub-pixel track rounding.
+            if (!row.metadataBoundValid) failures.push(`${label}: invalid desktop metadata bound measurement`)
+            else if (row.metadataWidth > row.metadataCap + 1) failures.push(`${label}: metadata width ${round2(row.metadataWidth)}px exceeds desktop cap ${round2(row.metadataCap)}px (${row.metadataLimit}; grid content ${round2(row.gridContentWidth)}px; root font ${round2(row.rootFontSize)}px)`)
+        }
     }
     if (welcomeFailures.length) failures.push(...welcomeFailures)
     if (externalRequests.length || cdpErrors.length) failures.push(`external ${externalRequests.join(',')}; interception ${cdpErrors.join(',')}`)
@@ -342,6 +371,10 @@ try {
         copyTop: Math.round(row.copy.top), metadataTop: Math.round(row.metadata.top), overlap: row.overlap,
         headingBodyGap: Math.round(row.headingBodyGap), stageOwned: row.stageOwned,
         sourceLines: row.sourceLines, sourceCharacters: row.sourceText.length, documentScrollWidth: row.documentScrollWidth,
+        metadataWidth: round2(row.metadataWidth), metadataCap: round2(row.metadataCap),
+        metadataRemCap: round2(row.metadataRemCap), metadataShareCap: round2(row.metadataShareCap),
+        metadataLimit: row.metadataLimit,
+        gridContentWidth: round2(row.gridContentWidth), rootFontSize: round2(row.rootFontSize),
     }))
     console.log(JSON.stringify({
         browser: owned.browser, origin,
