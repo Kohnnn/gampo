@@ -221,6 +221,47 @@ describe('BetPanel Auto reconciles Dice wallet and history callbacks (QA027)', (
         expect(recordedProfit).toBeCloseTo(credited - debited, 2)
     })
 
+    it('settles the pending second win once when the player stops Auto', async () => {
+        fixture.rolls = [0.9, 0.1, 0.9]
+        const game = mountGame()
+        const run = startAuto(game, { count: 3 })
+
+        for (let elapsed = 0; elapsed < 2500 && fixture.debit.mock.calls.length < 2; elapsed += 50) {
+            await vi.advanceTimersByTimeAsync(50)
+        }
+        const debits = [[1, 'Dice'], [1, 'Dice']]
+        expect(fixture.debit.mock.calls).toEqual(debits)
+        expect(fixture.record).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+            id: expect.stringMatching(/\S/), label: '90.00', betAmount: 1, profit: -1,
+        }))
+        expect(fixture.credit).not.toHaveBeenCalled()
+        const delivered = vi.fn()
+        game.onPlay.mock.results[1].value.then(delivered)
+
+        const stop = playButton(game.render())
+        expect(stop.props.className).toContain('stop')
+        expect(stop.props.disabled).toBe(false)
+        await stop.props.onClick()
+        expect(fixture.balance).toBe(98)
+        expect(fixture.record).toHaveBeenCalledTimes(1)
+        expect(fixture.credit).not.toHaveBeenCalled()
+        expect(delivered).not.toHaveBeenCalled()
+
+        await vi.runAllTimersAsync()
+        await run
+        expect(game.onPlay.mock.calls).toEqual([autoRequest, autoRequest])
+        expect(fixture.debit.mock.calls).toEqual(debits)
+        expect(fixture.credit).toHaveBeenCalledExactlyOnceWith(1.98, 'Dice return')
+        expect(fixture.record).toHaveBeenCalledTimes(2)
+        const [loss, win] = fixture.record.mock.calls.map(([entry]) => entry)
+        expect(win).toMatchObject({ id: expect.stringMatching(/\S/), label: '10.00', betAmount: 1, profit: 0.98 })
+        expect(win.id).not.toBe(loss.id)
+        expect(delivered).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+            kind: 'committed', id: win.id, betAmount: 1, profit: 0.98,
+        }))
+        expect(fixture.balance).toBeCloseTo(99.98, 2)
+    })
+
     it('uses updated Dice odds for the next Auto round and reconciles wallet and history', async () => {
         fixture.rolls = [0.7, 0.7]
         const game = mountGame()
