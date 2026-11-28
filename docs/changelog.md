@@ -5,6 +5,7 @@
 ### Fixed
 
 - Overlapping sportsbook feed requests in the same server runtime now share one provider refresh. The five-minute cache window and feed response format are unchanged.
+- QA042: bounded sportsbook status metadata in the desktop split so long provider lists cannot squeeze the readable copy; added a mounted-route native geometry regression.
 
 ## 2026-05 - Phase 9: BigWinOverlay full coverage + ESC dismiss + screen-shake
 

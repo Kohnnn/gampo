@@ -15,19 +15,19 @@ function ruleBody(selector) {
 
 // QA042: the feed status text had zero readable width on desktop while the
 // metadata overlapped it. The status block is a two-column grid whose right
-// column is `auto`, and that column's child is a flex `dl` holding
+// column sized to `auto`, and that column's child is a flex `dl` holding
 // `sources.join(', ')` - one long unbreakable token. An `auto` track sizes to
 // that token's min-content, and a grid child defaults to `min-width: auto`, so
 // the `minmax(0, 1fr)` text column was squeezed to nothing.
 //
-// No browser exists on this host, so this pins the declarations that make the
-// squeeze impossible. It is a source contract, not a measurement.
+// The track cap itself (`minmax(0, min(40%, 22rem))`) is not pinned here: only
+// a rendered bound proves it, and the mounted native geometry probe
+// (src/sportsbook/qa042NativeProbe.mjs, run in CI after `npm run build`)
+// measures the real metadata track against that cap and fails closed.
+//
+// The source invariants below are retained as automated CI coverage; they do
+// not by themselves prove the column cannot squeeze.
 describe('sportsbook feed status layout (QA042)', () => {
-    it('lets the metadata column shrink instead of sizing to its longest token', () => {
-        const body = ruleBody('.sb-feed-status')
-        expect(body).toContain('grid-template-columns: minmax(0, 1fr) minmax(0, auto)')
-    })
-
     it('wraps the metadata list rather than forcing one unbreakable line', () => {
         const body = ruleBody('.sb-feed-status dl')
         expect(body).toContain('flex-wrap: wrap')

@@ -60,6 +60,39 @@ jobs:
 
       - run: npm run build
 
+      # QA042 uses the built app and synthetic data. Keep Chrome off the network
+      # before it starts, rather than relying on page request interception alone.
+      - name: Sportsbook feed layout (isolated Chromium)
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          uid=$(id -u)
+          gid=$(id -g)
+          test "$uid" -ne 0
+          node=$(command -v node)
+          chrome=$(command -v google-chrome)
+          # Chrome's profile socket needs a short temporary path.
+          scratch=$(mktemp -d /tmp/gampo-q42.XXXXXXXX)
+          trap 'rm -rf -- "$scratch"' EXIT
+          # Let the foreground supervisor finish before running the EXIT trap.
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          # Only fixed system tools run as root. Repository code and Chromium
+          # run as the runner, with Chromium's own sandbox still enabled.
+          /usr/bin/sudo -n -- /usr/bin/env -i PATH=/usr/bin:/bin \
+            /usr/bin/unshare --net --pid --fork --kill-child --mount-proc \
+            /bin/bash -euc '
+              /usr/bin/ip link set lo up
+              # As PID 1, the fixed watchdog retains the parent-death signal.
+              # unshare waits for namespace teardown before scratch is removed.
+              exec /usr/bin/timeout --foreground --kill-after=5s 100s \
+                /usr/bin/setpriv --reuid "$1" --regid "$2" --clear-groups \
+                --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
+                /usr/bin/env -i PATH=/usr/bin:/bin HOME="$3" TMPDIR="$3" \
+                XDG_RUNTIME_DIR="$3" DBUS_SESSION_BUS_ADDRESS="unix:path=$3/no-bus" LC_ALL=C \
+                "$4" "$5" --browser="$6"
+            ' _ "$uid" "$gid" "$scratch" "$node" "$PWD/src/sportsbook/qa042NativeProbe.mjs" "$chrome"
+
       # Slots Phase 4: must run AFTER build — it inspects real bundle output.
       #
       # SlotsGame.jsx exposes window.__gampoSlotQa, whose forceBonusState() sets
